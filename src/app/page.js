@@ -28,8 +28,8 @@ export default function Home() {
             className="contenant-header-logo"
           />
           <div className="bouton-header">
-          <Button title="Inscription" color="var(--primary-color)" />  
-          <Button title="Connexion" color="#8c6a5d" />  
+          <Button title="Inscription" color="var(--primary-color)"href="/inscription" />  
+          <Button title="Connexion" color="#8c6a5d"href="/connexion" />  
           </div>
         </div>
         <div className="logo-contenant">
