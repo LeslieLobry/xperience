@@ -1,8 +1,4 @@
-.contenant {
-  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
-  background-repeat: no-repeat;
-  background-size: cover;
-}
+
 
 .contenant-header {
   display: flex;
@@ -22,7 +18,7 @@ button {
   display: flex;
   justify-content:center ;
 }
-.masque-contenat{
+.masque-contenant{
   display: flex;
   justify-content: center;
 }
