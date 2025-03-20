@@ -1,0 +1,36 @@
+.baniere-components {
+    width: 100%;
+    max-height: 500px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.baniere-img {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.baniere-img img {
+    width: 100%;
+    height: auto;
+    max-height: 500px;
+}
+
+.baniere-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 2rem;
+    text-align: center;
+    padding: 10px 20px;
+    border-radius: 5px;
+}
+
+

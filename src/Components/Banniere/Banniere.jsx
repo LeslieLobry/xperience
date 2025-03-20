@@ -1,23 +1,25 @@
 import React from "react"; 
-import "@/Components/Banniere/Banniere.css"
+import "@/Components/Banniere/Banniere.css";
 import Image from "next/image";
 
-function Banniere({image, title}) {
+function Banniere({ image, title }) {
     return (
         <div className="baniere-components">
-           <div className="baniere-img">
-           <Image 
-            src={image}
-            alt="Image plein écran"
-            fill
-            style={{ objectFit: "cover" }}
-            priority
-            />
-           </div>
-           <div className="baniere-text">
-            <h1><span>{title}</span></h1>
-           </div>
-        </div>)
+            <div className="baniere-img">
+                <Image 
+                    src={image}
+                    alt="Bannière"
+                    width={1920} 
+                    height={500} 
+                    style={{ objectFit: "cover", width: "100%", height: "auto" }} 
+                    priority
+                />
+                <div className="baniere-text">
+                    <h1><span>{title}</span></h1>
+                </div>
+            </div>
+        </div>
+    );
 }
 
-export default Banniere
+export default Banniere;

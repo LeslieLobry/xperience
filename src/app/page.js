@@ -48,7 +48,7 @@ export default function Home() {
            Ici, chaque connexion est une invitation à l’inattendu.
           </p> 
         </div>
-        {/* <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere> */}
+        <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere>
       </div>
     </div>
   );
