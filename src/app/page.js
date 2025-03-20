@@ -2,6 +2,7 @@ import Image from "next/image";
 import "@/app/page.css";
 import logo from "@/app/Assets/logo.png";
 import xperience3 from "@/app/Assets/xperience3.png"
+import masque from"@/app/Assets/masque.png";
 import { Crimson_Text } from "next/font/google";
 
 const crimsonText = Crimson_Text({
@@ -31,6 +32,17 @@ export default function Home() {
             <Image src={xperience3}
             alt="logo de xperience, plus sophistiqué">   
             </Image>
+        </div>
+        <div className="masque-contenant">
+            <Image src={masque}
+            alt="masque"
+            width={650}></Image>
+        </div>
+        <div className="text">
+         <p>Découvrez une communauté où la liberté et le désir se rencontrent. 
+          Exprimez-vous sans tabou, seul, en couple ou à plusieurs, et vivez des moments uniques avec des personnes qui partagent vos envies.
+           Ici, chaque connexion est une invitation à l’inattendu.
+          </p> 
         </div>
       </div>
     </div>
