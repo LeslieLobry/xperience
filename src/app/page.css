@@ -9,23 +9,6 @@
   align-items: center;
   justify-content: space-between;
 }
-
-.header-inscription {
-  padding: 15px 50px;
-  border-radius: 20px;
-  color: white;
-  background-color: var(--primary-color);
-  font-size: 20px;
-}
-
-.header-connexion {
-  padding: 15px 50px;
-  border-radius: 20px;
-  color: #f5ece0;
-  background-color: #8c6a5d;
-  font-size: 20px;
-}
-
 button {
   font-family: "Crimson Text", serif !important;
 }

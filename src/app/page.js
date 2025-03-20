@@ -4,6 +4,10 @@ import logo from "@/app/Assets/logo.png";
 import xperience3 from "@/app/Assets/xperience3.png"
 import masque from"@/app/Assets/masque.png";
 import { Crimson_Text } from "next/font/google";
+import Banniere from "@/Components/Banniere/Banniere"
+import skin from "@/app/Assets/skin.jpg"
+import woman from "@/app/Assets/woman.jpg"
+import Button from "@/Components/Button/Button";
 
 const crimsonText = Crimson_Text({
   subsets: ["latin"],
@@ -24,8 +28,8 @@ export default function Home() {
             className="contenant-header-logo"
           />
           <div className="bouton-header">
-            <button className="header-inscription">Inscription</button>
-            <button className="header-connexion">Connexion</button>
+          <Button title="Inscription" color="var(--primary-color)" />  
+          <Button title="Connexion" color="#8c6a5d" />  
           </div>
         </div>
         <div className="logo-contenant">
@@ -44,6 +48,7 @@ export default function Home() {
            Ici, chaque connexion est une invitation à l’inattendu.
           </p> 
         </div>
+        {/* <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere> */}
       </div>
     </div>
   );
