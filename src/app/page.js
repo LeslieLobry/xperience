@@ -48,7 +48,10 @@ export default function Home() {
            Ici, chaque connexion est une invitation à l’inattendu.
           </p> 
         </div>
+        <div className="image-components">
         <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere>
+         <Button title="Inscription" color="var(--primary-color)"href="/inscription"/>  
+        </div>
       </div>
     </div>
   );

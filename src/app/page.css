@@ -34,3 +34,14 @@ button {
   display: flex;
   justify-content: center;
 }
+.image-components{
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 80px;
+}
+
+button_image{
+  
+}
