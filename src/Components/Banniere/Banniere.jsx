@@ -11,7 +11,7 @@ function Banniere({ image, title }) {
                     alt="Bannière"
                     width={1920} 
                     height={500} 
-                    style={{ objectFit: "cover", width: "100%", height: "auto" }} 
+                    style={{ width: "100%", height: "auto" }} 
                     priority
                 />
                 <div className="baniere-text">

@@ -42,6 +42,12 @@ button {
   margin-top: 80px;
 }
 
-button_image{
-  
+.text-bas{
+  display: flex;  
+  justify-content: center;
+}
+
+.text-bas p{
+  font-size: 25px;
+  color: white;
 }

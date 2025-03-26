@@ -5,10 +5,9 @@ import xperience3 from "@/app/Assets/xperience3.png"
 import masque from"@/app/Assets/masque.png";
 import { Crimson_Text } from "next/font/google";
 import Banniere from "@/Components/Banniere/Banniere"
-import skin from "@/app/Assets/skin.jpg"
 import woman from "@/app/Assets/woman.jpg"
 import Button from "@/Components/Button/Button";
-
+import bannierehome from "@/app/Assets/bannierehome.png"
 const crimsonText = Crimson_Text({
   subsets: ["latin"],
   weight: ["400", "600", "700"],
@@ -43,16 +42,18 @@ export default function Home() {
             width={650}></Image>
         </div>
         <div className="text">
-         <p>Découvrez une communauté où la liberté et le désir se rencontrent. 
+          <p>Découvrez une communauté où la liberté et le désir se rencontrent. 
           Exprimez-vous sans tabou, seul, en couple ou à plusieurs, et vivez des moments uniques avec des personnes qui partagent vos envies.
-           Ici, chaque connexion est une invitation à l’inattendu.
+          Ici, chaque connexion est une invitation à l’inattendu.
           </p> 
         </div>
         <div className="image-components">
         <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere>
-         <Button title="Inscription" color="var(--primary-color)"href="/inscription"/>  
+        <Button   title="Inscription"  color="var(--primary-color)"  href="/inscription"  style={{ position: 'relative', marginTop: -50, zIndex: 1000 }}/>
         </div>
+        <dic className="text-bas"><p>Rejoignez une communauté exclusive où le respect et le plaisir sont maîtres-mots.</p></dic>
       </div>
+      <Banniere title='' image={bannierehome}style={{ objectFit: "", width: "100%", height: "auto" }} ></Banniere>
     </div>
   );
 }
