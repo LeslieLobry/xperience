@@ -51,9 +51,9 @@ export default function Home() {
         <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere>
         <Button   title="Inscription"  color="var(--primary-color)"  href="/inscription"  style={{ position: 'relative', marginTop: -50, zIndex: 1000 }}/>
         </div>
-        <dic className="text-bas"><p>Rejoignez une communauté exclusive où le respect et le plaisir sont maîtres-mots.</p></dic>
-      </div>
+        <div className="text-bas"><p>Rejoignez une communauté exclusive où le respect et le plaisir sont maîtres-mots.</p></div>
       <Banniere title='' image={bannierehome}style={{ objectFit: "", width: "100%", height: "auto" }} ></Banniere>
+    </div> 
     </div>
   );
 }
