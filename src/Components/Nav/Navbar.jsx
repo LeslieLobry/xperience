@@ -1,14 +1,16 @@
 "use client"
-
+import logo from "@/app/Assets/logo.png"
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import "@/Components/Nav/Navbar.css"
 
 const navLinks = [
   { label: "Accueil", href: "/" },
-  { label: "À propos", href: "/about" },
-  { label: "Services", href: "/services" },
-  { label: "Contact", href: "/contact" },
+  { label: "Mon profil", href: "/profil" },
+  { label: "Événements", href: "/evenement" },
+  { label: "Messagerie", href: "/messagerie" },
+  { label: "À votre service", href: "/partenaire" },
 ]
 
 export default function Navbar() {
@@ -17,7 +19,12 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="logo">
-        <Link href="/">MonSite</Link>
+        <Link href="/"><Image
+                            src={logo}
+                            alt="logo de xpérience"
+                            width={200}
+                            className="contenant-header-logo"
+                        /></Link>
       </div>
 
       <div className="burger" onClick={() => setMenuOpen(!menuOpen)}>

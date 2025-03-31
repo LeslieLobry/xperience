@@ -3,11 +3,12 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 2rem;
-    background-color: white;
-    border-bottom: 1px solid #ddd;
+    /* background-color: white; */
+    border-bottom: 1px solid var(--primary-color);
     position: sticky;
     top: 0;
     z-index: 999;
+    color: white;
   }
   
   .logo a {
@@ -26,12 +27,13 @@
   
   .navLinks li a {
     text-decoration: none;
-    color: #333;
+    color:var(--primary-color);
     transition: color 0.3s ease;
+    font-size: 25px;
   }
   
   .navLinks li a:hover {
-    color: black;
+    color:#8c6a5d;
   }
   
   .burger {
@@ -57,7 +59,6 @@
       position: absolute;
       top: 60px;
       right: 0;
-      background-color: white;
       flex-direction: column;
       width: 200px;
       transform: translateX(100%);
