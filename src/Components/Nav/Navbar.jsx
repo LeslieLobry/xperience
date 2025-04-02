@@ -23,6 +23,7 @@ export default function Navbar() {
                             src={logo}
                             alt="logo de xpérience"
                             width={200}
+                            height={200}
                             className="contenant-header-logo"
                         /></Link>
       </div>

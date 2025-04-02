@@ -2,18 +2,19 @@ import React from "react";
 import Link from "next/link";
 import "@/Components/Button/Button.css";
 
-function Button({ title, color, href, style }) {
-  return (
-    <Link href={href} passHref>
-      <button
-        className="custom-button"
-        style={{ backgroundColor: color, ...style }}
-      >
-        {title}
-      </button>
-    </Link>
+function Button({ title, color, href, style, onClick, type = "button" }) {
+  const buttonContent = (
+    <button
+      className="custom-button"
+      style={{ backgroundColor: color, ...style }}
+      onClick={onClick}
+      type={type}
+    >
+      {title}
+    </button>
   );
+
+  return href ? <Link href={href}>{buttonContent}</Link> : buttonContent;
 }
 
-
-export default Button
+export default Button;
