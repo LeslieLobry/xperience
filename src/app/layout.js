@@ -1,9 +1,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Footer from "@/Components/Footer/Footer";
-import Navbar from "@/Components/Nav/Navbar";
+import Footer from "@/components/Footer/Footer";
+import Navbar from "@/components/Nav/Navbar";
 import { ReactNode } from "react"
-import LayoutWrapper from "@/Components/LayoutWrapper/LayoutWrapper"
+import LayoutWrapper from "@/components/LayoutWrapper/LayoutWrapper"
 export const metadata = {
   title: "Xpérience",
   description: "site échangiste. ",

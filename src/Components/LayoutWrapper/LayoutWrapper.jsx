@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import Navbar from "@/Components/Nav/Navbar"
+import Navbar from "@/components/Nav/Navbar"
 import Footer from "../Footer/Footer"
 
 export default function LayoutWrapper({ children }) {

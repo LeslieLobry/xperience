@@ -1,7 +1,7 @@
 "use client";
-import Button from "@/Components/Button/Button";
 import React, { useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
+import Button from "@/components/Button/Button";
 import "@/app/inscription/inscription.css";
 
 export default function RegisterForm() {
@@ -138,82 +138,82 @@ export default function RegisterForm() {
 
   return (
     <div className="register-contenant">
-      <h2 className="form-title">Inscription</h2>
-      <p className="form-step">Étape {step} / 3</p>
-      <form onSubmit={handleSubmit} className="form-container">
-        {error && <p className="form-error">{error}</p>}
-        {success && <p className="form-success">{success}</p>}
+      <div className="register-background">
+        <h2 className="form-title">Inscription</h2>
+        <p className="form-step">Étape {step} / 3</p>
+        <form onSubmit={handleSubmit} className="form-container">
+          {error && <p className="form-error">{error}</p>}
+          {success && <p className="form-success">{success}</p>}
 
-        {step === 1 && (
-          <>
-            <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} required className="form-input" />
-            <input type="email" name="email" placeholder="Email" onChange={handleChange} required className="form-input" />
-            <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} required className="form-input" />
-            <input type="password" name="confirmPassword" placeholder="Confirmer mot de passe" onChange={handleChange} required className="form-input" />
-            <div className="form-buttons">
-              <button
-                type="button"
-                className="form-button"
-                onClick={() => validateStep() && nextStep()}
-              >
-                Suivant
-              </button>
-            </div>
-          </>
-        )}
+          {step === 1 && (
+            <>
+              <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} required className="form-input" />
+              <input type="email" name="email" placeholder="Email" onChange={handleChange} required className="form-input" />
+              <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} required className="form-input" />
+              <input type="password" name="confirmPassword" placeholder="Confirmer mot de passe" onChange={handleChange} required className="form-input" />
+              <div className="form-buttons">
+                <Button
+                  title="Suivant"
+                  onClick={() => validateStep() && nextStep()}
+                  color="var(--primary-color)"
+                />
+              </div>
+            </>
+          )}
 
-        {step === 2 && (
-          <>
-            <select name="type" onChange={handleChange} required className="form-input">
-              <option value="">Type de compte</option>
-              <option value="homme">Homme seul</option>
-              <option value="femme">Femme seule</option>
-              <option value="couple">Couple</option>
-              <option value="autre">Autre</option>
-            </select>
-            <select name="orientation" onChange={handleChange} required className="form-input">
-              <option value="">Orientation</option>
-              <option value="hetero">Hétéro</option>
-              <option value="bi">Bi</option>
-              <option value="pan">Pan</option>
-              <option value="ouvert">Ouvert</option>
-            </select>
-            <div className="form-group">
-              <label>Ce que vous recherchez :</label><br />
-              {["tchat", "rencontre", "échangisme", "trio", "soirées privées"].map((option) => (
-                <label key={option} className="form-checkbox">
-                  <input type="checkbox" value={option} checked={form.recherche.includes(option)} onChange={handleRechercheChange} />
-                  {option}
-                </label>
-              ))}
-            </div>
-            <div className="form-buttons">
-              <button onClick={prevStep} type="button" className="form-button form-button-grey">Retour</button>
-              <button onClick={() => validateStep() && nextStep()} type="button" className="form-button">Suivant</button>
-            </div>
-          </>
-        )}
+          {step === 2 && (
+            <>
+              <select name="type" onChange={handleChange} required className="form-input">
+                <option value="">Type de compte</option>
+                <option value="homme">Homme seul</option>
+                <option value="femme">Femme seule</option>
+                <option value="couple">Couple</option>
+                <option value="autre">Autre</option>
+              </select>
+              <select name="orientation" onChange={handleChange} required className="form-input">
+                <option value="">Orientation</option>
+                <option value="hetero">Hétéro</option>
+                <option value="bi">Bi</option>
+                <option value="pan">Pan</option>
+                <option value="ouvert">Ouvert</option>
+              </select>
+              <div className="form-group">
+                <label>Ce que vous recherchez :</label><br />
+                {["tchat", "rencontre", "échangisme", "trio", "soirées privées"].map((option) => (
+                  <label key={option} className="form-checkbox">
+                    <input type="checkbox" value={option} checked={form.recherche.includes(option)} onChange={handleRechercheChange} />
+                    {option}
+                  </label>
+                ))}
+              </div>
+              <div className="form-buttons">
+                <Button title="Retour" onClick={prevStep} color="#888" />
+                <Button title="Suivant" onClick={() => validateStep() && nextStep()} color="#0070f3" />
+              </div>
+            </>
+          )}
 
-        {step === 3 && (
-          <>
-            <input type="text" name="localisation" placeholder="Ville / région" onChange={handleChange} className="form-input" />
-            <input type="number" name="age" placeholder="Âge" onChange={handleChange} required className="form-input" />
-            <div className="form-group">
-              <label>Photo de profil :</label><br />
-              <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" />
-            </div>
-            <label className="form-checkbox">
-              <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
-              J’accepte les CGU et j’ai plus de 18 ans.
-            </label>
-            <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={(token) => setCaptchaToken(token)} />
-            <div className="form-buttons">
-              <button onClick={prevStep} type="button" className="form-button form-button-grey">Retour</button>
-              <button type="submit" className="form-button">Créer mon compte</button>
-            </div>
-          </>
-        )}
-      </form>
+          {step === 3 && (
+            <>
+              <input type="text" name="localisation" placeholder="Ville / région" onChange={handleChange} className="form-input" />
+              <input type="number" name="age" placeholder="Âge" onChange={handleChange} required className="form-input" />
+              <div className="form-group">
+                <label>Photo de profil :</label><br />
+                <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" />
+              </div>
+              <label className="form-checkbox">
+                <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
+                J’accepte les CGU et j’ai plus de 18 ans.
+              </label>
+              <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={(token) => setCaptchaToken(token)} />
+              <div className="form-buttons">
+                <Button title="Retour" onClick={prevStep} color="#888" />
+                <Button title="Créer mon compte" type="submit" color="#28a745" />
+              </div>
+            </>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

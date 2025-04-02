@@ -4,9 +4,9 @@ import logo from "@/app/Assets/logo.png";
 import xperience3 from "@/app/Assets/xperience3.png"
 import masque from"@/app/Assets/masque.png";
 import { Crimson_Text } from "next/font/google";
-import Banniere from "@/Components/Banniere/Banniere"
+import Banniere from "@/components/Banniere/Banniere"
 import woman from "@/app/Assets/woman.jpg"
-import Button from "@/Components/Button/Button";
+import Button from "@/components/Button/Button";
 import bannierehome from "@/app/Assets/bannierehome.png"
 const crimsonText = Crimson_Text({
   subsets: ["latin"],

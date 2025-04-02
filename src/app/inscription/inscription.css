@@ -1,23 +1,94 @@
-.form-container{
+.form-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 25px;
-    color:white ;
-    font-size: 25px;
+    font-size: 1.2rem;
+    width: 100%;
+    padding: 1rem;
 }
-.register-contenant{
-    display: flex    ;
+
+.register-contenant {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    background-image: url('../Assets/skin.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+.register-background {
+    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 25px;
+    justify-content: center;
+    background-color: var(--white-color);
+    width: 100%;
+    max-width: 600px;
+    opacity: 0.95;
+    padding: 2rem;
+    gap: 35px;
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
 }
-.form-title{
-    color:var(--primary-color);
-    margin-top: 20px;
-    font-size: 35px;
+
+.form-title {
+    color: var(--primary-color);
+    font-size: 2rem;
+    text-align: center;
 }
-.form-group{
+
+.form-step {
+    color: var(--marron-color);
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+}
+
+.form-group {
     display: flex;
-    gap: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    align-items: center;
+}
+
+input,
+select {
+    width: 100%;
+    max-width: 400px;
+    height: 2.5rem;
+    font-size: 2rem;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+.form-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+}
+
+/* Responsiveness */
+@media screen and (max-width: 768px) {
+    .register-background {
+        padding: 1rem;
+        gap: 20px;
+    }
+
+    .form-title {
+        font-size: 1.6rem;
+    }
+
+    .form-container {
+        font-size: 1rem;
+    }
 }
