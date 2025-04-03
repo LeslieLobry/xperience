@@ -48,8 +48,8 @@ export default function Home() {
           </p> 
         </div>
         <div className="image-components">
-        <Banniere title ='Explorez les sensations. Vivez X’perience.' image={woman}></Banniere>
-        <Button   title="Inscription"  color="var(--primary-color)"  href="/inscription"  style={{ position: 'relative', marginTop: -50, zIndex: 1000 }}/>
+        <Banniere title ='Explorez les sensations. Vivez Xperiences.' image={woman}></Banniere>
+        <Button   title="Inscription"  color="var(--primary-color)"  href="/inscription"  style={{ position: 'relative', marginTop: -50, zIndex: 1000,  }}/>
         </div>
         <div className="text-bas"><p>Rejoignez une communauté exclusive où le respect et le plaisir sont maîtres-mots.</p></div>
       <Banniere title='' image={bannierehome}style={{ objectFit: "", width: "100%", height: "auto" }} ></Banniere>
