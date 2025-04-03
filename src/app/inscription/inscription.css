@@ -9,17 +9,28 @@
 }
 
 .register-contenant {
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     width: 100%;
+    padding: 2rem;
+    box-sizing: border-box;
+    z-index: 1; /* Important pour que le contenu passe devant */
+    overflow: hidden; /* pour éviter les débordements du pseudo-élément */
+}
+
+.register-contenant::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     background-image: url('../Assets/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;
-    padding: 2rem;
-    box-sizing: border-box;
+    opacity: 0.3; /* ici tu règles la transparence de l'image */
+    z-index: -1; /* pour que l'image reste en fond */
 }
 
 .register-background {
@@ -27,14 +38,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background-color: var(--white-color);
     width: 100%;
     max-width: 600px;
     opacity: 0.95;
     padding: 2rem;
     gap: 35px;
     border-radius: 15px;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    /* box-shadow: 0 0 15px rgba(0, 0, 0, 0.2); */
 }
 
 .form-title {
@@ -44,12 +54,14 @@
 }
 
 .form-step {
-    color: var(--marron-color);
-    font-size: 1rem;
+    color: var(--white-color);
+    font-size: 1.5rem;
     font-weight: bold;
     text-align: center;
 }
-
+.form-error{
+    color: var(--white-color);
+}
 .form-group {
     display: flex;
     flex-wrap: wrap;
@@ -62,7 +74,7 @@ input,
 select {
     width: 100%;
     max-width: 400px;
-    height: 2.5rem;
+    height: 3.5rem;
     font-size: 2rem;
     padding: 0.5rem;
     box-sizing: border-box;
@@ -76,7 +88,30 @@ select {
     justify-content: center;
     gap: 15px;
 }
-
+.suggestions-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    z-index: 10;
+    list-style: none;
+    padding: 0.5rem;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .suggestions-list li {
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+  }
+  
+  .suggestions-list li:hover {
+    background-color: #f0f0f0;
+  }
+  
 /* Responsiveness */
 @media screen and (max-width: 768px) {
     .register-background {

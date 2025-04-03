@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import Button from "@/components/Button/Button";
 import "@/app/inscription/inscription.css";
+import axios from "axios";
 
 export default function RegisterForm() {
   const [step, setStep] = useState(1);
@@ -22,6 +23,10 @@ export default function RegisterForm() {
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Autocomplétion
+  const [suggestions, setSuggestions] = useState([]);
+  const [localisationInput, setLocalisationInput] = useState("");
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -73,14 +78,14 @@ export default function RegisterForm() {
     }
 
     if (step === 2) {
-      if (!form.type || !form.orientation || form.recherche.length === 0) {
-        setError("Merci de sélectionner un type, une orientation et au moins une recherche.");
+      if (!form.type || !form.orientation ) {
+        setError("Merci de sélectionner un type.");
         return false;
       }
     }
 
     if (step === 3) {
-      if (!form.age || !form.consent) {
+      if (!form.age || !form.consent || !form.localisation) {
         setError("Merci de compléter tous les champs requis.");
         return false;
       }
@@ -136,6 +141,45 @@ export default function RegisterForm() {
     }
   };
 
+  const handleLocalisationChange = async (e) => {
+    const value = e.target.value;
+    setLocalisationInput(value);
+    setForm((prev) => ({ ...prev, localisation: value }));
+
+    if (value.length >= 2) {
+      try {
+        const res = await axios.get(
+          "https://wft-geo-db.p.rapidapi.com/v1/geo/cities",
+          {
+            params: {
+              namePrefix: value,
+              countryIds: "FR",
+              limit: 5,
+              sort: "-population",
+            },
+            headers: {
+              "X-RapidAPI-Key": "TA_CLE_API_ICI", // 🔁 Remplace cette ligne avec ta vraie clé
+              "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
+            },
+          }
+        );
+        const villes = res.data.data.map((v) => v.city);
+        setSuggestions(villes);
+      } catch (err) {
+        console.error("Erreur GeoDB API :", err);
+        setSuggestions([]);
+      }
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  const handleVilleSelect = (ville) => {
+    setForm((prev) => ({ ...prev, localisation: ville }));
+    setLocalisationInput(ville);
+    setSuggestions([]);
+  };
+
   return (
     <div className="register-contenant">
       <div className="register-background">
@@ -177,15 +221,6 @@ export default function RegisterForm() {
                 <option value="pan">Pan</option>
                 <option value="ouvert">Ouvert</option>
               </select>
-              <div className="form-group">
-                <label>Ce que vous recherchez :</label><br />
-                {["tchat", "rencontre", "échangisme", "trio", "soirées privées"].map((option) => (
-                  <label key={option} className="form-checkbox">
-                    <input type="checkbox" value={option} checked={form.recherche.includes(option)} onChange={handleRechercheChange} />
-                    {option}
-                  </label>
-                ))}
-              </div>
               <div className="form-buttons">
                 <Button title="Retour" onClick={prevStep} color="#888" />
                 <Button title="Suivant" onClick={() => validateStep() && nextStep()} color="#0070f3" />
@@ -195,7 +230,26 @@ export default function RegisterForm() {
 
           {step === 3 && (
             <>
-              <input type="text" name="localisation" placeholder="Ville / région" onChange={handleChange} className="form-input" />
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  name="localisation"
+                  placeholder="Ville / région"
+                  value={localisationInput}
+                  onChange={handleLocalisationChange}
+                  className="form-input"
+                  autoComplete="on"
+                />
+                {suggestions.length > 0 && (
+                  <ul className="suggestions-list">
+                    {suggestions.map((ville, i) => (
+                      <li key={i} onClick={() => handleVilleSelect(ville)}>
+                        {ville}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <input type="number" name="age" placeholder="Âge" onChange={handleChange} required className="form-input" />
               <div className="form-group">
                 <label>Photo de profil :</label><br />

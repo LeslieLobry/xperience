@@ -19,6 +19,7 @@
     width: 100%;
     height: auto;
     max-height: 500px;
+    opacity: 0.6;
 }
 
 .baniere-text {
