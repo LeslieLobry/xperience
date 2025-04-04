@@ -235,7 +235,7 @@ export default function RegisterForm() {
                 <input
                   type="text"
                   name="localisation"
-                  placeholder="Ville / région"
+                  placeholder="Ville"
                   value={localisationInput}
                   onChange={handleLocalisationChange}
                   className="form-input"
