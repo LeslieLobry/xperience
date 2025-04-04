@@ -24,9 +24,10 @@ export default function RegisterForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Autocomplétion
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
+
+  const apiKey = process.env.NEXT_PUBLIC_GEODB_API_KEY;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -146,7 +147,7 @@ export default function RegisterForm() {
     setLocalisationInput(value);
     setForm((prev) => ({ ...prev, localisation: value }));
 
-    if (value.length >= 2) {
+    if (value.length >= 2 && apiKey) {
       try {
         const res = await axios.get(
           "https://wft-geo-db.p.rapidapi.com/v1/geo/cities",
@@ -158,7 +159,7 @@ export default function RegisterForm() {
               sort: "-population",
             },
             headers: {
-              "X-RapidAPI-Key": "TA_CLE_API_ICI", // 🔁 Remplace cette ligne avec ta vraie clé
+              "X-RapidAPI-Key": apiKey,
               "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
             },
           }
@@ -238,7 +239,7 @@ export default function RegisterForm() {
                   value={localisationInput}
                   onChange={handleLocalisationChange}
                   className="form-input"
-                  autoComplete="on"
+                  autoComplete="off"
                 />
                 {suggestions.length > 0 && (
                   <ul className="suggestions-list">
