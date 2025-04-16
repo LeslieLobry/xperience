@@ -1,5 +1,5 @@
 import React from "react"; 
-import "@/Components/Banniere/Banniere.css";
+import "../Banniere/Banniere.css";
 import Image from "next/image";
 
 function Banniere({ image, title }) {

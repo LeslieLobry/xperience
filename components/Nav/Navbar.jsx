@@ -1,9 +1,9 @@
 "use client"
-import logo from "@/app/Assets/logo.png"
+import logo from "../../app/Assets/logo.png"
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import "@/Components/Nav/Navbar.css"
+import "../Nav/Navbar.css"
 
 const navLinks = [
   { label: "Accueil", href: "/" },

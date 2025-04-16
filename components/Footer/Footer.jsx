@@ -1,8 +1,8 @@
-import logo from "@/app/Assets/logo.png"
+import logo from "../../app/Assets/logo.png"
 import Image from "next/image";
-import insta from "@/app/Assets/insta.png"
-import facebook from "@/app/Assets/facebook.png"
-import "@/Components/Footer/Footer.css"
+import insta from "../../app/Assets/insta.png"
+import facebook from "../../app/Assets/facebook.png"
+import "../Footer/Footer.css"
 function Footer(params) {
     return(
         <div className="footer-contenant">

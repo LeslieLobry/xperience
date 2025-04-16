@@ -1,14 +1,16 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
-import Button from "@/components/Button/Button";
-import "@/app/inscription/inscription.css";
+import Button from "../../components/Button/Button";
+import "../inscription/inscription.css";
 import axios from "axios";
 
 export default function RegisterForm() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1)
   const [captchaToken, setCaptchaToken] = useState(null);
   const [form, setForm] = useState({
+    nom: "",
+    prenom: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -26,9 +28,10 @@ export default function RegisterForm() {
 
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
+  const debounceTimeout = useRef(null);
 
-  const apiKey = process.env.NEXT_PUBLIC_GEODB_API_KEY;
-
+  const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
+ 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -61,12 +64,19 @@ export default function RegisterForm() {
 
   const nextStep = () => setStep((s) => s + 1);
   const prevStep = () => setStep((s) => s - 1);
-
+  const isValidName = (name) => {
+    return /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
+  };
   const validateStep = () => {
     if (step === 1) {
-      if (!form.pseudo || !form.email || !form.password || !form.confirmPassword) {
+      if (!form.nom || !form.prenom || !form.pseudo || !form.email || !form.password || !form.confirmPassword) {
         setError("Merci de remplir tous les champs requis à cette étape.");
         return false;
+      }
+      if (!isValidName(form.nom) || !isValidName(form.prenom)) {
+        setError("Le nom et le prénom doivent contenir uniquement des lettres, tirets ou apostrophes.");
+        return false;
+      }
       }
       if (form.password !== form.confirmPassword) {
         setError("Les mots de passe ne correspondent pas.");
@@ -79,7 +89,7 @@ export default function RegisterForm() {
     }
 
     if (step === 2) {
-      if (!form.type || !form.orientation ) {
+      if (!form.type || !form.orientation) {
         setError("Merci de sélectionner un type.");
         return false;
       }
@@ -100,10 +110,15 @@ export default function RegisterForm() {
     e.preventDefault();
     setError("");
     setSuccess("");
-
+  
+    // // 👉 Affiche les infos du formulaire
+    // console.log("📦 Données du formulaire :", form);
+    // console.log("🖼️ Fichier photo :", photo);
+    // console.log("🔒 Token reCAPTCHA :", captchaToken);
+  
     if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
     if (!validateStep()) return;
-
+  
     try {
       const captchaRes = await fetch("/api/verify-recaptcha", {
         method: "POST",
@@ -117,7 +132,7 @@ export default function RegisterForm() {
       console.error("Erreur reCAPTCHA :", err);
       return setError("Erreur serveur pendant la vérification reCAPTCHA.");
     }
-
+  
     const formData = new FormData();
     Object.entries(form).forEach(([key, value]) => {
       if (Array.isArray(value)) {
@@ -127,9 +142,15 @@ export default function RegisterForm() {
       }
     });
     if (photo) formData.append("photo", photo);
-
+  
+    // 👉 Affiche ce qui est dans le FormData
+    console.log("📤 Contenu du FormData :");
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key} →`, value);
+    }
+  
     try {
-      const res = await fetch("/api/register", {
+      const res = await fetch("http://localhost:3001/api/register", {
         method: "POST",
         body: formData,
       });
@@ -141,35 +162,39 @@ export default function RegisterForm() {
       setError("Erreur serveur pendant l'enregistrement.");
     }
   };
-
-  const handleLocalisationChange = async (e) => {
+  
+  const handleLocalisationChange = (e) => {
     const value = e.target.value;
     setLocalisationInput(value);
     setForm((prev) => ({ ...prev, localisation: value }));
 
-    if (value.length >= 2 && apiKey) {
-      try {
-        const res = await axios.get(
-          "https://wft-geo-db.p.rapidapi.com/v1/geo/cities",
-          {
-            params: {
-              namePrefix: value,
-              countryIds: "FR",
-              limit: 5,
-              sort: "-population",
-            },
-            headers: {
-              "X-RapidAPI-Key": apiKey,
-              "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-            },
-          }
-        );
-        const villes = res.data.data.map((v) => v.city);
-        setSuggestions(villes);
-      } catch (err) {
-        console.error("Erreur GeoDB API :", err);
-        setSuggestions([]);
-      }
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
+    }
+
+    if (value.length >= 2 && mapboxKey) {
+      debounceTimeout.current = setTimeout(async () => {
+        try {
+          const res = await axios.get(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value)}.json`,
+            {
+              params: {
+                access_token: mapboxKey,
+                autocomplete: true,
+                types: "place",
+                country: "FR",
+                limit: 5,
+              },
+            }
+          );
+          
+          const villes = res.data.features.map((v) => v.place_name);
+          setSuggestions(villes);
+        } catch (err) {
+          console.error("Erreur Mapbox API :", err);
+          setSuggestions([]);
+        }
+      }, 400);
     } else {
       setSuggestions([]);
     }
@@ -182,6 +207,7 @@ export default function RegisterForm() {
   };
 
   return (
+    
     <div className="register-contenant">
       <div className="register-background">
         <h2 className="form-title">Inscription</h2>
@@ -192,6 +218,8 @@ export default function RegisterForm() {
 
           {step === 1 && (
             <>
+              <input type="text" name="nom" placeholder="Nom" onChange={handleChange} required className="form-input" />
+              <input type="text" name="prenom" placeholder="Prénom" onChange={handleChange} required className="form-input" />
               <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} required className="form-input" />
               <input type="email" name="email" placeholder="Email" onChange={handleChange} required className="form-input" />
               <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} required className="form-input" />
@@ -223,8 +251,8 @@ export default function RegisterForm() {
                 <option value="ouvert">Ouvert</option>
               </select>
               <div className="form-buttons">
-                <Button title="Retour" onClick={prevStep} color="#888" />
-                <Button title="Suivant" onClick={() => validateStep() && nextStep()} color="#0070f3" />
+                <Button title="Retour" onClick={prevStep} color="#a2b9c1" />
+                <Button title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
               </div>
             </>
           )}
@@ -271,4 +299,3 @@ export default function RegisterForm() {
       </div>
     </div>
   );
-}

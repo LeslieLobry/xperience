@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import "@/Components/Button/Button.css";
+import "../Button/Button.css";
 
 function Button({ title, color, href, style, onClick, type = "button" }) {
   const buttonContent = (
