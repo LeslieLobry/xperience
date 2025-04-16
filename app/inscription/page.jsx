@@ -6,7 +6,7 @@ import "../inscription/inscription.css";
 import axios from "axios";
 
 export default function RegisterForm() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(1);
   const [captchaToken, setCaptchaToken] = useState(null);
   const [form, setForm] = useState({
     nom: "",
@@ -25,13 +25,14 @@ export default function RegisterForm() {
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
   const debounceTimeout = useRef(null);
 
   const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
- 
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -64,42 +65,30 @@ export default function RegisterForm() {
 
   const nextStep = () => setStep((s) => s + 1);
   const prevStep = () => setStep((s) => s - 1);
-  const isValidName = (name) => {
-    return /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
-  };
+
+  const isValidName = (name) => /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
+
   const validateStep = () => {
     if (step === 1) {
-      if (!form.nom || !form.prenom || !form.pseudo || !form.email || !form.password || !form.confirmPassword) {
-        setError("Merci de remplir tous les champs requis à cette étape.");
-        return false;
-      }
-      if (!isValidName(form.nom) || !isValidName(form.prenom)) {
-        setError("Le nom et le prénom doivent contenir uniquement des lettres, tirets ou apostrophes.");
-        return false;
-      }
-      }
-      if (form.password !== form.confirmPassword) {
-        setError("Les mots de passe ne correspondent pas.");
-        return false;
-      }
-      if (!isPasswordStrong(form.password)) {
-        setError("Le mot de passe n'est pas assez sécurisé.");
-        return false;
-      }
+      const { nom, prenom, pseudo, email, password, confirmPassword } = form;
+      if (!nom || !prenom || !pseudo || !email || !password || !confirmPassword)
+        return setError("Merci de remplir tous les champs requis."), false;
+      if (!isValidName(nom) || !isValidName(prenom))
+        return setError("Le nom et le prénom doivent contenir uniquement des lettres."), false;
+      if (password !== confirmPassword)
+        return setError("Les mots de passe ne correspondent pas."), false;
+      if (!isPasswordStrong(password))
+        return setError("Le mot de passe n'est pas assez sécurisé."), false;
     }
 
     if (step === 2) {
-      if (!form.type || !form.orientation) {
-        setError("Merci de sélectionner un type.");
-        return false;
-      }
+      if (!form.type || !form.orientation)
+        return setError("Merci de sélectionner un type et une orientation."), false;
     }
 
     if (step === 3) {
-      if (!form.age || !form.consent || !form.localisation) {
-        setError("Merci de compléter tous les champs requis.");
-        return false;
-      }
+      if (!form.age || !form.consent || !form.localisation)
+        return setError("Merci de compléter tous les champs requis."), false;
     }
 
     setError("");
@@ -110,16 +99,13 @@ export default function RegisterForm() {
     e.preventDefault();
     setError("");
     setSuccess("");
-  
-    // // 👉 Affiche les infos du formulaire
-    // console.log("📦 Données du formulaire :", form);
-    // console.log("🖼️ Fichier photo :", photo);
-    // console.log("🔒 Token reCAPTCHA :", captchaToken);
-  
+
     if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
     if (!validateStep()) return;
-  
+
     try {
+      setLoading(true);
+
       const captchaRes = await fetch("/api/verify-recaptcha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,49 +114,44 @@ export default function RegisterForm() {
       const captchaData = await captchaRes.json();
       if (!captchaData.success)
         return setError("Vérification reCAPTCHA échouée. Veuillez réessayer.");
-    } catch (err) {
-      console.error("Erreur reCAPTCHA :", err);
-      return setError("Erreur serveur pendant la vérification reCAPTCHA.");
-    }
-  
-    const formData = new FormData();
-    Object.entries(form).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach((v) => formData.append(`${key}[]`, v));
-      } else {
-        formData.append(key, value);
-      }
-    });
-    if (photo) formData.append("photo", photo);
-  
-    // 👉 Affiche ce qui est dans le FormData
-    console.log("📤 Contenu du FormData :");
-    for (const [key, value] of formData.entries()) {
-      console.log(`${key} →`, value);
-    }
-  
-    try {
+
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((v) => formData.append(`${key}[]`, v));
+        } else {
+          formData.append(key, value);
+        }
+      });
+      if (photo) formData.append("photo", photo);
+
       const res = await fetch("http://localhost:3001/api/register", {
         method: "POST",
         body: formData,
       });
+
       const result = await res.json();
-      if (result.success) setSuccess("Inscription réussie !");
-      else setError(result.message || "Erreur lors de l'inscription.");
+      if (result.success) {
+        setSuccess("Inscription réussie !");
+        setForm({ ...form, password: "", confirmPassword: "" });
+        setStep(1);
+      } else {
+        setError(result.message || "Erreur lors de l'inscription.");
+      }
     } catch (err) {
       console.error("Erreur lors de l'envoi du formulaire :", err);
       setError("Erreur serveur pendant l'enregistrement.");
+    } finally {
+      setLoading(false);
     }
   };
-  
+
   const handleLocalisationChange = (e) => {
     const value = e.target.value;
     setLocalisationInput(value);
     setForm((prev) => ({ ...prev, localisation: value }));
 
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
     if (value.length >= 2 && mapboxKey) {
       debounceTimeout.current = setTimeout(async () => {
@@ -187,7 +168,6 @@ export default function RegisterForm() {
               },
             }
           );
-          
           const villes = res.data.features.map((v) => v.place_name);
           setSuggestions(villes);
         } catch (err) {
@@ -207,7 +187,6 @@ export default function RegisterForm() {
   };
 
   return (
-    
     <div className="register-contenant">
       <div className="register-background">
         <h2 className="form-title">Inscription</h2>
@@ -218,14 +197,15 @@ export default function RegisterForm() {
 
           {step === 1 && (
             <>
-              <input type="text" name="nom" placeholder="Nom" onChange={handleChange} required className="form-input" />
-              <input type="text" name="prenom" placeholder="Prénom" onChange={handleChange} required className="form-input" />
-              <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} required className="form-input" />
-              <input type="email" name="email" placeholder="Email" onChange={handleChange} required className="form-input" />
-              <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} required className="form-input" />
-              <input type="password" name="confirmPassword" placeholder="Confirmer mot de passe" onChange={handleChange} required className="form-input" />
+              <input type="text" name="nom" placeholder="Nom" onChange={handleChange} className="form-input" />
+              <input type="text" name="prenom" placeholder="Prénom" onChange={handleChange} className="form-input" />
+              <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} className="form-input" />
+              <input type="email" name="email" placeholder="Email" onChange={handleChange} className="form-input" />
+              <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} className="form-input" />
+              <input type="password" name="confirmPassword" placeholder="Confirmer mot de passe" onChange={handleChange} className="form-input" />
               <div className="form-buttons">
                 <Button
+                  type="button"
                   title="Suivant"
                   onClick={() => validateStep() && nextStep()}
                   color="var(--primary-color)"
@@ -236,14 +216,14 @@ export default function RegisterForm() {
 
           {step === 2 && (
             <>
-              <select name="type" onChange={handleChange} required className="form-input">
+              <select name="type" onChange={handleChange} className="form-input">
                 <option value="">Type de compte</option>
                 <option value="homme">Homme seul</option>
                 <option value="femme">Femme seule</option>
                 <option value="couple">Couple</option>
                 <option value="autre">Autre</option>
               </select>
-              <select name="orientation" onChange={handleChange} required className="form-input">
+              <select name="orientation" onChange={handleChange} className="form-input">
                 <option value="">Orientation</option>
                 <option value="hetero">Hétéro</option>
                 <option value="bi">Bi</option>
@@ -251,8 +231,8 @@ export default function RegisterForm() {
                 <option value="ouvert">Ouvert</option>
               </select>
               <div className="form-buttons">
-                <Button title="Retour" onClick={prevStep} color="#a2b9c1" />
-                <Button title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
+                <Button type="button" title="Retour" onClick={prevStep} color="#a2b9c1" />
+                <Button type="button" title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
               </div>
             </>
           )}
@@ -279,7 +259,7 @@ export default function RegisterForm() {
                   </ul>
                 )}
               </div>
-              <input type="number" name="age" placeholder="Âge" onChange={handleChange} required className="form-input" />
+              <input type="number" name="age" placeholder="Âge" onChange={handleChange} className="form-input" />
               <div className="form-group">
                 <label>Photo de profil :</label><br />
                 <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" />
@@ -288,10 +268,10 @@ export default function RegisterForm() {
                 <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
                 J’accepte les CGU et j’ai plus de 18 ans.
               </label>
-              <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={(token) => setCaptchaToken(token)} />
+              <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={setCaptchaToken} />
               <div className="form-buttons">
-                <Button title="Retour" onClick={prevStep} color="#888" />
-                <Button title="Créer mon compte" type="submit" color="#28a745" />
+                <Button type="button" title="Retour" onClick={prevStep} color="#888" />
+                <Button title="Créer mon compte" type="submit" color="#28a745" disabled={loading} />
               </div>
             </>
           )}
@@ -299,3 +279,4 @@ export default function RegisterForm() {
       </div>
     </div>
   );
+}
