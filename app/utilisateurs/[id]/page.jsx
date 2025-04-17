@@ -1,27 +1,36 @@
-// /app/utilisateurs/[id]/page.jsx
-import { prisma } from "../../../lib/prisma";
+import { PrismaClient } from "@prisma/client";
+import { getUserFromToken } from "../../../lib/auth";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default async function ProfilUtilisateur({ params }) {
+const prisma = new PrismaClient();
+
+export default async function Page({ params }) {
+  const cookieStore = cookies();
+  const currentUser = getUserFromToken(cookieStore);
+
+  if (!currentUser) {
+    return redirect("/connexion");
+  }
+
+  const userId = params.id;
+
+  if (currentUser.id !== userId) {
+    return redirect("/connexion");
+  }
+
   const user = await prisma.utilisateur.findUnique({
-    where: { id: Number(params.id) },
+    where: { id: userId },
     include: { recherches: true },
   });
 
-  if (!user) {
-    return <div>Utilisateur introuvable</div>;
-  }
+  if (!user) return <p>Utilisateur introuvable.</p>;
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h1>Profil de {user.pseudo}</h1>
-      <p>Nom : {user.prenom} {user.nom}</p>
+      <h1>Bienvenue, {user.pseudo}</h1>
       <p>Email : {user.email}</p>
-      <p>Âge : {user.age} ans</p>
-      <p>Localisation : {user.localisation}</p>
-      <p>Type : {user.type}</p>
-      <p>Orientation : {user.orientation}</p>
       <p>Recherches : {user.recherches.map(r => r.label).join(", ")}</p>
-      {user.photoUrl && <img src={user.photoUrl} alt="Photo de profil" width={150} />}
     </div>
   );
 }

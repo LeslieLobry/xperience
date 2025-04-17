@@ -23,18 +23,23 @@ export async function POST(req) {
   }
 
   const passwordMatch = await bcrypt.compare(password, user.password);
+
   if (!passwordMatch) {
     return Response.json({ success: false, message: "Mot de passe incorrect." }, { status: 401 });
   }
 
-  // ✅ Génère le JWT
+  // ✅ Générer un JWT
   const token = jwt.sign(
-    { id: user.id, email: user.email, pseudo: user.pseudo },
+    {
+      id: user.id,
+      email: user.email,
+      pseudo: user.pseudo,
+    },
     secret,
     { expiresIn: "7d" }
   );
 
-  // ✅ Renvoie le JWT dans un cookie HttpOnly
+  // ✅ Retourner le token en cookie HttpOnly
   return new Response(JSON.stringify({ success: true, user: { id: user.id, pseudo: user.pseudo } }), {
     status: 200,
     headers: {
@@ -43,3 +48,4 @@ export async function POST(req) {
     },
   });
 }
+
