@@ -125,7 +125,7 @@ export default function RegisterForm() {
       });
       if (photo) formData.append("photo", photo);
 
-      const res = await fetch("http://localhost:3001/api/register", {
+      const res = await fetch("/api/register", {
         method: "POST",
         body: formData,
       });

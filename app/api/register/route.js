@@ -1,7 +1,10 @@
 import { IncomingForm } from "formidable";
-import { writeFile } from "fs/promises";
+import { mkdir, readFile, writeFile } from "fs/promises";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { Readable } from "stream";
+import crypto from "crypto";
+import path from "path";
 
 export const config = {
   api: {
@@ -11,50 +14,100 @@ export const config = {
 
 const prisma = new PrismaClient();
 
-export async function POST(req) {
-  return new Promise((resolve, reject) => {
-    const form = new IncomingForm({ keepExtensions: true, multiples: true });
+const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
-    form.parse(req, async (err, fields, files) => {
+function streamFromRequest(request) {
+  const reader = request.body.getReader();
+  return new Readable({
+    async read() {
+      const { done, value } = await reader.read();
+      if (done) return this.push(null);
+      this.push(value);
+    }
+  });
+}
+
+export async function POST(req) {
+  const nodeReq = Object.assign(streamFromRequest(req), {
+    headers: Object.fromEntries(req.headers),
+    method: req.method,
+    url: req.url,
+  });
+
+  return new Promise((resolve) => {
+    const form = new IncomingForm({
+      maxFileSize: MAX_FILE_SIZE,
+      keepExtensions: true,
+      multiples: true,
+    });
+
+    form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
         console.error("Erreur formidable :", err);
-        return resolve(
-          new Response(JSON.stringify({ success: false, message: "Erreur parsing" }), { status: 500 })
-        );
+        return resolve(new Response(JSON.stringify({ success: false, message: "Erreur parsing" }), { status: 500 }));
       }
 
       try {
-        const {
-          nom,
-          prenom,
-          pseudo,
-          email,
-          password,
-          type,
-          orientation,
-          age,
-          consent,
-          localisation,
-        } = fields;
+        const getField = (v) => Array.isArray(v) ? v[0] : v;
 
-        // Gestion des champs multiples (ex: recherche[])
+        const nom = getField(fields.nom);
+        const prenom = getField(fields.prenom);
+        const pseudo = getField(fields.pseudo);
+        const email = getField(fields.email);
+        const password = getField(fields.password);
+        const type = getField(fields.type);
+        const orientation = getField(fields.orientation);
+        const age = parseInt(getField(fields.age));
+        const consent = getField(fields.consent) === "true" || getField(fields.consent) === true;
+        const localisation = getField(fields.localisation);
+
+        // Vérifie unicité
+        const exists = await prisma.utilisateur.findFirst({
+          where: {
+            OR: [{ email }, { pseudo }],
+          },
+        });
+
+        if (exists) {
+          return resolve(new Response(JSON.stringify({ success: false, message: "Email ou pseudo déjà utilisé" }), { status: 400 }));
+        }
+
         const recherche = fields["recherche[]"]
-          ? Array.isArray(fields["recherche[]"])
-            ? fields["recherche[]"]
-            : [fields["recherche[]"]]
+          ? Array.isArray(fields["recherche[]"]) ? fields["recherche[]"] : [fields["recherche[]"]]
           : [];
 
-        // Hachage du mot de passe
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Gestion de la photo
+        // Traitement photo
+        const uploadDir = path.join(process.cwd(), "public", "uploads");
+        await mkdir(uploadDir, { recursive: true });
+
         let photoPath = null;
         if (files.photo && files.photo[0]) {
           const file = files.photo[0];
-          const buffer = await file.toBuffer();
-          const savePath = `./public/uploads/${file.originalFilename}`;
+
+          if (!allowedTypes.includes(file.mimetype)) {
+            return resolve(new Response(JSON.stringify({
+              success: false,
+              message: "Format de fichier non autorisé (JPEG, PNG, WEBP uniquement)"
+            }), { status: 400 }));
+          }
+
+          if (file.size > MAX_FILE_SIZE) {
+            return resolve(new Response(JSON.stringify({
+              success: false,
+              message: "Fichier trop volumineux (max 2 Mo)"
+            }), { status: 400 }));
+          }
+
+          const buffer = await readFile(file.filepath);
+          const ext = path.extname(file.originalFilename).toLowerCase();
+          const uniqueName = crypto.randomBytes(16).toString("hex") + ext;
+          const savePath = path.join(uploadDir, uniqueName);
+
           await writeFile(savePath, buffer);
-          photoPath = `/uploads/${file.originalFilename}`;
+          photoPath = `/uploads/${uniqueName}`;
         }
 
         const user = await prisma.utilisateur.create({
@@ -66,8 +119,8 @@ export async function POST(req) {
             password: hashedPassword,
             type,
             orientation,
-            age: parseInt(age),
-            consent: consent === "true" || consent === true,
+            age,
+            consent,
             localisation,
             photoUrl: photoPath,
             recherches: {
@@ -75,15 +128,11 @@ export async function POST(req) {
             },
           },
         });
-        
-        return resolve(
-          new Response(JSON.stringify({ success: true, user }), { status: 200 })
-        );
+
+        return resolve(new Response(JSON.stringify({ success: true, user }), { status: 200 }));
       } catch (error) {
         console.error("Erreur backend :", error);
-        return resolve(
-          new Response(JSON.stringify({ success: false, message: "Erreur serveur" }), { status: 500 })
-        );
+        return resolve(new Response(JSON.stringify({ success: false, message: "Erreur serveur" }), { status: 500 }));
       }
     });
   });
