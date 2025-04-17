@@ -28,6 +28,7 @@ model Utilisateur {
   photoUrl     String?
   recherches   Recherche[] // Relation 1-n
   createdAt    DateTime    @default(now())
+  emailVerified DateTime?
 }
 
 model Recherche {
@@ -35,4 +36,11 @@ model Recherche {
   label         String
   utilisateur   Utilisateur  @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
+}
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 }

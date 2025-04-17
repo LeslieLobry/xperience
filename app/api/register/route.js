@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { Readable } from "stream";
 import crypto from "crypto";
 import path from "path";
+import { resend } from "../../../lib/resend";
+import { v4 as uuidv4 } from "uuid";
 
 export const config = {
   api: {
@@ -79,7 +81,7 @@ export async function POST(req) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Traitement photo
+        // Upload photo
         const uploadDir = path.join(process.cwd(), "public", "uploads");
         await mkdir(uploadDir, { recursive: true });
 
@@ -110,6 +112,7 @@ export async function POST(req) {
           photoPath = `/uploads/${uniqueName}`;
         }
 
+        // Création utilisateur
         const user = await prisma.utilisateur.create({
           data: {
             nom,
@@ -127,6 +130,31 @@ export async function POST(req) {
               create: recherche.map((label) => ({ label })),
             },
           },
+        });
+
+        // Création token de vérification
+        const token = uuidv4();
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
+        await prisma.emailVerificationToken.create({
+          data: {
+            email,
+            token,
+            expiresAt,
+          },
+        });
+
+        // Envoi de l'email
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM,
+          to: email,
+          subject: "Confirme ton adresse email",
+          html: `
+            <p>Bienvenue sur Xperience, ${pseudo} 👋</p>
+            <p>Merci de t’être inscrit. Pour confirmer ton adresse email, clique sur le lien ci-dessous :</p>
+            <p><a href="http://localhost:3000/verify?token=${token}&email=${email}">Confirmer mon adresse</a></p>
+            <p>Ce lien expire dans 24 heures.</p>
+          `,
         });
 
         return resolve(new Response(JSON.stringify({ success: true, user }), { status: 200 }));
