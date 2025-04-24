@@ -4,6 +4,8 @@ import ReCAPTCHA from "react-google-recaptcha";
 import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
 import axios from "axios";
+import Select from "react-select";
+
 
 export default function RegisterForm() {
   const [step, setStep] = useState(1);
@@ -185,7 +187,66 @@ export default function RegisterForm() {
     setLocalisationInput(ville);
     setSuggestions([]);
   };
-
+  const typeLabel = (value) => {
+    switch (value) {
+      case "homme":
+        return "Homme seul";
+      case "femme":
+        return "Femme seule";
+      case "couple":
+        return "Couple";
+      case "autre":
+        return "Autre";
+      default:
+        return "";
+    }
+  };
+  
+  const orientationLabel = (value) => {
+    switch (value) {
+      case "hetero":
+        return "Hétéro";
+      case "bi":
+        return "Bi";
+      case "pan":
+        return "Pan";
+      case "ouvert":
+        return "Ouvert";
+      default:
+        return "";
+    }
+  };
+  
+  const customSelectStyles = {
+    control: (base) => ({
+      ...base,
+      backgroundColor: "transparent",
+      borderColor: "#ccc",
+      color: "white",
+      height: "3.5rem",
+      fontSize: "1.6rem",
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: "#222",
+      color: "white",
+      zIndex: 10,
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: "white",
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: "white",
+      opacity: 0.7,
+    }),
+    input: (base) => ({
+      ...base,
+      color: "white",
+    }),
+  };
+  
   return (
     <div className="register-contenant">
       <div className="register-background">
@@ -215,27 +276,52 @@ export default function RegisterForm() {
           )}
 
           {step === 2 && (
-            <>
-              <select name="type" onChange={handleChange} className="form-input">
-                <option value="">Type de compte</option>
-                <option value="homme">Homme seul</option>
-                <option value="femme">Femme seule</option>
-                <option value="couple">Couple</option>
-                <option value="autre">Autre</option>
-              </select>
-              <select name="orientation" onChange={handleChange} className="form-input">
-                <option value="">Orientation</option>
-                <option value="hetero">Hétéro</option>
-                <option value="bi">Bi</option>
-                <option value="pan">Pan</option>
-                <option value="ouvert">Ouvert</option>
-              </select>
-              <div className="form-buttons">
-                <Button type="button" title="Retour" onClick={prevStep} color="#a2b9c1" />
-                <Button type="button" title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
-              </div>
-            </>
-          )}
+  <>
+    <div style={{ width: "100%", maxWidth: "400px" }}>
+      <Select
+        options={[
+          { value: "homme", label: "Homme seul" },
+          { value: "femme", label: "Femme seule" },
+          { value: "couple", label: "Couple" },
+          { value: "autre", label: "Autre" },
+        ]}
+        placeholder="Type de compte"
+        value={
+          form.type
+            ? { value: form.type, label: typeLabel(form.type) }
+            : null
+        }
+        onChange={(e) => setForm((prev) => ({ ...prev, type: e.value }))}
+        styles={customSelectStyles}
+      />
+    </div>
+
+    <div style={{ width: "100%", maxWidth: "400px" }}>
+      <Select
+        options={[
+          { value: "hetero", label: "Hétéro" },
+          { value: "bi", label: "Bi" },
+          { value: "pan", label: "Pan" },
+          { value: "ouvert", label: "Ouvert" },
+        ]}
+        placeholder="Orientation"
+        value={
+          form.orientation
+            ? { value: form.orientation, label: orientationLabel(form.orientation) }
+            : null
+        }
+        onChange={(e) => setForm((prev) => ({ ...prev, orientation: e.value }))}
+        styles={customSelectStyles}
+      />
+    </div>
+
+    <div className="form-buttons">
+      <Button type="button" title="Retour" onClick={prevStep} color="#a2b9c1" />
+      <Button type="button" title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
+    </div>
+  </>
+)}
+
 
           {step === 3 && (
             <>
@@ -271,7 +357,7 @@ export default function RegisterForm() {
               <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={setCaptchaToken} />
               <div className="form-buttons">
                 <Button type="button" title="Retour" onClick={prevStep} color="#888" />
-                <Button title="Créer mon compte" type="submit" color="#28a745" disabled={loading} />
+                <Button title="Créer mon compte" type="submit" color="#e0c084" disabled={loading} />
               </div>
             </>
           )}

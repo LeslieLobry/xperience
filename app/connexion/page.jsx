@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Button from "../../components/Button/Button";
+import "../connexion/connexion.css"
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function ConnexionPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const router = useRouter();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,26 +31,26 @@ export default function ConnexionPage() {
     const data = await res.json();
     if (data.success) {
       setSuccess("Connexion réussie !");
-      // Rediriger vers le dashboard plus tard
+      router.push("/utilisateurs")
     } else {
       setError(data.message);
     }
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 400, margin: "auto" }}>
-      <h1>Connexion</h1>
+    <div className="connexion-contenant">
+      <h1 className="connexion-title">Connexion</h1>
       {error && <p style={{ color: "red" }}>{error}</p>}
       {success && <p style={{ color: "green" }}>{success}</p>}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="form-connexion">
         <input
           type="email"
           name="email"
           placeholder="Email"
           value={form.email}
           onChange={handleChange}
-          style={{ width: "100%", marginBottom: "1rem" }}
+          className="form-input"
           required
         />
         <input
@@ -54,13 +59,22 @@ export default function ConnexionPage() {
           placeholder="Mot de passe"
           value={form.password}
           onChange={handleChange}
-          style={{ width: "100%", marginBottom: "1rem" }}
+          className="form-input"
           required
         />
-        <button type="submit" style={{ width: "100%" }}>
-          Se connecter
-        </button>
+        <Button
+                  type="submit"
+                  title="Suivant"
+                  onClick={() => validateStep() && nextStep()}
+                  color="var(--primary-color)"
+                />
       </form>
+      <div style={{ marginTop: "1rem", textAlign: "center" }}>
+  <Link href="/mot-de-passe-oublie" className="forgot-link">
+    Mot de passe oublié ?
+  </Link>
+</div>
+
     </div>
   );
 }

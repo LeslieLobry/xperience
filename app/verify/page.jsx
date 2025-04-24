@@ -26,7 +26,7 @@ export default function VerifyPage() {
 
         if (data.success) {
           setStatus("success");
-          setMessage("Ton adresse email a bien été confirmée ✅");
+          setMessage("votre adresse email a bien été confirmée ✅");
           setTimeout(() => {
             router.push("/connexion");
           }, 3000);

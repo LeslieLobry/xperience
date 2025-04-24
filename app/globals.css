@@ -25,7 +25,8 @@ body {
 
 body {
   color: var(--foreground);
- 
+  color: var(--foreground);
+  font-family: "Allura", serif;
   /* font-family: Arial, Helvetica, sans-serif; */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -46,4 +47,14 @@ a {
   html {
     color-scheme: dark;
   }
+}
+input::placeholder {
+  color: rgb(245, 241, 241);
+  opacity: 1; /* pour s'assurer qu'il est bien visible */
+}
+.css-1u9des2-indicatorSeparator{
+  display: none;
+}
+.css-8gsnlb-control{
+  align-items: center;
 }

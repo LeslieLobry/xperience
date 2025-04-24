@@ -1,45 +1,39 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
-const secret = process.env.JWT_SECRET;
 
-export async function POST(req) {
-  const { email, password } = await req.json();
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const token = searchParams.get("token");
+  const email = searchParams.get("email");
 
-  if (!email || !password) {
-    return Response.json({ success: false, message: "Champs requis manquants." }, { status: 400 });
+  if (!token || !email) {
+    return Response.json({ success: false, message: "Lien invalide ou incomplet." }, { status: 400 });
   }
 
-  const user = await prisma.utilisateur.findUnique({ where: { email } });
+  try {
+    const record = await prisma.emailVerificationToken.findUnique({
+      where: { token },
+    });
 
-  if (!user) {
-    return Response.json({ success: false, message: "Utilisateur non trouvé." }, { status: 404 });
+    if (!record || record.email !== email) {
+      return Response.json({ success: false, message: "Lien invalide." }, { status: 401 });
+    }
+
+    if (record.expiresAt < new Date()) {
+      return Response.json({ success: false, message: "Lien expiré." }, { status: 410 });
+    }
+
+    await prisma.utilisateur.update({
+      where: { email },
+      data: { emailVerified: new Date() },
+    });
+
+    await prisma.emailVerificationToken.delete({ where: { token } });
+
+    return Response.json({ success: true, message: "Email confirmé." }, { status: 200 });
+  } catch (error) {
+    console.error("Erreur vérification :", error);
+    return Response.json({ success: false, message: "Erreur serveur." }, { status: 500 });
   }
-
-  if (!user.emailVerified) {
-    return Response.json({ success: false, message: "Adresse email non confirmée." }, { status: 403 });
-  }
-
-  const passwordMatch = await bcrypt.compare(password, user.password);
-  if (!passwordMatch) {
-    return Response.json({ success: false, message: "Mot de passe incorrect." }, { status: 401 });
-  }
-
-  // ✅ Génère le JWT
-  const token = jwt.sign(
-    { id: user.id, email: user.email, pseudo: user.pseudo },
-    secret,
-    { expiresIn: "7d" }
-  );
-
-  // ✅ Renvoie le JWT dans un cookie HttpOnly
-  return new Response(JSON.stringify({ success: true, user: { id: user.id, pseudo: user.pseudo } }), {
-    status: 200,
-    headers: {
-      "Set-Cookie": `token=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`,
-      "Content-Type": "application/json",
-    },
-  });
 }

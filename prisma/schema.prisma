@@ -44,3 +44,10 @@ model EmailVerificationToken {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
