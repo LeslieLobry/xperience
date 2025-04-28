@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import "../reinitialiser/reinitialiser.css"
 
 export default function ReinitialiserPage() {
   const searchParams = useSearchParams();
