@@ -1,0 +1,30 @@
+.preferences-summary {
+    background: #f9f5f1;
+    padding: 2rem;
+    border-radius: 8px;
+  }
+  
+  .preferences-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .edit-button {
+    background: none;
+    border: 1px solid black;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  
+  .preferences-section {
+    margin-top: 1.5rem;
+  }
+  
+  .not-defined {
+    color: red;
+    font-weight: bold;
+  }
+  
