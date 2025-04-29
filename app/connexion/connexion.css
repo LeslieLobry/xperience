@@ -39,8 +39,13 @@
     color: var(--primary);
     font-weight: 900;  
     opacity: 1; 
+    background-color: transparent;
+    border: 2px #F6D391 solid;
 }
 .form-connexion ::placeholder{
     color: #F6D391;
     opacity: 1;
+}
+.form-connexion :not(:placeholder-shown){
+    background-color: transparent;
 }

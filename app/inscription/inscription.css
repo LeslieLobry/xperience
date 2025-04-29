@@ -107,7 +107,9 @@ select {
     list-style: none;
     color: black;
   }
-  
+  input:not(:placeholder-shown) {
+    background-color: transparent; 
+  }
   .suggestions-list li {
     padding: 10px;
     cursor: pointer;

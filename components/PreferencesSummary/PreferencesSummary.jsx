@@ -1,38 +1,43 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import './PreferencesSummary.css';
+import Modal from '../Modal/Modal';
+import PreferencesForm from '../PreferencesForm/PreferencesForm';
 
 export default function PreferencesSummary() {
   const [recherches, setRecherches] = useState([]);
   const [envies, setEnvies] = useState([]);
-  const router = useRouter();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); 
+  const [confirmation, setConfirmation] = useState('');
+
+
+  const fetchPreferences = async () => {
+    const res = await fetch('/api/me', { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      setRecherches(data.user.recherches || []);
+      setEnvies(data.user.envies || []);
+    }
+  };
 
   useEffect(() => {
-    async function fetchPreferences() {
-      const res = await fetch('/api/me', { credentials: 'include' });
-
-      if (res.ok) {
-        const data = await res.json();
-        setRecherches(data.recherches || []);
-        setEnvies(data.envies || []);
-      }
-    }
-
     fetchPreferences();
-  }, []);
+  }, [refreshKey]); // <-- refresh quand refreshKey change
+
+  const handleOpenModal = () => setIsModalOpen(true);
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setRefreshKey(prev => prev + 1); 
+    setConfirmation("Préférences mises à jour ✅");
+    setTimeout(() => setConfirmation(''), 3000);
+  };
 
   return (
-    <div className="preferences-summary">
-      <div className="preferences-header">
-        <h2>Préférences</h2>
-        <button className="edit-button" onClick={() => router.push('/profil/preferences')}>
-          Modifier
-        </button>
-      </div>
-
-      <div className="preferences-section">
+    <div>
+      <h2>Préférences</h2>
+      <div>
         <h3>Je recherche</h3>
         {recherches.length > 0 ? (
           <ul>
@@ -41,11 +46,10 @@ export default function PreferencesSummary() {
             ))}
           </ul>
         ) : (
-          <p className="not-defined">Non défini</p>
+          <p style={{ color: 'red' }}>Non défini</p>
         )}
       </div>
-
-      <div className="preferences-section">
+      <div>
         <h3>Mes envies</h3>
         {envies.length > 0 ? (
           <ul>
@@ -54,9 +58,19 @@ export default function PreferencesSummary() {
             ))}
           </ul>
         ) : (
-          <p className="not-defined">Non défini</p>
+          <p style={{ color: 'red' }}>Non défini</p>
         )}
       </div>
+
+      <button onClick={handleOpenModal}>Modifier</button>
+            {confirmation && (
+               <p style={{ color: "green", fontWeight: "bold", marginTop: "1rem" }}>
+              {confirmation}
+            </p>
+            )}
+      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
+        <PreferencesForm onClose={handleCloseModal} />
+      </Modal>
     </div>
   );
 }

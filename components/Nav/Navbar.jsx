@@ -1,11 +1,11 @@
 "use client";
 import logo from "../../app/Assets/logo.png";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import "../Nav/Navbar.css";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/AuthContext"
+import { useAuth } from "../../context/AuthContext";
 
 const navLinks = [
   { label: "Accueil", href: "/" },
@@ -15,36 +15,16 @@ const navLinks = [
   { label: "À votre service", href: "/partenaire" },
 ];
 
-
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
   const handleLogout = async () => {
-    await fetch("/api/logout");
-    router.refresh();
+    await logout(); // Appelle le logout du contexte
+    setMenuOpen(false);
     router.push("/connexion");
   };
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch("/api/me");
-        const data = await res.json();
-        if (data.success) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
-      } catch (err) {
-        setIsAuthenticated(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
 
   return (
     <nav className="navbar">
@@ -60,12 +40,12 @@ export default function Navbar() {
           />
         </Link>
       </div>
-      {user && (
-  <div className="navbar-pseudo">
-    Bienvenue, <strong>{user.pseudo}</strong>
-  </div>
-)}
 
+      {user && (
+        <div className="navbar-pseudo">
+          <h3>Bienvenue, {user.pseudo}</h3>
+        </div>
+      )}
 
       <div className="burger" onClick={() => setMenuOpen(!menuOpen)}>
         <div className="line"></div>
@@ -80,18 +60,11 @@ export default function Navbar() {
           </li>
         ))}
 
-        {isAuthenticated && (
-          <li
-            onClick={() => {
-              setMenuOpen(false);
-              handleLogout();
-            }}
-          >
-            <span className="nav-link">Déconnexion</span>
+        {user ? (
+          <li onClick={handleLogout}>
+            <button className="nav-link logout-button">Déconnexion</button>
           </li>
-        )}
-
-        {!isAuthenticated && (
+        ) : (
           <li onClick={() => setMenuOpen(false)}>
             <Link href="/connexion" className="nav-link">Connexion</Link>
           </li>

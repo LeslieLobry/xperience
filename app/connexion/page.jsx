@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/Button/Button";
 import "../connexion/connexion.css"
 import { useRouter } from "next/navigation";
@@ -11,6 +12,7 @@ export default function ConnexionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
+  const { fetchUser } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,7 +33,8 @@ export default function ConnexionPage() {
     const data = await res.json();
     if (data.success) {
       setSuccess("Connexion réussie !");
-      router.push("/utilisateurs")
+      await fetchUser(); // <-- met à jour le contexte global
+      router.push("/utilisateurs");
     } else {
       setError(data.message);
     }

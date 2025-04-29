@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
-import PreferencesForm from "../../components/PreferencesForm/PreferencesForm";
+// import PreferencesForm from "../../components/PreferencesForm/PreferencesForm";
+import PreferencesSummary from "../../components/PreferencesSummary/PreferencesSummary";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -44,7 +45,7 @@ export default async function ProfilPage() {
           style={{ borderRadius: "10px", marginTop: "1rem" }}
         />
       )}
-      <PreferencesForm/>
+      <PreferencesSummary/>
     </div>
   );
 }

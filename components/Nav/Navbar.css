@@ -9,6 +9,7 @@
     top: 0;
     z-index: 999;
     color: white;
+   
   }
   
   .logo a {
@@ -17,7 +18,10 @@
     font-weight: bold;
     color: #333;
   }
-  
+  .navbar-pseudo{
+    color: #a2b9c1;
+    font-size:40px;
+  }
   .navLinks {
     list-style: none;
     display: flex;
@@ -30,7 +34,7 @@
     text-decoration: none;
     color:var(--primary-color);
     transition: color 0.3s ease;
-    font-size: 25px;
+    font-size: 30px;
   }
   
   .navLinks li a:hover {
@@ -52,14 +56,29 @@
   .logout-button {
     background: none;
     border: none;
-    color: white;
-    font-size: 1rem;
+    color: #e0c084 !important;
+    font-size: 25px !important;
     cursor: pointer;
     padding: 10px;
     text-align: left;
     width: 100%;
   }
   
+  .logout-button:hover {
+    text-decoration: underline;
+  }
+  .nav-link{
+    color: #e0c084;
+    font-size: 25px;
+  }
+  .logout-button {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
   .logout-button:hover {
     text-decoration: underline;
   }

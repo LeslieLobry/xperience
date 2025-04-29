@@ -1,14 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers"; // <-- AJOUTER ça
-import { NextResponse } from "next/server"; // <-- pour Response.json()
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function GET() {
-  const cookieStore = cookies(); // <-- CORRECTION ici
-  const token = cookieStore.get("token")?.value; // <-- et ici
+  const cookieHeader = headers().get("cookie") || "";
+  const token = cookieHeader
+    .split("; ")
+    .find(row => row.startsWith("token="))
+    ?.split("=")[1];
 
   if (!token) {
     return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
@@ -19,7 +22,7 @@ export async function GET() {
 
     const user = await prisma.utilisateur.findUnique({
       where: { id: decoded.id },
-      include: { recherches: true, envies: true }, // Ajout si tu veux aussi les envies
+      include: { recherches: true, envies: true },
     });
 
     if (!user) {

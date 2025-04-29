@@ -1,40 +1,37 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from 'react';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const fetchUser = async () => {
     try {
-      const res = await fetch("/api/me");
+      const res = await fetch('/api/me', { credentials: 'include' });
       const data = await res.json();
       if (data.success) {
         setUser(data.user);
       } else {
         setUser(null);
       }
-    } catch (err) {
+    } catch (error) {
       setUser(null);
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const logout = async () => {
+    await fetch('/api/logout', { credentials: 'include' });
+    setUser(null);
   };
 
   useEffect(() => {
     fetchUser();
   }, []);
 
-  const logout = async () => {
-    await fetch("/api/logout");
-    setUser(null);
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, setUser, logout, fetchUser }}>
       {children}
     </AuthContext.Provider>
   );
