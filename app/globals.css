@@ -48,6 +48,7 @@ h1, h2, h3,
 .logo-text,
 .navbar-pseudo strong {
   font-family: var(--font-allura);
+  font-weight: 900;
 }
 @media (prefers-color-scheme: dark) {
   html {
