@@ -57,11 +57,21 @@ h1, h2, h3,
 }
 input::placeholder {
   color: rgb(245, 241, 241);
-  opacity: 1; /* pour s'assurer qu'il est bien visible */
+  opacity: 1;
 }
 .css-1u9des2-indicatorSeparator{
   display: none;
 }
 .css-8gsnlb-control{
   align-items: center;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  background-color: transparent !important;
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

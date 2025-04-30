@@ -38,6 +38,17 @@ export async function GET() {
         photoUrl: user.photoUrl,
         recherches: user.recherches,
         envies: user.envies,
+        age: user.age,
+        localisation: user.localisation,
+        experience: user.experience,
+        rechercheType: user.rechercheType,
+        sexe: user.sexe,
+        fumeur: user.fumeur,
+        silhouette: user.silhouette,
+        taille: user.taille,
+        origines: user.origines,
+        yeux: user.yeux,
+        cheveux: user.cheveux,
       },
     });
   } catch (err) {

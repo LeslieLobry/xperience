@@ -1,0 +1,5 @@
+.profil-form input::placeholder {
+    color: #050505;       /* ou gris clair */
+    opacity: 1;
+  }
+  
