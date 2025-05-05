@@ -6,6 +6,8 @@ import Button from "../../components/Button/Button";
 import "../connexion/connexion.css"
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useEffect } from "react";
+
 
 export default function ConnexionPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -13,6 +15,14 @@ export default function ConnexionPage() {
   const [success, setSuccess] = useState("");
   const router = useRouter();
   const { fetchUser } = useAuth();
+
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.replace("/utilisateurs");
+    }
+  }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

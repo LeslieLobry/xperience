@@ -1,0 +1,35 @@
+.photo-preview-wrapper {
+  position: relative;
+  margin: 0 auto;
+}
+
+.photo-preview {
+  width: 100%;
+  border-radius: 50%;
+  display: block;
+  border: 3px solid var(--gold);
+}
+
+.camera-label {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  transform: translate(50%, 50%);
+  background-color: #0e1a2b;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.camera-icon {
+  color: var(--gold);
+  width: 20px;
+  height: 20px;
+}

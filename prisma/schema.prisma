@@ -32,6 +32,7 @@ model Utilisateur {
   description     String? 
   recherches     Recherche[]
   envies         Envie[]
+  coverUrl String? 
 
   // Ajouts pour le profil éditable
   experience     String?

@@ -1,6 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import "../PhotoUploader/PhotoUploader.css"
+import { Camera } from 'lucide-react';
+
 
 export default function PhotoUploader({ currentUrl, onUpload }) {
   const fileInputRef = useRef(null);
@@ -24,31 +27,33 @@ export default function PhotoUploader({ currentUrl, onUpload }) {
       setPreview(data.photoUrl);
       if (onUpload) onUpload(data.photoUrl);
     } else {
-      alert('Erreur lors de l\'envoi de la photo.');
+      alert("Erreur lors de l'envoi de la photo.");
     }
   };
 
   return (
-    <div>
+    <div className="photo-upload-contenant">
       {preview && (
-        <img
-          src={preview}
-          alt="Photo de profil"
-          width={120}
-          style={{ borderRadius: '10px', marginTop: '1rem' }}
-        />
-      )}
-      <br />
-      <button onClick={() => fileInputRef.current.click()}>
-        Changer la photo
-      </button>
+        <div className="photo-preview-wrapper">
+          <img
+            src={preview}
+            alt="Photo de profil"
+            className="photo-preview"
+          />
+          <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
+            <Camera className="camera-icon" />
+          </label>
       <input
+        id="photo-upload"
         ref={fileInputRef}
         type="file"
         accept="image/*"
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
+        </div>
+      )}
+
     </div>
   );
 }

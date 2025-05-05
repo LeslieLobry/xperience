@@ -1,4 +1,5 @@
 "use client";
+
 import logo from "../../app/Assets/logo.png";
 import { useState } from "react";
 import Link from "next/link";
@@ -6,6 +7,7 @@ import Image from "next/image";
 import "../Nav/Navbar.css";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
+import { LogIn, LogOut } from "lucide-react";
 
 const navLinks = [
   { label: "Accueil", href: "/" },
@@ -21,36 +23,34 @@ export default function Navbar() {
   const router = useRouter();
 
   const handleLogout = async () => {
-    await logout(); // Appelle le logout du contexte
+    await logout();
     setMenuOpen(false);
     router.push("/connexion");
   };
 
   return (
     <nav className="navbar">
-      <div className="logo">
+      <div className="navbar-left">
         <Link href="/">
           <Image
             src={logo}
             alt="logo de xpérience"
-            width={200}
-            height={200}
-            className="contenant-header-logo"
+            width={120}
+            height={120}
+            className="navbar-logo"
             priority
           />
         </Link>
+        {user && <h3 className="navbar-pseudo">Bienvenue, {user.pseudo}</h3>}
       </div>
 
-      {user && (
-        <div className="navbar-pseudo">
-          <h3>Bienvenue, {user.pseudo}</h3>
-        </div>
-      )}
-
-      <div className="burger" onClick={() => setMenuOpen(!menuOpen)}>
-        <div className="line"></div>
-        <div className="line"></div>
-        <div className="line"></div>
+      <div
+        className={`burger ${menuOpen ? "open" : ""}`}
+        onClick={() => setMenuOpen(!menuOpen)}
+      >
+        <div className="line top"></div>
+        <div className="line middle"></div>
+        <div className="line bottom"></div>
       </div>
 
       <ul className={`navLinks ${menuOpen ? "active" : ""}`}>
@@ -61,12 +61,14 @@ export default function Navbar() {
         ))}
 
         {user ? (
-          <li onClick={handleLogout}>
-            <button className="nav-link logout-button">Déconnexion</button>
+          <li onClick={handleLogout} title="Déconnexion">
+            <LogOut className="nav-icon" />
           </li>
         ) : (
-          <li onClick={() => setMenuOpen(false)}>
-            <Link href="/connexion" className="nav-link">Connexion</Link>
+          <li onClick={() => setMenuOpen(false)} title="Connexion">
+            <Link href="/connexion">
+              <LogIn className="nav-icon" />
+            </Link>
           </li>
         )}
       </ul>

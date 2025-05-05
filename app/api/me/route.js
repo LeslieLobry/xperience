@@ -7,7 +7,8 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function GET() {
-  const cookieHeader = headers().get("cookie") || "";
+  const headersList = await headers(); // ✅ ici on attend headers()
+  const cookieHeader = headersList.get("cookie") || "";
   const token = cookieHeader
     .split("; ")
     .find(row => row.startsWith("token="))
