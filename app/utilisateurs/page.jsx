@@ -4,13 +4,15 @@ import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import ProfilDetailsSummary from "../../components/ProfilDetailsSummary/ProfilDetailsSummary";
 import PreferencesSummary from "../../components/PreferencesSummary/PreferencesSummary";
+import DescriptionCard from "../../components/DescriptionCard/DescriptionCard";
+import AProposCard from "../../components/AProposCard/AProposCard";
+import PhotoUploader from "../../components/PhotoUploader/PhotoUploader";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function ProfilPage() {
-  const cookieStore = cookies();
-  const token = cookieStore.get("token")?.value;
+  const token = cookies().get("token")?.value;
 
   if (!token) return redirect("/connexion");
 
@@ -37,16 +39,11 @@ export default async function ProfilPage() {
       <p>Orientation : {user.orientation}</p>
       <p>Type : {user.type}</p>
       <p>Recherches : {user.recherches.map(r => r.label).join(", ") || "Aucune"}</p>
-      {user.photoUrl && (
-        <img
-          src={user.photoUrl}
-          alt={`Photo de ${user.pseudo}`}
-          width={120}
-          style={{ borderRadius: "10px", marginTop: "1rem" }}
-        />
-      )}
+      <PhotoUploader currentUrl={user.photoUrl} />
       <PreferencesSummary/>
       <ProfilDetailsSummary/>
+      <DescriptionCard/>
+      <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
     </div>
   );
 }

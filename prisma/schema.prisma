@@ -27,8 +27,9 @@ model Utilisateur {
   localisation   String
   photoUrl       String?
   createdAt      DateTime       @default(now())
+  lastLogin      DateTime? 
   emailVerified  DateTime?
-
+  description     String? 
   recherches     Recherche[]
   envies         Envie[]
 

@@ -39,6 +39,7 @@ export async function GET() {
         recherches: user.recherches,
         envies: user.envies,
         age: user.age,
+        description: user.description,
         localisation: user.localisation,
         experience: user.experience,
         rechercheType: user.rechercheType,
@@ -49,6 +50,8 @@ export async function GET() {
         origines: user.origines,
         yeux: user.yeux,
         cheveux: user.cheveux,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
       },
     });
   } catch (err) {

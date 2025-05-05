@@ -28,6 +28,12 @@ export async function POST(req) {
     return Response.json({ success: false, message: "Mot de passe incorrect." }, { status: 401 });
   }
 
+  // ✅ Mettre à jour la dernière connexion
+  await prisma.utilisateur.update({
+    where: { id: user.id },
+    data: { lastLogin: new Date() }
+  });
+
   // ✅ Générer un JWT
   const token = jwt.sign(
     {
@@ -48,4 +54,3 @@ export async function POST(req) {
     },
   });
 }
-
