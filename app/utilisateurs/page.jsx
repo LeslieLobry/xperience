@@ -34,8 +34,6 @@ export default async function ProfilPage() {
     <div style={{ padding: "2rem" }}>
       <h1>Bienvenue, {user.pseudo}</h1>
       <p>Email : {user.email}</p>
-      <p>Âge : {user.age} ans</p>
-      <p>Localisation : {user.localisation}</p>
       <p>Orientation : {user.orientation}</p>
       <p>Type : {user.type}</p>
       <p>Recherches : {user.recherches.map(r => r.label).join(", ") || "Aucune"}</p>
