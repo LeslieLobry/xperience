@@ -1,10 +1,6 @@
-.photo-preview-wrapper {
-  position: relative;
-  margin: 0 auto;
-}
 
 .photo-preview {
-  width: 100%;
+  width: 80%;
   border-radius: 50%;
   display: block;
   border: 3px solid var(--gold);
@@ -12,24 +8,34 @@
 
 .camera-label {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: 25px;
+  right: 109px;
   transform: translate(50%, 50%);
-  background-color: #0e1a2b;
-  border: 2px solid var(--gold);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   cursor: pointer;
-  z-index: 5;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.camera-label:hover {
+  transform: scale(1);
 }
 
 .camera-icon {
   color: var(--gold);
-  width: 20px;
-  height: 20px;
+}
+.photo-upload-contenant.gallery-mode {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255,255,255,0.05);
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.gallery-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

@@ -7,14 +7,12 @@
   }
   
   .profil-page {
-    background: url('/textures/fond-profil.jpg') center/cover no-repeat;
-    min-height: 100vh;
-    padding: 2rem;
-    font-family: 'Playfair Display', serif;
+    padding: 1rem;
     color: var(--text-light);
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 16px;
   }
   
   .profil-header {
@@ -22,13 +20,32 @@
     margin-bottom: 2rem;
   }
   
-
+  .profil-infos-wrapper {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    max-width: 600px;
+    margin: 30px auto;
+  }
+  
+  .info-block p {
+    margin: 10px 0;
+    font-size: 1rem;
+    color: #fff;
+  }
+  
+  .info-block span {
+    color: #ccc;
+    margin-left: 5px;
+  }
+  
   
   .profil-name {
     font-size: 2.5rem;
     color: var(--gold);
-    margin-top: 1rem;
+    margin-top: 10%;
     font-style: italic;
+
   }
   
   .profil-status {
@@ -78,7 +95,6 @@
     border-radius: 10px;
     margin: 1.5rem 0;
     text-align: center;
-    max-width: 600px;
   }
   
   .profil-completion-box h2 {
@@ -110,33 +126,3 @@
     width: 100%;
     max-width: 800px;
   }
-  /* .profil-avatar {
-    position: relative;
-    margin: 0 auto;
-    border-radius: 50%;
-    border: 3px solid var(--gold);
-    padding: 5px;
-    width: 130px;
-    height: 130px;
-    overflow: hidden;
-  } */
-  
-  /* .change-photo-icon {
-    position: absolute;
-    bottom: -8px;
-    right: -8px;
-    background-color: var(--background);
-    color: var(--gold);
-    border: 1px solid var(--gold);
-    border-radius: 50%;
-    padding: 6px;
-    width: 28px;
-    height: 28px;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-  } */
-  
-  /* .change-photo-icon:hover {
-    transform: scale(1.1);
-  }
-   */
