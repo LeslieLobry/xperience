@@ -15,7 +15,9 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false 
     const formData = new FormData();
     formData.append('photo', file);
 
-    const res = await fetch(isGallery ? '/api/upload-gallery-photo' : '/api/upload-photo', {
+    const endpoint = isGallery ? '/api/upload-gallery-photo' : '/api/upload-photo';
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       body: formData,
       credentials: 'include',
@@ -23,18 +25,26 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false 
 
     if (res.ok) {
       const data = await res.json();
-      setPreview(data.photoUrl);
-      if (onUpload) onUpload(data);
-      else location.reload(); // fallback
+
+      // ✅ Choix de l’URL selon le contexte
+      const photoUrl = isGallery ? data.url : data.photoUrl;
+
+      setPreview(photoUrl);
+
+      // ✅ Callback : soit on envoie { id, url } (galerie), soit l'URL seule (profil)
+      if (onUpload) {
+        onUpload(isGallery ? data : photoUrl);
+      } else {
+        location.reload(); // fallback
+      }
+
     } else {
       alert("Erreur lors de l'envoi de la photo.");
     }
   };
 
   const handleClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    fileInputRef.current?.click();
   };
 
   return (
