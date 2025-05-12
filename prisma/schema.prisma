@@ -8,57 +8,75 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
-model Utilisateur {
-  id             Int           @id @default(autoincrement())
-  nom            String
-  prenom         String
-  pseudo         String         @unique
-  email          String         @unique
-  password       String
-  type           String
-  orientation    String
-  age            Int
-  consent        Boolean
-  localisation   String
-  photoUrl       String?
-  createdAt      DateTime       @default(now())
-  lastLogin      DateTime? 
-  emailVerified  DateTime?
-  description     String? 
-  recherches     Recherche[]
-  envies         Envie[]
-  coverUrl String? 
-  photos       Photo[]  // Relation 1:N vers Photo
 
-  // Ajouts pour le profil éditable
-  experience     String?
-  rechercheType  String?
-  sexe           String?
-  fumeur         String?
-  silhouette     String?
-  taille         String?
-  origines       String?
-  yeux           String?
-  cheveux        String?
+enum Role {
+  USER
+  ADMIN
 }
 
+model Utilisateur {
+  id            Int         @id @default(autoincrement())
+  nom           String
+  prenom        String
+  pseudo        String      @unique
+  email         String      @unique
+  role          Role        @default(USER)
+  password      String
+  type          String
+  orientation   String
+  age           Int
+  consent       Boolean
+  localisation  String
+  photoUrl      String?
+  createdAt     DateTime    @default(now())
+  lastLogin     DateTime?
+  emailVerified DateTime?
+  description   String?
+  recherches    Recherche[]
+  envies        Envie[]
+  coverUrl      String?
+  photos        Photo[]
+  experience    String?
+  rechercheType String?
+  sexe          String?
+  fumeur        String?
+  silhouette    String?
+  taille        String?
+  origines      String?
+  yeux          String?
+  cheveux       String?
+
+  // ✅ Relation inverse des articles
+  articles Article[]
+}
+
+model Article {
+  id        String      @id @default(uuid())
+  titre     String
+  contenu   String
+  slug      String      @unique
+  auteurId  Int // ✅ Doit correspondre à Utilisateur.id (Int)
+  auteur    Utilisateur @relation(fields: [auteurId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
 
 model Recherche {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   label         String
-  utilisateur   Utilisateur  @relation(fields: [utilisateurId], references: [id])
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
 }
+
 model Envie {
-  id             Int          @id @default(autoincrement())
-  label          String
-  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
-  utilisateurId  Int
+  id            Int         @id @default(autoincrement())
+  label         String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateurId Int
 }
 
 model EmailVerificationToken {
@@ -68,6 +86,7 @@ model EmailVerificationToken {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+
 model PasswordResetToken {
   id        String   @id @default(uuid())
   email     String
@@ -75,6 +94,7 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+
 model Photo {
   id            Int         @id @default(autoincrement())
   url           String

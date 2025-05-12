@@ -1,0 +1,22 @@
+.article-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .article-title {
+    font-size: 2em;
+    margin-bottom: 10px;
+  }
+  
+  .article-meta {
+    font-size: 0.9em;
+    color: #777;
+    margin-bottom: 20px;
+  }
+  
+  .article-content {
+    font-size: 1.1em;
+    line-height: 1.6;
+  }
+  
