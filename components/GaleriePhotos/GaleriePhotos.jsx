@@ -39,7 +39,7 @@ export default function GaleriePhotos({ photos = [] }) {
 
   return (
     <div className="profil-section">
-      <h2 className="profil-section-title">Ma galerie</h2>
+      <h3 className="profil-section-title">Ma galerie</h3>
       <div className="gallery-grid">
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id || index}>

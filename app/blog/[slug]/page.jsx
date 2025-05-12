@@ -32,15 +32,34 @@ export default async function ArticlePage({ params }) {
   if (!article) return notFound();
 
   return (
-    <div className="article-container">
-      <h1 className="article-title">{article.titre}</h1>
-      <p className="article-meta">
-        Par {article.auteur.pseudo} – {new Date(article.createdAt).toLocaleDateString()}
-      </p>
-      <div
-        className="article-content"
-        dangerouslySetInnerHTML={{ __html: article.contenu }}
-      />
-    </div>
-  );
+  <div className="article-container">
+    <h1 className="article-title">{article.titre}</h1>
+    <p className="article-meta">
+      Par {article.auteur.pseudo} – {new Date(article.createdAt).toLocaleDateString()}
+    </p>
+
+    {article.description && (
+      <p className="article-description">{article.description}</p>
+    )}
+
+    {article.images && article.images.length > 0 && (
+      <div className="article-images">
+        {article.images.map((url, index) => (
+          <img
+            key={index}
+            src={url}
+            alt={`Illustration ${index + 1}`}
+            className="article-image"
+            style={{ maxWidth: "100%", margin: "10px 0" }}
+          />
+        ))}
+      </div>
+    )}
+
+    <div
+      className="article-content"
+      dangerouslySetInnerHTML={{ __html: article.contenu }}
+    />
+  </div>
+);
 }

@@ -1,9 +1,4 @@
-.profil-section-title {
-    font-size: 1.3rem;
-    color: #fff;
-    margin-bottom: 15px;
-  }
-  
+ 
   .gallery-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

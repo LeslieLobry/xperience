@@ -49,6 +49,7 @@ h1, h2, h3,
 .navbar-pseudo strong {
   font-family: var(--font-allura);
   font-weight: 900;
+  color: var(--gold);
 }
 @media (prefers-color-scheme: dark) {
   html {

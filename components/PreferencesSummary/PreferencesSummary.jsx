@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Modal from '../Modal/Modal';
 import PreferencesForm from '../PreferencesForm/PreferencesForm';
+import Button from '../Button/Button';
+import "../PreferencesSummary/PreferencesSummary.css"
 
 export default function PreferencesSummary() {
   const [recherches, setRecherches] = useState([]);
@@ -35,8 +37,10 @@ export default function PreferencesSummary() {
   };
 
   return (
-    <div>
+    <div className='preference-contenant'>
       <h2>Préférences</h2>
+      <div className="ref">
+
       <div>
         <h3>Je recherche</h3>
         {recherches.length > 0 ? (
@@ -46,7 +50,7 @@ export default function PreferencesSummary() {
             ))}
           </ul>
         ) : (
-          <p style={{ color: 'red' }}>Non défini</p>
+          <p style={{ color: "#a2b9c1" }}>Non défini</p>
         )}
       </div>
       <div>
@@ -58,13 +62,14 @@ export default function PreferencesSummary() {
             ))}
           </ul>
         ) : (
-          <p style={{ color: 'red' }}>Non défini</p>
+          <p style={{ color: "#a2b9c1" }}>Non défini</p>
         )}
       </div>
+      </div>
 
-      <button onClick={handleOpenModal}>Modifier</button>
+      <Button onClick={handleOpenModal} title="Modifier" color="#8c6a5d"/>
             {confirmation && (
-               <p style={{ color: "green", fontWeight: "bold", marginTop: "1rem" }}>
+               <p style={{  color:"#e0c084", fontWeight: "bold", marginTop: "1rem" }}>
               {confirmation}
             </p>
             )}

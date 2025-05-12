@@ -6,7 +6,9 @@ import "./adminBlog.css";
 export default function AdminBlogPage() {
   const [articles, setArticles] = useState([]);
   const [titre, setTitre] = useState("");
+  const [description, setDescription] = useState("");
   const [contenu, setContenu] = useState("");
+  const [images, setImages] = useState([]);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
@@ -20,6 +22,34 @@ export default function AdminBlogPage() {
     fetchArticles();
   }, []);
 
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    const uploaded = [];
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch("/api/upload-article-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        uploaded.push(data.imageUrl);
+      } else {
+        alert("Erreur lors de l'upload d'une image.");
+      }
+    }
+
+    setImages((prev) => [...prev, ...uploaded]);
+  };
+
+  const handleRemoveImage = (urlToDelete) => {
+    setImages((prev) => prev.filter((url) => url !== urlToDelete));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSuccess("");
@@ -28,12 +58,14 @@ export default function AdminBlogPage() {
     const res = await fetch("/api/articles/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titre, contenu }),
+      body: JSON.stringify({ titre, description, contenu, images }),
     });
 
     if (res.ok) {
       setTitre("");
+      setDescription("");
       setContenu("");
+      setImages([]);
       setSuccess("✅ Article publié !");
       fetchArticles();
     } else {
@@ -63,27 +95,63 @@ export default function AdminBlogPage() {
           onChange={(e) => setTitre(e.target.value)}
           required
         />
+
+        <input
+          type="text"
+          placeholder="Brève description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+
         <textarea
-          placeholder="Contenu (HTML autorisé)"
+          placeholder="Contenu HTML"
           value={contenu}
           onChange={(e) => setContenu(e.target.value)}
           required
         />
+
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+        />
+
+        <div className="image-preview">
+          {images.map((url, i) => (
+            <div key={i} className="image-wrapper">
+              <img src={url} alt={`Aperçu ${i}`} />
+              <button type="button" onClick={() => handleRemoveImage(url)}>
+                ❌
+              </button>
+            </div>
+          ))}
+        </div>
+
         <button type="submit">Publier</button>
       </form>
 
       <h2>Articles existants</h2>
-      <ul className="admin-list">
+      <div className="admin-articles">
         {articles.map((article) => (
-          <li key={article.id}>
-            <span>{article.titre}</span>
-            <div className="admin-buttons">
-              <button onClick={() => handleDelete(article.id)}>🗑️ Supprimer</button>
-              <a href={`/admin/blog/editer/${article.id}`} className="edit-link">✏️ Éditer</a>
+          <div className="article-card" key={article.id}>
+            {article.images?.[0] && (
+              <img
+                src={article.images[0].url}
+                alt={`Image de ${article.titre}`}
+                className="article-thumbnail"
+              />
+            )}
+            <div className="article-info">
+              <h3>{article.titre}</h3>
+              <div className="admin-buttons">
+                <a href={`/admin/blog/editer/${article.id}`} className="edit-link">✏️ Éditer</a>
+                <button onClick={() => handleDelete(article.id)}>🗑️ Supprimer</button>
+              </div>
             </div>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

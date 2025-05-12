@@ -14,6 +14,7 @@ const navLinks = [
   { label: "Mon profil", href: "/utilisateurs" },
   { label: "Événements", href: "/evenement" },
   { label: "Messagerie", href: "/messagerie" },
+  { label: "Blog", href: "/blog" },
   { label: "À votre service", href: "/partenaire" },
 ];
 

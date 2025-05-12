@@ -1,42 +1,58 @@
 import { PrismaClient } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { NextResponse } from "next/server";
+import { slugify } from "../../../../lib/slugify";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
-if (!secret) throw new Error("JWT_SECRET non défini");
 
 export async function POST(req) {
-    const cookieStore = cookies();
-    const token = (await cookieStore).get("token")?.value;
-   
-  if (!token) return NextResponse.json({ success: false }, { status: 401 });
+  const cookieStore = cookies();
+  const token = cookieStore.get("token")?.value;
 
-  let decoded;
-try {
-  decoded = jwt.verify(token, secret);
-  console.log("✅ decoded JWT:", decoded); // ← ça, c'est pour diagnostiquer
-} catch {
-  return NextResponse.json({ success: false }, { status: 403 });
-}
-
-
-  if (decoded.role !== "ADMIN") {
-    return NextResponse.json({ success: false }, { status: 403 });
+  if (!token) {
+    return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
   }
 
-  const { titre, contenu } = await req.json();
-  const slug = titre.toLowerCase().replace(/\s+/g, "-");
+  let decoded;
+  try {
+    decoded = jwt.verify(token, secret);
+  } catch {
+    return NextResponse.json({ success: false, message: "Token invalide." }, { status: 403 });
+  }
 
-  const article = await prisma.article.create({
-    data: {
-      titre,
-      contenu,
-      slug,
-      auteurId: decoded.id,
-    },
-  });
+  const { titre, description, contenu, images } = await req.json();
 
-  return NextResponse.json({ success: true, article });
+  if (!titre || !contenu) {
+    return NextResponse.json({ success: false, message: "Titre et contenu requis." }, { status: 400 });
+  }
+
+  const slug = slugify(titre);
+
+  try {
+    const article = await prisma.article.create({
+      data: {
+        titre,
+        slug,
+        description,
+        contenu,
+        auteurId: parseInt(decoded.id), // ✅ Sécurité ici
+      },
+    });
+
+    if (Array.isArray(images)) {
+      const imageData = images.map((url) => ({
+        url,
+        articleId: article.id,
+      }));
+
+      await prisma.imageArticle.createMany({ data: imageData });
+    }
+
+    return NextResponse.json({ success: true, article });
+  } catch (err) {
+    console.error("Erreur création article :", err);
+    return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500 });
+  }
 }

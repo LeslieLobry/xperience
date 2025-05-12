@@ -12,41 +12,28 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
   }
-  
+  .grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 64px;
+  }
   .profil-header {
     text-align: center;
     margin-bottom: 2rem;
-  }
-  
-  .profil-infos-wrapper {
-    background-color: rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    border-radius: 12px;
-    max-width: 600px;
-    margin: 30px auto;
-  }
-  
-  .info-block p {
+  } 
+  /* .info-block p {
     margin: 10px 0;
     font-size: 1rem;
     color: #fff;
-  }
-  
-  .info-block span {
-    color: #ccc;
-    margin-left: 5px;
-  }
+  } */
   
   
   .profil-name {
     font-size: 2.5rem;
     color: var(--gold);
-    margin-top: 10%;
-    font-style: italic;
-
-  }
+ }
   
   .profil-status {
     display: inline-block;
@@ -55,7 +42,6 @@
     color: #9effa0;
     font-weight: bold;
   }
-  
   .profil-badge {
     margin-top: 0.5rem;
     display: inline-block;
@@ -95,6 +81,7 @@
     border-radius: 10px;
     margin: 1.5rem 0;
     text-align: center;
+    width: 100%;
   }
   
   .profil-completion-box h2 {
@@ -121,8 +108,11 @@
     font-size: 1.1rem;
   }
   
-  .profil-section {
-    margin: 2rem 0;
-    width: 100%;
-    max-width: 800px;
-  }
+.profil-infos-wrapper{
+    display: flex;
+    flex-direction: column;
+}
+.info-label{
+  color:#e0c084; 
+ 
+}

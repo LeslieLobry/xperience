@@ -1,5 +1,5 @@
 'use client';
-
+import "../AProposCard/AProposCard.css"
 export default function AProposCard({ createdAt, lastLogin }) {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('fr-FR');

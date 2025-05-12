@@ -27,4 +27,14 @@
     color: red;
     font-weight: bold;
   }
-  
+.preference-contenant{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.ref{
+    display: flex;
+    justify-content: space-evenly;
+    width: 100%;
+}

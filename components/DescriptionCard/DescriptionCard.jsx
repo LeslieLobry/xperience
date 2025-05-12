@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Modal from '../Modal/Modal';
+import Button from '../Button/Button';
+import "../DescriptionCard/descriptionCard.css";
 
 export default function DescriptionCard() {
   const [currentDescription, setCurrentDescription] = useState('');
@@ -9,7 +11,7 @@ export default function DescriptionCard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState('');
 
-  // 🔄 Charge la description de l'utilisateur
+  // 🔄 Chargement de la description depuis l'API
   useEffect(() => {
     async function fetchDescription() {
       try {
@@ -32,7 +34,7 @@ export default function DescriptionCard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ description: tempDescription })
+        body: JSON.stringify({ description: tempDescription }),
       });
 
       if (res.ok) {
@@ -51,17 +53,17 @@ export default function DescriptionCard() {
 
   return (
     <div className="description-card">
-      <div>
-        <strong>Description</strong>
-        <p>{currentDescription || 'Non défini'}</p>
-      </div>
+      <h3>Description</h3>
+      <p>{currentDescription || 'Non défini'}</p>
 
-      <button onClick={() => {
-        setTempDescription(currentDescription);
-        setIsModalOpen(true);
-      }}>
-        Modifier
-      </button>
+      <Button
+        title="Modifier"
+        onClick={() => {
+          setTempDescription(currentDescription);
+          setIsModalOpen(true);
+        }}
+        color="#8c6a5d"
+      />
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h3>Modifier la description</h3>
@@ -69,12 +71,20 @@ export default function DescriptionCard() {
           value={tempDescription}
           onChange={(e) => setTempDescription(e.target.value)}
           rows={5}
+          style={{ width: "100%" }}
         />
-        <div>
-          <button onClick={handleSave}>Enregistrer</button>
-          <button onClick={() => setIsModalOpen(false)}>Annuler</button>
+        <div className="modal-buttons">
+          <Button
+            title="Enregistrer"
+            onClick={handleSave}
+            color="#e0c084"
+          />
+          <Button
+            title="Annuler"
+            onClick={() => setIsModalOpen(false)}
+            color="#a2b9c1"
+          />
         </div>
-        {message && <p>{message}</p>}
       </Modal>
     </div>
   );

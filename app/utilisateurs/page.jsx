@@ -62,22 +62,16 @@ const token = cookieStore.get("token")?.value;
 
   return (
     <div className="profil-page">
-      {/* Zone cover avec photo en background */}
-      <div className="cover-container">
-        <div
-          className="cover-photo"
+      <div className="profil-header-horizontal">
+        <div className="profil-avatar-horizontal">
+          <PhotoUploader currentUrl={user.photoUrl} />
+        </div>
+        {/* <div
+          className="cover-photo-horizontal"
           style={{
             backgroundImage: `url(${user.coverUrl || "/Assets/woman.jpg"})`,
           }}
-        >
-          <CoverUploader currentUrl={user.coverUrl} />
-        </div>
-
-        <div className="profil-avatar-wrapper">
-          <div className="profil-avatar">
-            <PhotoUploader currentUrl={user.photoUrl} />
-          </div>
-        </div>
+        ></div> */}
       </div>
 
       <h1 className="profil-name">{user.pseudo}</h1>
@@ -99,35 +93,21 @@ const token = cookieStore.get("token")?.value;
         </div>
         <p className="completion-text">{completion}% complété</p>
       </div>
-
-      <div className="profil-infos-wrapper">
-        <div className="info-block">
-          <p><strong>Âge :</strong> <span>{user.age}</span></p>
-          <p><strong>Silhouette :</strong> <span>{user.silhouette}</span></p>
-          <p><strong>Localisation :</strong> <span>{user.localisation}</span></p>
-          <p><strong>Origines :</strong> <span>{user.origines}</span></p>
-          <p><strong>Taille :</strong> <span>{user.taille} cm</span></p>
-        </div>
-</div>
-
-      <div className="profil-section">
-        <DescriptionCard />
-      </div>
-      <div className="profil-section">
-  <GaleriePhotos photos={user.photos || []} />
-</div>
-
-      <div className="profil-section">
-        <PreferencesSummary />
-      </div>
-
-      <div className="profil-section">
-        <ProfilDetailsSummary />
-      </div>
-
-
-      <div className="profil-section">
-        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
+      <div className="grid">
+        <div className="profil-infos-wrapper">
+            <div className="info-block">
+              <p><span className="info-label">Âge :</span> <span className="info-value">{user.age}</span></p>
+              <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette}</span></p>
+              <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span></p>
+              <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
+              <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
+            </div>  
+        </div>  
+          <DescriptionCard />
+          <GaleriePhotos photos={user.photos || []} />
+          <PreferencesSummary />
+          <ProfilDetailsSummary />
+          <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
     </div>
   );
