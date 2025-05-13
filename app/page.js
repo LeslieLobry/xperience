@@ -33,7 +33,8 @@ export default function Home() {
         <div className="masque-contenant">
             <Image src={masque}
             alt="masque"
-            width={650}></Image>
+            width={650}
+            ></Image>
         </div>
         <div className="text">
           <p>Découvrez une communauté où la liberté et le désir se rencontrent. 
