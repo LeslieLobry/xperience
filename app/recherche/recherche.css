@@ -1,0 +1,19 @@
+.recherche-resultats {
+  padding: 1rem;
+  max-width: 700px;
+  margin: auto;
+}
+
+.resultat-item {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #ccc;
+  padding: 1rem 0;
+}
+
+.resultat-photo {
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 50%;
+}

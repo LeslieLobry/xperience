@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
 import "./accueil.css"; // crée-le pour le style
+import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -48,6 +49,7 @@ export default async function AccueilPage() {
           </div>
         ))}
       </div>
+       <RechercheWrapper />
     </div>
   );
 }

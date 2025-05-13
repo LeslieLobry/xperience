@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { Geist, Geist_Mono, Crimson_Text, Allura, Raleway} from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
