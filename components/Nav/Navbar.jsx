@@ -10,7 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import { LogIn, LogOut } from "lucide-react";
 
 const navLinks = [
-  { label: "Accueil", href: "/" },
+  { label: "Accueil", href: "/accueil" },
   { label: "Mon profil", href: "/utilisateurs" },
   { label: "Événements", href: "/evenement" },
   { label: "Messagerie", href: "/messagerie" },

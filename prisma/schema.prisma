@@ -43,6 +43,7 @@ model Utilisateur {
   origines      String?
   yeux          String?
   cheveux       String?
+  statut   String  @default("hors_ligne") // "en_ligne" ou "hors_ligne"
 
   // ✅ Relation inverse
   articles      Article[]

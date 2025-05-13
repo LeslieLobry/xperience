@@ -76,11 +76,10 @@ export default function ConnexionPage() {
           required
         />
         <Button
-                  type="submit"
-                  title="Suivant"
-                  onClick={() => validateStep() && nextStep()}
-                  color="var(--primary-color)"
-                />
+  type="submit"
+  title="Se connecter"
+  color="var(--primary-color)"
+/>
       </form>
       <div style={{ marginTop: "1rem", textAlign: "center" }}>
   <Link href="/mot-de-passe-oublie" className="forgot-link">

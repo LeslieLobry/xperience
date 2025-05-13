@@ -9,6 +9,8 @@ import AProposCard from "../../components/AProposCard/AProposCard";
 import PhotoUploader from "../../components/PhotoUploader/PhotoUploader";
 import CoverUploader from "../../components/CoverUploader/CoverUploader";
 import GaleriePhotos from "../../components/GaleriePhotos/GaleriePhotos";
+import StatutToggle from "../../components/StatutToggle/StatutToggle";
+
 
 import "../utilisateurs/utilisateurs.css";
 
@@ -59,6 +61,8 @@ const token = cookieStore.get("token")?.value;
   }
 
   const completion = calculateProfileCompletion(user);
+  
+  
 
   return (
     <div className="profil-page">
@@ -75,9 +79,8 @@ const token = cookieStore.get("token")?.value;
       </div>
 
       <h1 className="profil-name">{user.pseudo}</h1>
-      <span className="profil-status en-ligne">● EN LIGNE</span>
+      <StatutToggle initialStatut={user.statut} />
       <div className="profil-badge">{user.type} {user.orientation}</div>
-
       {/* Complétion du profil */}
       <div className="profil-completion-box">
         <h2>Devenez irrésistible, complétez votre profil !</h2>
