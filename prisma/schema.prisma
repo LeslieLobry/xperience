@@ -112,13 +112,10 @@ model Avis {
   id          Int         @id @default(autoincrement())
   commentaire String
   createdAt   DateTime    @default(now())
-
   auteurId    Int
   cibleId     Int
-
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
-
   @@unique([auteurId, cibleId]) // un seul avis par couple auteur/cible
 }
 

@@ -28,28 +28,30 @@ export default function ConnexionPage() {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSuccess("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  const res = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(form),
+  });
 
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      setSuccess("Connexion réussie !");
-      await fetchUser(); // <-- met à jour le contexte global
-      router.push("/utilisateurs");
-    } else {
-      setError(data.message);
+  const data = await res.json();
+  if (data.success) {
+    setSuccess("Connexion réussie !");
+    const userData = await fetchUser(); // ✅ on récupère l'user avec l'id
+    if (userData?.id) {
+      router.push(`/profil/${userData.id}`);
     }
-  };
+  } else {
+    setError(data.message);
+  }
+};
 
+ 
   return (
     <div className="connexion-contenant">
       <h1 className="connexion-title">Connexion</h1>

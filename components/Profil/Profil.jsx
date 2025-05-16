@@ -9,6 +9,7 @@ import ProfilDetailsSummary from "../ProfilDetailsSummary/ProfilDetailsSummary";
 import AProposCard from "../AProposCard/AProposCard";
 import AvisForm from "../AvisForm/AvisForm";
 import AvisList from "../AvisList/AvisList";
+import "../Profil/Profil.css"
 
 export default function Profil({ user, connectedUser }) {
   const completion = calculateProfileCompletion(user);

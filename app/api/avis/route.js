@@ -60,9 +60,13 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json({ success: true, avis });
+    return NextResponse.json({ success: true, avis }); // ✅ Succès ici
+
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Erreur lors de l'enregistrement." }, { status: 500 });
+    return NextResponse.json({
+      error: "Erreur lors de l'enregistrement.",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
+    }, { status: 500 });
   }
 }

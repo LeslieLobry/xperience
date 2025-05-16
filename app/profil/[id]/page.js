@@ -1,14 +1,16 @@
-import { PrismaClient } from "@prisma/client";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
-import { redirect, notFound } from "next/navigation";
+import { PrismaClient } from "@prisma/client";
 import Profil from "../../../components/Profil/Profil";
+import ProfilProtege from "../../../components/ProfilProtege/ProfilProtege";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function ProfilPage({ params }) {
   const token = cookies().get("token")?.value;
+
   if (!token) return redirect("/connexion");
 
   let decoded;
@@ -22,28 +24,25 @@ export default async function ProfilPage({ params }) {
     where: { id: decoded.id },
   });
 
-  const userId = parseInt(params.id);
-  const viewedUser = await prisma.utilisateur.findUnique({
-    where: { id: userId },
+  const user = await prisma.utilisateur.findUnique({
+    where: { id: parseInt(params.id) },
     include: {
       recherches: true,
+      envies: true,
       photos: true,
       avisRecus: {
         include: {
-          auteur: {
-            select: {
-              id: true,
-              pseudo: true,
-              photoUrl: true,
-            },
-          },
+          auteur: true,
         },
-        orderBy: { createdAt: "desc" },
       },
     },
   });
 
-  if (!viewedUser) return notFound();
+  if (!user) return redirect("/utilisateurs");
 
-  return <Profil user={viewedUser} connectedUser={connectedUser} />;
+  return (
+    <ProfilProtege userId={decoded.id}>
+      <Profil user={user} connectedUser={connectedUser} />
+    </ProfilProtege>
+  );
 }
