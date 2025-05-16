@@ -7,10 +7,10 @@ import PreferencesSummary from "../../components/PreferencesSummary/PreferencesS
 import DescriptionCard from "../../components/DescriptionCard/DescriptionCard";
 import AProposCard from "../../components/AProposCard/AProposCard";
 import PhotoUploader from "../../components/PhotoUploader/PhotoUploader";
-import CoverUploader from "../../components/CoverUploader/CoverUploader";
 import GaleriePhotos from "../../components/GaleriePhotos/GaleriePhotos";
 import StatutToggle from "../../components/StatutToggle/StatutToggle";
-
+import AvisForm from "../../components/AvisForm/AvisForm";
+import AvisList from "../../components/AvisList/AvisList";
 
 import "../utilisateurs/utilisateurs.css";
 
@@ -18,9 +18,8 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function ProfilPage() {
-  // const token = cookies().get("token")?.value;
   const cookieStore = await cookies();
-const token = cookieStore.get("token")?.value;
+  const token = cookieStore.get("token")?.value;
 
   if (!token) return redirect("/connexion");
 
@@ -31,11 +30,27 @@ const token = cookieStore.get("token")?.value;
     return redirect("/connexion");
   }
 
-  const user = await prisma.utilisateur.findUnique({
+  const connectedUser = await prisma.utilisateur.findUnique({
     where: { id: decoded.id },
+  });
+
+  const user = await prisma.utilisateur.findUnique({
+    where: { id: decoded.id }, // ⛳️ ou un autre id si profil public
     include: {
       recherches: true,
       photos: true,
+      avisRecus: {
+        include: {
+          auteur: {
+            select: {
+              id: true, // requis pour pouvoir modifier/supprimer
+              pseudo: true,
+              photoUrl: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
 
@@ -61,8 +76,6 @@ const token = cookieStore.get("token")?.value;
   }
 
   const completion = calculateProfileCompletion(user);
-  
-  
 
   return (
     <div className="profil-page">
@@ -70,18 +83,12 @@ const token = cookieStore.get("token")?.value;
         <div className="profil-avatar-horizontal">
           <PhotoUploader currentUrl={user.photoUrl} />
         </div>
-        {/* <div
-          className="cover-photo-horizontal"
-          style={{
-            backgroundImage: `url(${user.coverUrl || "/Assets/woman.jpg"})`,
-          }}
-        ></div> */}
       </div>
 
       <h1 className="profil-name">{user.pseudo}</h1>
       <StatutToggle initialStatut={user.statut} />
       <div className="profil-badge">{user.type} {user.orientation}</div>
-      {/* Complétion du profil */}
+
       <div className="profil-completion-box">
         <h2>Devenez irrésistible, complétez votre profil !</h2>
         <p>
@@ -96,21 +103,31 @@ const token = cookieStore.get("token")?.value;
         </div>
         <p className="completion-text">{completion}% complété</p>
       </div>
+
       <div className="grid">
         <div className="profil-infos-wrapper">
-            <div className="info-block">
-              <p><span className="info-label">Âge :</span> <span className="info-value">{user.age}</span></p>
-              <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette}</span></p>
-              <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span></p>
-              <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
-              <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
-            </div>  
-        </div>  
-          <DescriptionCard />
-          <GaleriePhotos photos={user.photos || []} />
-          <PreferencesSummary />
-          <ProfilDetailsSummary />
-          <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
+          <div className="info-block">
+            <p><span className="info-label">Âge :</span> <span className="info-value">{user.age}</span></p>
+            <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette}</span></p>
+            <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span></p>
+            <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
+            <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
+          </div>
+        </div>
+
+        <DescriptionCard />
+        <GaleriePhotos photos={user.photos || []} />
+        <PreferencesSummary />
+        <ProfilDetailsSummary />
+
+        {/* ✅ Affichage des avis avec actions si l'utilisateur est l'auteur */}
+        <AvisList avisRecus={user.avisRecus} connectedUserId={connectedUser.id} />
+
+        {/* ✅ Affiche le formulaire seulement si ce n’est pas son propre profil */}
+        {connectedUser.id !== user.id && (
+          <AvisForm cibleId={user.id} />
+        )}
+        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
     </div>
   );

@@ -1,8 +1,0 @@
--- CreateTable
-CREATE TABLE "Photo" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "url" TEXT NOT NULL,
-    "utilisateurId" INTEGER NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Photo_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "Utilisateur" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);

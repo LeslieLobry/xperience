@@ -1,0 +1,23 @@
+.avis-list {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.avis-card {
+  border-bottom: 1px solid #ccc;
+  padding: 1rem 0;
+}
+
+.avis-auteur {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.avis-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}

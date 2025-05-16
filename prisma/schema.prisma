@@ -44,6 +44,8 @@ model Utilisateur {
   yeux          String?
   cheveux       String?
   statut   String  @default("hors_ligne") // "en_ligne" ou "hors_ligne"
+  avisRecus   Avis[]   @relation("AvisCible")
+  avisLaisses Avis[]   @relation("AvisAuteur")
 
   // ✅ Relation inverse
   articles      Article[]
@@ -106,3 +108,17 @@ model Photo {
   utilisateurId Int
   createdAt     DateTime    @default(now())
 }
+model Avis {
+  id          Int         @id @default(autoincrement())
+  commentaire String
+  createdAt   DateTime    @default(now())
+
+  auteurId    Int
+  cibleId     Int
+
+  auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
+  cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
+
+  @@unique([auteurId, cibleId]) // un seul avis par couple auteur/cible
+}
+
