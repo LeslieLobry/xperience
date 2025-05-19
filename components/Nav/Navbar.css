@@ -71,6 +71,17 @@
   height: 3px;
   background-color: #f0d084;
 }
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--gold);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.nav-icon:hover {
+  transform: scale(1.1);
+}
 
 /* Responsive */
 @media (max-width: 768px) {

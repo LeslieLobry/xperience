@@ -5,7 +5,7 @@ import PhotoUploader from '../PhotoUploader/PhotoUploader';
 import './GaleriePhotos.css';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function GaleriePhotos({ photos = [] }) {
+export default function GaleriePhotos({ photos = [], editable = false }) {
   const MAX_PHOTOS = 6;
   const [photoList, setPhotoList] = useState(photos);
   const [currentIndex, setCurrentIndex] = useState(null); // index de la photo sélectionnée
@@ -15,6 +15,7 @@ export default function GaleriePhotos({ photos = [] }) {
   };
 
   const handleDelete = async (id) => {
+    if (!editable) return;
     const res = await fetch(`/api/photos/${id}`, {
       method: "DELETE",
     });
@@ -43,9 +44,11 @@ export default function GaleriePhotos({ photos = [] }) {
       <div className="gallery-grid">
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id || index}>
-            <button className="delete-button" onClick={() => handleDelete(photo.id)}>
-              <Trash2 size={16} />
-            </button>
+            {editable && (
+              <button className="delete-button" onClick={() => handleDelete(photo.id)}>
+                <Trash2 size={16} />
+              </button>
+            )}
             <img
               src={photo.url}
               alt={`Photo ${index + 1}`}
@@ -54,7 +57,8 @@ export default function GaleriePhotos({ photos = [] }) {
             />
           </div>
         ))}
-        {Array.from({ length: emptySlots }).map((_, idx) => (
+
+        {editable && Array.from({ length: emptySlots }).map((_, idx) => (
           <div className="gallery-slot empty" key={`empty-${idx}`}>
             <PhotoUploader isGallery onUpload={handleNewPhoto} />
           </div>

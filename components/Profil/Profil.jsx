@@ -9,13 +9,15 @@ import ProfilDetailsSummary from "../ProfilDetailsSummary/ProfilDetailsSummary";
 import AProposCard from "../AProposCard/AProposCard";
 import AvisForm from "../AvisForm/AvisForm";
 import AvisList from "../AvisList/AvisList";
-import "../Profil/Profil.css"
+import "../Profil/Profil.css";
 
 export default function Profil({ user, connectedUser }) {
+  const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
+
   const completion = calculateProfileCompletion(user);
 
-  const aDejaCommente = user.avisRecus.some(
-    (avis) => avis.auteur.id === connectedUser.id
+  const aDejaCommente = user.avisRecus?.some(
+    (avis) => avis.auteur?.id === connectedUser.id
   );
 
   function calculateProfileCompletion(user) {
@@ -41,12 +43,12 @@ export default function Profil({ user, connectedUser }) {
     <div className="profil-page">
       <div className="profil-header-horizontal">
         <div className="profil-avatar-horizontal">
-          <PhotoUploader currentUrl={user.photoUrl} />
+          {isOwnProfile && <PhotoUploader currentUrl={user.photoUrl} />}
         </div>
       </div>
 
       <h1 className="profil-name">{user.pseudo}</h1>
-      <StatutToggle initialStatut={user.statut} />
+      {isOwnProfile && <StatutToggle initialStatut={user.statut} />}
       <div className="profil-badge">{user.type} {user.orientation}</div>
 
       <div className="profil-completion-box">
@@ -75,18 +77,33 @@ export default function Profil({ user, connectedUser }) {
           </div>
         </div>
 
-        <DescriptionCard />
-        <GaleriePhotos photos={user.photos || []} />
-        <PreferencesSummary />
-        <ProfilDetailsSummary />
+        <DescriptionCard editable={isOwnProfile} />
+        <GaleriePhotos photos={user.photos || []} editable={isOwnProfile} />
+        <PreferencesSummary editable={isOwnProfile} />
+        <ProfilDetailsSummary editable={isOwnProfile} />
 
-        <AvisList initialAvisRecus={user.avisRecus} connectedUserId={connectedUser.id} />
+        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
 
-        {parseInt(connectedUser.id) !== parseInt(user.id) && !aDejaCommente && (
+        {user.avisLaisses?.length > 0 && (
+          <div className="avis-laisses-section">
+            <h2>Avis laissés</h2>
+            {user.avisLaisses.map((avis) => (
+              <div key={avis.id} className="avis-card">
+                <div className="avis-header">
+                  <strong>{user.pseudo}</strong> a laissé un avis à {" "}
+                  <strong>{avis.cible?.pseudo || "un utilisateur"}</strong>
+                </div>
+                <p className="avis-commentaire">{avis.commentaire}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isOwnProfile && !aDejaCommente && (
           <AvisForm cibleId={user.id} />
         )}
 
-        {parseInt(connectedUser.id) !== parseInt(user.id) && aDejaCommente && (
+        {!isOwnProfile && aDejaCommente && (
           <p className="avis-deja-message">✅ Vous avez déjà laissé un avis sur ce profil.</p>
         )}
 

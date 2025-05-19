@@ -5,13 +5,12 @@ import Modal from '../Modal/Modal';
 import Button from '../Button/Button';
 import "../DescriptionCard/descriptionCard.css";
 
-export default function DescriptionCard() {
+export default function DescriptionCard({ editable = false }) {
   const [currentDescription, setCurrentDescription] = useState('');
   const [tempDescription, setTempDescription] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState('');
 
-  // 🔄 Chargement de la description depuis l'API
   useEffect(() => {
     async function fetchDescription() {
       try {
@@ -46,7 +45,7 @@ export default function DescriptionCard() {
         setMessage(data.message || "Erreur lors de l'enregistrement.");
       }
     } catch (error) {
-      console.error("Erreur réseau :", error);
+      console.error("Erreur serveur :", error);
       setMessage("Erreur serveur.");
     }
   };
@@ -56,36 +55,40 @@ export default function DescriptionCard() {
       <h3>Description</h3>
       <p>{currentDescription || 'Non défini'}</p>
 
-      <Button
-        title="Modifier"
-        onClick={() => {
-          setTempDescription(currentDescription);
-          setIsModalOpen(true);
-        }}
-        color="#8c6a5d"
-      />
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h3>Modifier la description</h3>
-        <textarea
-          value={tempDescription}
-          onChange={(e) => setTempDescription(e.target.value)}
-          rows={5}
-          style={{ width: "100%" }}
+      {editable && (
+        <Button
+          title="Modifier"
+          onClick={() => {
+            setTempDescription(currentDescription);
+            setIsModalOpen(true);
+          }}
+          color="#8c6a5d"
         />
-        <div className="modal-buttons">
-          <Button
-            title="Enregistrer"
-            onClick={handleSave}
-            color="#e0c084"
+      )}
+
+      {editable && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <h3>Modifier la description</h3>
+          <textarea
+            value={tempDescription}
+            onChange={(e) => setTempDescription(e.target.value)}
+            rows={5}
+            style={{ width: "100%" }}
           />
-          <Button
-            title="Annuler"
-            onClick={() => setIsModalOpen(false)}
-            color="#a2b9c1"
-          />
-        </div>
-      </Modal>
+          <div className="modal-buttons">
+            <Button
+              title="Enregistrer"
+              onClick={handleSave}
+              color="#e0c084"
+            />
+            <Button
+              title="Annuler"
+              onClick={() => setIsModalOpen(false)}
+              color="#a2b9c1"
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

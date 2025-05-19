@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react';
 import Modal from '../Modal/Modal';
 import PreferencesForm from '../PreferencesForm/PreferencesForm';
 import Button from '../Button/Button';
-import "../PreferencesSummary/PreferencesSummary.css"
+import "../PreferencesSummary/PreferencesSummary.css";
 
-export default function PreferencesSummary() {
+export default function PreferencesSummary({ editable = false }) {
   const [recherches, setRecherches] = useState([]);
   const [envies, setEnvies] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); 
   const [confirmation, setConfirmation] = useState('');
-
 
   const fetchPreferences = async () => {
     const res = await fetch('/api/me', { credentials: 'include' });
@@ -25,7 +24,7 @@ export default function PreferencesSummary() {
 
   useEffect(() => {
     fetchPreferences();
-  }, [refreshKey]); // <-- refresh quand refreshKey change
+  }, [refreshKey]);
 
   const handleOpenModal = () => setIsModalOpen(true);
 
@@ -40,42 +39,45 @@ export default function PreferencesSummary() {
     <div className='preference-contenant'>
       <h2>Préférences</h2>
       <div className="ref">
+        <div>
+          <h3>Je recherche</h3>
+          {recherches.length > 0 ? (
+            <ul>
+              {recherches.map((r, idx) => (
+                <li key={idx}>{r.label}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "#a2b9c1" }}>Non défini</p>
+          )}
+        </div>
+        <div>
+          <h3>Mes envies</h3>
+          {envies.length > 0 ? (
+            <ul>
+              {envies.map((e, idx) => (
+                <li key={idx}>{e.label}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "#a2b9c1" }}>Non défini</p>
+          )}
+        </div>
+      </div>
 
-      <div>
-        <h3>Je recherche</h3>
-        {recherches.length > 0 ? (
-          <ul>
-            {recherches.map((r, idx) => (
-              <li key={idx}>{r.label}</li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: "#a2b9c1" }}>Non défini</p>
-        )}
-      </div>
-      <div>
-        <h3>Mes envies</h3>
-        {envies.length > 0 ? (
-          <ul>
-            {envies.map((e, idx) => (
-              <li key={idx}>{e.label}</li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: "#a2b9c1" }}>Non défini</p>
-        )}
-      </div>
-      </div>
-
-      <Button onClick={handleOpenModal} title="Modifier" color="#8c6a5d"/>
-            {confirmation && (
-               <p style={{  color:"#e0c084", fontWeight: "bold", marginTop: "1rem" }}>
+      {editable && (
+        <>
+          <Button onClick={handleOpenModal} title="Modifier" color="#8c6a5d" />
+          {confirmation && (
+            <p style={{ color: "#e0c084", fontWeight: "bold", marginTop: "1rem" }}>
               {confirmation}
             </p>
-            )}
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-        <PreferencesForm onClose={handleCloseModal} />
-      </Modal>
+          )}
+          <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
+            <PreferencesForm onClose={handleCloseModal} />
+          </Modal>
+        </>
+      )}
     </div>
   );
 }

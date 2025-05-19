@@ -3,16 +3,20 @@
 import AvisCard from "../AvisCard/AvisCard";
 import { useState, useEffect } from "react";
 
-export default function AvisList({ avisRecus: initialAvisRecus, connectedUserId }) {
-  const [avisRecus, setAvisRecus] = useState(initialAvisRecus || []);
+export default function AvisList({ cibleId, connectedUserId }) {
+  const [avisRecus, setAvisRecus] = useState([]);
 
-  const refreshAvis = async () => {
-    const res = await fetch("/api/avis/moi"); // 👈 à adapter selon ta route
+  const fetchAvis = async () => {
+    const res = await fetch(`/api/avis/utilisateur/${cibleId}`);
     const data = await res.json();
     if (res.ok && data.avis) {
       setAvisRecus(data.avis);
     }
   };
+
+  useEffect(() => {
+    fetchAvis();
+  }, [cibleId]);
 
   if (!avisRecus || avisRecus.length === 0) {
     return <p>Aucun avis reçu pour l'instant.</p>;
@@ -26,7 +30,7 @@ export default function AvisList({ avisRecus: initialAvisRecus, connectedUserId 
           key={avis.id}
           avis={avis}
           connectedUserId={connectedUserId}
-          onRefresh={refreshAvis}
+          onRefresh={fetchAvis}
         />
       ))}
     </div>

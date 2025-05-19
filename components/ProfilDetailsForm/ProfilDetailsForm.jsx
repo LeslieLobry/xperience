@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import "../ProfilDetailsForm/ProfilDetailsForm.css";
 
-export default function ProfilDetailsForm({ onClose }) {
+export default function ProfilDetailsForm({ onClose, editable = true }) {
   const [form, setForm] = useState({
     localisation: "",
     experience: "",
@@ -33,12 +33,15 @@ export default function ProfilDetailsForm({ onClose }) {
   }, []);
 
   const handleChange = (e) => {
+    if (!editable) return;
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!editable) return;
+
     const res = await fetch("/api/update-profil", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -64,6 +67,7 @@ export default function ProfilDetailsForm({ onClose }) {
         placeholder="Ville"
         value={form.localisation}
         onChange={handleChange}
+        disabled={!editable}
       />
 
       <label htmlFor="experience">Expérience</label>
@@ -72,6 +76,7 @@ export default function ProfilDetailsForm({ onClose }) {
         id="experience"
         value={form.experience}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Expérience</option>
         <option value="A découvrir">A découvrir</option>
@@ -87,18 +92,15 @@ export default function ProfilDetailsForm({ onClose }) {
         name="rechercheType"
         value={form.rechercheType}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Type de recherche</option>
         <option value="Je le garde pour moi">Je le garde pour moi</option>
         <option value="Virtuel uniquement">Virtuel uniquement</option>
-        <option value="Virtuel et peut-être plus">
-          Virtuel et peut-être plus
-        </option>
+        <option value="Virtuel et peut-être plus">Virtuel et peut-être plus</option>
         <option value="Réel seulement">Réel seulement</option>
         <option value="Réel & Virtuel">Réel & Virtuel</option>
-        <option value="Je ne sais pas, c’est à voir">
-          Je ne sais pas, c’est à voir
-        </option>
+        <option value="Je ne sais pas, c’est à voir">Je ne sais pas, c’est à voir</option>
         <option value="Aventure d’un soir">Aventure d’un soir</option>
         <option value="Relation secrète">Relation secrète</option>
         <option value="Relation à long terme">Relation à long terme</option>
@@ -110,6 +112,7 @@ export default function ProfilDetailsForm({ onClose }) {
         placeholder="Sexe"
         value={form.sexe}
         onChange={handleChange}
+        disabled={!editable}
       />
 
       <input
@@ -118,6 +121,7 @@ export default function ProfilDetailsForm({ onClose }) {
         placeholder="Âge"
         value={form.age}
         onChange={handleChange}
+        disabled={!editable}
       />
 
       <input
@@ -126,6 +130,7 @@ export default function ProfilDetailsForm({ onClose }) {
         placeholder="Date de naissance"
         value={form.dateNaissance}
         onChange={handleChange}
+        disabled={!editable}
       />
 
       <label htmlFor="fumeur">Fumeur</label>
@@ -134,6 +139,7 @@ export default function ProfilDetailsForm({ onClose }) {
         name="fumeur"
         value={form.fumeur}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Sélectionner</option>
         <option value="Non fumeur">Non fumeur</option>
@@ -148,6 +154,7 @@ export default function ProfilDetailsForm({ onClose }) {
         name="silhouette"
         value={form.silhouette}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Sélectionner</option>
         <option value="Mince">Mince</option>
@@ -166,6 +173,7 @@ export default function ProfilDetailsForm({ onClose }) {
         max="220"
         value={form.taille}
         onChange={handleChange}
+        disabled={!editable}
       />
 
       <label htmlFor="origines">Origines</label>
@@ -174,6 +182,7 @@ export default function ProfilDetailsForm({ onClose }) {
         name="origines"
         value={form.origines}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Sélectionner</option>
         <option value="Caucasien(ne)">Caucasien(ne)</option>
@@ -187,7 +196,7 @@ export default function ProfilDetailsForm({ onClose }) {
       </select>
 
       <label htmlFor="yeux">Yeux</label>
-      <select id="yeux" name="yeux" value={form.yeux} onChange={handleChange}>
+      <select id="yeux" name="yeux" value={form.yeux} onChange={handleChange} disabled={!editable}>
         <option value="">Sélectionner</option>
         <option value="Marron">Marron</option>
         <option value="Verts">Verts</option>
@@ -201,6 +210,7 @@ export default function ProfilDetailsForm({ onClose }) {
         name="cheveux"
         value={form.cheveux}
         onChange={handleChange}
+        disabled={!editable}
       >
         <option value="">Sélectionner</option>
         <option value="Bruns">Bruns</option>
@@ -212,12 +222,13 @@ export default function ProfilDetailsForm({ onClose }) {
         <option value="Crâne rasé">Crâne rasé</option>
       </select>
 
-      <button type="submit">Enregistrer</button>
-      {onClose && (
-        <button type="button" onClick={onClose}>
-          Annuler
-        </button>
+      {editable && (
+        <div className="form-actions">
+          <button type="submit">Enregistrer</button>
+          {onClose && <button type="button" onClick={onClose}>Annuler</button>}
+        </div>
       )}
+
       {message && <p>{message}</p>}
     </form>
   );

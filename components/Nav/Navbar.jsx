@@ -7,11 +7,10 @@ import Image from "next/image";
 import "../Nav/Navbar.css";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, User } from "lucide-react";
 
 const navLinks = [
   { label: "Accueil", href: "/accueil" },
-  { label: "Mon profil", href: "/utilisateurs" },
   { label: "Événements", href: "/evenement" },
   { label: "Messagerie", href: "/messagerie" },
   { label: "Blog", href: "/blog" },
@@ -62,9 +61,16 @@ export default function Navbar() {
         ))}
 
         {user ? (
-          <li onClick={handleLogout} title="Déconnexion">
-            <LogOut className="nav-icon" />
-          </li>
+          <>
+            <li onClick={() => setMenuOpen(false)} title="Mon profil">
+              <Link href={`/profil/${user.id}`}>
+                <User className="nav-icon" />
+              </Link>
+            </li>
+            <li onClick={handleLogout} title="Déconnexion">
+              <LogOut className="nav-icon" />
+            </li>
+          </>
         ) : (
           <li onClick={() => setMenuOpen(false)} title="Connexion">
             <Link href="/connexion">

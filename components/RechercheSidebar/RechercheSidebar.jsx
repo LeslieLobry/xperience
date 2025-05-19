@@ -14,7 +14,7 @@ export default function RechercheSidebar({ onSearch }) {
     localisation: "",
     photo: false,
     description: false,
-    enLigne: false,
+    statut: "all", // 👈 nouveau champ
   });
 
   const handleChange = (e) => {
@@ -36,7 +36,7 @@ export default function RechercheSidebar({ onSearch }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSearch?.(form); // envoie les données au parent
+    onSearch?.(form);
     console.log("Recherche avec :", form);
   };
 
@@ -168,14 +168,29 @@ export default function RechercheSidebar({ onSearch }) {
             />
             Avec description
           </label>
+        </div>
+
+        <div className="filters-group">
+          <h3>Statut</h3>
           <label>
             <input
-              type="checkbox"
-              name="enLigne"
-              checked={form.enLigne}
+              type="radio"
+              name="statut"
+              value="all"
+              checked={form.statut === "all"}
               onChange={handleChange}
             />
-            En ligne
+            Tous les profils
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="statut"
+              value="en_ligne"
+              checked={form.statut === "en_ligne"}
+              onChange={handleChange}
+            />
+            Uniquement en ligne
           </label>
         </div>
 
