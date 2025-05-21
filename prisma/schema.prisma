@@ -46,7 +46,7 @@ model Utilisateur {
   statut   String  @default("hors_ligne") // "en_ligne" ou "hors_ligne"
   avisRecus   Avis[]   @relation("AvisCible")
   avisLaisses Avis[]   @relation("AvisAuteur")
-
+  events Evenement[]
   // ✅ Relation inverse
   articles      Article[]
 }
@@ -117,5 +117,18 @@ model Avis {
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
   @@unique([auteurId, cibleId]) // un seul avis par couple auteur/cible
+}
+model Evenement {
+  id           Int          @id @default(autoincrement())
+  titre        String
+  description  String
+  date         DateTime
+  lieu         String
+  imageUrl     String?
+  type         String       // "club" ou "privée"
+  acces        String       // "femmes_couples" ou "hommes"
+  participants Int          @default(0)
+  createdBy    Utilisateur  @relation(fields: [createdById], references: [id])
+  createdById  Int
 }
 

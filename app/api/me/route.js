@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { use } from "react";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -35,6 +36,7 @@ export async function GET() {
       user: {
         id: user.id,
         email: user.email,
+        role: user.role,
         pseudo: user.pseudo,
         photoUrl: user.photoUrl,
         recherches: user.recherches,

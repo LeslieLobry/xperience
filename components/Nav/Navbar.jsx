@@ -11,7 +11,7 @@ import { LogIn, LogOut, User } from "lucide-react";
 
 const navLinks = [
   { label: "Accueil", href: "/accueil" },
-  { label: "Événements", href: "/evenement" },
+  { label: "Événements", href: "/evenements" },
   { label: "Messagerie", href: "/messagerie" },
   { label: "Blog", href: "/blog" },
   { label: "À votre service", href: "/partenaire" },
