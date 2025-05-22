@@ -149,38 +149,39 @@ export default function RegisterForm() {
   };
 
   const handleLocalisationChange = (e) => {
-    const value = e.target.value;
-    setLocalisationInput(value);
-    setForm((prev) => ({ ...prev, localisation: value }));
+  const value = e.target.value;
+  setLocalisationInput(value);
+  setForm((prev) => ({ ...prev, localisation: value }));
 
-    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+  if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
-    if (value.length >= 2 && mapboxKey) {
-      debounceTimeout.current = setTimeout(async () => {
-        try {
-          const res = await axios.get(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value)}.json`,
-            {
-              params: {
-                access_token: mapboxKey,
-                autocomplete: true,
-                types: "place",
-                country: "FR",
-                limit: 5,
-              },
-            }
-          );
-          const villes = res.data.features.map((v) => v.place_name);
-          setSuggestions(villes);
-        } catch (err) {
-          console.error("Erreur Mapbox API :", err);
-          setSuggestions([]);
-        }
-      }, 400);
-    } else {
-      setSuggestions([]);
-    }
-  };
+  if (value.length >= 2) {
+    debounceTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
+            value
+          )}&fields=nom&boost=population&limit=5`
+        );
+        const data = await res.json();
+        const villes = data.map((v) => v.nom);
+        setSuggestions(villes);
+      } catch (err) {
+        console.error("Erreur geo.api.gouv.fr :", err);
+        setSuggestions([]);
+      }
+    }, 400);
+  } else {
+    setSuggestions([]);
+  }
+};
+
+const handleVilleSelect = (ville) => {
+  setForm((prev) => ({ ...prev, localisation: ville }));
+  setLocalisationInput(ville);
+  setSuggestions([]);
+};
+
 
   const handleVilleSelect = (ville) => {
     setForm((prev) => ({ ...prev, localisation: ville }));

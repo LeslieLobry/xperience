@@ -69,28 +69,21 @@ export default function CreateEventPage() {
   };
 
   // 🔍 Récupération des villes
-  const fetchCities = async (query) => {
-    if (!query) {
-      setCitySuggestions([]);
-      return;
-    }
+const fetchCities = async (query) => {
+  if (!query) return setCitySuggestions([]);
 
-    try {
-      const response = await fetch(
-        `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${query}&limit=5&languageCode=fr&sort=-population`,
-        {
-          headers: {
-            "X-RapidAPI-Key": process.env.NEXT_PUBLIC_GEODB_API_KEY,
-            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-          },
-        }
-      );
-      const data = await response.json();
-      setCitySuggestions(data.data || []);
-    } catch (error) {
-      console.error("Erreur de récupération des villes :", error);
-    }
-  };
+  try {
+    const res = await fetch(
+      `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(query)}&fields=nom&boost=population&limit=5`
+    );
+    const data = await res.json();
+    setCitySuggestions(data.map((v) => v.nom));
+  } catch (err) {
+    console.error("Erreur geo.api.gouv.fr :", err);
+    setCitySuggestions([]);
+  }
+};
+
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -100,7 +93,7 @@ export default function CreateEventPage() {
   }, [lieuInput]);
 
   const handleCitySelect = (city) => {
-    const fullCity = `${city.name}, ${city.countryCode}`;
+    const fullCity = city;
     setForm((prev) => ({ ...prev, lieu: fullCity }));
     setLieuInput(fullCity);
     setCitySuggestions([]);
@@ -163,7 +156,7 @@ export default function CreateEventPage() {
                 style={{ padding: "0.5rem", cursor: "pointer" }}
                 onClick={() => handleCitySelect(city)}
               >
-                {city.name}, {city.countryCode}
+                {city}
               </li>
             ))}
           </ul>

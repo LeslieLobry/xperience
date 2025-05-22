@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./FiltreEvenements.css";
 
 export default function FiltreEvenements({ onFilterChange }) {
@@ -25,32 +25,23 @@ export default function FiltreEvenements({ onFilterChange }) {
         console.log("📍 Position GPS:", latitude, longitude);
 
         try {
-          const response = await fetch(
-            `https://wft-geo-db.p.rapidapi.com/v1/geo/locations/${latitude},${longitude}/nearbyCities?limit=1&countryIds=FR`,
-            {
-              headers: {
-                "X-RapidAPI-Key": process.env.NEXT_PUBLIC_GEODB_API_KEY,
-                "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-              },
-            }
+          const res = await fetch(
+            `https://geo.api.gouv.fr/communes?lat=${latitude}&lon=${longitude}&fields=nom,centre&format=json`
           );
+          const data = await res.json();
 
-          const data = await response.json();
-          console.log("📦 Réponse GeoDB:", data);
-
-          const city = data.data?.[0];
+          const city = data?.[0];
           if (city) {
-            const full = `${city.city}, ${city.region}`;
-            setLieu(full);
-            setLieuInput(full);
-            setLatitude(city.latitude);
-            setLongitude(city.longitude);
-            console.log("🏙️ Ville détectée :", full);
+            setLieu(city.nom);
+            setLieuInput(city.nom);
+            setLatitude(city.centre.coordinates[1]);
+            setLongitude(city.centre.coordinates[0]);
+            console.log("🏙️ Ville détectée :", city.nom);
           } else {
-            console.warn("❗ Aucune ville détectée via GeoDB.");
+            console.warn("❗ Aucune ville détectée via geo.api.gouv.fr.");
           }
         } catch (err) {
-          console.error("🚨 Erreur API GeoDB :", err);
+          console.error("🚨 Erreur API Gouv :", err);
         }
       },
       () => {
@@ -60,36 +51,36 @@ export default function FiltreEvenements({ onFilterChange }) {
   };
 
   const fetchCities = async (input) => {
-    if (!input) {
+    if (!input || input.length < 2) {
       setCitySuggestions([]);
       return;
     }
 
     try {
       const res = await fetch(
-        `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${input}&limit=5&languageCode=fr&countryIds=FR`,
-        {
-          headers: {
-            "X-RapidAPI-Key": process.env.NEXT_PUBLIC_GEODB_API_KEY,
-            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
-          },
-        }
+        `https://geo.api.gouv.fr/communes?nom=${input}&fields=nom,centre&boost=population&limit=5`
       );
       const data = await res.json();
-      setCitySuggestions(data.data || []);
+
+      const suggestions = data.map((commune) => ({
+        nom: commune.nom,
+        lat: commune.centre.coordinates[1],
+        lon: commune.centre.coordinates[0],
+      }));
+
+      setCitySuggestions(suggestions);
     } catch (error) {
       console.error("Erreur autocomplétion :", error);
     }
   };
 
   const handleCitySelect = (city) => {
-    const full = `${city.name}, ${city.region}`;
-    setLieu(full);
-    setLieuInput(full);
-    setLatitude(city.latitude);
-    setLongitude(city.longitude);
+    setLieu(city.nom);
+    setLieuInput(city.nom);
+    setLatitude(city.lat);
+    setLongitude(city.lon);
     setCitySuggestions([]);
-    console.log("✅ Ville sélectionnée manuellement :", full);
+    console.log("✅ Ville sélectionnée :", city.nom);
   };
 
   const handleLieuChange = (e) => {
@@ -174,9 +165,9 @@ export default function FiltreEvenements({ onFilterChange }) {
         </button>
         {citySuggestions.length > 0 && (
           <ul className="suggestions">
-            {citySuggestions.map((city) => (
-              <li key={city.id} onClick={() => handleCitySelect(city)}>
-                {city.name}, {city.region}
+            {citySuggestions.map((city, i) => (
+              <li key={i} onClick={() => handleCitySelect(city)}>
+                {city.nom}
               </li>
             ))}
           </ul>
@@ -213,9 +204,7 @@ export default function FiltreEvenements({ onFilterChange }) {
           <input
             type="checkbox"
             checked={acces.includes("femmes_couples")}
-            onChange={() =>
-              handleCheckbox("femmes_couples", acces, setAcces)
-            }
+            onChange={() => handleCheckbox("femmes_couples", acces, setAcces)}
           />
           Femmes et couples uniquement
         </label>

@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function POST(req) {
-  const cookieHeader = headers().get('cookie') || '';
+  const cookieHeader = (await headers()).get('cookie') || '';
   const token = cookieHeader
     .split('; ')
     .find(row => row.startsWith('token='))
@@ -46,6 +46,7 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    console.error("Erreur update-profil :", err);
     return NextResponse.json({ success: false, message: 'Erreur serveur.' }, { status: 500 });
   }
 }

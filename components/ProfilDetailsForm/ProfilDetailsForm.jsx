@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "../ProfilDetailsForm/ProfilDetailsForm.css";
 
 export default function ProfilDetailsForm({ onClose, editable = true }) {
@@ -20,6 +20,9 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
   });
 
   const [message, setMessage] = useState("");
+  const [localisationInput, setLocalisationInput] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const debounceTimeout = useRef(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -27,6 +30,7 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
       const data = await res.json();
       if (res.ok && data.user) {
         setForm((prev) => ({ ...prev, ...data.user }));
+        setLocalisationInput(data.user.localisation || "");
       }
     }
     fetchData();
@@ -36,6 +40,40 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
     if (!editable) return;
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleLocalisationChange = (e) => {
+    const value = e.target.value;
+    setLocalisationInput(value);
+    setForm((prev) => ({ ...prev, localisation: value }));
+
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+    if (value.length >= 2) {
+      debounceTimeout.current = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
+              value
+            )}&fields=nom&boost=population&limit=5`
+          );
+          const data = await res.json();
+          const villes = data.map((v) => v.nom);
+          setSuggestions(villes);
+        } catch (err) {
+          console.error("Erreur geo.api.gouv.fr :", err);
+          setSuggestions([]);
+        }
+      }, 300);
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  const handleVilleSelect = (ville) => {
+    setForm((prev) => ({ ...prev, localisation: ville }));
+    setLocalisationInput(ville);
+    setSuggestions([]);
   };
 
   const handleSubmit = async (e) => {
@@ -61,14 +99,25 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
     <form onSubmit={handleSubmit} className="profil-form">
       <h2>Modifier mon profil</h2>
 
-      <input
-        type="text"
-        name="localisation"
-        placeholder="Ville"
-        value={form.localisation}
-        onChange={handleChange}
-        disabled={!editable}
-      />
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          name="localisation"
+          placeholder="Ville"
+          value={localisationInput}
+          onChange={handleLocalisationChange}
+          disabled={!editable}
+        />
+        {suggestions.length > 0 && editable && (
+          <ul className="suggestions">
+            {suggestions.map((ville, i) => (
+              <li key={i} onClick={() => handleVilleSelect(ville)}>
+                {ville}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <label htmlFor="experience">Expérience</label>
       <select
@@ -196,7 +245,13 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
       </select>
 
       <label htmlFor="yeux">Yeux</label>
-      <select id="yeux" name="yeux" value={form.yeux} onChange={handleChange} disabled={!editable}>
+      <select
+        id="yeux"
+        name="yeux"
+        value={form.yeux}
+        onChange={handleChange}
+        disabled={!editable}
+      >
         <option value="">Sélectionner</option>
         <option value="Marron">Marron</option>
         <option value="Verts">Verts</option>
