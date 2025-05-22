@@ -21,6 +21,9 @@ export default function CreateEventPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
 
+  const [lieuInput, setLieuInput] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState([]);
+
   useEffect(() => {
     if (!user || user.role !== "ADMIN") {
       router.push("/evenements");
@@ -29,7 +32,7 @@ export default function CreateEventPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e) => {
@@ -65,6 +68,44 @@ export default function CreateEventPage() {
     }
   };
 
+  // 🔍 Récupération des villes
+  const fetchCities = async (query) => {
+    if (!query) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${query}&limit=5&languageCode=fr&sort=-population`,
+        {
+          headers: {
+            "X-RapidAPI-Key": process.env.NEXT_PUBLIC_GEODB_API_KEY,
+            "X-RapidAPI-Host": "wft-geo-db.p.rapidapi.com",
+          },
+        }
+      );
+      const data = await response.json();
+      setCitySuggestions(data.data || []);
+    } catch (error) {
+      console.error("Erreur de récupération des villes :", error);
+    }
+  };
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchCities(lieuInput);
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [lieuInput]);
+
+  const handleCitySelect = (city) => {
+    const fullCity = `${city.name}, ${city.countryCode}`;
+    setForm((prev) => ({ ...prev, lieu: fullCity }));
+    setLieuInput(fullCity);
+    setCitySuggestions([]);
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -85,7 +126,49 @@ export default function CreateEventPage() {
       <input name="titre" placeholder="Titre" onChange={handleChange} required />
       <textarea name="description" placeholder="Description" onChange={handleChange} required />
       <input name="date" type="date" onChange={handleChange} required />
-      <input name="lieu" placeholder="Lieu" onChange={handleChange} required />
+
+      {/* Champ Lieu avec autocomplétion */}
+      <div style={{ position: "relative" }}>
+        <input
+          name="lieu"
+          placeholder="Ville"
+          value={lieuInput}
+          onChange={(e) => {
+            setLieuInput(e.target.value);
+            setForm((prev) => ({ ...prev, lieu: e.target.value }));
+          }}
+          autoComplete="off"
+          required
+        />
+        {citySuggestions.length > 0 && (
+          <ul
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              background: "#fff",
+              border: "1px solid #ccc",
+              maxHeight: "150px",
+              overflowY: "auto",
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+            }}
+          >
+            {citySuggestions.map((city) => (
+              <li
+                key={city.id}
+                style={{ padding: "0.5rem", cursor: "pointer" }}
+                onClick={() => handleCitySelect(city)}
+              >
+                {city.name}, {city.countryCode}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <input type="file" accept="image/*" onChange={handleImageChange} />
       {previewUrl && (

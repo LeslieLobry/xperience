@@ -1,0 +1,83 @@
+.filtre-evenements {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-width: 300px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.filtre-input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.filtre-dates {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.filtre-date {
+  flex: 1;
+}
+
+.filtre-rayon {
+  margin-bottom: 1rem;
+}
+
+.filtre-range {
+  width: 100%;
+}
+
+.filtre-access {
+  margin-top: 1rem;
+}
+.input-ville-wrapper {
+  position: relative;
+}
+
+.filtre-input {
+  width: 100%;
+  padding-right: 2.5rem; /* espace pour le bouton 📍 */
+}
+
+.detecter-icone {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #555;
+}
+
+.detecter-icone:hover {
+  color: #000;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.suggestions li {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.suggestions li:hover {
+  background-color: #eee;
+}

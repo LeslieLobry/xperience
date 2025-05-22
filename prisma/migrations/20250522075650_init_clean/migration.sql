@@ -105,6 +105,23 @@ CREATE TABLE "Avis" (
     CONSTRAINT "Avis_cibleId_fkey" FOREIGN KEY ("cibleId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "Evenement" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "titre" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "date" DATETIME NOT NULL,
+    "lieu" TEXT NOT NULL,
+    "latitude" REAL,
+    "longitude" REAL,
+    "type" TEXT NOT NULL,
+    "acces" TEXT NOT NULL,
+    "participants" INTEGER NOT NULL DEFAULT 0,
+    "imageUrl" TEXT,
+    "createurId" INTEGER NOT NULL,
+    CONSTRAINT "Evenement_createurId_fkey" FOREIGN KEY ("createurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Utilisateur_pseudo_key" ON "Utilisateur"("pseudo");
 
