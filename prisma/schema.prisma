@@ -43,12 +43,28 @@ model Utilisateur {
   origines      String?
   yeux          String?
   cheveux       String?
-  statut   String  @default("hors_ligne") // "en_ligne" ou "hors_ligne"
-  avisRecus   Avis[]   @relation("AvisCible")
-  avisLaisses Avis[]   @relation("AvisAuteur")
-  events Evenement[] @relation("UtilisateurEvenements")
-  // ✅ Relation inverse
+  statut        String       @default("hors_ligne") // "en_ligne" ou "hors_ligne"
+  avisRecus     Avis[]       @relation("AvisCible")
+  avisLaisses   Avis[]       @relation("AvisAuteur")
+  evenements    Evenement[]  @relation("Participation") // ✅ correction ici
   articles      Article[]
+}
+
+model Evenement {
+  id           Int           @id @default(autoincrement())
+  titre        String
+  description  String
+  date         DateTime
+  heureDebut   String?
+  heureFin     String?
+  lieu         String
+  type         String?
+  acces        String?
+  imageUrl     String?
+  tarifCouple  Float?
+  tarifFemme   Float?
+  tarifHomme   Float?
+  participants Utilisateur[] @relation("Participation") // ✅ relation cohérente
 }
 
 model Article {
@@ -57,11 +73,11 @@ model Article {
   titre       String
   description String?
   contenu     String
-  images      ImageArticle[]        // ✅ Liste des images associées
-  auteurId    Int                   // ✅ Correspond à Utilisateur.id
-  auteur      Utilisateur           @relation(fields: [auteurId], references: [id])
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  images      ImageArticle[]
+  auteurId    Int
+  auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 }
 
 model ImageArticle {
@@ -108,6 +124,7 @@ model Photo {
   utilisateurId Int
   createdAt     DateTime    @default(now())
 }
+
 model Avis {
   id          Int         @id @default(autoincrement())
   commentaire String
@@ -116,22 +133,5 @@ model Avis {
   cibleId     Int
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
-  @@unique([auteurId, cibleId]) // un seul avis par couple auteur/cible
+  @@unique([auteurId, cibleId])
 }
-model Evenement {
-  id           Int      @id @default(autoincrement())
-  titre        String
-  description  String
-  date         DateTime
-  lieu         String
-  latitude     Float?
-  longitude    Float?
-  type         String
-  acces        String
-  participants Int      @default(0)
-  imageUrl     String?
-  createur   Utilisateur @relation("UtilisateurEvenements", fields: [createurId], references: [id])
-  createurId Int
-
-}
-

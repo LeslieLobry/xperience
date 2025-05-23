@@ -12,9 +12,14 @@ export default function CreateEventPage() {
     titre: "",
     description: "",
     date: "",
+    heureDebut: "",
+    heureFin: "",
     lieu: "",
     type: "club",
     acces: "femmes_couples",
+    tarifCouple: "",
+    tarifFemme: "",
+    tarifHomme: "",
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -55,7 +60,8 @@ export default function CreateEventPage() {
       formData.append("image", imageFile);
     }
 
-    const res = await fetch("/api/events", {
+    const res = await fetch("/api/evenements", {
+
       method: "POST",
       body: formData,
     });
@@ -68,22 +74,20 @@ export default function CreateEventPage() {
     }
   };
 
-  // 🔍 Récupération des villes
-const fetchCities = async (query) => {
-  if (!query) return setCitySuggestions([]);
+  const fetchCities = async (query) => {
+    if (!query) return setCitySuggestions([]);
 
-  try {
-    const res = await fetch(
-      `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(query)}&fields=nom&boost=population&limit=5`
-    );
-    const data = await res.json();
-    setCitySuggestions(data.map((v) => v.nom));
-  } catch (err) {
-    console.error("Erreur geo.api.gouv.fr :", err);
-    setCitySuggestions([]);
-  }
-};
-
+    try {
+      const res = await fetch(
+        `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(query)}&fields=nom&boost=population&limit=5`
+      );
+      const data = await res.json();
+      setCitySuggestions(data.map((v) => v.nom));
+    } catch (err) {
+      console.error("Erreur geo.api.gouv.fr :", err);
+      setCitySuggestions([]);
+    }
+  };
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -93,35 +97,24 @@ const fetchCities = async (query) => {
   }, [lieuInput]);
 
   const handleCitySelect = (city) => {
-    const fullCity = city;
-    setForm((prev) => ({ ...prev, lieu: fullCity }));
-    setLieuInput(fullCity);
+    setForm((prev) => ({ ...prev, lieu: city }));
+    setLieuInput(city);
     setCitySuggestions([]);
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      encType="multipart/form-data"
-      style={{
-        maxWidth: "500px",
-        margin: "auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: "1rem",
-        padding: "2rem",
-      }}
-    >
+    <form onSubmit={handleSubmit} encType="multipart/form-data" className="event-form">
       <h2>Créer un événement</h2>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="error-message">{error}</p>}
 
       <input name="titre" placeholder="Titre" onChange={handleChange} required />
       <textarea name="description" placeholder="Description" onChange={handleChange} required />
       <input name="date" type="date" onChange={handleChange} required />
+      <input name="heureDebut" placeholder="Heure de début (ex: 22:00)" onChange={handleChange} />
+      <input name="heureFin" placeholder="Heure de fin (ex: 04:00)" onChange={handleChange} />
 
-      {/* Champ Lieu avec autocomplétion */}
-      <div style={{ position: "relative" }}>
+      <div className="autocomplete-wrapper">
         <input
           name="lieu"
           placeholder="Ville"
@@ -134,28 +127,9 @@ const fetchCities = async (query) => {
           required
         />
         {citySuggestions.length > 0 && (
-          <ul
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              background: "#fff",
-              border: "1px solid #ccc",
-              maxHeight: "150px",
-              overflowY: "auto",
-              listStyle: "none",
-              padding: 0,
-              margin: 0,
-            }}
-          >
+          <ul className="city-suggestions">
             {citySuggestions.map((city) => (
-              <li
-                key={city.id}
-                style={{ padding: "0.5rem", cursor: "pointer" }}
-                onClick={() => handleCitySelect(city)}
-              >
+              <li key={city} onClick={() => handleCitySelect(city)}>
                 {city}
               </li>
             ))}
@@ -163,14 +137,12 @@ const fetchCities = async (query) => {
         )}
       </div>
 
+      <input name="tarifCouple" placeholder="Tarif couple (€)" type="number" onChange={handleChange} />
+      <input name="tarifFemme" placeholder="Tarif femme (€)" type="number" onChange={handleChange} />
+      <input name="tarifHomme" placeholder="Tarif homme (€)" type="number" onChange={handleChange} />
+
       <input type="file" accept="image/*" onChange={handleImageChange} />
-      {previewUrl && (
-        <img
-          src={previewUrl}
-          alt="Aperçu"
-          style={{ maxWidth: "100%", borderRadius: "4px" }}
-        />
-      )}
+      {previewUrl && <img src={previewUrl} alt="Aperçu" className="image-preview" />}
 
       <select name="type" onChange={handleChange} value={form.type}>
         <option value="club">Soirée club</option>

@@ -13,36 +13,44 @@ export default function ModifierEvenementPage() {
     titre: "",
     description: "",
     date: "",
+    heureDebut: "",
+    heureFin: "",
     lieu: "",
     type: "club",
     acces: "femmes_couples",
+    tarifCouple: "",
+    tarifFemme: "",
+    tarifHomme: "",
   });
 
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
 
-  // Redirige si non admin
   useEffect(() => {
     if (!user || user.role !== "ADMIN") {
       router.push("/evenements");
     }
   }, [user]);
 
-  // Préremplir le formulaire
   useEffect(() => {
     const fetchEvent = async () => {
-      const res = await fetch(`/api/events?page=1&perPage=100`);
+      const res = await fetch(`/api/evenements?page=1&perPage=100`);
       const data = await res.json();
-      const event = data.events.find(e => e.id === parseInt(params.id));
+      const event = data.events.find((e) => e.id === parseInt(params.id));
       if (event) {
         setForm({
           titre: event.titre,
           description: event.description,
           date: event.date.split("T")[0],
+          heureDebut: event.heureDebut || "",
+          heureFin: event.heureFin || "",
           lieu: event.lieu,
           type: event.type,
           acces: event.acces,
+          tarifCouple: event.tarifCouple || "",
+          tarifFemme: event.tarifFemme || "",
+          tarifHomme: event.tarifHomme || "",
         });
         if (event.imageUrl) setPreviewUrl(event.imageUrl);
       } else {
@@ -54,7 +62,7 @@ export default function ModifierEvenementPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e) => {
@@ -77,7 +85,7 @@ export default function ModifierEvenementPage() {
       formData.append("image", imageFile);
     }
 
-    const res = await fetch(`/api/events/${params.id}`, {
+    const res = await fetch(`/api/evenements/${params.id}`, {
       method: "PUT",
       body: formData,
     });
@@ -91,34 +99,24 @@ export default function ModifierEvenementPage() {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      encType="multipart/form-data"
-      style={{
-        maxWidth: "500px",
-        margin: "auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: "1rem",
-        padding: "2rem",
-      }}
-    >
+    <form onSubmit={handleSubmit} encType="multipart/form-data" className="event-edit-form">
       <h2>Modifier un événement</h2>
-      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {error && <p className="error-message">{error}</p>}
 
       <input name="titre" value={form.titre} onChange={handleChange} required />
       <textarea name="description" value={form.description} onChange={handleChange} required />
       <input type="date" name="date" value={form.date} onChange={handleChange} required />
+      <input name="heureDebut" placeholder="Heure de début (ex: 22:00)" value={form.heureDebut} onChange={handleChange} />
+      <input name="heureFin" placeholder="Heure de fin (ex: 04:00)" value={form.heureFin} onChange={handleChange} />
       <input name="lieu" value={form.lieu} onChange={handleChange} required />
 
+      <input name="tarifCouple" placeholder="Tarif couple (€)" type="number" value={form.tarifCouple} onChange={handleChange} />
+      <input name="tarifFemme" placeholder="Tarif femme (€)" type="number" value={form.tarifFemme} onChange={handleChange} />
+      <input name="tarifHomme" placeholder="Tarif homme (€)" type="number" value={form.tarifHomme} onChange={handleChange} />
+
       <input type="file" accept="image/*" onChange={handleImageChange} />
-      {previewUrl && (
-        <img
-          src={previewUrl}
-          alt="Aperçu"
-          style={{ maxWidth: "100%", borderRadius: "4px" }}
-        />
-      )}
+      {previewUrl && <img src={previewUrl} alt="Aperçu" className="image-preview" />}
 
       <select name="type" value={form.type} onChange={handleChange}>
         <option value="club">Soirée club</option>

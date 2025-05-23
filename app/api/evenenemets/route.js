@@ -11,7 +11,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 async function getUserFromCookie() {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-
   if (!token || !JWT_SECRET) return null;
 
   try {
@@ -37,6 +36,12 @@ export async function POST(req) {
   const acces = formData.get("acces");
   const image = formData.get("image");
 
+  const tarifCouple = parseFloat(formData.get("tarifCouple")) || null;
+  const tarifFemme = parseFloat(formData.get("tarifFemme")) || null;
+  const tarifHomme = parseFloat(formData.get("tarifHomme")) || null;
+  const heureDebut = formData.get("heureDebut") || null;
+  const heureFin = formData.get("heureFin") || null;
+
   if (!titre || !description || !date || !lieu || !type || !acces) {
     return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
   }
@@ -49,7 +54,6 @@ export async function POST(req) {
       const filename = `${Date.now()}_${image.name.replace(/\s/g, "_")}`;
       const uploadsDir = path.join(process.cwd(), "public/uploads");
 
-      // 🔧 Crée le dossier s’il n’existe pas
       await fs.mkdir(uploadsDir, { recursive: true });
 
       const imagePath = path.join(uploadsDir, filename);
@@ -71,8 +75,12 @@ export async function POST(req) {
         lieu,
         type,
         acces,
+        heureDebut,
+        heureFin,
+        tarifCouple,
+        tarifFemme,
+        tarifHomme,
         imageUrl,
-        createurId: user.id,
       },
     });
 
@@ -112,10 +120,8 @@ export async function GET(req) {
         skip,
         take: perPage,
         include: {
-          createur: {
-            select: { pseudo: true },
-          },
-        },
+          participants: true
+        }
       }),
       prisma.evenement.count({ where: filters }),
     ]);

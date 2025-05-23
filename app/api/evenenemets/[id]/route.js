@@ -8,6 +8,7 @@ import sharp from "sharp";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// 🔐 Vérifie l'utilisateur via le token JWT (HTTP-only cookie)
 async function getUserFromCookie() {
   const cookieStore = await cookies();
   const token = (await cookieStore)?.get("token")?.value;
@@ -20,6 +21,32 @@ async function getUserFromCookie() {
   }
 }
 
+// 📘 GET - Obtenir un événement (public)
+export async function GET(_, { params }) {
+  const id = parseInt(params.id);
+
+  try {
+    const evenement = await prisma.evenement.findUnique({
+      where: { id },
+      include: {
+        participants: {
+          select: { id: true, pseudo: true },
+        },
+      },
+    });
+
+    if (!evenement) {
+      return NextResponse.json({ error: "Événement non trouvé" }, { status: 404 });
+    }
+
+    return NextResponse.json(evenement);
+  } catch (error) {
+    console.error("Erreur GET:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ✏️ PUT - Modifier un événement (admin uniquement)
 export async function PUT(req, { params }) {
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
@@ -32,13 +59,12 @@ export async function PUT(req, { params }) {
 
   let imageUrl = null;
 
-  // 📦 On récupère l'événement pour supprimer l'ancienne image si besoin
   const existing = await prisma.evenement.findUnique({
     where: { id },
     select: { imageUrl: true },
   });
 
-  // 🖼️ Si nouvelle image, remplacer
+  // 🖼️ Image de remplacement
   if (imageFile && typeof imageFile !== "string") {
     const bytes = await imageFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -50,13 +76,12 @@ export async function PUT(req, { params }) {
 
     imageUrl = `/uploads/${filename}`;
 
-    // ❌ supprimer l'ancienne si elle existe
     if (existing.imageUrl) {
       const oldPath = path.join(process.cwd(), "public", existing.imageUrl);
       try {
         await fs.unlink(oldPath);
-      } catch (e) {
-        console.warn("Ancienne image introuvable ou déjà supprimée");
+      } catch {
+        console.warn("Ancienne image introuvable.");
       }
     }
   }
@@ -77,6 +102,7 @@ export async function PUT(req, { params }) {
   return NextResponse.json(updated);
 }
 
+// ❌ DELETE - Supprimer un événement (admin uniquement)
 export async function DELETE(_, { params }) {
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
@@ -90,12 +116,11 @@ export async function DELETE(_, { params }) {
     select: { imageUrl: true },
   });
 
-  // ❌ supprimer l'image si elle existe
   if (existing?.imageUrl) {
     const imagePath = path.join(process.cwd(), "public", existing.imageUrl);
     try {
       await fs.unlink(imagePath);
-    } catch (e) {
+    } catch {
       console.warn("Image introuvable lors de la suppression.");
     }
   }
@@ -106,3 +131,4 @@ export async function DELETE(_, { params }) {
 
   return NextResponse.json({ success: true });
 }
+
