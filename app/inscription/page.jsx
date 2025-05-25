@@ -176,13 +176,6 @@ export default function RegisterForm() {
   }
 };
 
-const handleVilleSelect = (ville) => {
-  setForm((prev) => ({ ...prev, localisation: ville }));
-  setLocalisationInput(ville);
-  setSuggestions([]);
-};
-
-
   const handleVilleSelect = (ville) => {
     setForm((prev) => ({ ...prev, localisation: ville }));
     setLocalisationInput(ville);

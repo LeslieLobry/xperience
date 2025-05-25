@@ -13,41 +13,42 @@ enum Role {
 }
 
 model Utilisateur {
-  id            Int         @id @default(autoincrement())
-  nom           String
-  prenom        String
-  pseudo        String      @unique
-  email         String      @unique
-  role          Role        @default(USER)
-  password      String
-  type          String
-  orientation   String
-  age           Int
-  consent       Boolean
-  localisation  String
-  photoUrl      String?
-  createdAt     DateTime    @default(now())
-  lastLogin     DateTime?
-  emailVerified DateTime?
-  description   String?
-  recherches    Recherche[]
-  envies        Envie[]
-  coverUrl      String?
-  photos        Photo[]
-  experience    String?
-  rechercheType String?
-  sexe          String?
-  fumeur        String?
-  silhouette    String?
-  taille        String?
-  origines      String?
-  yeux          String?
-  cheveux       String?
-  statut        String       @default("hors_ligne") // "en_ligne" ou "hors_ligne"
-  avisRecus     Avis[]       @relation("AvisCible")
-  avisLaisses   Avis[]       @relation("AvisAuteur")
-  evenements    Evenement[]  @relation("Participation") // ✅ correction ici
-  articles      Article[]
+  id              Int         @id @default(autoincrement())
+  nom             String
+  prenom          String
+  pseudo          String      @unique
+  email           String      @unique
+  role            Role        @default(USER)
+  password        String
+  type            String
+  orientation     String
+  age             Int
+  consent         Boolean
+  localisation    String
+  photoUrl        String?
+  createdAt       DateTime    @default(now())
+  lastLogin       DateTime?
+  emailVerified   DateTime?
+  description     String?
+  recherches      Recherche[]
+  envies          Envie[]
+  coverUrl        String?
+  photos          Photo[]
+  experience      String?
+  rechercheType   String?
+  sexe            String?
+  fumeur          String?
+  silhouette      String?
+  taille          String?
+  origines        String?
+  yeux            String?
+  cheveux         String?
+  statut          String      @default("hors_ligne") // "en_ligne" ou "hors_ligne"
+  avisRecus       Avis[]      @relation("AvisCible")
+  avisLaisses     Avis[]      @relation("AvisAuteur")
+  evenements      Evenement[] @relation("Participation") // ✅ correction ici
+  articles        Article[]
+  evenementsCrees Evenement[] @relation("EvenementCreateur")
 }
 
 model Evenement {
@@ -64,6 +65,8 @@ model Evenement {
   tarifCouple  Float?
   tarifFemme   Float?
   tarifHomme   Float?
+  createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
+  createurId   Int
   participants Utilisateur[] @relation("Participation") // ✅ relation cohérente
 }
 
@@ -81,9 +84,9 @@ model Article {
 }
 
 model ImageArticle {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   url       String
-  article   Article  @relation(fields: [articleId], references: [id])
+  article   Article @relation(fields: [articleId], references: [id])
   articleId String
 }
 
@@ -133,5 +136,6 @@ model Avis {
   cibleId     Int
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
+
   @@unique([auteurId, cibleId])
 }

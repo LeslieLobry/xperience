@@ -25,6 +25,7 @@ export default function CreateEventPage() {
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [lieuInput, setLieuInput] = useState("");
   const [citySuggestions, setCitySuggestions] = useState([]);
@@ -51,6 +52,7 @@ export default function CreateEventPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
 
     const formData = new FormData();
     for (const key in form) {
@@ -60,23 +62,32 @@ export default function CreateEventPage() {
       formData.append("image", imageFile);
     }
 
-    const res = await fetch("/api/evenements", {
+    try {
+      const res = await fetch("/api/evenements", {
+        method: "POST",
+        body: formData,
+      });
 
-      method: "POST",
-      body: formData,
-    });
-
-    if (res.ok) {
-      router.push("/evenements");
-    } else {
-      const data = await res.json();
-      setError(data.error || "Erreur lors de la création");
+      if (res.ok) {
+        router.push("/evenements");
+      } else {
+        let data;
+        try {
+          data = await res.json();
+        } catch {
+          data = { error: "Erreur inconnue du serveur" };
+        }
+        setError(data.error || "Erreur lors de la création");
+      }
+    } catch (err) {
+      setError("Erreur réseau");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const fetchCities = async (query) => {
     if (!query) return setCitySuggestions([]);
-
     try {
       const res = await fetch(
         `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(query)}&fields=nom&boost=population&limit=5`
@@ -154,7 +165,9 @@ export default function CreateEventPage() {
         <option value="hommes">Hommes seuls acceptés</option>
       </select>
 
-      <button type="submit">Valider</button>
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Envoi en cours..." : "Valider"}
+      </button>
     </form>
   );
 }
