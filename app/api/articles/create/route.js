@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function POST(req) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // ✅
   const token = cookieStore.get("token")?.value;
 
   if (!token) {

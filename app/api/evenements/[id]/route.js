@@ -1,134 +1,76 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
-import path from "path";
-import fs from "fs/promises";
-import sharp from "sharp";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// 🔐 Vérifie l'utilisateur via le token JWT (HTTP-only cookie)
-async function getUserFromCookie() {
-  const cookieStore = await cookies();
-  const token = (await cookieStore)?.get("token")?.value;
-  if (!token || !JWT_SECRET) return null;
-
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
+import { prisma } from "@/lib/prisma";
 
 // 📘 GET - Obtenir un événement (public)
-export async function GET(_, { params }) {
-  const id = parseInt(params.id);
+export async function GET(request, context) {
+  const id = parseInt(context.params.id);
 
   try {
     const evenement = await prisma.evenement.findUnique({
       where: { id },
-      include: {
-        participants: {
-          select: { id: true, pseudo: true },
-        },
-      },
     });
 
     if (!evenement) {
-      return NextResponse.json({ error: "Événement non trouvé" }, { status: 404 });
+      return new Response(JSON.stringify({ error: "Événement non trouvé" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    return NextResponse.json(evenement);
+    return new Response(JSON.stringify(evenement), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Erreur GET:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("Erreur GET événement :", error);
+    return new Response(JSON.stringify({ error: "Erreur serveur" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
-// ✏️ PUT - Modifier un événement (admin uniquement)
-export async function PUT(req, { params }) {
-  const user = await getUserFromCookie();
-  if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+// ✏️ PATCH - Modifier un événement (admin uniquement)
+export async function PATCH(request, context) {
+  const id = parseInt(context.params.id);
+  const data = await request.json();
+
+  try {
+    const evenement = await prisma.evenement.update({
+      where: { id },
+      data,
+    });
+
+    return new Response(JSON.stringify(evenement), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Erreur PATCH événement :", error);
+    return new Response(JSON.stringify({ error: "Erreur serveur" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-
-  const formData = await req.formData();
-  const id = parseInt(params.id);
-  const imageFile = formData.get("image");
-
-  let imageUrl = null;
-
-  const existing = await prisma.evenement.findUnique({
-    where: { id },
-    select: { imageUrl: true },
-  });
-
-  // 🖼️ Image de remplacement
-  if (imageFile && typeof imageFile !== "string") {
-    const bytes = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filename = `event_${Date.now()}.webp`;
-    const filepath = path.join(process.cwd(), "public/uploads", filename);
-
-    await fs.mkdir(path.dirname(filepath), { recursive: true });
-    await sharp(buffer).resize(800).webp({ quality: 80 }).toFile(filepath);
-
-    imageUrl = `/uploads/${filename}`;
-
-    if (existing.imageUrl) {
-      const oldPath = path.join(process.cwd(), "public", existing.imageUrl);
-      try {
-        await fs.unlink(oldPath);
-      } catch {
-        console.warn("Ancienne image introuvable.");
-      }
-    }
-  }
-
-  const updated = await prisma.evenement.update({
-    where: { id },
-    data: {
-      titre: formData.get("titre"),
-      description: formData.get("description"),
-      date: new Date(formData.get("date")),
-      lieu: formData.get("lieu"),
-      type: formData.get("type"),
-      acces: formData.get("acces"),
-      ...(imageUrl && { imageUrl }),
-    },
-  });
-
-  return NextResponse.json(updated);
 }
 
-// ❌ DELETE - Supprimer un événement (admin uniquement)
-export async function DELETE(_, { params }) {
-  const user = await getUserFromCookie();
-  if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+// 🗑️ DELETE - Supprimer un événement (admin uniquement)
+export async function DELETE(request, context) {
+  const id = parseInt(context.params.id);
+
+  try {
+    await prisma.evenement.delete({
+      where: { id },
+    });
+
+    return new Response(JSON.stringify({ message: "Événement supprimé" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Erreur DELETE événement :", error);
+    return new Response(JSON.stringify({ error: "Erreur serveur" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-
-  const id = parseInt(params.id);
-
-  const existing = await prisma.evenement.findUnique({
-    where: { id },
-    select: { imageUrl: true },
-  });
-
-  if (existing?.imageUrl) {
-    const imagePath = path.join(process.cwd(), "public", existing.imageUrl);
-    try {
-      await fs.unlink(imagePath);
-    } catch {
-      console.warn("Image introuvable lors de la suppression.");
-    }
-  }
-
-  await prisma.evenement.delete({
-    where: { id },
-  });
-
-  return NextResponse.json({ success: true });
 }
-

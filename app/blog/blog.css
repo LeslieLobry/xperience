@@ -1,32 +1,115 @@
-.blog-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+ .blog-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 2rem;
+    box-sizing: border-box;
+    z-index: 1; 
+    overflow: hidden; 
+    color:#f5ece0;
+    gap: 25px;
+}
+
+.blog-container::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('../Assets/skin.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3;
+    z-index: -1;
+}
+.blog-title {
+  font-size: 70px ;
+  color:#e0c084;
+}
+.blog-article {
+    border: 2px solid #e0c084;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
   }
+
+.blog-admin-button {
+  color: #f5ece0;
+  font-size: 25px;
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.blog-admin-button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background-color: #e0c084;
+  transition: width 0.3s ease;
+}
+
+.blog-admin-button:hover {
+  color: #e0c084;
+}
+
+.blog-admin-button:hover::after {
+  width: 100%;
+}
+.blog-link{
+  font-size: 35px;
+   color: #e0c084;
+}
+.blog-article-link{
+  width: 50%;
+}
+.pagination {
+  display: flex;
+  gap: 10px;
+  margin-top: 2rem;
+  justify-content: center;
+}
+
+.pagination-link {
+  padding: 8px 12px;
+  border: 1px solid #e0c084;
+  color: #f5ece0;
+  text-decoration: none;
   
-  .blog-title {
-    font-size: 2em;
-    margin-bottom: 20px;
-  }
-  
-  .blog-article {
-    margin-bottom: 30px;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 15px;
-  }
-  
-  .blog-link {
-    font-size: 1.4em;
-    color: #0066cc;
-    text-decoration: none;
-  }
-  
-  .blog-link:hover {
-    text-decoration: underline;
-  }
-  
-  .blog-date {
-    font-size: 0.9em;
-    color: #666;
-  }
-  
+}
+
+.pagination-link:hover {
+  background: #e0c084;
+  color: #2b2b2b;
+}
+
+.pagination-link.active {
+  background: #e0c084;
+  color: #2b2b2b;
+  font-weight: bold;
+}
+.blog-article-link {
+  width: 50%;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: block;
+}
+
+.blog-article-link:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+.blog-article {
+  transition: background 0.3s ease;
+}
+
+.blog-article-link:hover .blog-article {
+  background: rgba(255, 255, 255, 0.05);
+}
