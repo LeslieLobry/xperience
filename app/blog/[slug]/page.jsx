@@ -1,21 +1,20 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
+import ArticleWrapper from "./ArticleWrapper"; // ✅ composant client-only wrapper
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
 export default async function ArticlePage({ params }) {
   console.log("🔍 SLUG reçu :", params.slug);
 
-  // ✅ Auth via cookies
+  // ✅ Authentification via JWT dans cookie
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-
   if (!token) return redirect("/connexion");
 
   let decoded;
@@ -25,7 +24,7 @@ export default async function ArticlePage({ params }) {
     return redirect("/connexion");
   }
 
-  // ✅ Récupération de l'article avec auteur + images
+  // ✅ Récupération article + auteur + images
   const article = await prisma.article.findUnique({
     where: { slug: params.slug },
     include: {
@@ -38,17 +37,21 @@ export default async function ArticlePage({ params }) {
 
   return (
     <div className="article-container">
+      {/* ✅ Incrémentation des vues côté client */}
+      <ArticleWrapper articleId={article.id} />
+
       <h1 className="article-title">{article.titre}</h1>
       <p className="article-meta">
         Par {article.auteur.pseudo} –{" "}
-        {new Date(article.createdAt).toLocaleDateString("fr-FR")}
+        {new Date(article.createdAt).toLocaleDateString("fr-FR")} –{" "}
+        {article.vues} vues
       </p>
 
       {article.description && (
         <p className="article-description">{article.description}</p>
       )}
 
-      {article.images && article.images.length > 0 && (
+      {article.images?.length > 0 && (
         <div className="article-images">
           {article.images.map((image, index) => (
             <img
@@ -66,10 +69,10 @@ export default async function ArticlePage({ params }) {
         className="article-content"
         dangerouslySetInnerHTML={{ __html: article.contenu }}
       />
-      <Link href="/blog" className="back-to-blog-button">
-  ← Retour au blog
-</Link>
 
+      <Link href="/blog" className="back-to-blog-button">
+        ← Retour au blog
+      </Link>
     </div>
   );
 }

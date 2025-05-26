@@ -5,6 +5,8 @@ import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
 import axios from "axios";
 import Select from "react-select";
+import { useRouter } from "next/navigation";
+
 
 
 export default function RegisterForm() {
@@ -32,6 +34,7 @@ export default function RegisterForm() {
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
   const debounceTimeout = useRef(null);
+  const router = useRouter();
 
   const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
 
@@ -134,12 +137,14 @@ export default function RegisterForm() {
 
       const result = await res.json();
       if (result.success) {
-        setSuccess("Inscription réussie !");
-        setForm({ ...form, password: "", confirmPassword: "" });
-        setStep(1);
-      } else {
-        setError(result.message || "Erreur lors de l'inscription.");
-      }
+      setSuccess("Inscription réussie !");
+      setTimeout(() => {
+        router.push("/connexion"); // ou la route que tu veux, ex: /dashboard
+      }, 1500); // délai pour laisser apparaître le message de succès
+    } else {
+      setError(result.message || "Erreur lors de l'inscription.");
+    }
+
     } catch (err) {
       console.error("Erreur lors de l'envoi du formulaire :", err);
       setError("Erreur serveur pendant l'enregistrement.");
