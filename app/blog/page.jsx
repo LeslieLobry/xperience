@@ -1,24 +1,19 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import "./blog.css";
+import ArticleWrapper from "./[slug]/ArticleWrapper";
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
-export default async function BlogPage({ searchParams }) {
-  const page = Number.isInteger(Number(searchParams?.page))
-    ? parseInt(searchParams.page)
-    : 1;
-  const perPage = 5;
-  const skip = (page - 1) * perPage;
+export default async function ArticlePage(context) {
+  const slug = context.params?.slug; // ✅ évite erreur
+  if (!slug) return notFound();
 
-  const cookieStore = await cookies();
+  const cookieStore = await cookies(); // ✅ obligatoire
   const token = cookieStore.get("token")?.value;
-
   if (!token) return redirect("/connexion");
 
   let decoded;
@@ -28,74 +23,52 @@ export default async function BlogPage({ searchParams }) {
     return redirect("/connexion");
   }
 
-  const user = await prisma.utilisateur.findUnique({
-    where: { id: decoded.id },
+  const article = await prisma.article.findUnique({
+    where: { slug },
+    include: {
+      auteur: true,
+      images: true,
+    },
   });
 
-  const [articles, totalArticles] = await Promise.all([
-    prisma.article.findMany({
-      skip,
-      take: perPage,
-      orderBy: { createdAt: "desc" },
-      include: { images: true },
-    }),
-    prisma.article.count(),
-  ]);
-
-  const totalPages = Math.ceil(totalArticles / perPage);
+  if (!article) return notFound();
 
   return (
-    <div className="blog-container">
-      <h1 className="blog-title">Blog</h1>
+    <div className="article-container">
+      <ArticleWrapper articleId={article.id} />
 
-      {user?.role === "ADMIN" && (
-        <div className="blog-admin-link">
-          <Link href="/admin/blog" className="blog-admin-button">
-            Éditer les articles
-          </Link>
-        </div>
+      <h1 className="article-title">{article.titre}</h1>
+      <p className="article-meta">
+        Par {article.auteur.pseudo} –{" "}
+        {new Date(article.createdAt).toLocaleDateString("fr-FR")} – {article.vues} vues
+      </p>
+
+      {article.description && (
+        <p className="article-description">{article.description}</p>
       )}
 
-      {articles.map((article) => {
-        const image = article.images?.[0];
-
-        return (
-          <Link
-            key={article.id}
-            href={`/blog/${article.slug}`}
-            className="blog-article-link"
-          >
-            <div className="blog-article">
-              <h2 className="blog-link">{article.titre}</h2>
-              <p className="blog-date">
-                Publié le {new Date(article.createdAt).toLocaleDateString("fr-FR")}
-              </p>
-              {image && (
-                <img
-                  src={image.url}
-                  alt={article.titre}
-                  className="blog-thumbnail"
-                  style={{ maxWidth: "200px", marginBottom: "10px" }}
-                />
-              )}
-            </div>
-          </Link>
-        );
-      })}
-
-      {totalPages > 1 && (
-        <div className="pagination">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <Link
-              key={i}
-              href={`/blog?page=${i + 1}`}
-              className={`pagination-link ${page === i + 1 ? "active" : ""}`}
-            >
-              {i + 1}
-            </Link>
+      {article.images?.length > 0 && (
+        <div className="article-images">
+          {article.images.map((image, index) => (
+            <img
+              key={index}
+              src={image.url}
+              alt={`Illustration ${index + 1}`}
+              className="article-image"
+              style={{ maxWidth: "100%", margin: "10px 0" }}
+            />
           ))}
         </div>
       )}
+
+      <div
+        className="article-content"
+        dangerouslySetInnerHTML={{ __html: article.contenu }}
+      />
+
+      <Link href="/blog" className="back-to-blog-button">
+        ← Retour au blog
+      </Link>
     </div>
   );
 }

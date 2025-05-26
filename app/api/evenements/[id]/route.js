@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 
 // 📘 GET - Obtenir un événement (public)
 export async function GET(request, context) {

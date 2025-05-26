@@ -4,17 +4,17 @@ import jwt from "jsonwebtoken";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
-import ArticleWrapper from "./ArticleWrapper"; // ✅ composant client-only wrapper
+import ArticleWrapper from "./ArticleWrapper";
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
 export default async function ArticlePage({ params }) {
-  console.log("🔍 SLUG reçu :", params.slug);
+  const slug = params.slug;
 
-  // ✅ Authentification via JWT dans cookie
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  if (!slug) return notFound();
+
+  const token = cookies().get("token")?.value;
   if (!token) return redirect("/connexion");
 
   let decoded;
@@ -24,9 +24,8 @@ export default async function ArticlePage({ params }) {
     return redirect("/connexion");
   }
 
-  // ✅ Récupération article + auteur + images
   const article = await prisma.article.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     include: {
       auteur: true,
       images: true,
@@ -37,9 +36,7 @@ export default async function ArticlePage({ params }) {
 
   return (
     <div className="article-container">
-      {/* ✅ Incrémentation des vues côté client */}
       <ArticleWrapper articleId={article.id} />
-
       <h1 className="article-title">{article.titre}</h1>
       <p className="article-meta">
         Par {article.auteur.pseudo} –{" "}

@@ -1,31 +1,26 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import Profil from "../../../components/Profil/Profil";
 import ProfilProtege from "../../../components/ProfilProtege/ProfilProtege";
+import { safeParam, getUserFromToken } from "../../../lib/serverUtils";
 
 const prisma = new PrismaClient();
-const secret = process.env.JWT_SECRET;
 
-export default async function ProfilPage({ params }) {
-  const token = cookies().get("token")?.value;
+export default async function ProfilPage(context) {
+  const id = safeParam(context, "id");
+  if (!id) return redirect("/utilisateurs");
 
-  if (!token) return redirect("/connexion");
-
-  let decoded;
-  try {
-    decoded = jwt.verify(token, secret);
-  } catch {
-    return redirect("/connexion");
-  }
+  const decoded = getUserFromToken();
+  if (!decoded) return redirect("/connexion");
 
   const connectedUser = await prisma.utilisateur.findUnique({
     where: { id: decoded.id },
   });
 
   const user = await prisma.utilisateur.findUnique({
-    where: { id: parseInt(params.id) },
+    where: {
+      id: parseInt(id),
+    },
     include: {
       recherches: true,
       envies: true,

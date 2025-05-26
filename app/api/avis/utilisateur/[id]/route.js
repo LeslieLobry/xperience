@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
 
-export async function GET(req, { params }) {
-  const { id } = params;
+export async function GET(req, context) {
+  const id = context.params.id; // ✅ Pas de déstructuration
 
   if (!id) {
     return NextResponse.json({ error: "ID requis" }, { status: 400 });
@@ -17,13 +17,13 @@ export async function GET(req, { params }) {
         select: {
           id: true,
           pseudo: true,
-          photoUrl: true
-        }
-      }
+          photoUrl: true,
+        },
+      },
     },
     orderBy: {
-      createdAt: "desc"
-    }
+      createdAt: "desc",
+    },
   });
 
   return NextResponse.json({ avis });

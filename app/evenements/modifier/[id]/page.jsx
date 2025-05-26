@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "../../../../context/AuthContext";
 
 export default function ModifierEvenementPage() {
   const { user } = useAuth();

@@ -3,8 +3,7 @@ import { cookies } from 'next/headers';
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
-import { getUserFromToken } from '@/lib/auth';
-
+import { getUserFromToken } from "../../../../lib/auth"
 export async function POST(req) {
   const cookieStore = cookies();
   const user = getUserFromToken(cookieStore);

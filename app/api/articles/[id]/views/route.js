@@ -1,13 +1,16 @@
-
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(req, { params }) {
-  const { id } = params;
+  const articleId = parseInt(params.id);
+
+  if (isNaN(articleId)) {
+    return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+  }
 
   try {
     await prisma.article.update({
-      where: { id },
+      where: { id: articleId },
       data: {
         vues: {
           increment: 1,
