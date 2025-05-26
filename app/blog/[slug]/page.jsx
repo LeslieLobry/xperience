@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
+import Link from "next/link";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -65,6 +66,10 @@ export default async function ArticlePage({ params }) {
         className="article-content"
         dangerouslySetInnerHTML={{ __html: article.contenu }}
       />
+      <Link href="/blog" className="back-to-blog-button">
+  ← Retour au blog
+</Link>
+
     </div>
   );
 }

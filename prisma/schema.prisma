@@ -81,6 +81,7 @@ model Article {
   auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  vues        Int            @default(0)
 }
 
 model ImageArticle {

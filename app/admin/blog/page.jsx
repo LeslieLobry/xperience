@@ -131,7 +131,7 @@ export default function AdminBlogPage() {
         <button type="submit">Publier</button>
       </form>
 
-      <h2>Articles existants</h2>
+      <h2 className="blog-h2">Articles existants</h2>
       <div className="admin-articles">
         {articles.map((article) => (
           <div className="article-card" key={article.id}>

@@ -30,3 +30,62 @@
   height: 20px;
   font-size: 12px;
 }
+.article-thumbnail {
+  width: 100px;         /* ou max-width: 100px si tu veux être plus souple */
+  height: auto;
+  border-radius: 6px;
+  object-fit: cover;
+  margin-right: 1rem;
+}
+
+.article-card {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e0c084;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #f5ece0;
+}
+
+.article-info {
+  flex-grow: 1;
+}
+
+.admin-buttons {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.edit-link {
+  color: #e0c084;
+  text-decoration: none;
+}
+.admin-container{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.admin-articles{
+  width: 50%;
+}
+.admin-container h1{
+ color: #e0c084;
+ font-size: 64px;
+}
+.blog-h2 {
+   color: #e0c084;
+ font-size: 50px;
+}
+.admin-form{
+  display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 6%;
+    gap: 16px;
+}
+.admin-form input::placeholder {
+  color: black;
+}
