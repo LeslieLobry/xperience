@@ -76,6 +76,7 @@
 .filtre-date::-webkit-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
+  
 }
 .custom-button {
   padding: 12px 24px;
@@ -105,51 +106,46 @@
   border-radius: 3px;
   background: linear-gradient(to right, #f0d084 0%, #f0d084 var(--progress), white var(--progress), white 100%);
   outline: none;
+  padding: 0;
+  box-sizing: content-box;
 }
 
-/* Curseur - Chrome/Edge/Safari */
+/* Chrome, Edge, Safari */
 .filtre-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #f0d084;
-  border: 2px solid white;
+  width: 60px;
+  height: 40px;
+  background-image: url("/masque.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: transparent;
+  border: none;
   cursor: pointer;
-  margin-top: -5px;
+  margin-top: calc((25px - 30px) / 2); /* = -17px */
+  position: relative;
+  z-index: 1;
 }
 
-/* Curseur - Firefox */
+
+/* Firefox */
 .filtre-range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #f0d084;
-  border: 2px solid white;
+  width: 40px;
+  height: 40px;
+  background: url("/masque.png") no-repeat center;
+  background-size: contain;
+  background-color: transparent;
+  border: none;
   cursor: pointer;
 }
 
-/* Firefox track */
 .filtre-range::-moz-range-track {
   height: 6px;
   background: white;
   border-radius: 3px;
 }
-/* Style générique pour tous les checkboxes dans les filtres */
-.filtre-access input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 2px solid #f0d084;
-  border-radius: 4px;
-  background-color: transparent;
-  cursor: pointer;
-  position: relative;
-  margin-right: 8px;
-}
+
 
 /* Coche visible quand activé */
 .filtre-access input[type="checkbox"]:checked::after {

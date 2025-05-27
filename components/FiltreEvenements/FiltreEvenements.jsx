@@ -173,7 +173,7 @@ export default function FiltreEvenements({ onFilterChange }) {
         </label>
         <input
           type="range"
-          min="10"
+          min="00"
           max="200"
           step="10"
           value={rayon}
