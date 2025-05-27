@@ -8,6 +8,8 @@ import "../Nav/Navbar.css";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import { LogIn, LogOut, User } from "lucide-react";
+import { useEffect} from "react";
+
 
 const navLinks = [
   { label: "Accueil", href: "/accueil" },
@@ -18,6 +20,10 @@ const navLinks = [
 ];
 
 export default function Navbar() {
+  useEffect(() => {
+  console.log("🧭 Navbar monté");
+}, []);
+
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();

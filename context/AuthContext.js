@@ -31,6 +31,7 @@ const fetchUser = async () => {
   };
 
   useEffect(() => {
+    console.log("🔐 AuthProvider monté");
     fetchUser();
   }, []);
 

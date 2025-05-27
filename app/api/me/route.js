@@ -14,7 +14,7 @@ export async function GET() {
     .split("; ")
     .find(row => row.startsWith("token="))
     ?.split("=")[1];
-
+console.log("📥 /api/me – Token reçu :", token);
   if (!token) {
     return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
   }
@@ -58,6 +58,7 @@ export async function GET() {
       },
     });
   } catch (err) {
+    console.error("❌ Erreur vérification JWT :", err.message);
     return NextResponse.json({ success: false, message: "Token invalide." }, { status: 403 });
   }
 }

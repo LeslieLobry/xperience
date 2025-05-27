@@ -8,21 +8,35 @@ export default function ProfilProtege({ userId, children }) {
   const { user, fetchUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  
+useEffect(() => {
+  let isMounted = true;
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const fetchedUser = await fetchUser();
-      if (!fetchedUser) {
-        router.replace("/connexion");
-      } else if (parseInt(fetchedUser.id) !== parseInt(userId)) {
-        router.replace(`/profil/${fetchedUser.id}`);
-      } else {
-        setLoading(false);
-      }
-    };
+  const checkUser = async () => {
+    const fetchedUser = await fetchUser();
 
-    checkUser();
-  }, [userId, fetchUser, router]);
+    if (!isMounted) return;
+
+    if (!fetchedUser) {
+      router.replace("/connexion");
+      return;
+    }
+
+    if (parseInt(fetchedUser.id) !== parseInt(userId)) {
+      router.replace(`/profil/${fetchedUser.id}`);
+      return;
+    }
+
+    setLoading(false);
+  };
+
+  checkUser();
+
+  return () => {
+    isMounted = false;
+  };
+}, [userId, router]); // ✅ supprime fetchUser des dépendances
+
 
   if (loading) {
     return (
