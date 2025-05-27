@@ -1,0 +1,60 @@
+.evenements-container{
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    box-sizing: border-box;
+    z-index: 1; 
+    overflow: hidden; 
+    color:#f5ece0;
+    gap: 25px;
+    padding: 5%;
+}
+.evenements-container::before{
+     content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('../Assets/skin.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3; /* ici tu règles la transparence de l'image */
+    z-index: -1; /* pour que l'image reste en fond */
+}
+.grid-evenements{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    
+}
+.evenements-title{
+    color:#e0c084 ;
+    font-size: 64px;
+}
+.btn-create {
+  display: inline-block;
+  padding: 12px 24px;
+  background-color: #e0c084;
+  color: #f5ece0;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  font-size: 25px;
+}
+
+.btn-create:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  background-color: #f5ece0;
+  color: #2b2b2b;
+}
+.evenements-list{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}

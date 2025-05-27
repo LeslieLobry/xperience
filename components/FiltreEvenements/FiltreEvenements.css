@@ -1,17 +1,10 @@
 .filtre-evenements {
-  background: #fff;
-  padding: 1.5rem;
-  border-radius: 8px;
-  max-width: 300px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  max-width: 500px;
+  gap: 16px ;
 }
-
-.filtre-input {
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
-}
-
 .filtre-dates {
   display: flex;
   gap: 0.5rem;
@@ -20,6 +13,10 @@
 
 .filtre-date {
   flex: 1;
+  background-color: transparent;
+  color: white;
+  border: none;
+  font-size: 20px;
 }
 
 .filtre-rayon {
@@ -35,11 +32,6 @@
 }
 .input-ville-wrapper {
   position: relative;
-}
-
-.filtre-input {
-  width: 100%;
-  padding-right: 2.5rem; /* espace pour le bouton 📍 */
 }
 
 .detecter-icone {
@@ -80,4 +72,94 @@
 
 .suggestions li:hover {
   background-color: #eee;
+}
+.filtre-date::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+.custom-button {
+  padding: 12px 24px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  color: #2b2b2b;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.custom-button:hover {
+  background-color: #f5ece0;
+  transform: translateY(-2px);
+}
+.filtre-input{
+  background-color: transparent;
+  border: none;
+  font-size: 20px;
+  color: #eee;
+}
+.filtre-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #f0d084 0%, #f0d084 var(--progress), white var(--progress), white 100%);
+  outline: none;
+}
+
+/* Curseur - Chrome/Edge/Safari */
+.filtre-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f0d084;
+  border: 2px solid white;
+  cursor: pointer;
+  margin-top: -5px;
+}
+
+/* Curseur - Firefox */
+.filtre-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f0d084;
+  border: 2px solid white;
+  cursor: pointer;
+}
+
+/* Firefox track */
+.filtre-range::-moz-range-track {
+  height: 6px;
+  background: white;
+  border-radius: 3px;
+}
+/* Style générique pour tous les checkboxes dans les filtres */
+.filtre-access input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #f0d084;
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  margin-right: 8px;
+}
+
+/* Coche visible quand activé */
+.filtre-access input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 4px;
+  height: 9px;
+  border: solid #f0d084;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }

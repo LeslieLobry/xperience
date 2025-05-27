@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../../context/AuthContext";
 import FiltreEvenements from "../../components/FiltreEvenements/FiltreEvenements";
+import "../evenements/evenements.css"
 
 export default function EvenementsPage() {
   const [evenements, setEvenements] = useState([]);
@@ -64,11 +65,12 @@ export default function EvenementsPage() {
 
   return (
     <div className="evenements-container">
-      <FiltreEvenements onFilterChange={setFiltres} />
-
+    <h1 className="evenements-title">Événements</h1>
+    <div className="grid-evenements">
+          <FiltreEvenements onFilterChange={setFiltres} />
       <div className="evenements-list">
         <div className="evenements-header">
-          <h1>Événements</h1>
+          
           {isAdmin && (
             <Link href="/evenements/creer" className="btn-create">
               Créer un événement
@@ -101,7 +103,7 @@ export default function EvenementsPage() {
             <p>Aucun événement trouvé.</p>
           )}
         </div>
-
+{/* 
         <div className="pagination">
           <button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1}>
             Précédent
@@ -112,8 +114,9 @@ export default function EvenementsPage() {
           <button onClick={() => setPage((p) => Math.min(p + 1, totalPages))} disabled={page === totalPages}>
             Suivant
           </button>
-        </div>
+        </div> */}
       </div>
+    </div>
     </div>
   );
 }

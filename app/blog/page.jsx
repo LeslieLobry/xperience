@@ -1,74 +1,81 @@
+import Link from "next/link";
 import { prisma } from "../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import ArticleWrapper from "./[slug]/ArticleWrapper";
+import DeleteArticleButton from "../../components/DeleteArticleButton/DeleteArticleButton";
+import "./blog.css";
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
-export default async function ArticlePage(context) {
-  const slug = context.params?.slug; // ✅ évite erreur
-  if (!slug) return notFound();
-
-  const cookieStore = await cookies(); // ✅ obligatoire
+export default async function BlogPage() {
+  // 🔐 Vérifier l'utilisateur connecté
+  const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-  if (!token) return redirect("/connexion");
+  let user = null;
 
-  let decoded;
-  try {
-    decoded = jwt.verify(token, secret);
-  } catch {
-    return redirect("/connexion");
+  if (token) {
+    try {
+      user = jwt.verify(token, secret);
+    } catch {
+      // token invalide
+    }
   }
 
-  const article = await prisma.article.findUnique({
-    where: { slug },
-    include: {
-      auteur: true,
-      images: true,
+  const isAdmin = user?.role === "ADMIN";
+
+  // 📄 Récupérer les articles
+  const articles = await prisma.article.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      slug: true,
+      titre: true,
+      description: true,
+      createdAt: true,
     },
   });
 
-  if (!article) return notFound();
-
   return (
-    <div className="article-container">
-      <ArticleWrapper articleId={article.id} />
+    <div className="blog-container">
+      <h1 className="blog-title">Les articles du blog</h1>
 
-      <h1 className="article-title">{article.titre}</h1>
-      <p className="article-meta">
-        Par {article.auteur.pseudo} –{" "}
-        {new Date(article.createdAt).toLocaleDateString("fr-FR")} – {article.vues} vues
-      </p>
-
-      {article.description && (
-        <p className="article-description">{article.description}</p>
+      {isAdmin && (
+        <Link href="/admin/blog" className="blog-admin-button">
+          ✏️ Créer un article
+        </Link>
       )}
 
-      {article.images?.length > 0 && (
-        <div className="article-images">
-          {article.images.map((image, index) => (
-            <img
-              key={index}
-              src={image.url}
-              alt={`Illustration ${index + 1}`}
-              className="article-image"
-              style={{ maxWidth: "100%", margin: "10px 0" }}
-            />
+      {articles.length === 0 ? (
+        <p>Aucun article pour le moment.</p>
+      ) : (
+        <ul className="blog-list">
+          {articles.map((article) => (
+            <li key={article.id} className="blog-article">
+              <Link
+                href={`/blog/${article.slug}`}
+                className="blog-article-link"
+              >
+                <h2>{article.titre}</h2>
+                <p>{article.description}</p>
+                <small>
+                  Publié le{" "}
+                  {new Date(article.createdAt).toLocaleDateString("fr-FR")}
+                </small>
+              </Link>
+
+              {isAdmin && (
+                <div className="admin-actions">
+                  <Link href={`/admin/blog/editer/${article.id}`}>
+                    ✏️ Modifier
+                  </Link>
+                  <DeleteArticleButton articleId={article.id} />
+                </div>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-
-      <div
-        className="article-content"
-        dangerouslySetInnerHTML={{ __html: article.contenu }}
-      />
-
-      <Link href="/blog" className="back-to-blog-button">
-        ← Retour au blog
-      </Link>
     </div>
   );
 }

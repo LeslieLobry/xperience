@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import "./edit.css";
 
 export default function EditArticlePage() {
@@ -29,7 +30,7 @@ export default function EditArticlePage() {
     }
 
     fetchArticle();
-  }, [id]);
+  }, [id, router]);
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -46,9 +47,9 @@ export default function EditArticlePage() {
 
       if (res.ok) {
         const data = await res.json();
-        uploaded.push(data.imageUrl); // L'API renvoie { imageUrl }
+        uploaded.push(data.imageUrl);
       } else {
-        alert("Erreur lors du téléchargement d'une image.");
+        alert("Erreur lors du téléchargement d&apos;une image.");
       }
     }
 
@@ -90,7 +91,7 @@ export default function EditArticlePage() {
 
   return (
     <div className="edit-container">
-      <h1>Éditer l'article</h1>
+      <h1>Éditer l&apos;article</h1>
       <form className="edit-form" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -124,7 +125,13 @@ export default function EditArticlePage() {
         <div className="image-preview">
           {images.map((url, index) => (
             <div key={index} className="image-wrapper">
-              <img src={url} alt={`Image ${index}`} />
+              <Image
+                src={url}
+                alt={`Image ${index}`}
+                width={200}
+                height={150}
+                className="preview-image"
+              />
               <button
                 type="button"
                 className="remove-image-btn"

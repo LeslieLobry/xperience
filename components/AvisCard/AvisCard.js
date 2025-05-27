@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from "react";
+import Image from "next/image";
 
 export default function AvisCard({ avis, connectedUserId, onRefresh }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -39,7 +40,13 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
   return (
     <div className="avis-card">
       <div className="avis-header">
-        <img src={avis.auteur.photoUrl || "/default.jpg"} alt="avatar" className="avis-avatar" />
+        <Image
+          src={avis.auteur.photoUrl || "/default.jpg"}
+          alt="avatar"
+          width={40}
+          height={40}
+          className="avis-avatar"
+        />
         <strong>{avis.auteur.pseudo}</strong>
       </div>
 

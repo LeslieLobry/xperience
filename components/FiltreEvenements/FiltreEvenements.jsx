@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import "./FiltreEvenements.css";
+import Button from "../Button/Button";
 
 export default function FiltreEvenements({ onFilterChange }) {
   const today = new Date().toISOString().split("T")[0];
@@ -16,36 +17,39 @@ export default function FiltreEvenements({ onFilterChange }) {
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
 
+  useEffect(() => {
+    const rangeEl = document.querySelector(".filtre-range");
+    if (rangeEl) {
+      const percentage = ((rayon - 10) / (200 - 10)) * 100;
+      rangeEl.style.background = `linear-gradient(to right, #f0d084 ${percentage}%, white ${percentage}%)`;
+    }
+  }, [rayon]);
+
   const detecterVille = async () => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLatitude(latitude);
         setLongitude(longitude);
-        console.log("📍 Position GPS:", latitude, longitude);
 
         try {
           const res = await fetch(
             `https://geo.api.gouv.fr/communes?lat=${latitude}&lon=${longitude}&fields=nom,centre&format=json`
           );
           const data = await res.json();
-
           const city = data?.[0];
           if (city) {
             setLieu(city.nom);
             setLieuInput(city.nom);
             setLatitude(city.centre.coordinates[1]);
             setLongitude(city.centre.coordinates[0]);
-            console.log("🏙️ Ville détectée :", city.nom);
-          } else {
-            console.warn("❗ Aucune ville détectée via geo.api.gouv.fr.");
           }
         } catch (err) {
-          console.error("🚨 Erreur API Gouv :", err);
+          console.error("Erreur API Gouv :", err);
         }
       },
       () => {
-        console.warn("❌ Localisation refusée par l'utilisateur");
+        console.warn("Localisation refusée");
       }
     );
   };
@@ -80,7 +84,6 @@ export default function FiltreEvenements({ onFilterChange }) {
     setLatitude(city.lat);
     setLongitude(city.lon);
     setCitySuggestions([]);
-    console.log("✅ Ville sélectionnée :", city.nom);
   };
 
   const handleLieuChange = (e) => {
@@ -99,16 +102,6 @@ export default function FiltreEvenements({ onFilterChange }) {
   };
 
   const appliquerFiltres = () => {
-    console.log("📤 Filtres appliqués :", {
-      lieu,
-      rayon,
-      dateDebut,
-      dateFin,
-      acces,
-      latitude,
-      longitude,
-    });
-
     onFilterChange({
       lieu,
       rayon,
@@ -210,9 +203,13 @@ export default function FiltreEvenements({ onFilterChange }) {
         </label>
       </div>
 
-      <button className="filtre-btn" onClick={appliquerFiltres}>
-        Rechercher
-      </button>
+      <Button
+        title="Rechercher"
+        onClick={appliquerFiltres}
+        color="#e0c084"
+        style={{ marginTop: "1rem" }}
+        className="filtre-btn"
+      />
     </aside>
   );
 }

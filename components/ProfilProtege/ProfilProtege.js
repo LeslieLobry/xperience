@@ -22,7 +22,7 @@ export default function ProfilProtege({ userId, children }) {
     };
 
     checkUser();
-  }, [userId]);
+  }, [userId, fetchUser, router]);
 
   if (loading) {
     return (
