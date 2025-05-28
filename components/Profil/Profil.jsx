@@ -9,6 +9,7 @@ import ProfilDetailsSummary from "../ProfilDetailsSummary/ProfilDetailsSummary";
 import AProposCard from "../AProposCard/AProposCard";
 import AvisForm from "../AvisForm/AvisForm";
 import AvisList from "../AvisList/AvisList";
+import MenuProfilActions from "../MenuProfilActions/MenuProfilActions";
 import "../Profil/Profil.css";
 
 export default function Profil({ user, connectedUser }) {
@@ -45,6 +46,10 @@ export default function Profil({ user, connectedUser }) {
         <div className="profil-avatar-horizontal">
           {isOwnProfile && <PhotoUploader currentUrl={user.photoUrl} />}
         </div>
+
+        {!isOwnProfile && (
+          <MenuProfilActions cibleId={user.id} />
+        )}
       </div>
 
       <h1 className="profil-name">{user.pseudo}</h1>

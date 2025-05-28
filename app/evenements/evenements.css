@@ -58,3 +58,25 @@
     flex-direction: column;
     gap: 16px;
 }
+.event-card{
+    display: flex;
+    flex-direction: column;
+    border: 1px #e0c084 solid ;
+    align-items: center;
+    gap: 16px;
+}
+.evenements-grid{
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+.event-info-title{
+    color: #e0c084;
+    font-size:24px;
+}
+.event-info{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}

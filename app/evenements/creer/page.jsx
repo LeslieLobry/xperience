@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
+import "./creer.css"
+import Button from "../../../components/Button/Button";
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -112,19 +114,39 @@ export default function CreateEventPage() {
     setLieuInput(city);
     setCitySuggestions([]);
   };
+const generateHeureOptions = () => {
+  const options = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const heure = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      options.push(heure);
+    }
+  }
+  return options;
+};
 
   return (
-    <form onSubmit={handleSubmit} encType="multipart/form-data" className="event-form">
-      <h2>Créer un événement</h2>
+    <div className="creer-contenant">
+      <h2 className="creer-title">Créer un événement</h2>
 
+    <form onSubmit={handleSubmit} encType="multipart/form-data" className="event-form">
       {error && <p className="error-message">{error}</p>}
 
       <input name="titre" placeholder="Titre" onChange={handleChange} required />
-      <textarea name="description" placeholder="Description" onChange={handleChange} required />
-      <input name="date" type="date" onChange={handleChange} required />
-      <input name="heureDebut" placeholder="Heure de début (ex: 22:00)" onChange={handleChange} />
-      <input name="heureFin" placeholder="Heure de fin (ex: 04:00)" onChange={handleChange} />
-
+      <textarea name="description" placeholder="Description" onChange={handleChange} className="creer-description" required />
+      <input name="date" type="date" onChange={handleChange} required className="filtre-date"/>
+      <select name="heureDebut" onChange={handleChange} value={form.heureDebut} required>
+  <option value="">Heure de début</option>
+  {generateHeureOptions().map((heure) => (
+    <option key={heure} value={heure}>{heure}</option>
+  ))}
+  </select>
+  <select name="heureFin" onChange={handleChange} value={form.heureFin} required>
+    <option value="">Heure de fin</option>
+    {generateHeureOptions().map((heure) => (
+      <option key={heure} value={heure}>{heure}</option>
+    ))}
+  </select>
       <div className="autocomplete-wrapper">
         <input
           name="lieu"
@@ -155,19 +177,32 @@ export default function CreateEventPage() {
       <input type="file" accept="image/*" onChange={handleImageChange} />
       {previewUrl && <img src={previewUrl} alt="Aperçu" className="image-preview" />}
 
-      <select name="type" onChange={handleChange} value={form.type}>
+      {/* <select name="type" onChange={handleChange} value={form.type}>
         <option value="club">Soirée club</option>
         <option value="privée">Soirée privée</option>
-      </select>
+      </select> */}
 
-      <select name="acces" onChange={handleChange} value={form.acces}>
+      <select name="acces" onChange={handleChange} value={form.acces} className="acces-select">
         <option value="femmes_couples">Femmes et couples</option>
         <option value="hommes">Hommes seuls acceptés</option>
       </select>
 
-      <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Envoi en cours..." : "Valider"}
-      </button>
+     <Button
+  title={isSubmitting ? "Envoi en cours..." : "Valider"}
+  type="submit"
+  disabled={isSubmitting}
+  color="#e0c084"
+  className="filtre-btn"
+  style={{ marginTop: "1rem" }}
+/>
     </form>
+    <Button
+  title="← Retour"
+  onClick={() => router.push("/evenements")}
+  color="#8c6a5d"
+  className="filtre-btn"
+  style={{ marginBottom: "1rem" }}
+/>
+    </div>
   );
 }

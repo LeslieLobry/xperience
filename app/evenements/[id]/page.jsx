@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
+import Button from "../../../components/Button/Button";
+import "./id.css";
 
 export default function PageEvenement() {
   const { id } = useParams();
+  const router = useRouter();
   const [evenement, setEvenement] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [confirmation, setConfirmation] = useState("");
   const { user } = useAuth();
 
   useEffect(() => {
@@ -16,7 +20,10 @@ export default function PageEvenement() {
         const res = await fetch(`/api/evenements/${id}`);
         if (!res.ok) throw new Error("Erreur lors de la récupération");
         const data = await res.json();
-        setEvenement(data);
+        setEvenement({
+          ...data,
+          participants: data.participants || [],
+        });
       } catch (err) {
         console.error(err);
       } finally {
@@ -33,7 +40,9 @@ export default function PageEvenement() {
   const dejaInscrit = evenement.participants?.some((p) => p.id === user?.id);
 
   const participer = async () => {
-    const res = await fetch(`/api/evenements/${id}/participer`, {
+    if (dejaInscrit) return;
+
+    const res = await fetch(`/api/evenements/${id}`, {
       method: "POST",
     });
 
@@ -42,11 +51,43 @@ export default function PageEvenement() {
         ...prev,
         participants: [...prev.participants, { id: user.id, pseudo: user.pseudo }],
       }));
+      setConfirmation("✅ Vous êtes inscrit(e) à cet événement !");
+    } else {
+      setConfirmation("❌ Une erreur est survenue.");
     }
+
+    setTimeout(() => setConfirmation(""), 5000);
+  };
+
+  const seDesinscrire = async () => {
+    const res = await fetch(`/api/evenements/${id}`, {
+      method: "DELETE",
+      headers: { "x-action": "leave" },
+    });
+
+    if (res.ok) {
+      setEvenement((prev) => ({
+        ...prev,
+        participants: prev.participants.filter((p) => p.id !== user.id),
+      }));
+      setConfirmation("❌ Vous vous êtes désinscrit(e) de cet événement.");
+    } else {
+      setConfirmation("⚠️ Erreur lors de la désinscription.");
+    }
+
+    setTimeout(() => setConfirmation(""), 5000);
   };
 
   return (
     <div className="evenement-container">
+      <Button
+        title="← Retour"
+        onClick={() => router.push("/evenements")}
+        color="#e0c084"
+        className="filtre-btn"
+        style={{ marginBottom: "1rem" }}
+      />
+
       <h1>{evenement.titre}</h1>
 
       {evenement.imageUrl && (
@@ -71,15 +112,21 @@ export default function PageEvenement() {
 
       <h2>Participants ({evenement.participants?.length || 0})</h2>
       <ul>
-        {evenement.participants?.map((p) => (
-          <li key={p.id}>{p.pseudo}</li>
+        {evenement.participants.map((p) => (
+          <li key={`${p.id}-${p.pseudo}`}>{p.pseudo}</li>
         ))}
       </ul>
 
+      {confirmation && <p className="confirmation-message">{confirmation}</p>}
+
       {user && (
-        <button onClick={participer} disabled={dejaInscrit}>
-          {dejaInscrit ? "Déjà inscrit" : "Participer"}
-        </button>
+        <Button
+          title={dejaInscrit ? "Se désinscrire" : "Participer"}
+          onClick={dejaInscrit ? seDesinscrire : participer}
+          color={dejaInscrit ? "#e57c73" : "#e0c084"}
+          className="filtre-btn"
+          style={{ marginTop: "1rem" }}
+        />
       )}
     </div>
   );

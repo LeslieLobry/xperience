@@ -1,15 +1,14 @@
 "use client";
+import React from "react";
 
 import logo from "../../app/Assets/logo.png";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import "../Nav/Navbar.css";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import { LogIn, LogOut, User } from "lucide-react";
-import { useEffect} from "react";
-
 
 const navLinks = [
   { label: "Accueil", href: "/accueil" },
@@ -21,8 +20,8 @@ const navLinks = [
 
 export default function Navbar() {
   useEffect(() => {
-  console.log("🧭 Navbar monté");
-}, []);
+    console.log("🧭 Navbar monté");
+  }, []);
 
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -59,32 +58,46 @@ export default function Navbar() {
         <div className="line bottom"></div>
       </div>
 
-      <ul className={`navLinks ${menuOpen ? "active" : ""}`}>
-        {navLinks.map((link) => (
-          <li key={link.href} onClick={() => setMenuOpen(false)}>
+<ul className={`navLinks ${menuOpen ? "active" : ""}`}>
+  {navLinks.map((link) => {
+    if (link.href === "/accueil") {
+      return (
+        <React.Fragment key={link.href}>
+          <li onClick={() => setMenuOpen(false)}>
             <Link href={link.href}>{link.label}</Link>
           </li>
-        ))}
 
-        {user ? (
-          <>
+          {/* L’icône User placée juste après Accueil */}
+          {user && (
             <li onClick={() => setMenuOpen(false)} title="Mon profil">
               <Link href={`/profil/${user.id}`}>
                 <User className="nav-icon" />
               </Link>
             </li>
-            <li onClick={handleLogout} title="Déconnexion">
-              <LogOut className="nav-icon" />
-            </li>
-          </>
-        ) : (
-          <li onClick={() => setMenuOpen(false)} title="Connexion">
-            <Link href="/connexion">
-              <LogIn className="nav-icon" />
-            </Link>
-          </li>
-        )}
-      </ul>
+          )}
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <li key={link.href} onClick={() => setMenuOpen(false)}>
+        <Link href={link.href}>{link.label}</Link>
+      </li>
+    );
+  })}
+
+  {user ? (
+    <li onClick={handleLogout} title="Déconnexion">
+      <LogOut className="nav-icon" />
+    </li>
+  ) : (
+    <li onClick={() => setMenuOpen(false)} title="Connexion">
+      <Link href="/connexion">
+        <LogIn className="nav-icon" />
+      </Link>
+    </li>
+  )}
+</ul>
     </nav>
   );
 }

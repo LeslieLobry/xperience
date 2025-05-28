@@ -1,0 +1,36 @@
+.evenement-container{
+position: relative;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+width: 100%;
+padding: 2rem;
+box-sizing: border-box;
+z-index: 1; 
+overflow: hidden; 
+color:#f5ece0;
+gap: 25px; 
+}
+.evenement-container::before{
+     content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('../../Assets/skin.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3; /* ici tu règles la transparence de l'image */
+    z-index: -1;
+}
+.confirmation-message {
+  margin-top: 1rem;
+  color: green;
+  font-weight: bold;
+}
+.filtre-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}

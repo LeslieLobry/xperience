@@ -37,7 +37,8 @@ export async function POST(req) {
   const type = formData.get("type");
   const acces = formData.get("acces");
   const image = formData.get("image");
-
+  const latitude = parseFloat(formData.get("latitude")) || null;
+  const longitude = parseFloat(formData.get("longitude")) || null;
   const tarifCouple = parseFloat(formData.get("tarifCouple")) || null;
   const tarifFemme = parseFloat(formData.get("tarifFemme")) || null;
   const tarifHomme = parseFloat(formData.get("tarifHomme")) || null;
@@ -100,23 +101,71 @@ export async function POST(req) {
 // 📤 GET — Liste des événements (pagination)
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
+
   const page = parseInt(searchParams.get("page") || "1");
   const perPage = 10;
   const skip = (page - 1) * perPage;
 
-  try {
-    const [events, total] = await prisma.$transaction([
-      prisma.evenement.findMany({
-        skip,
-        take: perPage,
-        orderBy: { date: "asc" },
-      }),
-      prisma.evenement.count(),
-    ]);
+  const dateDebut = searchParams.get("dateDebut");
+  const dateFin = searchParams.get("dateFin");
+  const accesParam = searchParams.get("acces");
+  const acces = accesParam ? accesParam.split(",") : [];
 
-    return NextResponse.json({ events, total, page, perPage });
+  const latitude = parseFloat(searchParams.get("latitude"));
+  const longitude = parseFloat(searchParams.get("longitude"));
+  const rayon = parseFloat(searchParams.get("rayon")) || 50;
+
+  try {
+    let evenements = await prisma.evenement.findMany({
+      where: {
+        date: {
+          gte: dateDebut ? new Date(dateDebut) : undefined,
+          lte: dateFin ? new Date(dateFin) : undefined,
+        },
+        acces: acces.length ? { in: acces } : undefined,
+      },
+      orderBy: { date: "asc" },
+      include: {
+        participants: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // 🌍 Filtrage géographique
+    if (!isNaN(latitude) && !isNaN(longitude)) {
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      const R = 6371; // Rayon Terre en km
+
+      evenements = evenements.filter((e) => {
+        if (e.latitude == null || e.longitude == null) return false;
+
+        const dLat = toRad(e.latitude - latitude);
+        const dLon = toRad(e.longitude - longitude);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(latitude)) *
+            Math.cos(toRad(e.latitude)) *
+            Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+
+        return distance <= rayon;
+      });
+    }
+
+    const total = evenements.length;
+    const paginated = evenements.slice(skip, skip + perPage);
+
+    return NextResponse.json({
+      events: paginated,
+      total,
+      page,
+      perPage,
+    });
   } catch (err) {
     console.error("❌ Erreur GET /api/evenements :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
+

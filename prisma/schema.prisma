@@ -43,10 +43,10 @@ model Utilisateur {
   origines        String?
   yeux            String?
   cheveux         String?
-  statut          String      @default("hors_ligne") // "en_ligne" ou "hors_ligne"
+  statut          String      @default("hors_ligne")
   avisRecus       Avis[]      @relation("AvisCible")
   avisLaisses     Avis[]      @relation("AvisAuteur")
-  evenements      Evenement[] @relation("Participation") // ✅ correction ici
+  evenements      Evenement[] @relation("Participation")     // ✔ Relation corrigée
   articles        Article[]
   evenementsCrees Evenement[] @relation("EvenementCreateur")
 }
@@ -56,18 +56,20 @@ model Evenement {
   titre        String
   description  String
   date         DateTime
+  lieu         String
+  type         String
+  acces        String
+  imageUrl     String?
   heureDebut   String?
   heureFin     String?
-  lieu         String
-  type         String?
-  acces        String?
-  imageUrl     String?
   tarifCouple  Float?
   tarifFemme   Float?
   tarifHomme   Float?
+  latitude     Float?
+  longitude    Float?
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   createurId   Int
-  participants Utilisateur[] @relation("Participation") // ✅ relation cohérente
+  participants Utilisateur[] @relation("Participation") // ✔ Relation corrigée
 }
 
 model Article {

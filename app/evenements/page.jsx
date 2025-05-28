@@ -91,7 +91,7 @@ export default function EvenementsPage() {
                     className="event-image"
                   />
                   <div className="event-info">
-                    <h3>{event.titre}</h3>
+                    <h3 className="event-info-title">{event.titre}</h3>
                     <p>{new Date(event.date).toISOString().split("T")[0]}</p>
                     <p>{event.lieu}</p>
                     <p>{event.participants?.length || 0} participant(s)</p> {/* ✅ corrigé */}

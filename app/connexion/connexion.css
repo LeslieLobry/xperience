@@ -22,8 +22,8 @@
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;
-    opacity: 0.3; /* ici tu règles la transparence de l'image */
-    z-index: -1; /* pour que l'image reste en fond */
+    opacity: 0.3; 
+    z-index: -1; 
 }
 .connexion-title{
     color: #F6D391;
