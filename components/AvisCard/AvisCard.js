@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Button from "../Button/Button";
 
 export default function AvisCard({ avis, connectedUserId, onRefresh }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -66,8 +67,20 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
 
       {isAuteur && !isEditing && (
         <div className="avis-actions">
-          <button onClick={() => setIsEditing(true)}>Modifier</button>
-          <button onClick={handleDelete} disabled={loading}>Supprimer</button>
+          <Button
+  title="Modifier"
+  onClick={() => setIsEditing(true)}
+  color="#e0c084" 
+  style={{ marginRight: "1em" }}
+/>
+
+<Button
+  title="Supprimer"
+  onClick={handleDelete}
+  color="#8c6a5d"
+  style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+  disabled={loading}
+/>
         </div>
       )}
     </div>

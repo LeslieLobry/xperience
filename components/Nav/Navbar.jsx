@@ -71,7 +71,7 @@ export default function Navbar() {
           {user && (
             <li onClick={() => setMenuOpen(false)} title="Mon profil">
               <Link href={`/profil/${user.id}`}>
-                <User className="nav-icon" />
+                {/* <User className="nav-icon" /> */}Mon profil
               </Link>
             </li>
           )}

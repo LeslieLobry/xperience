@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import "./SignalementModal.css";
+import Button from "../Button/Button";
 
 export default function SignalementModal({ cibleId, onClose }) {
   const [motif, setMotif] = useState("");
@@ -28,7 +29,7 @@ export default function SignalementModal({ cibleId, onClose }) {
             <form onSubmit={handleSubmit}>
               <label>
                 Motif :
-                <select value={motif} onChange={(e) => setMotif(e.target.value)} required>
+                <select value={motif} onChange={(e) => setMotif(e.target.value)} className="signal" required>
                   <option value="">-- Choisir un motif --</option>
                   <option value="contenu inapproprié">Contenu inapproprié</option>
                   <option value="faux profil">Faux profil</option>
@@ -39,11 +40,24 @@ export default function SignalementModal({ cibleId, onClose }) {
 
               <label>
                 Commentaire (optionnel) :
-                <textarea value={commentaire} onChange={(e) => setCommentaire(e.target.value)} />
+                <textarea value={commentaire} onChange={(e) => setCommentaire(e.target.value)} className="text-signal" />
               </label>
 
-              <button type="submit">Envoyer</button>
-              <button type="button" onClick={onClose} className="btn-cancel">Annuler</button>
+              <Button
+                title="Envoyer"
+                type="submit"
+                color="#e0c084" 
+                style={{ marginRight: "1em" }}
+              />
+
+              <Button
+                title="Annuler"
+                type="button"
+                onClick={onClose}
+                color="#8c6a5d" 
+                style={{ marginTop: "1em" }}
+              />
+
             </form>
           </>
         ) : (

@@ -1,7 +1,7 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -9,7 +9,7 @@
 }
 
 .modal {
-  background: white;
+  background: #2c3e50;
   padding: 2rem;
   border-radius: 8px;
   max-width: 400px;
@@ -39,4 +39,10 @@
 .confirmation {
   font-weight: bold;
   text-align: center;
+}
+.signal{
+  font-size: 26px;
+}
+.text-signal{
+  font-size: 16px;
 }
