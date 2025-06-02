@@ -1,0 +1,33 @@
+.liste-conversations {
+  width: 30%;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+.conversation-item {
+  display: flex;
+  padding: 8px;
+  cursor: pointer;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.conv-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.conv-info {
+  margin-left: 8px;
+  flex: 1;
+}
+
+.conv-pseudo {
+  font-weight: bold;
+}
+
+.conv-apercu {
+  font-size: 0.9rem;
+  color: #666;
+}

@@ -1,0 +1,44 @@
+/* components/ChatBubble/ChatBubble.css */
+
+.chat-bubble-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background-color: #1877f2; /* bleu Messenger-like */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 999; /* au-dessus de tout */
+  transition: background-color 0.2s;
+}
+
+.chat-bubble-container:hover {
+  background-color: #165db6;
+}
+
+.chat-bubble-icon {
+  font-size: 24px;
+  color: white;
+}
+
+.chat-bubble-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #e02424; /* rouge */
+  color: white;
+  font-size: 0.65rem;
+  font-weight: bold;
+  line-height: 1;
+  border-radius: 50%;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

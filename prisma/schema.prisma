@@ -12,13 +12,19 @@ enum Role {
   ADMIN
 }
 
+enum MessageType {
+  TEXTE
+  IMAGE
+  VIDEO
+}
+
 model Utilisateur {
-  id              Int         @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   nom             String
   prenom          String
-  pseudo          String      @unique
-  email           String      @unique
-  role            Role        @default(USER)
+  pseudo          String        @unique
+  email           String        @unique
+  role            Role          @default(USER)
   password        String
   type            String
   orientation     String
@@ -26,7 +32,7 @@ model Utilisateur {
   consent         Boolean
   localisation    String
   photoUrl        String?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime      @default(now())
   lastLogin       DateTime?
   emailVerified   DateTime?
   description     String?
@@ -43,12 +49,14 @@ model Utilisateur {
   origines        String?
   yeux            String?
   cheveux         String?
-  statut          String      @default("hors_ligne")
-  avisRecus       Avis[]      @relation("AvisCible")
-  avisLaisses     Avis[]      @relation("AvisAuteur")
-  evenements      Evenement[] @relation("Participation")     // ✔ Relation corrigée
+  statut          String        @default("hors_ligne")
+  avisRecus       Avis[]        @relation("AvisCible")
+  avisLaisses     Avis[]        @relation("AvisAuteur")
+  evenements      Evenement[]   @relation("Participation")
+  evenementsCrees Evenement[]   @relation("EvenementCreateur")
   articles        Article[]
-  evenementsCrees Evenement[] @relation("EvenementCreateur")
+  messages        Message[]     @relation("MessageAuteur")
+  participants    Participant[]
 }
 
 model Evenement {
@@ -69,7 +77,7 @@ model Evenement {
   longitude    Float?
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   createurId   Int
-  participants Utilisateur[] @relation("Participation") // ✔ Relation corrigée
+  participants Utilisateur[] @relation("Participation")
 }
 
 model Article {
@@ -141,4 +149,40 @@ model Avis {
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
 
   @@unique([auteurId, cibleId])
+}
+
+model Conversation {
+  id           Int           @id @default(autoincrement())
+  participants Participant[]
+  messages     Message[]
+  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+}
+
+model Participant {
+  id             Int           @id @default(autoincrement())
+  utilisateurId  Int
+  conversationId Int
+
+  utilisateur    Utilisateur   @relation(fields: [utilisateurId], references: [id])
+  conversation   Conversation  @relation(fields: [conversationId], references: [id])
+
+  lastReadAt     DateTime?     // Date à laquelle l’utilisateur a lu cette conversation
+
+  @@unique([utilisateurId, conversationId])
+}
+
+
+model Message {
+  id             Int         @id @default(autoincrement())
+  conversationId Int
+  auteurId       Int
+  contenu        String?
+  imageUrl       String?
+  videoUrl       String?
+  type           MessageType @default(TEXTE)
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  auteur       Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
 }

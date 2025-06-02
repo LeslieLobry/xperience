@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
 import GaleriePhotos from "../GaleriePhotos/GaleriePhotos";
 import StatutToggle from "../StatutToggle/StatutToggle";
@@ -13,6 +14,7 @@ import MenuProfilActions from "../MenuProfilActions/MenuProfilActions";
 import "../Profil/Profil.css";
 
 export default function Profil({ user, connectedUser }) {
+  const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
   const completion = calculateProfileCompletion(user);
@@ -40,6 +42,29 @@ export default function Profil({ user, connectedUser }) {
     return Math.round((completed / fields.length) * 100);
   }
 
+  // 📨 Fonction pour démarrer une conversation
+  const handleStartConversation = async () => {
+    try {
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participantIds: [parseInt(connectedUser.id), parseInt(user.id)],
+        }),
+      });
+
+      const data = await response.json();
+      if (data.conversation?.id) {
+        // Redirige vers la messagerie en passant conversationId en query
+        router.push(`/messagerie?conversationId=${data.conversation.id}`);
+      } else {
+        console.error("Impossible de démarrer la conversation", data);
+      }
+    } catch (err) {
+      console.error("Erreur lors de la création de conversation :", err);
+    }
+  };
+
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
@@ -48,7 +73,16 @@ export default function Profil({ user, connectedUser }) {
         </div>
 
         {!isOwnProfile && (
-          <MenuProfilActions cibleId={user.id} />
+          <>
+            {/* Bouton “Envoyer un message” */}
+            <button
+              className="btn-envoyer-message"
+              onClick={handleStartConversation}
+            >
+              Envoyer un message
+            </button>
+            <MenuProfilActions cibleId={user.id} />
+          </>
         )}
       </div>
 
@@ -74,11 +108,26 @@ export default function Profil({ user, connectedUser }) {
       <div className="grid">
         <div className="profil-infos-wrapper">
           <div className="info-block">
-            <p><span className="info-label">Âge :</span> <span className="info-value">{user.age}</span></p>
-            <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette}</span></p>
-            <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span></p>
-            <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
-            <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
+            <p>
+              <span className="info-label">Âge :</span>{" "}
+              <span className="info-value">{user.age}</span>
+            </p>
+            <p>
+              <span className="info-label">Silhouette :</span>{" "}
+              <span className="info-value">{user.silhouette}</span>
+            </p>
+            <p>
+              <span className="info-label">Localisation :</span>{" "}
+              <span className="info-value">{user.localisation}</span>
+            </p>
+            <p>
+              <span className="info-label">Origines :</span>{" "}
+              <span className="info-value">{user.origines}</span>
+            </p>
+            <p>
+              <span className="info-label">Taille :</span>{" "}
+              <span className="info-value">{user.taille} cm</span>
+            </p>
           </div>
         </div>
 
@@ -95,7 +144,7 @@ export default function Profil({ user, connectedUser }) {
             {user.avisLaisses.map((avis) => (
               <div key={avis.id} className="avis-card">
                 <div className="avis-header">
-                  <strong>{user.pseudo}</strong> a laissé un avis à {" "}
+                  <strong>{user.pseudo}</strong> a laissé un avis à{" "}
                   <strong>{avis.cible?.pseudo || "un utilisateur"}</strong>
                 </div>
                 <p className="avis-commentaire">{avis.commentaire}</p>
@@ -109,10 +158,15 @@ export default function Profil({ user, connectedUser }) {
         )}
 
         {!isOwnProfile && aDejaCommente && (
-          <p className="avis-deja-message">✅ Vous avez déjà laissé un avis sur ce profil.</p>
+          <p className="avis-deja-message">
+            ✅ Vous avez déjà laissé un avis sur ce profil.
+          </p>
         )}
 
-        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
+        <AProposCard
+          createdAt={user.createdAt}
+          lastLogin={user.lastLogin}
+        />
       </div>
     </div>
   );

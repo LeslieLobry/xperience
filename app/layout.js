@@ -2,6 +2,7 @@ import "../app/globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
+import ChatBubble from "../components/ChatBubble/ChatBubble"
 
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
@@ -19,8 +20,11 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ConditionalNavbar />
           {children}
+          {/* La bulle de conversation apparaît partout */}
+          <ChatBubble />
         </AuthProvider>
       </body>
     </html>
   );
 }
+
