@@ -2,6 +2,7 @@ import "../app/globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
+import Footer from "../components/Footer/Footer"
 import ChatBubble from "../components/ChatBubble/ChatBubble"
 
 
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
           {children}
           {/* La bulle de conversation apparaît partout */}
           <ChatBubble />
+          <Footer/>
         </AuthProvider>
       </body>
     </html>

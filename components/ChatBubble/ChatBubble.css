@@ -4,26 +4,26 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 48px;
-  height: 48px;
-  background-color: #1877f2; /* bleu Messenger-like */
+  width: 100px;
+  height:100px;
+  background-color: #a2b9c1; 
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  z-index: 999; /* au-dessus de tout */
+  z-index: 999; 
   transition: background-color 0.2s;
 }
 
 .chat-bubble-container:hover {
-  background-color: #165db6;
+  background-color: #f2f0eb;
 }
 
 .chat-bubble-icon {
   font-size: 24px;
-  color: white;
+  color: rgb(216, 17, 17);
 }
 
 .chat-bubble-badge {

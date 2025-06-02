@@ -6,7 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 import { io } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import "./ChatBubble.css";
-
+import Image from "next/image";
+import masque from "../../public/masque.png"
 let socket;
 
 export default function ChatBubble() {
@@ -79,7 +80,13 @@ export default function ChatBubble() {
 
   return (
     <div className="chat-bubble-container" onClick={handleClick}>
-      <div className="chat-bubble-icon">💬</div>
+       <Image
+        src={masque}
+        alt="Chat"
+        width={80}
+        height={60}
+        className="chat-bubble-icon"
+      />
       {unreadCount > 0 && (
         <span className="chat-bubble-badge">{unreadCount}</span>
       )}

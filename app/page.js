@@ -19,12 +19,6 @@ export default function Home() {
   return (
     <div className={crimsonText.className}>
       <div className="contenant">
-        <div className="contenant-header">
-          <div className="bouton-header">
-          <Button title="Inscription" color="var(--primary-color)"href="/inscription" />  
-          <Button title="Connexion" color="#8c6a5d"href="/connexion" />  
-          </div>
-        </div>
         <div className="logo-contenant">
             <Image src={xperience3}
             alt="logo de xperience, plus sophistiqué">   
