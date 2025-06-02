@@ -44,6 +44,7 @@ export async function POST(req) {
   const tarifHomme = parseFloat(formData.get("tarifHomme")) || null;
   const heureDebut = formData.get("heureDebut") || null;
   const heureFin = formData.get("heureFin") || null;
+  const lien = formData.get("lien") || null; // ← ajout du champ lien
 
   if (!titre || !description || !date || !lieu || !type || !acces) {
     return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
@@ -87,6 +88,9 @@ export async function POST(req) {
         tarifFemme,
         tarifHomme,
         imageUrl,
+        latitude,
+        longitude,
+        lien, // ← on inclut le lien ici
         createur: { connect: { id: user.id } },
       },
     });
@@ -168,4 +172,3 @@ export async function GET(req) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
-

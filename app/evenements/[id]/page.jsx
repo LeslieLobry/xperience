@@ -94,11 +94,36 @@ export default function PageEvenement() {
         <img src={evenement.imageUrl} alt="Affiche de l'événement" />
       )}
 
-      <p><strong>Date :</strong> {new Date(evenement.date).toISOString().split("T")[0]}</p>
-      <p><strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}</p>
-      <p><strong>Lieu :</strong> {evenement.lieu}</p>
-      <p><strong>Type :</strong> {evenement.type}</p>
-      <p><strong>Accès :</strong> {evenement.acces}</p>
+      <p>
+        <strong>Date :</strong>{" "}
+        {new Date(evenement.date).toISOString().split("T")[0]}
+      </p>
+      <p>
+        <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}
+      </p>
+      <p>
+        <strong>Lieu :</strong> {evenement.lieu}
+      </p>
+      <p>
+        <strong>Type :</strong> {evenement.type}
+      </p>
+      <p>
+        <strong>Accès :</strong> {evenement.acces}
+      </p>
+
+      {/* Affichage du lien vers l'événement si défini */}
+      {evenement.lien && (
+        <p>
+          <strong>Lien :</strong>{" "}
+          <a
+            href={evenement.lien.startsWith("http") ? evenement.lien : `https://${evenement.lien}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {evenement.lien}
+          </a>
+        </p>
+      )}
 
       <h2>Description</h2>
       <p>{evenement.description}</p>

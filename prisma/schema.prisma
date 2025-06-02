@@ -75,6 +75,7 @@ model Evenement {
   tarifHomme   Float?
   latitude     Float?
   longitude    Float?
+  lien          String? 
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   createurId   Int
   participants Utilisateur[] @relation("Participation")
