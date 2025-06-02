@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import DeleteArticleButton from "../../components/DeleteArticleButton/DeleteArticleButton";
 import "./blog.css";
+import { redirect } from "next/navigation";
+
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
@@ -20,7 +22,11 @@ export default async function BlogPage() {
     } catch {
       // token invalide
     }
+  }if (!user) {
+    // Si pas connecté, redirection vers la page de connexion
+    redirect("/connexion");
   }
+
 
   const isAdmin = user?.role === "ADMIN";
 

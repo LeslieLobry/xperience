@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useAuth } from "../../context/AuthContext";
 import FiltreEvenements from "../../components/FiltreEvenements/FiltreEvenements";
 import "../evenements/evenements.css"
+import { useRouter } from "next/navigation";
 
 export default function EvenementsPage() {
   const [evenements, setEvenements] = useState([]);
@@ -14,8 +15,13 @@ export default function EvenementsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filtres, setFiltres] = useState(null);
-
+  const router = useRouter();
   const { user } = useAuth();
+
+  useEffect(() => {
+  if (user === undefined) return;
+  if (!user) router.push("/connexion");
+}, [user, router]);
 
   useEffect(() => {
     if (user?.role === "ADMIN") setIsAdmin(true);

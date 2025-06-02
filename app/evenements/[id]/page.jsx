@@ -13,6 +13,19 @@ export default function PageEvenement() {
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState("");
   const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Protection : rediriger si pas connecté
+  useEffect(() => {
+    if (user === undefined) return;
+    if (!user) router.push("/connexion");
+  }, [user, router]);
+
+  // Détection admin
+  useEffect(() => {
+    if (user?.role === "ADMIN") setIsAdmin(true);
+    else setIsAdmin(false);
+  }, [user]);
 
   useEffect(() => {
     const fetchEvenement = async () => {
@@ -30,7 +43,6 @@ export default function PageEvenement() {
         setLoading(false);
       }
     };
-
     if (id) fetchEvenement();
   }, [id]);
 
@@ -41,7 +53,6 @@ export default function PageEvenement() {
 
   const participer = async () => {
     if (dejaInscrit) return;
-
     const res = await fetch(`/api/evenements/${id}`, {
       method: "POST",
     });
@@ -55,7 +66,6 @@ export default function PageEvenement() {
     } else {
       setConfirmation("❌ Une erreur est survenue.");
     }
-
     setTimeout(() => setConfirmation(""), 5000);
   };
 
@@ -74,8 +84,20 @@ export default function PageEvenement() {
     } else {
       setConfirmation("⚠️ Erreur lors de la désinscription.");
     }
-
     setTimeout(() => setConfirmation(""), 5000);
+  };
+
+  const supprimerEvenement = async () => {
+    if (!window.confirm("Supprimer définitivement cet événement ?")) return;
+    const res = await fetch(`/api/evenements/${evenement.id}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      router.push("/evenements");
+    } else {
+      setConfirmation("❌ Erreur lors de la suppression.");
+      setTimeout(() => setConfirmation(""), 5000);
+    }
   };
 
   return (
@@ -111,7 +133,6 @@ export default function PageEvenement() {
         <strong>Accès :</strong> {evenement.acces}
       </p>
 
-      {/* Affichage du lien vers l'événement si défini */}
       {evenement.lien && (
         <p>
           <strong>Lien :</strong>{" "}
@@ -152,6 +173,24 @@ export default function PageEvenement() {
           className="filtre-btn"
           style={{ marginTop: "1rem" }}
         />
+      )}
+
+      {/* Boutons admin visibles seulement pour l’admin */}
+      {isAdmin && (
+        <div className="admin-actions" style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
+          <Button
+            title="✏️ Modifier"
+            onClick={() => router.push(`/evenements/editer/${evenement.id}`)}
+            color="#7cbbe5"
+            className="filtre-btn"
+          />
+          <Button
+            title="🗑️ Supprimer"
+            onClick={supprimerEvenement}
+            color="#e57c73"
+            className="filtre-btn"
+          />
+        </div>
       )}
     </div>
   );
