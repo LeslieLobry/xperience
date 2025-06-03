@@ -9,25 +9,21 @@ import "./id.css";
 export default function PageEvenement() {
   const { id } = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [evenement, setEvenement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState("");
-  const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = user?.role === "ADMIN";
 
-  // Protection : rediriger si pas connecté
+  // Redirige si pas connecté
   useEffect(() => {
     if (user === undefined) return;
     if (!user) router.push("/connexion");
   }, [user, router]);
 
-  // Détection admin
+  // Récupération de l'événement
   useEffect(() => {
-    if (user?.role === "ADMIN") setIsAdmin(true);
-    else setIsAdmin(false);
-  }, [user]);
-
-  useEffect(() => {
+    if (!id) return;
     const fetchEvenement = async () => {
       try {
         const res = await fetch(`/api/evenements/${id}`);
@@ -38,12 +34,12 @@ export default function PageEvenement() {
           participants: data.participants || [],
         });
       } catch (err) {
-        console.error(err);
+        setEvenement(null);
       } finally {
         setLoading(false);
       }
     };
-    if (id) fetchEvenement();
+    fetchEvenement();
   }, [id]);
 
   if (loading) return <div>Chargement...</div>;
@@ -53,10 +49,7 @@ export default function PageEvenement() {
 
   const participer = async () => {
     if (dejaInscrit) return;
-    const res = await fetch(`/api/evenements/${id}`, {
-      method: "POST",
-    });
-
+    const res = await fetch(`/api/evenements/${id}`, { method: "POST" });
     if (res.ok) {
       setEvenement((prev) => ({
         ...prev,
@@ -74,7 +67,6 @@ export default function PageEvenement() {
       method: "DELETE",
       headers: { "x-action": "leave" },
     });
-
     if (res.ok) {
       setEvenement((prev) => ({
         ...prev,
@@ -118,7 +110,7 @@ export default function PageEvenement() {
 
       <p>
         <strong>Date :</strong>{" "}
-        {new Date(evenement.date).toISOString().split("T")[0]}
+        {evenement.date ? new Date(evenement.date).toISOString().split("T")[0] : "?"}
       </p>
       <p>
         <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}
@@ -180,7 +172,7 @@ export default function PageEvenement() {
         <div className="admin-actions" style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
           <Button
             title="✏️ Modifier"
-            onClick={() => router.push(`/evenements/editer/${evenement.id}`)}
+            onClick={() => router.push(`/evenements/modifier/${evenement.id}`)}
             color="#7cbbe5"
             className="filtre-btn"
           />

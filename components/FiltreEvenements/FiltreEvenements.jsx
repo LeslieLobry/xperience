@@ -17,6 +17,7 @@ export default function FiltreEvenements({ onFilterChange }) {
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
 
+  // Met à jour le slider visuellement
   useEffect(() => {
     const rangeEl = document.querySelector(".filtre-range");
     if (rangeEl) {
@@ -101,15 +102,34 @@ export default function FiltreEvenements({ onFilterChange }) {
     }
   };
 
-  const appliquerFiltres = () => {
+  // 👇 Correction principale : toujours renseigner lat/lon pour la recherche rayon
+  const appliquerFiltres = async () => {
+    let lat = latitude;
+    let lon = longitude;
+
+    if ((!lat || !lon) && lieuInput.length > 1) {
+      try {
+        const res = await fetch(
+          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(lieuInput)}&fields=nom,centre&limit=1`
+        );
+        const data = await res.json();
+        if (data[0]?.centre?.coordinates) {
+          lat = data[0].centre.coordinates[1];
+          lon = data[0].centre.coordinates[0];
+        }
+      } catch (e) {
+        // Si erreur, on garde lat/lon null
+      }
+    }
+
     onFilterChange({
       lieu,
       rayon,
       dateDebut,
       dateFin,
       acces,
-      latitude,
-      longitude,
+      latitude: lat,
+      longitude: lon,
     });
   };
 
@@ -159,7 +179,7 @@ export default function FiltreEvenements({ onFilterChange }) {
         {citySuggestions.length > 0 && (
           <ul className="suggestions">
             {citySuggestions.map((city, i) => (
-              <li key={i} onClick={() => handleCitySelect(city)}>
+              <li key={city.nom + "-" + i} onClick={() => handleCitySelect(city)}>
                 {city.nom}
               </li>
             ))}
@@ -173,11 +193,11 @@ export default function FiltreEvenements({ onFilterChange }) {
         </label>
         <input
           type="range"
-          min="00"
+          min="10"
           max="200"
           step="10"
           value={rayon}
-          onChange={(e) => setRayon(parseInt(e.target.value))}
+          onChange={(e) => setRayon(Number(e.target.value))}
           className="filtre-range"
         />
       </div>
