@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
 import GaleriePhotos from "../GaleriePhotos/GaleriePhotos";
+import GaleriePriveePhotos from "../GaleriePriveePhotos/GaleriePriveePhotos";
+import CreerGaleriePrivee from "../CreerGaleriePrivee/CreerGaleriePrivee";
 import StatutToggle from "../StatutToggle/StatutToggle";
 import DescriptionCard from "../DescriptionCard/DescriptionCard";
 import PreferencesSummary from "../PreferencesSummary/PreferencesSummary";
@@ -133,6 +135,20 @@ export default function Profil({ user, connectedUser }) {
 
         <DescriptionCard editable={isOwnProfile} />
         <GaleriePhotos photos={user.photos || []} editable={isOwnProfile} />
+
+        {/* --- GESTION GALERIE PRIVÉE --- */}
+        {isOwnProfile && (
+          <CreerGaleriePrivee utilisateurId={user.id} onCreated={() => window.location.reload()} />
+        )}
+        {user.galeriesPrivees && user.galeriesPrivees.length > 0 && (
+          <GaleriePriveePhotos
+            galerieId={user.galeriesPrivees[0].id}
+            editable={isOwnProfile}
+            utilisateurId={user.id}
+          />
+        )}
+        {/* --- FIN GALERIE PRIVÉE --- */}
+
         <PreferencesSummary editable={isOwnProfile} />
         <ProfilDetailsSummary editable={isOwnProfile} />
 

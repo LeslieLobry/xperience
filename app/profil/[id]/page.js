@@ -25,6 +25,10 @@ export default async function ProfilPage(context) {
       recherches: true,
       envies: true,
       photos: true,
+      galeriesPrivees: {        
+      include: { photos: true },
+      orderBy: { createdAt: 'desc' }
+    },
       avisRecus: {
         include: {
           auteur: true,

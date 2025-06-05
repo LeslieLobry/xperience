@@ -31,6 +31,28 @@ CREATE TABLE "Utilisateur" (
 );
 
 -- CreateTable
+CREATE TABLE "Evenement" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "titre" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "date" DATETIME NOT NULL,
+    "lieu" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "acces" TEXT NOT NULL,
+    "imageUrl" TEXT,
+    "heureDebut" TEXT,
+    "heureFin" TEXT,
+    "tarifCouple" REAL,
+    "tarifFemme" REAL,
+    "tarifHomme" REAL,
+    "latitude" REAL,
+    "longitude" REAL,
+    "lien" TEXT,
+    "createurId" INTEGER NOT NULL,
+    CONSTRAINT "Evenement_createurId_fkey" FOREIGN KEY ("createurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Article" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "slug" TEXT NOT NULL,
@@ -40,6 +62,7 @@ CREATE TABLE "Article" (
     "auteurId" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    "vues" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "Article_auteurId_fkey" FOREIGN KEY ("auteurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -86,24 +109,74 @@ CREATE TABLE "PasswordResetToken" (
 );
 
 -- CreateTable
-CREATE TABLE "Photo" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "url" TEXT NOT NULL,
-    "utilisateurId" INTEGER NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Photo_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "Utilisateur" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "Avis" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "note" INTEGER NOT NULL,
     "commentaire" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "auteurId" INTEGER NOT NULL,
     "cibleId" INTEGER NOT NULL,
     CONSTRAINT "Avis_auteurId_fkey" FOREIGN KEY ("auteurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Avis_cibleId_fkey" FOREIGN KEY ("cibleId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Conversation" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "updatedAt" DATETIME NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "Participant" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "utilisateurId" INTEGER NOT NULL,
+    "conversationId" INTEGER NOT NULL,
+    "lastReadAt" DATETIME,
+    CONSTRAINT "Participant_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Participant_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Message" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "conversationId" INTEGER NOT NULL,
+    "auteurId" INTEGER NOT NULL,
+    "contenu" TEXT,
+    "imageUrl" TEXT,
+    "videoUrl" TEXT,
+    "type" TEXT NOT NULL DEFAULT 'TEXTE',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Message_auteurId_fkey" FOREIGN KEY ("auteurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "GaleriePrivee" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "nom" TEXT NOT NULL,
+    "codeAcces" TEXT NOT NULL,
+    "utilisateurId" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "GaleriePrivee_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Photo" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "url" TEXT NOT NULL,
+    "utilisateurId" INTEGER NOT NULL,
+    "galeriePriveeId" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Photo_utilisateurId_fkey" FOREIGN KEY ("utilisateurId") REFERENCES "Utilisateur" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Photo_galeriePriveeId_fkey" FOREIGN KEY ("galeriePriveeId") REFERENCES "GaleriePrivee" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "_Participation" (
+    "A" INTEGER NOT NULL,
+    "B" INTEGER NOT NULL,
+    CONSTRAINT "_Participation_A_fkey" FOREIGN KEY ("A") REFERENCES "Evenement" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_Participation_B_fkey" FOREIGN KEY ("B") REFERENCES "Utilisateur" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -123,3 +196,12 @@ CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("toke
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Avis_auteurId_cibleId_key" ON "Avis"("auteurId", "cibleId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Participant_utilisateurId_conversationId_key" ON "Participant"("utilisateurId", "conversationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "_Participation_AB_unique" ON "_Participation"("A", "B");
+
+-- CreateIndex
+CREATE INDEX "_Participation_B_index" ON "_Participation"("B");
