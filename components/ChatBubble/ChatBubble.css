@@ -42,3 +42,34 @@
   align-items: center;
   justify-content: center;
 }
+.chat-bubble-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.chat-menu {
+  position: absolute;
+  top: 70px;
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
+  z-index: 100;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-menu button {
+  padding: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.chat-menu button:hover {
+  background-color: #f0f0f0;
+}

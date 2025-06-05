@@ -185,7 +185,7 @@ model GaleriePrivee {
   nom           String
   codeAcces     String     // On stockera ici le hash du code (pas le code en clair)
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
-  utilisateurId Int
+  utilisateurId Int @unique
   photos        Photo[]
   createdAt     DateTime   @default(now())
 }
@@ -199,4 +199,12 @@ model Photo {
   galeriePriveeId Int?
   createdAt       DateTime        @default(now())
   
+}
+model GlobalMessage {
+  id        Int      @id @default(autoincrement())
+  auteurId  Int
+  contenu   String
+  createdAt DateTime @default(now())
+
+  auteur    Utilisateur @relation(fields: [auteurId], references: [id])
 }

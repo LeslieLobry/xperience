@@ -201,6 +201,9 @@ CREATE UNIQUE INDEX "Avis_auteurId_cibleId_key" ON "Avis"("auteurId", "cibleId")
 CREATE UNIQUE INDEX "Participant_utilisateurId_conversationId_key" ON "Participant"("utilisateurId", "conversationId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "GaleriePrivee_utilisateurId_key" ON "GaleriePrivee"("utilisateurId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "_Participation_AB_unique" ON "_Participation"("A", "B");
 
 -- CreateIndex

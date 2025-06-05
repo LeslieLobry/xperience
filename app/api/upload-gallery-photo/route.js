@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import path from 'path';
@@ -7,8 +8,8 @@ import { prisma } from '../../../lib/prisma';
 import { getUserFromToken } from '../../../lib/auth';
 
 export async function POST(req) {
-  const cookieStore = cookies();
-  const user = getUserFromToken(cookieStore);
+  const cookieStore = await cookies();
+  const user = await getUserFromToken(cookieStore);
 
   if (!user || !user.id) {
     return NextResponse.json({ success: false, message: 'Non autorisé' }, { status: 401 });
@@ -21,8 +22,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
   }
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
+  const buffer = Buffer.from(await file.arrayBuffer());
 
   const filename = `gallery_${user.id}_${Date.now()}.webp`;
   const filepath = path.join(process.cwd(), 'public/uploads', filename);
@@ -32,11 +32,11 @@ export async function POST(req) {
 
   const photoUrl = `/uploads/${filename}`;
 
-  // ✅ Enregistrement dans la table Photo
   const photo = await prisma.photo.create({
     data: {
       url: photoUrl,
       utilisateurId: user.id,
+      galeriePriveeId: null, // Important : null car galerie publique
     },
   });
 

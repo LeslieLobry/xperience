@@ -19,27 +19,24 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("✅ Nouveau client connecté :", socket.id);
 
-  // Rejoindre une room pour une conversation donnée
+  // Rooms pour conversations privées
   socket.on("join_conversation", (conversationId) => {
     socket.join(`conversation_${conversationId}`);
     console.log(`🟢 Client ${socket.id} a rejoint la conversation ${conversationId}`);
   });
 
-  // Lorsqu’un client envoie un message
   socket.on("send_message", (message) => {
-    console.log("📨 Nouveau message reçu :", message);
-
-    // 1) On broadcast le message à tous les membres de la conversation
     io.to(`conversation_${message.conversationId}`).emit("message_received", message);
-
-    // 2) On émet aussi un event "notification" pour que la bulle de tous 
-    //    les clients fasse son fetch("/api/unread-messages-count")
     io.emit("notification", { userId: message.auteurId });
   });
 
-  // Nouvel événement : lorsqu’une conversation est marquée lue côté client
+  // Event pour chat global
+  socket.on("send_global_message", (message) => {
+    // Ici tu peux sauvegarder en base aussi
+    io.emit("receive_global_message", message);
+  });
+
   socket.on("refresh_unread", ({ userId }) => {
-    // On broadcast pour que ChatBubble.composant réagisse
     io.emit("refresh_unread", { userId });
   });
 
@@ -47,6 +44,7 @@ io.on("connection", (socket) => {
     console.log("🔌 Client déconnecté :", socket.id);
   });
 });
+
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {

@@ -13,6 +13,7 @@ import AProposCard from "../AProposCard/AProposCard";
 import AvisForm from "../AvisForm/AvisForm";
 import AvisList from "../AvisList/AvisList";
 import MenuProfilActions from "../MenuProfilActions/MenuProfilActions";
+import GalerieTabs from "../GalerieTabs/GalerieTabs"
 import "../Profil/Profil.css";
 
 export default function Profil({ user, connectedUser }) {
@@ -134,21 +135,26 @@ export default function Profil({ user, connectedUser }) {
         </div>
 
         <DescriptionCard editable={isOwnProfile} />
-        <GaleriePhotos photos={user.photos || []} editable={isOwnProfile} />
+        {/* <GaleriePhotos photos={user.photos || []} editable={isOwnProfile} /> */}
 
         {/* --- GESTION GALERIE PRIVÉE --- */}
-        {isOwnProfile && (
-          <CreerGaleriePrivee utilisateurId={user.id} onCreated={() => window.location.reload()} />
-        )}
+        {/* {isOwnProfile && (!user.galeriesPrivees || user.galeriesPrivees.length === 0) && (
+  <CreerGaleriePrivee utilisateurId={user.id} onCreated={() => window.location.reload()} />
+)}
         {user.galeriesPrivees && user.galeriesPrivees.length > 0 && (
           <GaleriePriveePhotos
             galerieId={user.galeriesPrivees[0].id}
             editable={isOwnProfile}
             utilisateurId={user.id}
           />
-        )}
+        )} */}
         {/* --- FIN GALERIE PRIVÉE --- */}
-
+        <GalerieTabs
+          publicPhotos={user.photos}
+          galeriePrivee={user.galeriesPrivees?.[0]}
+          editable={isOwnProfile}
+          utilisateurId={user.id}
+        />
         <PreferencesSummary editable={isOwnProfile} />
         <ProfilDetailsSummary editable={isOwnProfile} />
 

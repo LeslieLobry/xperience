@@ -11,7 +11,7 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
   const [currentIndex, setCurrentIndex] = useState(null); // index de la photo sélectionnée
 
   const handleNewPhoto = (photo) => {
-    setPhotoList(prev => [...prev, photo]); 
+    setPhotoList(prev => [...prev, photo]);
   };
 
   const handleDelete = async (id) => {

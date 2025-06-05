@@ -17,25 +17,30 @@ export default async function ProfilPage(context) {
     where: { id: decoded.id },
   });
 
-  const user = await prisma.utilisateur.findUnique({
-    where: {
-      id: parseInt(id),
+ const user = await prisma.utilisateur.findUnique({
+  where: {
+    id: parseInt(id),
+  },
+  include: {
+    recherches: true,
+    envies: true,
+    photos: {
+      where: {
+        galeriePriveeId: null, // ✅ on ne prend que les photos publiques
+      },
     },
-    include: {
-      recherches: true,
-      envies: true,
-      photos: true,
-      galeriesPrivees: {        
+    galeriesPrivees: {        
       include: { photos: true },
       orderBy: { createdAt: 'desc' }
     },
-      avisRecus: {
-        include: {
-          auteur: true,
-        },
+    avisRecus: {
+      include: {
+        auteur: true,
       },
     },
-  });
+  },
+});
+
 
   if (!user) return redirect("/utilisateurs");
 

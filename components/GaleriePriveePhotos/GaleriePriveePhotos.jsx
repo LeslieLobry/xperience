@@ -2,62 +2,89 @@
 
 import React, { useEffect, useState } from 'react';
 import PhotoUploader from '../PhotoUploader/PhotoUploader';
+import CreerGaleriePrivee from '../CreerGaleriePrivee/CreerGaleriePrivee';
 import '../GaleriePhotos/GaleriePhotos.css';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function GaleriePriveePhotos({
-  galerieId,
-  editable = false,
-  utilisateurId
-}) {
+export default function GaleriePriveePhotos({ editable = false, utilisateurId }) {
   const MAX_PHOTOS = 6;
+  const [galerie, setGalerie] = useState(null);
   const [photoList, setPhotoList] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accessGranted, setAccessGranted] = useState(false);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
 
-  // Charge toujours depuis l'API (source de vérité)
-  const fetchPhotos = async () => {
-    if (!galerieId) return;
-    setLoading(true);
-    const res = await fetch(`/api/galeries-privees/${galerieId}/photos`);
+  // Récupération galerie de l'utilisateur
+  useEffect(() => {
+    const fetchGalerie = async () => {
+      const res = await fetch(`/api/utilisateurs/${utilisateurId}/galerie-privee`);
+      if (res.ok) {
+        const data = await res.json();
+        setGalerie(data);
+      } else {
+        setGalerie(null);
+      }
+    };
+    if (utilisateurId) fetchGalerie();
+  }, [utilisateurId]);
+
+  // Chargement des photos
+  const checkAccess = async () => {
+    if (!galerie) return;
+    const res = await fetch(`/api/galeries-privees/${galerie.id}/photos`);
     if (res.ok) {
       const data = await res.json();
       setPhotoList(data.photos);
+      setAccessGranted(true);
+    } else {
+      setAccessGranted(false);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchPhotos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galerieId]);
+    if (galerie?.id) checkAccess();
+  }, [galerie]);
 
-  // Ajout d'une photo
-  const handleNewPhoto = async (url) => {
-    if (!editable || !utilisateurId) return;
-    const res = await fetch(`/api/galeries-privees/${galerieId}/photos`, {
+  const handleSubmitCode = async (e) => {
+    e.preventDefault();
+    setError('');
+    const res = await fetch(`/api/galeries-privees/${galerie.id}/verifier-code`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, utilisateurId }),
+      body: JSON.stringify({ code }),
     });
     if (res.ok) {
-      // On ne push plus en local, on refetch (plus clean !)
-      await fetchPhotos();
+      setAccessGranted(true);
+      setCode('');
+      await checkAccess();
+    } else {
+      const data = await res.json();
+      setError(data.error || 'Erreur');
     }
   };
 
-  // Suppression d'une photo
+  const handleNewPhoto = async (file) => {
+    if (!editable || !galerie?.id) return;
+    const formData = new FormData();
+    formData.append('photo', file);
+    const res = await fetch(`/api/galeries-privees/${galerie.id}/photos`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (res.ok) await checkAccess();
+  };
+
   const handleDelete = async (id) => {
     if (!editable) return;
-    const res = await fetch(`/api/photos/${id}`, {
-      method: "DELETE",
+    const res = await fetch(`/api/galeries-privees/${galerie.id}/photos?photoId=${id}`, {
+      method: 'DELETE',
     });
-    if (res.ok) {
-      await fetchPhotos();
-    }
+    if (res.ok) await checkAccess();
   };
 
-  // Navigation/zoom
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
     if (e.key === 'Escape') setCurrentIndex(null);
@@ -68,8 +95,31 @@ export default function GaleriePriveePhotos({
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, photoList.length]);
+  }, [currentIndex]);
+
+  // ➤ Aucune galerie privée : proposer formulaire de création
+  if (galerie === null && editable) {
+    return (
+      <CreerGaleriePrivee utilisateurId={utilisateurId} onCreated={setGalerie} />
+    );
+  }
+
+  // ➤ Galerie présente mais pas encore de code validé
+  if (galerie && !accessGranted) {
+    return (
+      <form onSubmit={handleSubmitCode} className="code-access-form">
+        <h3>Accès galerie privée</h3>
+        <input
+          type="password"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Entrez le code"
+        />
+        <button type="submit">Valider</button>
+        {error && <p className="error-text">{error}</p>}
+      </form>
+    );
+  }
 
   const emptySlots = MAX_PHOTOS - photoList.length;
 
@@ -98,7 +148,11 @@ export default function GaleriePriveePhotos({
 
           {editable && Array.from({ length: emptySlots }).map((_, idx) => (
             <div className="gallery-slot empty" key={`empty-${idx}`}>
-              <PhotoUploader isGallery onUpload={handleNewPhoto} />
+              <PhotoUploader
+                isGallery={true}
+                galerieId={galerie.id}
+                onUpload={handleNewPhoto}
+              />
             </div>
           ))}
         </div>

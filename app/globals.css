@@ -8,6 +8,15 @@
     --font-raleway: 'Raleway', sans-serif;
    
 }
+img, body {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
 
 @media (prefers-color-scheme: dark) {
   :root {
