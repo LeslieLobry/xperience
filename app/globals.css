@@ -15,7 +15,7 @@ img, body {
 img {
   user-select: none;
   -webkit-user-drag: none;
-  pointer-events: none;
+  /* pointer-events: none; */
 }
 
 @media (prefers-color-scheme: dark) {

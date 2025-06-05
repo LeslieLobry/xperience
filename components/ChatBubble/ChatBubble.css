@@ -1,75 +1,36 @@
-/* components/ChatBubble/ChatBubble.css */
-
-.chat-bubble-container {
+.chat-bubble-wrapper {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 100px;
-  height:100px;
-  background-color: #a2b9c1; 
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 9999;
+}
+
+.chat-bubble-container {
+  position: relative;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  z-index: 999; 
-  transition: background-color 0.2s;
-}
-
-.chat-bubble-container:hover {
-  background-color: #f2f0eb;
-}
-
-.chat-bubble-icon {
-  font-size: 24px;
-  color: rgb(216, 17, 17);
 }
 
 .chat-bubble-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  background-color: #e02424; /* rouge */
+  top: 0;
+  right: 0;
+  background: red;
   color: white;
-  font-size: 0.65rem;
-  font-weight: bold;
-  line-height: 1;
   border-radius: 50%;
-  min-width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.chat-bubble-wrapper {
-  position: relative;
-  display: inline-block;
+  padding: 4px 7px;
+  font-size: 12px;
 }
 
 .chat-menu {
   position: absolute;
-  top: 70px;
+  bottom: 80px;
   right: 0;
   background: white;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
-  z-index: 100;
-  width: 150px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-}
-
-.chat-menu button {
-  padding: 10px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 14px;
-  text-align: left;
-}
-
-.chat-menu button:hover {
-  background-color: #f0f0f0;
+  gap: 8px;
 }

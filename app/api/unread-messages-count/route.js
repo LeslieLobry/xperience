@@ -1,5 +1,4 @@
-
-import { prisma } from "../../../lib/prisma";
+import { prisma } from "../../../lib/prisma"; 
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -14,36 +13,39 @@ export async function GET(req) {
     );
   }
 
-  // Récupère toutes les participations de l'utilisateur
-  const participantEntries = await prisma.participant.findMany({
-    where: { utilisateurId: userId },
-    select: {
-      conversationId: true,
-      lastReadAt: true,
-    },
-  });
-
-  if (participantEntries.length === 0) {
-    // Aucune conversation → aucun message non lu
-    return NextResponse.json({ unreadCount: 0 });
-  }
-
-  let totalUnread = 0;
-
-  // Pour chaque conversation, compte les messages postérieurs à lastReadAt
-  for (const { conversationId, lastReadAt } of participantEntries) {
-    const cutoff = lastReadAt || new Date(0);
-
-    const countInConv = await prisma.message.count({
-      where: {
-        conversationId: conversationId,
-        auteurId: { not: userId },
-        createdAt: { gt: cutoff },
+  try {
+    // 🔍 Récupère toutes les conversations auxquelles participe l'utilisateur
+    const participantEntries = await prisma.Participant.findMany({
+      where: { utilisateurId: userId },
+      select: {
+        conversationId: true,
+        lastReadAt: true,
       },
     });
 
-    totalUnread += countInConv;
-  }
+    if (participantEntries.length === 0) {
+      return NextResponse.json({ unreadCount: 0 });
+    }
 
-  return NextResponse.json({ unreadCount: totalUnread });
+    let totalUnread = 0;
+
+    for (const { conversationId, lastReadAt } of participantEntries) {
+      const cutoff = lastReadAt || new Date(0);
+
+      const countInConv = await prisma.Message.count({
+        where: {
+          conversationId,
+          auteurId: { not: userId },
+          createdAt: { gt: cutoff },
+        },
+      });
+
+      totalUnread += countInConv;
+    }
+
+    return NextResponse.json({ unreadCount: totalUnread });
+  } catch (error) {
+    console.error("❌ Erreur dans /api/unread-messages-count :", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
 }

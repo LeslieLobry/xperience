@@ -27,8 +27,38 @@ export async function POST(req) {
       auteurId: decoded.id,
       contenu,
     },
-    include: { auteur: { select: { id: true, pseudo: true } } },
+    include: {
+      auteur: {
+        select: { id: true, pseudo: true },
+      },
+    },
   });
 
-  return NextResponse.json(message);
+  const formattedMessage = {
+    ...message,
+    createdAtFormatted: new Date(message.createdAt).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+
+  return NextResponse.json(formattedMessage);
+}
+
+export async function GET() {
+  try {
+    const messages = await prisma.globalMessage.findMany({
+      orderBy: { createdAt: "asc" },
+      include: {
+        auteur: {
+          select: { id: true, pseudo: true },
+        },
+      },
+    });
+
+    return NextResponse.json({ messages }); // ✅ important pour le frontend
+  } catch (error) {
+    console.error("Erreur récupération messages globaux :", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
 }

@@ -1,4 +1,3 @@
-// /app/api/conversations/route.js
 import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -11,7 +10,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Participants invalides" }, { status: 400 });
   }
 
-  // 🔍 Vérifie si une conversation existe déjà entre ces participants
+  // Vérifie si une conversation existe déjà entre ces participants
   const existingConversation = await prisma.conversation.findFirst({
     where: {
       participants: {
@@ -29,7 +28,7 @@ export async function POST(req) {
     return NextResponse.json({ conversation: existingConversation, existed: true });
   }
 
-  // 🆕 Crée une nouvelle conversation avec les participants
+  // Crée une nouvelle conversation
   const conversation = await prisma.conversation.create({
     data: {
       participants: {
@@ -47,31 +46,40 @@ export async function POST(req) {
 // GET /api/conversations?userId=xxx
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
-  const userId = parseInt(searchParams.get("userId"));
+  const userIdParam = searchParams.get("userId");
+  const userId = userIdParam ? parseInt(userIdParam, 10) : null;
 
-  if (!userId) {
-    return NextResponse.json({ error: "Paramètre userId requis" }, { status: 400 });
+  if (!userId || isNaN(userId)) {
+    return NextResponse.json(
+      { error: "Paramètre userId requis ou invalide" },
+      { status: 400 }
+    );
   }
 
-  const conversations = await prisma.conversation.findMany({
-    where: {
-      participants: {
-        some: {
-          utilisateurId: userId,
+  try {
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: {
+          some: {
+            utilisateurId: userId,
+          },
         },
       },
-    },
-    include: {
-      participants: { include: { utilisateur: true } },
-      messages: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
+      include: {
+        participants: { include: { utilisateur: true } },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
-    },
-    orderBy: {
-      updatedAt: "desc",
-    },
-  });
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
 
-  return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations });
+  } catch (err) {
+    console.error("❌ Erreur serveur dans /api/conversations :", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
 }
