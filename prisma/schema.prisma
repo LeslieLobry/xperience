@@ -59,6 +59,7 @@ model Utilisateur {
   messages        Message[]       @relation("MessageAuteur")
   participants    Participant[]
   messagesGlobaux GlobalMessage[]
+  globalChatRead  GlobalChatRead?
 }
 
 model Evenement {
@@ -208,4 +209,11 @@ model GlobalMessage {
   createdAt DateTime @default(now())
 
   auteur Utilisateur @relation(fields: [auteurId], references: [id])
+}
+
+model GlobalChatRead {
+  id       Int         @id @default(autoincrement())
+  userId   Int         @unique
+  lastRead DateTime
+  user     Utilisateur @relation(fields: [userId], references: [id])
 }

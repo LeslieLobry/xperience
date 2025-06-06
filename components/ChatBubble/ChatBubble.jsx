@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { io } from "socket.io-client";
 import { useRouter } from "next/navigation";
@@ -11,57 +11,78 @@ import masque from "../../public/masque.png";
 export default function ChatBubble() {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadPrivate, setUnreadPrivate] = useState(0);
+  const [unreadGlobal, setUnreadGlobal] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [socket, setSocket] = useState(null);
   const router = useRouter();
 
-  useEffect(() => {
-    if (user && !socket) {
-      const newSocket = io("http://localhost:4000");
-      setSocket(newSocket);
-      console.log("🔌 Socket connecté");
+  const sonGlobal = useRef(null);
+  const sonPrive = useRef(null);
 
-      return () => {
-        newSocket.disconnect();
-        console.log("❌ Socket déconnecté");
-      };
+  const fetchUnreadCounts = async () => {
+    if (!user?.id) return;
+
+    try {
+      const [privateRes, globalRes] = await Promise.all([
+        fetch(`/api/unread-messages-count?userId=${user.id}`),
+        fetch(`/api/unread-global-messages?userId=${user.id}`),
+      ]);
+
+      const { unreadCount: privateCount = 0 } = await privateRes.json();
+      const { unreadGlobal = 0 } = await globalRes.json();
+
+      setUnreadPrivate(privateCount);
+      setUnreadGlobal(unreadGlobal);
+      setUnreadCount(privateCount + unreadGlobal);
+    } catch (err) {
+      console.error("❌ Erreur compteur messages :", err);
     }
+  };
+
+  useEffect(() => {
+    if (!user || socket) return;
+
+    const newSocket = io("http://localhost:4000");
+    setSocket(newSocket);
+    console.log("🔌 Socket connecté");
+
+    return () => {
+      newSocket.disconnect();
+      console.log("❌ Socket déconnecté");
+    };
   }, [user, socket]);
 
   useEffect(() => {
-    if (!user) return;
-
-    fetch(`/api/unread-messages-count?userId=${user.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (typeof data.unreadCount === "number") {
-          setUnreadCount(data.unreadCount);
-        }
-      })
-      .catch((err) => console.error("Erreur unreadCount :", err));
+    fetchUnreadCounts();
   }, [user?.id]);
 
   useEffect(() => {
     if (!user || !socket) return;
 
-    const updateUnread = () => {
-      fetch(`/api/unread-messages-count?userId=${user.id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (typeof data.unreadCount === "number") {
-            setUnreadCount(data.unreadCount);
-          }
-        });
-    };
+    socket.on("notification", () => {
+      fetchUnreadCounts();
+      sonPrive.current?.play().catch(() => {});
+    });
 
-    socket.on("notification", updateUnread);
     socket.on("refresh_unread", ({ userId }) => {
-      if (userId === user.id) updateUnread();
+      if (userId === user.id) {
+        fetchUnreadCounts();
+        sonPrive.current?.play().catch(() => {});
+      }
+    });
+
+    socket.on("receive_global_message", (msg) => {
+      if (msg.auteurId !== user.id) {
+        fetchUnreadCounts();
+        sonGlobal.current?.play().catch(() => {});
+      }
     });
 
     return () => {
-      socket.off("notification", updateUnread);
+      socket.off("notification");
       socket.off("refresh_unread");
+      socket.off("receive_global_message");
     };
   }, [user, socket]);
 
@@ -73,19 +94,20 @@ export default function ChatBubble() {
   };
 
   const goToGlobalChat = () => {
-    console.log("➡️ Aller vers chat global");
     router.push("/chat-global");
     setShowMenu(false);
   };
 
   const goToPrivateMessages = () => {
-    console.log("➡️ Aller vers messagerie privée");
     router.push("/messagerie");
     setShowMenu(false);
   };
 
   return (
     <div className="chat-bubble-wrapper">
+      <audio ref={sonGlobal} src="/sounds/message-global.mp3" />
+      <audio ref={sonPrive} src="/sounds/message-prive.mp3" />
+      
       <div className="chat-bubble-container" onClick={handleToggleMenu}>
         <Image
           src={masque}
@@ -101,8 +123,12 @@ export default function ChatBubble() {
 
       {showMenu && (
         <div className="chat-menu">
-          <button onClick={goToGlobalChat}>Chat global</button>
-          <button onClick={goToPrivateMessages}>Messagerie privée</button>
+          <button onClick={goToGlobalChat}>
+            Chat global {unreadGlobal > 0 && `(${unreadGlobal})`}
+          </button>
+          <button onClick={goToPrivateMessages}>
+            Messagerie privée {unreadPrivate > 0 && `(${unreadPrivate})`}
+          </button>
         </div>
       )}
     </div>

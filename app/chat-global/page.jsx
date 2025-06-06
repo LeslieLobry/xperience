@@ -15,6 +15,15 @@ export default function ChatGlobalPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+useEffect(() => {
+  if (!user?.id) return;
+
+  fetch("/api/global-chat-read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: user.id }),
+  });
+}, [user]);
 
   // Initialiser la connexion socket
   useEffect(() => {
