@@ -63,6 +63,7 @@ export async function POST(req) {
         const age = parseInt(getField(fields.age));
         const consent = getField(fields.consent) === "true" || getField(fields.consent) === true;
         const localisation = getField(fields.localisation);
+        const consentCGUDate = consent ? new Date() : null;
 
         // Vérifie unicité
         const exists = await prisma.utilisateur.findFirst({
@@ -123,8 +124,9 @@ export async function POST(req) {
             type,
             orientation,
             age,
-            consent,
             localisation,
+            consentCGU: consent,
+            consentCGUDate,
             photoUrl: photoPath,
             recherches: {
               create: recherche.map((label) => ({ label })),
@@ -148,7 +150,7 @@ export async function POST(req) {
         await resend.emails.send({
           from: process.env.EMAIL_FROM,
           to: email,
-          subject: "Confirmz ton adresse email",
+          subject: "Confirmez votre adresse email",
           html: `
             <p>Bienvenue sur X-periences, ${pseudo} 👋</p>
             <p>Merci de vous être inscrit. Pour confirmer votre adresse email, cliquez sur le lien ci-dessous :</p>

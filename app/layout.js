@@ -5,6 +5,7 @@ import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar
 import Footer from "../components/Footer/Footer"
 import ChatBubble from "../components/ChatBubble/ChatBubble"
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper"
+import BandeauCookies from "../components/BandeauCookies/BandeauCookies"
 
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
@@ -26,6 +27,7 @@ export default function RootLayout({ children }) {
           {/* La bulle de conversation apparaît partout */}
           <ChatBubble />
           <Footer/>
+          <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
       </body>

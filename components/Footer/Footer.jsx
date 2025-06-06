@@ -2,6 +2,7 @@ import logo from "../../app/Assets/logo.png"
 import Image from "next/image";
 import insta from "../../app/Assets/insta.png"
 import facebook from "../../app/Assets/facebook.png"
+import Link from "next/link";
 import "../Footer/Footer.css"
 function Footer(params) {
     return(
@@ -18,17 +19,17 @@ function Footer(params) {
             <div className="footer-a-propos">
                 <h2 className="footer-apropos-title">À PROPOS</h2>
                 <ul className="footer-ul">
-                    <li>CGU</li>
-                    <li>Cookies et vie privée</li>
-                    <li>Politique de confidentialité</li>
-                    <li>Mentions légales</li>
-                    <li>La charte</li>
+                    <li>  <Link href="/cgu">CGU</Link></li>
+                    <li><Link href="/cookies">Cookies et vie privée</Link></li>
+                    <li><Link href="/confidentialite">Politique de confidentialité</Link></li>
+                    <li><Link href="/mentions-legales">Mentions légales</Link></li>
+                    <li><Link href="/charte">La charte</Link></li>
                 </ul>
             </div>
             <div className="footer-contact"><h2>Nous Contacter</h2></div>
             <div className="footer-reseau">
                 <h2>Nos réseaux</h2>
-                <a href="">
+                <a href="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR">
                     <Image
                         src={facebook}
                         alt="liens facebook"

@@ -1,10 +1,11 @@
-// /app/messagerie/page.jsx
 "use client";
 
 import { useSearchParams } from "next/navigation";
 import ListeConversations from "../../components/ListeConversations/ListeConversations";
-import ChatBox from "../../components/ChatBox/ChatBox"
+import ChatBox from "../../components/ChatBox/ChatBox";
+import WebcamView from "../../components/WebcamView/WebcamView";
 import { useAuth } from "../../context/AuthContext";
+import "./messagerie.css"
 
 export default function MessageriePage() {
   const { user } = useAuth();
@@ -15,7 +16,7 @@ export default function MessageriePage() {
   if (!user) return <p>Connecte-toi pour accéder à la messagerie.</p>;
 
   return (
-    <div className="messagerie-page" style={{ display: "flex", height: "100vh" }}>
+    <div className="messagerie-page">
       <ListeConversations
         userId={user.id}
         onSelectConversation={(id) =>
@@ -23,20 +24,18 @@ export default function MessageriePage() {
         }
       />
 
-      {conversationId ? (
-        <ChatBox conversationId={conversationId} utilisateur={user} />
-      ) : (
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <p>Sélectionne une conversation</p>
-        </div>
-      )}
+      <div className="chat-section">
+        {conversationId ? (
+          <ChatBox conversationId={conversationId} utilisateur={user} />
+        ) : (
+          <div className="no-conversation">
+            <p>Sélectionne une conversation</p>
+          </div>
+        )}
+
+        {/* Webcam affichée à droite */}
+        <WebcamView />
+      </div>
     </div>
   );
 }
