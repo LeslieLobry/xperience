@@ -1,52 +1,46 @@
-// components/ChatBox/ChatBox.jsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
-import "../ChatBox/ChatBox.css";
+import ChatHeader from "./ChatHeader";
+import MessageBubble from "./MessageBubble";
+import "./ChatBox.css";
 
 let socket;
+const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 export default function ChatBox({ conversationId, utilisateur }) {
   const [messages, setMessages] = useState([]);
   const [nouveauTexte, setNouveauTexte] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const messagesEndRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const pcRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [inCall, setInCall] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null); // { offer, type }
 
-  // ① Initialise Socket.IO dès que l'utilisateur existe
   useEffect(() => {
-    if (utilisateur && !socket) {
-      socket = io("http://localhost:4000"); // adapter si nécessaire
+    socket = io("http://localhost:4000");
+    if (conversationId) {
+      socket.emit("join_conversation", conversationId);
     }
-  }, [utilisateur]);
+  }, [conversationId]);
 
-  // ② Quand conversationId ou utilisateur change, on marque lecture + on charge + on écoute
   useEffect(() => {
     if (!conversationId || !utilisateur) return;
 
-    // a) Si le socket n’était pas encore créé, on le crée avant d’émettre
-    if (!socket) {
-      socket = io("http://localhost:4000");
-    }
-
-    // b) Marquer la conversation comme lue
     fetch(`/api/conversations/${conversationId}/mark-as-read`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: utilisateur.id }),
     })
       .then(() => {
-        // Notifier la bulle pour rafraîchir son compteur
-        if (socket) {
-          socket.emit("refresh_unread", { userId: utilisateur.id });
-        }
+        socket.emit("refresh_unread", { userId: utilisateur.id });
       })
       .catch((err) => console.error("Erreur mark-as-read :", err));
 
-    // c) Rejoindre la room
-    socket.emit("join_conversation", conversationId);
-
-    // d) Charger l'historique des messages
     fetch(`/api/messages?conversationId=${conversationId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -55,7 +49,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
       })
       .catch((err) => console.error("Erreur fetch messages :", err));
 
-    // e) Écoute des nouveaux messages
     socket.on("message_received", (msg) => {
       if (msg.conversationId === conversationId) {
         setMessages((prev) => [...prev, msg]);
@@ -63,8 +56,23 @@ export default function ChatBox({ conversationId, utilisateur }) {
       }
     });
 
+    socket.on("webrtc_offer", ({ offer, callType }) => {
+      setIncomingCall({ offer, callType });
+    });
+
+    socket.on("webrtc_answer", async (answer) => {
+      await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+    });
+
+    socket.on("webrtc_ice_candidate", (candidate) => {
+      pcRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
     return () => {
       socket.off("message_received");
+      socket.off("webrtc_offer");
+      socket.off("webrtc_answer");
+      socket.off("webrtc_ice_candidate");
     };
   }, [conversationId, utilisateur]);
 
@@ -74,17 +82,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }, 100);
   };
 
-  // ③ Fonction d'envoi
   const handleEnvoyer = async (e) => {
     e.preventDefault();
     if (!conversationId || !utilisateur) return;
 
-    // a) S’assurer que le socket existe avant d’émettre
-    if (!socket) {
-      socket = io("http://localhost:4000");
-    }
-
-    // b) Envoi d'image si sélectionnée
     if (imageFile) {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -105,16 +106,13 @@ export default function ChatBox({ conversationId, utilisateur }) {
         });
         const data = await res.json();
 
-        if (socket) {
-          socket.emit("send_message", data.message);
-        }
+        socket.emit("send_message", data.message);
         setImageFile(null);
       };
       reader.readAsDataURL(imageFile);
       return;
     }
 
-    // c) Envoi de texte
     if (nouveauTexte.trim() === "") return;
 
     const nouveauMsg = {
@@ -133,31 +131,146 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
     const data = await res.json();
 
-    if (socket) {
-      socket.emit("send_message", data.message);
-    }
+    socket.emit("send_message", data.message);
     setNouveauTexte("");
+  };
+
+  const startCall = async (type) => {
+    const constraints = {
+      audio: true,
+      video: type === "video",
+    };
+    const localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    setStream(localStream);
+    if (type === "video" && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    pcRef.current = pc;
+
+    localStream.getTracks().forEach((track) => {
+      pc.addTrack(track, localStream);
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("webrtc_ice_candidate", {
+          roomId: conversationId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socket.emit("webrtc_offer", {
+      roomId: conversationId,
+      offer,
+      callType: type,
+    });
+
+    setInCall(true);
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+    const { offer, callType } = incomingCall;
+    setIncomingCall(null);
+
+    const constraints = {
+      audio: true,
+      video: callType === "video",
+    };
+    const localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    setStream(localStream);
+    if (callType === "video" && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    pcRef.current = pc;
+
+    localStream.getTracks().forEach((track) => {
+      pc.addTrack(track, localStream);
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("webrtc_ice_candidate", {
+          roomId: conversationId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    socket.emit("webrtc_answer", {
+      roomId: conversationId,
+      answer,
+    });
+
+    setInCall(true);
+  };
+
+  const refuseCall = () => {
+    setIncomingCall(null);
+  };
+
+  const handleHangup = () => {
+    stream?.getTracks().forEach((track) => track.stop());
+    pcRef.current?.close();
+    pcRef.current = null;
+    setStream(null);
+    setInCall(false);
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
   };
 
   return (
     <div className="chatbox-container">
+      <ChatHeader
+        nom="Conversation"
+        onClose={handleHangup}
+        onCallAudio={() => startCall("audio")}
+        onCallVideo={() => startCall("video")}
+      />
+
+      {incomingCall && (
+        <div className="incoming-call">
+          <p>📞 Appel {incomingCall.callType} entrant…</p>
+          <button onClick={acceptCall}>Accepter</button>
+          <button onClick={refuseCall}>Refuser</button>
+        </div>
+      )}
+
+      {inCall && (
+        <>
+          <video ref={localVideoRef} autoPlay muted playsInline className="mini-webcam" />
+          <video ref={remoteVideoRef} autoPlay playsInline className="mini-webcam remote" />
+          <button className="hangup-button" onClick={handleHangup}>Raccrocher</button>
+        </>
+      )}
+
       <div className="chat-messages">
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={
-              msg.auteurId === utilisateur.id
-                ? "message message-sent"
-                : "message message-received"
-            }
-          >
-            {msg.type === "TEXTE" && <p>{msg.contenu}</p>}
-            {msg.type === "IMAGE" && <img src={msg.imageUrl} alt="Image envoyée" />}
-            {msg.type === "VIDEO" && <video src={msg.videoUrl} controls />}
-            <span className="message-meta">
-              {msg.auteur.pseudo} • {new Date(msg.createdAt).toLocaleTimeString()}
-            </span>
-          </div>
+          <MessageBubble key={msg.id} msg={msg} utilisateur={utilisateur} />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -165,7 +278,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <form className="chat-input" onSubmit={handleEnvoyer}>
         <input
           type="text"
-          placeholder="Écrire un message…"
+          placeholder="\u00c9crire un message\u2026"
           value={nouveauTexte}
           onChange={(e) => setNouveauTexte(e.target.value)}
         />

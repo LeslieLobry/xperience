@@ -3,7 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import ListeConversations from "../../components/ListeConversations/ListeConversations";
 import ChatBox from "../../components/ChatBox/ChatBox";
-import WebcamView from "../../components/WebcamView/WebcamView";
 import { useAuth } from "../../context/AuthContext";
 import "./messagerie.css"
 
@@ -32,9 +31,6 @@ export default function MessageriePage() {
             <p>Sélectionne une conversation</p>
           </div>
         )}
-
-        {/* Webcam affichée à droite */}
-        <WebcamView />
       </div>
     </div>
   );
