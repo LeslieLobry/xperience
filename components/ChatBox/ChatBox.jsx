@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { io } from "socket.io-client";
+import socket from "../../lib/socket";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import "./ChatBox.css";
 
-let socket;
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 export default function ChatBox({ conversationId, utilisateur }) {
@@ -16,17 +15,47 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const messagesEndRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
+  const ringtoneRef = useRef(null);
+  const callTimeoutRef = useRef(null);
   const pcRef = useRef(null);
+
   const [stream, setStream] = useState(null);
   const [inCall, setInCall] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null); // { offer, type }
+  const [incomingCall, setIncomingCall] = useState(null);
 
   useEffect(() => {
-    socket = io("http://localhost:4000");
     if (conversationId) {
       socket.emit("join_conversation", conversationId);
     }
   }, [conversationId]);
+
+  useEffect(() => {
+    if (inCall && stream && localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+  }, [inCall, stream]);
+
+  // Sonnerie appel entrant
+  useEffect(() => {
+    if (incomingCall && ringtoneRef.current) {
+      ringtoneRef.current.loop = true;
+      ringtoneRef.current.play().catch(() => {});
+    } else if (!incomingCall && ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+    }
+  }, [incomingCall]);
+
+  // Timeout auto après 30s si pas répondu
+  useEffect(() => {
+    if (incomingCall) {
+      callTimeoutRef.current = setTimeout(() => {
+        setIncomingCall(null);
+      }, 30000);
+    } else {
+      clearTimeout(callTimeoutRef.current);
+    }
+  }, [incomingCall]);
 
   useEffect(() => {
     if (!conversationId || !utilisateur) return;
@@ -36,10 +65,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: utilisateur.id }),
     })
-      .then(() => {
-        socket.emit("refresh_unread", { userId: utilisateur.id });
-      })
-      .catch((err) => console.error("Erreur mark-as-read :", err));
+      .then(() => socket.emit("refresh_unread", { userId: utilisateur.id }))
+      .catch(console.error);
 
     fetch(`/api/messages?conversationId=${conversationId}`)
       .then((res) => res.json())
@@ -47,7 +74,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
         setMessages(data.messages || []);
         scrollToBottom();
       })
-      .catch((err) => console.error("Erreur fetch messages :", err));
+      .catch(console.error);
 
     socket.on("message_received", (msg) => {
       if (msg.conversationId === conversationId) {
@@ -61,11 +88,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
 
     socket.on("webrtc_answer", async (answer) => {
-      await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      await pcRef.current?.setRemoteDescription(new RTCSessionDescription(answer));
     });
 
     socket.on("webrtc_ice_candidate", (candidate) => {
       pcRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
+    socket.on("call_accepted", () => {
+      setIncomingCall(null);
+    });
+
+    socket.on("call_hangup", () => {
+      handleHangup();
     });
 
     return () => {
@@ -73,13 +108,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
       socket.off("webrtc_offer");
       socket.off("webrtc_answer");
       socket.off("webrtc_ice_candidate");
+      socket.off("call_accepted");
+      socket.off("call_hangup");
+      clearTimeout(callTimeoutRef.current);
     };
   }, [conversationId, utilisateur]);
 
   const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
   const handleEnvoyer = async (e) => {
@@ -90,22 +126,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result;
-        const nouveauMsg = {
-          conversationId,
-          auteurId: utilisateur.id,
-          contenu: null,
-          imageUrl: base64,
-          videoUrl: null,
-          type: "IMAGE",
-        };
-
         const res = await fetch("/api/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nouveauMsg),
+          body: JSON.stringify({
+            conversationId,
+            auteurId: utilisateur.id,
+            contenu: null,
+            imageUrl: base64,
+            videoUrl: null,
+            type: "IMAGE",
+          }),
         });
         const data = await res.json();
-
         socket.emit("send_message", data.message);
         setImageFile(null);
       };
@@ -113,45 +146,39 @@ export default function ChatBox({ conversationId, utilisateur }) {
       return;
     }
 
-    if (nouveauTexte.trim() === "") return;
-
-    const nouveauMsg = {
-      conversationId,
-      auteurId: utilisateur.id,
-      contenu: nouveauTexte.trim(),
-      imageUrl: null,
-      videoUrl: null,
-      type: "TEXTE",
-    };
+    if (!nouveauTexte.trim()) return;
 
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nouveauMsg),
+      body: JSON.stringify({
+        conversationId,
+        auteurId: utilisateur.id,
+        contenu: nouveauTexte.trim(),
+        imageUrl: null,
+        videoUrl: null,
+        type: "TEXTE",
+      }),
     });
     const data = await res.json();
-
     socket.emit("send_message", data.message);
     setNouveauTexte("");
   };
 
   const startCall = async (type) => {
-    const constraints = {
-      audio: true,
-      video: type === "video",
-    };
+    if (inCall) {
+      alert("Vous êtes déjà en appel !");
+      return;
+    }
+
+    const constraints = { audio: true, video: type === "video" };
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
     setStream(localStream);
-    if (type === "video" && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pcRef.current = pc;
 
-    localStream.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream);
-    });
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -178,6 +205,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
 
     setInCall(true);
+    setIncomingCall(null);
   };
 
   const acceptCall = async () => {
@@ -185,22 +213,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
     const { offer, callType } = incomingCall;
     setIncomingCall(null);
 
-    const constraints = {
-      audio: true,
-      video: callType === "video",
-    };
+    const constraints = { audio: true, video: callType === "video" };
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
     setStream(localStream);
-    if (callType === "video" && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pcRef.current = pc;
 
-    localStream.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream);
-    });
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -226,11 +246,9 @@ export default function ChatBox({ conversationId, utilisateur }) {
       answer,
     });
 
-    setInCall(true);
-  };
+    socket.emit("call_accepted", { roomId: conversationId });
 
-  const refuseCall = () => {
-    setIncomingCall(null);
+    setInCall(true);
   };
 
   const handleHangup = () => {
@@ -239,24 +257,28 @@ export default function ChatBox({ conversationId, utilisateur }) {
     pcRef.current = null;
     setStream(null);
     setInCall(false);
+    setIncomingCall(null);
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+
+    // Notifier les autres participants
+    socket.emit("call_hangup", { roomId: conversationId });
   };
 
   return (
     <div className="chatbox-container">
       <ChatHeader
         nom="Conversation"
-        onClose={handleHangup}
         onCallAudio={() => startCall("audio")}
         onCallVideo={() => startCall("video")}
+        onClose={handleHangup}
       />
 
       {incomingCall && (
         <div className="incoming-call">
           <p>📞 Appel {incomingCall.callType} entrant…</p>
           <button onClick={acceptCall}>Accepter</button>
-          <button onClick={refuseCall}>Refuser</button>
+          <button onClick={() => setIncomingCall(null)}>Refuser</button>
         </div>
       )}
 
@@ -278,7 +300,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <form className="chat-input" onSubmit={handleEnvoyer}>
         <input
           type="text"
-          placeholder="\u00c9crire un message\u2026"
+          placeholder="Écrire un message…"
           value={nouveauTexte}
           onChange={(e) => setNouveauTexte(e.target.value)}
         />
@@ -289,6 +311,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
         />
         <button type="submit">Envoyer</button>
       </form>
+
+      <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" preload="auto" />
     </div>
   );
 }

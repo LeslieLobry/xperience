@@ -21,19 +21,16 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("✅ Nouveau client connecté :", socket.id);
 
-  // 👉 Rejoindre une conversation privée
   socket.on("join_conversation", (conversationId) => {
     socket.join(`conversation_${conversationId}`);
     console.log(`🟢 Client ${socket.id} a rejoint la conversation ${conversationId}`);
   });
 
-  // 📩 Message texte/image
   socket.on("send_message", (message) => {
     io.to(`conversation_${message.conversationId}`).emit("message_received", message);
-    io.emit("notification", { userId: message.auteurId }); // notification globale
+    io.emit("notification", { userId: message.auteurId });
   });
 
-  // 🌍 Chat global
   socket.on("send_global_message", async (message) => {
     try {
       const saved = await prisma.globalMessage.create({
@@ -53,27 +50,33 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 🔄 Rafraîchir les messages non lus
   socket.on("refresh_unread", ({ userId }) => {
     io.emit("refresh_unread", { userId });
   });
 
-  // 📞 WebRTC Signaling
-  socket.on("webrtc_offer", ({ roomId, offer }) => {
-    socket.to(`conversation_${roomId}`).emit("webrtc_offer", offer);
+  socket.on("webrtc_offer", ({ roomId, offer, callType }) => {
+    io.to(`conversation_${roomId}`).emit("webrtc_offer", { offer, callType });
   });
 
   socket.on("webrtc_answer", ({ roomId, answer }) => {
-    socket.to(`conversation_${roomId}`).emit("webrtc_answer", answer);
+    io.to(`conversation_${roomId}`).emit("webrtc_answer", answer);
   });
 
   socket.on("webrtc_ice_candidate", ({ roomId, candidate }) => {
-    socket.to(`conversation_${roomId}`).emit("webrtc_ice_candidate", candidate);
+    io.to(`conversation_${roomId}`).emit("webrtc_ice_candidate", candidate);
+  });
+
+  // ✅ Nouvel événement : informer les autres que l’appel a été accepté
+  socket.on("call_accepted", ({ roomId }) => {
+    io.to(`conversation_${roomId}`).emit("call_accepted");
   });
 
   socket.on("disconnect", () => {
     console.log("🔌 Client déconnecté :", socket.id);
   });
+});
+socket.on("call_hangup", ({ roomId }) => {
+  io.to(`conversation_${roomId}`).emit("call_hangup");
 });
 
 const PORT = process.env.PORT || 4000;
