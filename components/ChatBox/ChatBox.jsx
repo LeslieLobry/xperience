@@ -8,10 +8,11 @@ import "./ChatBox.css";
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-export default function ChatBox({ conversationId, utilisateur, interlocuteur }) {
+export default function ChatBox({ conversationId, utilisateur }) {
   const [messages, setMessages] = useState([]);
   const [nouveauTexte, setNouveauTexte] = useState("");
   const [imageFile, setImageFile] = useState(null);
+  const [interlocuteur, setInterlocuteur] = useState(null);
   const messagesEndRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -27,6 +28,7 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
   useEffect(() => {
     if (conversationId) {
       socket.emit("join_conversation", conversationId);
+      console.log("🧩 Rejoint la room :", conversationId);
     }
   }, [conversationId]);
 
@@ -75,6 +77,15 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
       })
       .catch(console.error);
 
+    fetch(`/api/conversations/${conversationId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setInterlocuteur(data.interlocuteur);
+      })
+      .catch((err) => {
+        console.error("❌ Erreur chargement interlocuteur :", err);
+      });
+
     socket.on("message_received", (msg) => {
       if (msg.conversationId === conversationId) {
         setMessages((prev) => [...prev, msg]);
@@ -83,6 +94,7 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
     });
 
     socket.on("webrtc_offer", ({ offer, callType }) => {
+      console.log("📞 Offre WebRTC reçue !", { offer, callType });
       setIncomingCall({ offer, callType });
     });
 
@@ -91,12 +103,15 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
     });
 
     socket.on("webrtc_ice_candidate", (candidate) => {
-      pcRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
+      if (pcRef.current?.remoteDescription) {
+        pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+      }
     });
 
     socket.on("call_accepted", () => {
       setIncomingCall(null);
       setWaitingAnswer(false);
+      setInCall(true); // ✅ Ajout important
       ringtoneRef.current?.pause();
       ringtoneRef.current.currentTime = 0;
     });
@@ -149,7 +164,7 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
 
   const startCall = async (type) => {
     if (inCall || waitingAnswer) return alert("Un appel est déjà en cours ou en attente.");
-    if (interlocuteur.estBloqueParUtilisateur) return alert("Vous ne pouvez pas appeler cet utilisateur.");
+    if (interlocuteur?.estBloqueParUtilisateur) return alert("Vous ne pouvez pas appeler cet utilisateur.");
 
     const constraints = { audio: true, video: type === "video" };
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -239,15 +254,35 @@ export default function ChatBox({ conversationId, utilisateur, interlocuteur }) 
         onClose={handleHangup}
       />
 
-      {incomingCall && (
+      {incomingCall && interlocuteur && (
         <div className="incoming-call-toast">
-          <img src={interlocuteur.avatarUrl} alt="avatar" className="avatar" />
+          <img
+            src={interlocuteur.photoUrl || "/images/default-avatar.png"}
+            alt="avatar"
+            className="avatar"
+          />
           <p>{interlocuteur.pseudo} vous appelle en {incomingCall.callType}...</p>
           <button onClick={acceptCall}>Accepter</button>
-          <button onClick={() => {
-            socket.emit("call_declined", { roomId: conversationId });
-            setIncomingCall(null);
-          }}>Refuser</button>
+          <button
+            onClick={() => {
+              socket.emit("call_declined", { roomId: conversationId });
+              setIncomingCall(null);
+            }}
+          >
+            Refuser
+          </button>
+        </div>
+      )}
+
+      {waitingAnswer && interlocuteur && (
+        <div className="incoming-call-toast">
+          <img
+            src={interlocuteur.photoUrl || "/images/default-avatar.png"}
+            alt="avatar"
+            className="avatar"
+          />
+          <p>⏳ En attente de réponse de {interlocuteur.pseudo}...</p>
+          <button className="hangup-button" onClick={handleHangup}>Annuler l'appel</button>
         </div>
       )}
 

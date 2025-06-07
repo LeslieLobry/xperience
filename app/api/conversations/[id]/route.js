@@ -30,7 +30,7 @@ export async function GET(req, { params }) {
             select: {
               id: true,
               pseudo: true,
-              avatarUrl: true,
+              photoUrl: true, // ✅ CHANGÉ ICI
             },
           },
         },

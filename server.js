@@ -66,17 +66,18 @@ io.on("connection", (socket) => {
     io.to(`conversation_${roomId}`).emit("webrtc_ice_candidate", candidate);
   });
 
-  // ✅ Nouvel événement : informer les autres que l’appel a été accepté
   socket.on("call_accepted", ({ roomId }) => {
     io.to(`conversation_${roomId}`).emit("call_accepted");
+  });
+
+  // ✅ Ici c’est la ligne que tu avais en-dehors, maintenant elle est bien placée :
+  socket.on("call_hangup", ({ roomId }) => {
+    io.to(`conversation_${roomId}`).emit("call_hangup");
   });
 
   socket.on("disconnect", () => {
     console.log("🔌 Client déconnecté :", socket.id);
   });
-});
-socket.on("call_hangup", ({ roomId }) => {
-  io.to(`conversation_${roomId}`).emit("call_hangup");
 });
 
 const PORT = process.env.PORT || 4000;
