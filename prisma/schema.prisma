@@ -62,6 +62,9 @@ model Utilisateur {
   globalChatRead  GlobalChatRead?
   consentCGU     Boolean       @default(false)
   consentCGUDate DateTime?
+  blocagesFaits   Blocage[] @relation("BlocagesFaits")
+  blocagesRecus   Blocage[] @relation("BlocagesRecus")
+
 }
 
 model Evenement {
@@ -218,4 +221,14 @@ model GlobalChatRead {
   userId   Int         @unique
   lastRead DateTime
   user     Utilisateur @relation(fields: [userId], references: [id])
+}
+model Blocage {
+  id           Int         @id @default(autoincrement())
+  bloqueur     Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
+  bloqueurId   Int
+  bloque       Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
+  bloquéId     Int
+  createdAt    DateTime    @default(now())
+
+  @@unique([bloqueurId, bloquéId])
 }

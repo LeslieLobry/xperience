@@ -8,7 +8,7 @@ import "./ChatBox.css";
 
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-export default function ChatBox({ conversationId, utilisateur }) {
+export default function ChatBox({ conversationId, utilisateur, interlocuteur }) {
   const [messages, setMessages] = useState([]);
   const [nouveauTexte, setNouveauTexte] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -21,6 +21,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   const [stream, setStream] = useState(null);
   const [inCall, setInCall] = useState(false);
+  const [waitingAnswer, setWaitingAnswer] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
 
   useEffect(() => {
@@ -35,7 +36,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }
   }, [inCall, stream]);
 
-  // Sonnerie appel entrant
   useEffect(() => {
     if (incomingCall && ringtoneRef.current) {
       ringtoneRef.current.loop = true;
@@ -46,7 +46,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }
   }, [incomingCall]);
 
-  // Timeout auto après 30s si pas répondu
   useEffect(() => {
     if (incomingCall) {
       callTimeoutRef.current = setTimeout(() => {
@@ -97,6 +96,20 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
     socket.on("call_accepted", () => {
       setIncomingCall(null);
+      setWaitingAnswer(false);
+      ringtoneRef.current?.pause();
+      ringtoneRef.current.currentTime = 0;
+    });
+
+    socket.on("call_declined", () => {
+      setWaitingAnswer(false);
+      setInCall(false);
+      setStream(null);
+      pcRef.current?.close();
+      pcRef.current = null;
+      ringtoneRef.current?.pause();
+      ringtoneRef.current.currentTime = 0;
+      alert("📵 Appel refusé");
     });
 
     socket.on("call_hangup", () => {
@@ -109,6 +122,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       socket.off("webrtc_answer");
       socket.off("webrtc_ice_candidate");
       socket.off("call_accepted");
+      socket.off("call_declined");
       socket.off("call_hangup");
       clearTimeout(callTimeoutRef.current);
     };
@@ -118,58 +132,24 @@ export default function ChatBox({ conversationId, utilisateur }) {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
-  const handleEnvoyer = async (e) => {
-    e.preventDefault();
-    if (!conversationId || !utilisateur) return;
-
-    if (imageFile) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result;
-        const res = await fetch("/api/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            auteurId: utilisateur.id,
-            contenu: null,
-            imageUrl: base64,
-            videoUrl: null,
-            type: "IMAGE",
-          }),
-        });
-        const data = await res.json();
-        socket.emit("send_message", data.message);
-        setImageFile(null);
-      };
-      reader.readAsDataURL(imageFile);
-      return;
-    }
-
-    if (!nouveauTexte.trim()) return;
-
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversationId,
-        auteurId: utilisateur.id,
-        contenu: nouveauTexte.trim(),
-        imageUrl: null,
-        videoUrl: null,
-        type: "TEXTE",
-      }),
-    });
-    const data = await res.json();
-    socket.emit("send_message", data.message);
-    setNouveauTexte("");
+  const handleHangup = () => {
+    stream?.getTracks().forEach((track) => track.stop());
+    pcRef.current?.close();
+    pcRef.current = null;
+    setStream(null);
+    setInCall(false);
+    setIncomingCall(null);
+    setWaitingAnswer(false);
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    ringtoneRef.current?.pause();
+    ringtoneRef.current.currentTime = 0;
+    socket.emit("call_hangup", { roomId: conversationId });
   };
 
   const startCall = async (type) => {
-    if (inCall) {
-      alert("Vous êtes déjà en appel !");
-      return;
-    }
+    if (inCall || waitingAnswer) return alert("Un appel est déjà en cours ou en attente.");
+    if (interlocuteur.estBloqueParUtilisateur) return alert("Vous ne pouvez pas appeler cet utilisateur.");
 
     const constraints = { audio: true, video: type === "video" };
     const localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -204,8 +184,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
       callType: type,
     });
 
-    setInCall(true);
-    setIncomingCall(null);
+    setWaitingAnswer(true);
+    ringtoneRef.current?.play().catch(() => {});
   };
 
   const acceptCall = async () => {
@@ -247,22 +227,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
 
     socket.emit("call_accepted", { roomId: conversationId });
-
     setInCall(true);
-  };
-
-  const handleHangup = () => {
-    stream?.getTracks().forEach((track) => track.stop());
-    pcRef.current?.close();
-    pcRef.current = null;
-    setStream(null);
-    setInCall(false);
-    setIncomingCall(null);
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-
-    // Notifier les autres participants
-    socket.emit("call_hangup", { roomId: conversationId });
   };
 
   return (
@@ -275,10 +240,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
       />
 
       {incomingCall && (
-        <div className="incoming-call">
-          <p>📞 Appel {incomingCall.callType} entrant…</p>
+        <div className="incoming-call-toast">
+          <img src={interlocuteur.avatarUrl} alt="avatar" className="avatar" />
+          <p>{interlocuteur.pseudo} vous appelle en {incomingCall.callType}...</p>
           <button onClick={acceptCall}>Accepter</button>
-          <button onClick={() => setIncomingCall(null)}>Refuser</button>
+          <button onClick={() => {
+            socket.emit("call_declined", { roomId: conversationId });
+            setIncomingCall(null);
+          }}>Refuser</button>
         </div>
       )}
 
@@ -297,10 +266,30 @@ export default function ChatBox({ conversationId, utilisateur }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <form className="chat-input" onSubmit={handleEnvoyer}>
+      <form className="chat-input" onSubmit={(e) => {
+        e.preventDefault();
+        if (!nouveauTexte.trim()) return;
+        fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            auteurId: utilisateur.id,
+            contenu: nouveauTexte,
+            imageUrl: null,
+            videoUrl: null,
+            type: "TEXTE",
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            socket.emit("send_message", data.message);
+            setNouveauTexte("");
+          });
+      }}>
         <input
           type="text"
-          placeholder="Écrire un message…"
+          placeholder="Écrire un message..."
           value={nouveauTexte}
           onChange={(e) => setNouveauTexte(e.target.value)}
         />
