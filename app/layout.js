@@ -24,7 +24,6 @@ export default function RootLayout({ children }) {
         <ClientWrapper>
           <ConditionalNavbar />
           {children}
-          {/* La bulle de conversation apparaît partout */}
           <ChatBubble />
           <Footer/>
           <BandeauCookies />

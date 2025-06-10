@@ -24,7 +24,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [inCall, setInCall] = useState(false);
   const [waitingAnswer, setWaitingAnswer] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
+  const textareaRef = useRef(null);
 
+  const adjustTextareaHeight = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  };
+
+  const handleChange = (e) => {
+    setNouveauTexte(e.target.value);
+    adjustTextareaHeight();
+  };
   useEffect(() => {
     if (conversationId) {
       socket.emit("join_conversation", conversationId);
@@ -301,7 +313,9 @@ export default function ChatBox({ conversationId, utilisateur }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <form className="chat-input" onSubmit={(e) => {
+      <form
+      className="chat-input"
+      onSubmit={(e) => {
         e.preventDefault();
         if (!nouveauTexte.trim()) return;
         fetch("/api/messages", {
@@ -320,21 +334,28 @@ export default function ChatBox({ conversationId, utilisateur }) {
           .then((data) => {
             socket.emit("send_message", data.message);
             setNouveauTexte("");
+            if (textareaRef.current) {
+              textareaRef.current.style.height = "auto";
+            }
           });
-      }}>
-        <input
-          type="text"
-          placeholder="Écrire un message..."
-          value={nouveauTexte}
-          onChange={(e) => setNouveauTexte(e.target.value)}
-        />
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImageFile(e.target.files[0])}
-        />
-        <button type="submit">Envoyer</button>
-      </form>
+      }}
+    >
+      <textarea
+        ref={textareaRef}
+        className="input-text"
+        placeholder="Écrire un message..."
+        value={nouveauTexte}
+        onChange={handleChange}
+        rows={1}
+        style={{ overflow: "hidden", resize: "none" }}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setImageFile(e.target.files[0])}
+      />
+      <button type="submit">Envoyer</button>
+    </form>
 
       <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" preload="auto" />
     </div>

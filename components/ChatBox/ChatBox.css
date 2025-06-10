@@ -9,8 +9,10 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background-color: #f0f2f5;
-  border-bottom: 1px solid #ccc;
+  background-color: transparent;
+  border-bottom: 1px solid #e0c084;
+  font-size: 25px;
+  color: #e0c084;
 }
 
 .chat-title {
@@ -42,7 +44,7 @@
 
 .message-bubble.sent {
   align-self: flex-end;
-  background-color: #9147ff;
+  background-color: #e0c084;
   color: white;
 }
 
@@ -83,4 +85,26 @@
 .mini-webcam.remote {
   bottom: 80px;
   right: 200px;
+}
+.chat-input{
+  display: flex;
+  flex-direction: column;
+}
+.input-text {
+  width: 100%;
+  font-size: 1.5rem;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: 1.4;
+  background-color: transparent;
+}
+
+/* Optionnel : un focus plus visible */
+.input-text:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 3px #007bff;
 }

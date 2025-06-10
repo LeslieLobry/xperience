@@ -4,7 +4,7 @@ import "./ChatBox.css";
 export default function ChatHeader({ nom, onCallAudio, onCallVideo, onClose }) {
   return (
     <div className="chat-header">
-      <span className="chat-title">{nom}</span>
+      <h2 className="chat-title">{nom}</h2>
       <div className="chat-actions">
         <button onClick={onCallAudio}><Phone /></button>
         <button onClick={onCallVideo}><Video /></button>
