@@ -15,14 +15,11 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
     const formData = new FormData();
     formData.append('photo', file);
 
-    // Gestion des différents endpoints selon le contexte
-    // Galerie privée : /api/galeries-privees/[id]/photos (avec galerieId)
-    // Galerie publique : /api/upload-gallery-photo (isGallery = true, mais sans galerieId)
-    // Photo de profil : /api/upload-photo (isGallery = false)
+    // Choix de l'endpoint en fonction du contexte
     let endpoint;
     if (isGallery && galerieId) {
       endpoint = `/api/galeries-privees/${galerieId}/photos`;
-      formData.append('galerieId', galerieId); // optionnel ici mais peut être utile côté serveur
+      // NE PAS ajouter galeriePriveeId dans FormData car déjà dans l'URL
     } else if (isGallery && !galerieId) {
       endpoint = '/api/upload-gallery-photo';
     } else {
@@ -44,7 +41,7 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
       console.log("Upload response data:", data);
 
       if (isGallery) {
-        // Mode galerie (publique ou privée) : on passe l'objet photo complet
+        // Mode galerie (publique ou privée) : on passe l'objet photo complet au parent
         if (onUpload) onUpload(data);
       } else {
         // Mode photo de profil : on récupère l'URL et met à jour preview

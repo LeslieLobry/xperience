@@ -18,6 +18,31 @@ enum MessageType {
   VIDEO
 }
 
+enum DemandeStatut {
+  EN_ATTENTE
+  ACCEPTEE
+  REFUSEE
+}
+
+model DemandeAcces {
+  id Int @id @default(autoincrement())
+
+  galeriePriveeId Int
+  galeriePrivee   GaleriePrivee @relation("GalerieProprio", fields: [galeriePriveeId], references: [id])
+
+  demandeurId Int
+  demandeur   Utilisateur @relation("Demandeur", fields: [demandeurId], references: [id])
+
+  proprietaireId Int // <- le propriétaire de la galerie
+  proprietaire   Utilisateur @relation("GalerieProprio", fields: [proprietaireId], references: [id])
+
+  statut    DemandeStatut @default(EN_ATTENTE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([galeriePriveeId, demandeurId])
+}
+
 model Utilisateur {
   id              Int             @id @default(autoincrement())
   nom             String
@@ -46,7 +71,7 @@ model Utilisateur {
   sexe            String?
   fumeur          String?
   silhouette      String?
-  taille          String?
+  taille          Int?
   origines        String?
   yeux            String?
   cheveux         String?
@@ -60,14 +85,27 @@ model Utilisateur {
   participants    Participant[]
   messagesGlobaux GlobalMessage[]
   globalChatRead  GlobalChatRead?
-  consentCGU     Boolean       @default(false)
-  consentCGUDate DateTime?
-  blocagesFaits   Blocage[] @relation("BlocagesFaits")
-  blocagesRecus   Blocage[] @relation("BlocagesRecus")
-  likesEnvoyes Like[] @relation("LikesEnvoyes")
-  likesRecus   Like[] @relation("LikesRecus")
-  notifications  Notification[] 
+  consentCGU      Boolean         @default(false)
+  consentCGUDate  DateTime?
+  blocagesFaits   Blocage[]       @relation("BlocagesFaits")
+  blocagesRecus   Blocage[]       @relation("BlocagesRecus")
+  likesEnvoyes    Like[]          @relation("LikesEnvoyes")
+  likesRecus      Like[]          @relation("LikesRecus")
+  notifications   Notification[]
 
+  demandesFaite  DemandeAcces[] @relation("Demandeur")
+  demandesRecues DemandeAcces[] @relation("GalerieProprio")
+}
+
+model GaleriePrivee {
+  id            Int         @id @default(autoincrement())
+  nom           String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateurId Int         @unique
+  photos        Photo[]
+  createdAt     DateTime    @default(now())
+
+  demandesAcces DemandeAcces[] @relation("GalerieProprio")
 }
 
 model Evenement {
@@ -184,21 +222,11 @@ model Message {
   imageUrl       String?
   videoUrl       String?
   type           MessageType @default(TEXTE)
-  lu             Boolean     @default(false)   // <-- Ajouté ici
+  lu             Boolean     @default(false)
   createdAt      DateTime    @default(now())
+
   conversation Conversation @relation(fields: [conversationId], references: [id])
   auteur       Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
-}
-
-
-model GaleriePrivee {
-  id            Int         @id @default(autoincrement())
-  nom           String
-  codeAcces     String // On stockera ici le hash du code (pas le code en clair)
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
-  utilisateurId Int         @unique
-  photos        Photo[]
-  createdAt     DateTime    @default(now())
 }
 
 model Photo {
@@ -226,32 +254,36 @@ model GlobalChatRead {
   lastRead DateTime
   user     Utilisateur @relation(fields: [userId], references: [id])
 }
+
 model Blocage {
-  id           Int         @id @default(autoincrement())
-  bloqueur     Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
-  bloqueurId   Int
-  bloque       Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
-  bloquéId     Int
-  createdAt    DateTime    @default(now())
+  id         Int         @id @default(autoincrement())
+  bloqueur   Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
+  bloqueurId Int
+  bloque     Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
+  bloquéId  Int
+  createdAt  DateTime    @default(now())
 
   @@unique([bloqueurId, bloquéId])
 }
+
 model Like {
-  id           Int          @id @default(autoincrement())
-  auteurId     Int
-  cibleId      Int
-  createdAt    DateTime     @default(now())
-  auteur       Utilisateur  @relation("LikesEnvoyes", fields: [auteurId], references: [id])
-  cible        Utilisateur  @relation("LikesRecus", fields: [cibleId], references: [id])
+  id        Int         @id @default(autoincrement())
+  auteurId  Int
+  cibleId   Int
+  createdAt DateTime    @default(now())
+  auteur    Utilisateur @relation("LikesEnvoyes", fields: [auteurId], references: [id])
+  cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
+
   @@unique([auteurId, cibleId]) // un seul like possible par paire
 }
+
 model Notification {
-  id          Int       @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   utilisateurId Int
-  message     String
-  lien        String?   // par ex. lien vers profil ou message
-  lu          Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  message       String
+  lien          String? // par ex. lien vers profil ou message
+  lu            Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
 }

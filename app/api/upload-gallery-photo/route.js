@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import path from 'path';
@@ -36,7 +35,7 @@ export async function POST(req) {
     data: {
       url: photoUrl,
       utilisateurId: user.id,
-      galeriePriveeId: null, // Important : null car galerie publique
+      galeriePriveeId: null,
     },
   });
 
