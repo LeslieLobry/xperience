@@ -64,6 +64,9 @@ model Utilisateur {
   consentCGUDate DateTime?
   blocagesFaits   Blocage[] @relation("BlocagesFaits")
   blocagesRecus   Blocage[] @relation("BlocagesRecus")
+  likesEnvoyes Like[] @relation("LikesEnvoyes")
+  likesRecus   Like[] @relation("LikesRecus")
+  notifications  Notification[] 
 
 }
 
@@ -181,11 +184,12 @@ model Message {
   imageUrl       String?
   videoUrl       String?
   type           MessageType @default(TEXTE)
+  lu             Boolean     @default(false)   // <-- Ajouté ici
   createdAt      DateTime    @default(now())
-
   conversation Conversation @relation(fields: [conversationId], references: [id])
   auteur       Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
 }
+
 
 model GaleriePrivee {
   id            Int         @id @default(autoincrement())
@@ -231,4 +235,23 @@ model Blocage {
   createdAt    DateTime    @default(now())
 
   @@unique([bloqueurId, bloquéId])
+}
+model Like {
+  id           Int          @id @default(autoincrement())
+  auteurId     Int
+  cibleId      Int
+  createdAt    DateTime     @default(now())
+  auteur       Utilisateur  @relation("LikesEnvoyes", fields: [auteurId], references: [id])
+  cible        Utilisateur  @relation("LikesRecus", fields: [cibleId], references: [id])
+  @@unique([auteurId, cibleId]) // un seul like possible par paire
+}
+model Notification {
+  id          Int       @id @default(autoincrement())
+  utilisateurId Int
+  message     String
+  lien        String?   // par ex. lien vers profil ou message
+  lu          Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
 }
