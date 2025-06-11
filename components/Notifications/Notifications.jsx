@@ -51,8 +51,7 @@ export default function Notifications() {
 
   return (
     <div className="notifications-popup">
-      <button onClick={markAsRead}>Marquer tout comme lu</button>
-      <ul>
+           <ul>
         {notifications.map((notif) => (
           <li key={notif.id}>
             <Link href={notif.lien || "#"} onClick={() => setNotifications([])}>

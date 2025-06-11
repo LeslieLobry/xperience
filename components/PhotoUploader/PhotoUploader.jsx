@@ -4,7 +4,13 @@ import { useRef, useState } from 'react';
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
-export default function PhotoUploader({ currentUrl, onUpload, isGallery = false, galerieId }) {
+export default function PhotoUploader({
+  currentUrl,
+  onUpload,
+  isGallery = false,
+  galerieId,
+  isOwnProfile = false
+}) {
   const fileInputRef = useRef(null);
   const [preview, setPreview] = useState(currentUrl);
 
@@ -15,20 +21,14 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
     const formData = new FormData();
     formData.append('photo', file);
 
-    // Choix de l'endpoint en fonction du contexte
+    // Choix de l'endpoint
     let endpoint;
     if (isGallery && galerieId) {
       endpoint = `/api/galeries-privees/${galerieId}/photos`;
-      // NE PAS ajouter galeriePriveeId dans FormData car déjà dans l'URL
     } else if (isGallery && !galerieId) {
       endpoint = '/api/upload-gallery-photo';
     } else {
       endpoint = '/api/upload-photo';
-    }
-
-    console.log("Uploading photo to:", endpoint);
-    for (const [key, value] of formData.entries()) {
-      console.log(`FormData field: ${key}`, value);
     }
 
     const res = await fetch(endpoint, {
@@ -38,17 +38,9 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
 
     if (res.ok) {
       const data = await res.json();
-      console.log("Upload response data:", data);
-
-      if (isGallery) {
-        // Mode galerie (publique ou privée) : on passe l'objet photo complet au parent
-        if (onUpload) onUpload(data);
-      } else {
-        // Mode photo de profil : on récupère l'URL et met à jour preview
-        const url = data.photoUrl || data.url;
-        setPreview(url);
-        if (onUpload) onUpload(url);
-      }
+      const url = data.photoUrl || data.url;
+      setPreview(url);
+      if (onUpload) onUpload(isGallery ? data : url);
     } else {
       alert("Erreur lors de l'envoi de la photo.");
       console.error("Upload failed", await res.text());
@@ -56,7 +48,9 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
   };
 
   const handleClick = () => {
-    fileInputRef.current?.click();
+    if (isOwnProfile) {
+      fileInputRef.current?.click();
+    }
   };
 
   return (
@@ -66,10 +60,16 @@ export default function PhotoUploader({ currentUrl, onUpload, isGallery = false,
     >
       {!isGallery && preview && (
         <div className="photo-preview-wrapper">
-          <img src={preview} alt="Photo" className="photo-preview" />
-          <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
-            <Camera className="camera-icon" />
-          </label>
+         <img
+          src={preview || "/images/default-avatar.png"}
+          alt="Photo de profil"
+          className="photo-preview"
+        />
+          {isOwnProfile && (
+            <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
+              <Camera className="camera-icon" />
+            </label>
+          )}
         </div>
       )}
 

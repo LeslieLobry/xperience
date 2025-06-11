@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import "./MenuProfilActions.css";
+import Image from "next/image";
 import SignalementModal from "../SignalementModal/SignalementModal";
 
 export default function MenuProfilActions({ cibleId }) {
@@ -23,7 +24,12 @@ export default function MenuProfilActions({ cibleId }) {
   return (
     <div className="profil-menu">
       <button className="menu-button" onClick={() => setOpen((o) => !o)}>
-        ⚙️
+        <Image
+          src="/images/warning.svg"
+          alt="signaler"
+          width={46}
+          height={46}
+        />
       </button>
 
       {open && (

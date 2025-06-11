@@ -11,26 +11,21 @@
   background-color: transparent;
 }
 
-.logo a {
-  text-decoration: none;
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--primary-color);
-}
-
 .navbar-pseudo {
   color: #a2b9c1;
   font-size: 32px;
   font-style: italic;
 }
 
-/* Menu principal */
 .navLinks {
   list-style: none;
   display: flex;
   gap: 1.5rem;
   transition: transform 0.3s ease-in-out;
   align-items: center;
+  position: relative;
+  overflow: visible; /* ✅ Important pour afficher le dropdown */
+  z-index: 998;
 }
 
 .navLinks li a {
@@ -44,22 +39,19 @@
   color: #8c6a5d;
 }
 
-/* Icônes connexion/déconnexion */
 .nav-icon {
-  width: 60px;
-  height: 28px;
-  color: var(--primary-color);
+  width: 24px;
+  height: 24px;
+  color: var(--gold);
   cursor: pointer;
-  transition: transform 0.3s ease;
-  font-weight: 900;
+  transition: transform 0.2s ease;
 }
 
 .nav-icon:hover {
-  color: #8c6a5d;
   transform: scale(1.1);
+  color: #8c6a5d;
 }
 
-/* Burger menu */
 .burger {
   display: none;
   flex-direction: column;
@@ -71,17 +63,6 @@
   width: 25px;
   height: 3px;
   background-color: #f0d084;
-}
-.nav-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--gold);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.nav-icon:hover {
-  transform: scale(1.1);
 }
 
 /* Responsive */
@@ -96,12 +77,13 @@
     right: 0;
     flex-direction: column;
     background-color: #0e1a2b;
-    width: 200px;
+    width: 220px;
     transform: translateX(100%);
     padding: 1rem;
     border-left: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     z-index: 998;
+    overflow: visible; /* ✅ Pour éviter que le menu soit masqué */
   }
 
   .navLinks.active {
@@ -114,7 +96,13 @@
 }
 
 .nav-avatar-wrapper {
+  position: relative; /* ✅ pour positionner le dropdown */
+  cursor: pointer;
+}
+
+.nav-avatar-container {
   position: relative;
+  display: inline-block;
   cursor: pointer;
 }
 
@@ -124,46 +112,11 @@
   object-fit: cover;
 }
 
-.nav-dropdown {
+/* Badge notification */
+.notif-badge-on-avatar {
   position: absolute;
-  top: 50px;
-  right: 0;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  padding: 10px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-dropdown a,
-.nav-dropdown button {
-  text-align: left;
-  padding: 8px 12px;
-  border: none;
-  background: none;
-  width: 100%;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-}
-
-.nav-dropdown a:hover,
-.nav-dropdown button:hover {
-  background-color: #f0f0f0;
-}
-nav-avatar-wrapper {
-  position: relative; /* essentiel pour positionner le badge dessus */
-  cursor: pointer;
-  display: inline-block; /* pour contenir l’image et badge */
-}
-
-.notif-badge {
-  position: absolute;
-  top: -6px;     /* ajuste selon ta photo */
-  right: -6px;   /* ajuste selon ta photo */
+  top: -6px;
+  right: -6px;
   background: red;
   color: white;
   border-radius: 50%;
@@ -174,40 +127,70 @@ nav-avatar-wrapper {
   text-align: center;
   line-height: 16px;
   user-select: none;
-  pointer-events: none;
-  box-shadow: 0 0 2px rgba(0,0,0,0.3);
-  z-index: 10; /* pour être au-dessus */
-}
-
-.nav-notif-wrapper {
-  position: relative;
+  pointer-events: auto;
   cursor: pointer;
-  display: inline-block;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 }
 
-.notif-button {
-  background: none;
-  border: none;
-  position: relative;
+/* Popup notifications + actions */
+.nav-combined-popup {
+  position: absolute;
+  top: 60px; /* juste sous l'avatar */
+  right: 0;
+  width: 320px;
+  max-height: 500px;
+  background: white;
+  color: black;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-combined-popup ul {
+  list-style: none;
+  margin: 0;
   padding: 0;
 }
 
-.notifications-popup {
-  position: absolute;
-  top: 50px;
-  right: 0;
-  width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 1000;
-  padding: 12px;
+.nav-combined-popup li {
+  margin-bottom: 8px;
 }
 
-/* Bouton marquer tout comme lu */
+.nav-combined-popup a {
+  color: #0070f3;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.nav-combined-popup a:hover {
+  text-decoration: underline;
+}
+
+.nav-combined-popup small {
+  color: #666;
+  font-size: 11px;
+  display: block;
+}
+
 .btn-mark-read {
   background: #0070f3;
   color: white;
@@ -218,25 +201,28 @@ nav-avatar-wrapper {
   margin-bottom: 8px;
 }
 
-/* Liste notifications */
-.notifications-popup ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.btn-mark-read:hover {
+  background-color: #005bb5;
 }
 
-.notifications-popup li {
-  margin-bottom: 8px;
+.profil-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.notifications-popup a {
-  color: #0070f3;
-  text-decoration: none;
-  font-weight: 500;
+.profil-actions a,
+.profil-actions button {
+  padding: 8px 12px;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
 }
 
-.notifications-popup small {
-  display: block;
-  color: #666;
-  font-size: 11px;
+.profil-actions a:hover,
+.profil-actions button:hover {
+  background-color: #f0f0f0;
 }

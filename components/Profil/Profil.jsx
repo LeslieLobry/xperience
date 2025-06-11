@@ -14,6 +14,8 @@ import MenuProfilActions from "../MenuProfilActions/MenuProfilActions";
 import GalerieTabs from "../GalerieTabs/GalerieTabs";
 import "../Profil/Profil.css";
 import BoutonLike from "../BoutonLike/BoutonLike";
+import Image from "next/image";
+
 
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
@@ -68,9 +70,9 @@ export default function Profil({ user, connectedUser }) {
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
-        <div className="profil-avatar-horizontal">
-          {isOwnProfile && <PhotoUploader currentUrl={user.photoUrl} />}
-        </div>
+       <div className="profil-avatar-horizontal">
+         <PhotoUploader currentUrl={user.photoUrl} isOwnProfile={isOwnProfile} />
+      </div>
 
         {!isOwnProfile && (
           <>
@@ -78,7 +80,12 @@ export default function Profil({ user, connectedUser }) {
               className="btn-envoyer-message"
               onClick={handleStartConversation}
             >
-              Envoyer un message
+              <Image
+                src="/images/enveloppe.svg"
+                alt="Envoyer un message"
+                width={46}
+                height={46}
+              />
             </button>
           {!isOwnProfile && <BoutonLike cibleId={user.id} />}
             <MenuProfilActions cibleId={user.id} />
@@ -89,20 +96,23 @@ export default function Profil({ user, connectedUser }) {
       {isOwnProfile && <StatutToggle initialStatut={user.statut} />}
       <div className="profil-badge">{user.type} {user.orientation}</div>
 
-      <div className="profil-completion-box">
-        <h2>Devenez irrésistible, complétez votre profil !</h2>
-        <p>
-          Vous valoriserez ainsi davantage vos recherches tout en vous présentant
-          sous votre meilleur jour.
-        </p>
-        <div className="progress-bar">
-          <div
-            className="progress-fill"
-            style={{ width: `${completion}%` }}
-          ></div>
-        </div>
-        <p className="completion-text">{completion}% complété</p>
-      </div>
+      {isOwnProfile && (
+  <div className="profil-completion-box">
+    <h2>Devenez irrésistible, complétez votre profil !</h2>
+    <p>
+      Vous valoriserez ainsi davantage vos recherches tout en vous présentant
+      sous votre meilleur jour.
+    </p>
+    <div className="progress-bar">
+      <div
+        className="progress-fill"
+        style={{ width: `${completion}%` }}
+      ></div>
+    </div>
+    <p className="completion-text">{completion}% complété</p>
+  </div>
+)}
+
 
       <div className="grid">
         <div className="profil-infos-wrapper">

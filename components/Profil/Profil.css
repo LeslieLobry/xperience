@@ -142,3 +142,8 @@
   color:#e0c084; 
  
 }
+.btn-envoyer-message{
+  background-color: transparent;
+  cursor: pointer;
+  border: none;
+}

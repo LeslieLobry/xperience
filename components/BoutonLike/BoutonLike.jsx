@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
+import "./BoutonLike.css"
 export default function BoutonLike({ cibleId }) {
   const [hasLiked, setHasLiked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,8 +56,14 @@ export default function BoutonLike({ cibleId }) {
   };
 
   return (
-    <button onClick={toggleLike} disabled={loading}>
-      {hasLiked ? "💖 Retirer" : "🤍 J’aime bien"}
-    </button>
-  );
+  <button onClick={toggleLike} disabled={loading} className="btn-like">
+    <img
+      src={hasLiked ? "/images/coeurnon.svg":"/images/coeur.svg"  }
+      alt={hasLiked ? "" : ""}
+      style={{ width: "46px", height: "46px",}}
+    />
+    {hasLiked ? "" : ""}
+  </button>
+);
+
 }

@@ -1,36 +1,40 @@
 
-/* .photo-preview {
-  width: 80%;
-  border-radius: 50%;
-  display: block;
-  border: 3px solid var(--gold);
-} */
-
-.camera-label {
-  transform: translate(50%, 50%);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-.camera-icon {
-  color: var(--gold);
-}
-/* .photo-upload-contenant.gallery-mode {
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255,255,255,0.05);
-  border: 2px dashed rgba(255,255,255,0.2);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-} */
-
-/* .gallery-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-} */
 .photo-preview-wrapper img{
   border-radius: 100%;
+}
+.photo-upload-contenant {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.photo-preview-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.camera-label {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.camera-icon {
+  width: 20px;
+  height: 20px;
+  color: #333;
 }
