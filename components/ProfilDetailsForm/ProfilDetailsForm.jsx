@@ -129,9 +129,9 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
       >
         <option value="">Expérience</option>
         <option value="A découvrir">A découvrir</option>
-        <option value="Débutante">Débutante</option>
-        <option value="Occasionnelle">Occasionnelle</option>
-        <option value="Expérimentée">Expérimentée</option>
+        <option value="Débutant">Débutant</option>
+        <option value="Occasionnel">Occasionnelle</option>
+        <option value="Expérimenté">Expérimenté</option>
         <option value="Je la garde pour moi">Je la garde pour moi</option>
       </select>
 

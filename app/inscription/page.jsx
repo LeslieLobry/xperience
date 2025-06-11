@@ -13,19 +13,21 @@ export default function RegisterForm() {
   const [step, setStep] = useState(1);
   const [captchaToken, setCaptchaToken] = useState(null);
   const [form, setForm] = useState({
-    nom: "",
-    prenom: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    pseudo: "",
-    type: "",
-    orientation: "",
-    recherche: [],
-    localisation: "",
-    age: "",
-    consent: false,
-  });
+  nom: "",
+  prenom: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  pseudo: "",
+  type: "",
+  orientation: "",
+  sexe: "",
+  recherche: [],
+  localisation: "",
+  age: "",
+  consent: false,
+});
+
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");

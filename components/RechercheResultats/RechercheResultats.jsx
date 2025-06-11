@@ -1,25 +1,30 @@
-'use client';
+"use client";
 
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function RechercheResultats() {
   const searchParams = useSearchParams();
   const [utilisateurs, setUtilisateurs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    const query = params.toString();
+    if (!params.toString()) return;
 
-    fetch(`/api/recherche?${query}`)
+    setLoading(true);
+    setHasSearched(true);
+
+    fetch(`/api/recherche?${params}`)
       .then((res) => res.json())
       .then((data) => {
-        setUtilisateurs(data.utilisateurs);
+        setUtilisateurs(data.utilisateurs || []);
         setLoading(false);
       });
   }, [searchParams]);
 
+  if (!hasSearched) return null;
   if (loading) return <p>Chargement...</p>;
 
   return (

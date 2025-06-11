@@ -44,14 +44,14 @@ model DemandeAcces {
 }
 
 model Utilisateur {
-  id              Int             @id @default(autoincrement())
+   id              Int             @id @default(autoincrement())
   nom             String
   prenom          String
   pseudo          String          @unique
   email           String          @unique
   role            Role            @default(USER)
   password        String
-  type            String
+  type            String          // "homme" | "femme" | "couple" | "autre"
   orientation     String
   age             Int
   consent         Boolean
@@ -61,21 +61,15 @@ model Utilisateur {
   lastLogin       DateTime?
   emailVerified   DateTime?
   description     String?
-  recherches      Recherche[]
-  envies          Envie[]
-  coverUrl        String?
-  galeriesPrivees GaleriePrivee[]
-  photos          Photo[]
   experience      String?
   rechercheType   String?
-  sexe            String?
   fumeur          String?
   silhouette      String?
   taille          Int?
   origines        String?
   yeux            String?
   cheveux         String?
-  statut          String          @default("hors_ligne")
+  statut          String          @default("en_ligne")
   avisRecus       Avis[]          @relation("AvisCible")
   avisLaisses     Avis[]          @relation("AvisAuteur")
   evenements      Evenement[]     @relation("Participation")
@@ -212,6 +206,7 @@ model Participant {
   lastReadAt DateTime? // Date à laquelle l’utilisateur a lu cette conversation
 
   @@unique([utilisateurId, conversationId])
+  supprimé       Boolean      @default(false)
 }
 
 model Message {

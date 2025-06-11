@@ -21,3 +21,4 @@ export default function RechercheWrapper() {
 
   return <RechercheSidebar onSearch={handleSearch} />;
 }
+ 

@@ -7,8 +7,7 @@ export default function RechercheSidebar({ onSearch }) {
     pseudo: "",
     type: [],
     orientation: [],
-    recherche: [],
-    sexe: [],
+    rechercheType: [],
     ageMin: "",
     ageMax: "",
     localisation: "",
@@ -16,13 +15,14 @@ export default function RechercheSidebar({ onSearch }) {
     description: false,
     statut: "all",
     experience: [],
-    rechercheType: [],
     fumeur: [],
     silhouette: [],
     taille: [],
     origines: [],
     yeux: [],
     cheveux: [],
+    recherches: [],
+    envies: []
   });
 
   const handleChange = (e) => {
@@ -45,7 +45,6 @@ export default function RechercheSidebar({ onSearch }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     onSearch?.(form);
-    console.log("Recherche avec :", form);
   };
 
   return (
@@ -63,7 +62,7 @@ export default function RechercheSidebar({ onSearch }) {
         {/* Type */}
         <div className="filters-group">
           <h3>Type</h3>
-          {["Solo", "Couple", "Groupe"].map((opt) => (
+          {["Homme", "Femme", "Couple", "Groupe"].map((opt) => (
             <label key={opt}>
               <input
                 type="checkbox"
@@ -80,7 +79,7 @@ export default function RechercheSidebar({ onSearch }) {
         {/* Orientation */}
         <div className="filters-group">
           <h3>Orientation</h3>
-          {["Hétéro", "Bi", "Lesbienne", "Gay"].map((opt) => (
+          {["Hétéro", "Bi", "Pan", "Ouvert"].map((opt) => (
             <label key={opt}>
               <input
                 type="checkbox"
@@ -94,16 +93,16 @@ export default function RechercheSidebar({ onSearch }) {
           ))}
         </div>
 
-        {/* Recherche */}
+        {/* Type de recherche */}
         <div className="filters-group">
-          <h3>Recherche</h3>
-          {["Femmes", "Hommes", "Couples", "Groupes"].map((opt) => (
+          <h3>Type de recherche</h3>
+          {["Je le garde pour moi", "Virtuel uniquement", "Virtuel et peut-être plus", "Réel seulement", "Réel & Virtuel", "Je ne sais pas, c’est à voir", "Aventure d’un soir", "Relation secrète", "Relation à long terme"].map((opt) => (
             <label key={opt}>
               <input
                 type="checkbox"
-                name="recherche"
+                name="rechercheType"
                 value={opt}
-                checked={form.recherche.includes(opt)}
+                checked={form.rechercheType.includes(opt)}
                 onChange={handleChange}
               />
               {opt}
@@ -111,16 +110,50 @@ export default function RechercheSidebar({ onSearch }) {
           ))}
         </div>
 
-        {/* Sexe */}
+        {/* Recherches */}
         <div className="filters-group">
-          <h3>Sexe</h3>
-          {["Femme", "Homme", "Transgenre"].map((opt) => (
+          <h3>Je recherche</h3>
+          {["Hommes hétéros", "Femmes hétéros", "Couples hétéros", "Couples F Bi", "Couples H Bi", "Couples Bi", "Hommes Bi", "Gays", "Femmes Bi", "Lesbiennes", "Travestis", "Transgenres"].map((opt) => (
             <label key={opt}>
               <input
                 type="checkbox"
-                name="sexe"
+                name="recherches"
                 value={opt}
-                checked={form.sexe.includes(opt)}
+                checked={form.recherches.includes(opt)}
+                onChange={handleChange}
+              />
+              {opt}
+            </label>
+          ))}
+        </div>
+
+        {/* Envies */}
+        <div className="filters-group">
+          <h3>Mes envies</h3>
+          {["2+2", "BDSM", "Cam", "Candualisme", "Chat", "Côte-à-côtisme", "Curieux", "Duo", "Echangisme", "Exhibition", "Extreme", "Feeling", "Fétichisme", "Gang bang", "Hard", "Mélangisme", "Papouilles", "Photos", "Pluralité", "Scénario", "Soft", "Trio", "Vidéos", "Voyeurisme"].map((opt) => (
+            <label key={opt}>
+              <input
+                type="checkbox"
+                name="envies"
+                value={opt}
+                checked={form.envies.includes(opt)}
+                onChange={handleChange}
+              />
+              {opt}
+            </label>
+          ))}
+        </div>
+
+        {/* Expérience */}
+        <div className="filters-group">
+          <h3>Expérience</h3>
+          {["A découvrir", "Débutant", "Occasionnel", "Expérimenté", "Je la garde pour moi"].map((opt) => (
+            <label key={opt}>
+              <input
+                type="checkbox"
+                name="experience"
+                value={opt}
+                checked={form.experience.includes(opt)}
                 onChange={handleChange}
               />
               {opt}
@@ -208,135 +241,6 @@ export default function RechercheSidebar({ onSearch }) {
             />
             Uniquement en ligne
           </label>
-        </div>
-
-        {/* Champs supplémentaires */}
-        <div className="filters-group">
-          <h3>Expérience</h3>
-          {["Débutant", "Curieux", "Confirmé", "Expert"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="experience"
-                value={opt}
-                checked={form.experience.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Type de recherche</h3>
-          {["Rencontre", "Aventure", "Relation régulière", "Plan d’un soir"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="rechercheType"
-                value={opt}
-                checked={form.rechercheType.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Fumeur</h3>
-          {["Non fumeur", "Fumeur occasionnel", "Fumeur régulier"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="fumeur"
-                value={opt}
-                checked={form.fumeur.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Silhouette</h3>
-          {["Fine", "Mince", "Sportive", "Ronde", "Pulpeuse"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="silhouette"
-                value={opt}
-                checked={form.silhouette.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Taille</h3>
-          {["< 1m60", "1m60–1m70", "1m70–1m80", "> 1m80"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="taille"
-                value={opt}
-                checked={form.taille.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Origines</h3>
-          {["Européenne", "Africaine", "Maghrébine", "Asiatique", "Autre"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="origines"
-                value={opt}
-                checked={form.origines.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Yeux</h3>
-          {["Bleus", "Marron", "Verts", "Noirs"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="yeux"
-                value={opt}
-                checked={form.yeux.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-
-        <div className="filters-group">
-          <h3>Cheveux</h3>
-          {["Blonds", "Bruns", "Noirs", "Roux", "Chauve"].map((opt) => (
-            <label key={opt}>
-              <input
-                type="checkbox"
-                name="cheveux"
-                value={opt}
-                checked={form.cheveux.includes(opt)}
-                onChange={handleChange}
-              />
-              {opt}
-            </label>
-          ))}
         </div>
 
         <button type="submit" className="recherche-button">

@@ -1,6 +1,7 @@
 import logo from "../../app/Assets/logo.png"
 import Image from "next/image";
 import insta from "../../app/Assets/insta.png"
+import tik from "../../public/images/tik.png"
 import facebook from "../../app/Assets/facebook.png"
 import Link from "next/link";
 import "../Footer/Footer.css"
@@ -32,7 +33,7 @@ function Footer(params) {
                 <a href="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR">
                     <Image
                         src={facebook}
-                        alt="liens facebook"
+                        alt="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR"
                         width={50}
                         className="footer-facebook"
                     />
@@ -40,6 +41,14 @@ function Footer(params) {
                 <a href="">
                     <Image
                         src={insta}
+                        alt="liens insta"
+                        width={50}
+                        className="footer-insta"
+                    />
+                </a>
+                <a href="https://www.tiktok.com/@xperiences1">
+                    <Image
+                        src={tik}
                         alt="liens insta"
                         width={50}
                         className="footer-insta"

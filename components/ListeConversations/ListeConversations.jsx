@@ -1,8 +1,8 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
-import "./ListeConversations.css"
+import "./ListeConversations.css";
+
 export default function ListeConversations({ userId, onSelectConversation }) {
   const [conversations, setConversations] = useState([]);
 
@@ -12,7 +12,10 @@ export default function ListeConversations({ userId, onSelectConversation }) {
     fetch(`/api/conversations?userId=${userId}`)
       .then((res) => res.json())
       .then((data) => {
-        setConversations(data.conversations || []);
+        const visibles = (data.conversations || []).filter((conv) =>
+          conv.participants.some((p) => p.utilisateurId === userId && !p.supprimé)
+        );
+        setConversations(visibles);
       })
       .catch((err) => {
         console.error("Erreur chargement conversations :", err);
@@ -28,37 +31,72 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       : message.contenu;
   };
 
+  const handleDelete = async (id) => {
+    const confirmDelete = confirm("Supprimer cette conversation ?");
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        if (typeof onSelectConversation === "function") {
+          onSelectConversation(null);
+        }
+      } else {
+        console.error("Erreur suppression conversation :", await res.json());
+      }
+    } catch (err) {
+      console.error("Erreur serveur :", err);
+    }
+  };
+
   return (
     <aside className="liste-conversations">
+      {conversations.length === 0 && (
+        <div className="no-conversation-message">
+          <p>Aucune conversation pour l’instant.</p>
+          <a href="/recherche" className="start-search-link">
+            Trouver des profils à contacter 
+          </a>
+        </div>
+      )}
+
       {conversations.map((conv) => {
-        // Trouve l'autre participant : celui qui n'est pas userId
         const autre = conv.participants.find(
           (p) => p.utilisateurId !== userId
         )?.utilisateur;
 
-        // Récupérer le dernier message (il est inclus dans conv.messages[0])
+        const pseudo = autre?.pseudo || "Conversation supprimée par l'autre utilisateur";
+        const avatar = autre?.photoUrl || "/default-avatar.png";
         const dernierMsg = conv.messages[0];
 
         return (
-          <div
-            key={conv.id}
-            className="conversation-item"
-            onClick={() => onSelectConversation(conv.id)}
-          >
-            <div className="conv-avatar">
-              <img
-                src={autre?.photoUrl || "/default-avatar.png"}
-                alt={autre?.pseudo || "Groupe"}
-              />
-            </div>
-            <div className="conv-info">
-              <div className="conv-pseudo">
-                {autre ? autre.pseudo : "Groupe"}
+          <div key={conv.id} className="conversation-item">
+            <div
+              className="conversation-clickable"
+              onClick={() => onSelectConversation(conv.id)}
+            >
+              <div className="conv-avatar">
+                <img src={avatar} alt={pseudo} />
               </div>
-              <div className="conv-apercu">
-                {renderApercu(dernierMsg)}
+              <div className="conv-info">
+                <div className="conv-pseudo">{pseudo}</div>
+                <div className="conv-apercu">
+                  {renderApercu(dernierMsg)}
+                </div>
               </div>
             </div>
+            <button
+              className="delete-conv-button"
+              onClick={() => handleDelete(conv.id)}
+              title="Supprimer cette conversation"
+            >
+              🗑️
+            </button>
           </div>
         );
       })}
