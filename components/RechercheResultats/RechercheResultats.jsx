@@ -1,10 +1,12 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import "./RechercheResultats.css"; // pour ajouter ton propre style
 
 export default function RechercheResultats() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -31,19 +33,25 @@ export default function RechercheResultats() {
     <div className="recherche-resultats">
       <h1>Résultats de recherche</h1>
       {utilisateurs.length === 0 && <p>Aucun utilisateur trouvé.</p>}
-      <ul>
+
+      <div className="resultats-grid">
         {utilisateurs.map((u) => (
-          <li key={u.id} className="resultat-item">
+          <div
+            key={u.id}
+            className="card"
+            onClick={() => router.push(`/profil/${u.id}`)}
+          >
             {u.photoUrl && (
-              <img src={u.photoUrl} className="resultat-photo" alt={u.pseudo} />
+              <img src={u.photoUrl} alt={u.pseudo} className="card-photo" />
             )}
-            <div>
-              <strong>{u.pseudo}</strong> ({u.age} ans) - {u.localisation}
-              <p>{u.description}</p>
+            <div className="card-content">
+              <h3>{u.pseudo} ({u.age} ans)</h3>
+              <p className="card-localisation">{u.localisation}</p>
+              <p className="card-description">{u.description}</p>
             </div>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

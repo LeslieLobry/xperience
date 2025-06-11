@@ -29,6 +29,9 @@ const fetchUser = async () => {
     await fetch('/api/logout', { credentials: 'include' });
     setUser(null);
   };
+const updateUser = (updatedFields) => {
+  setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
+};
 
   useEffect(() => {
     console.log("🔐 AuthProvider monté");
@@ -36,7 +39,7 @@ const fetchUser = async () => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, fetchUser }}>
+    <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser}}>
       {children}
     </AuthContext.Provider>
   );

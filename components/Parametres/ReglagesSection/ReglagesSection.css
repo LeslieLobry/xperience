@@ -1,0 +1,72 @@
+.reglages-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.reglage-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reglage-input-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.reglage-input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  border-radius: 4px;
+  flex: 1;
+}
+
+.btn-gerer {
+  background: black;
+  color: lime;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.message-success {
+  color: green;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.bloc-recuperation {
+  background: #f6f6f6;
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.bloc-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.btn-danger {
+  background: #e8413f;
+  color: white;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-retour {
+  background: transparent;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}

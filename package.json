@@ -13,6 +13,7 @@
   "dependencies": {
     "@prisma/client": "^6.6.0",
     "@tailwindcss/postcss": "^4.0.14",
+    "adm-zip": "^0.5.16",
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
