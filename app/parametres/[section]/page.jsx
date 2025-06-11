@@ -1,5 +1,7 @@
+"use client";
+
 import ReglagesSection from "../../../components/Parametres/ReglagesSection/ReglagesSection";
-// import SecuriteSection from "@/components/Parametres/SecuriteSection";
+import SecuriteSection from "../../../components/Parametres/SecuritySection/SecuritySection";
 // import ConfidentialiteSection from "@/components/Parametres/ConfidentialiteSection";
 // import BlocagesSection from "@/components/Parametres/BlocagesSection";
 // import AlertesSection from "@/components/Parametres/AlertesSection";
@@ -7,12 +9,12 @@ import ReglagesSection from "../../../components/Parametres/ReglagesSection/Regl
 // import ParrainageSection from "@/components/Parametres/ParrainageSection";
 // import CommandesSection from "@/components/Parametres/CommandesSection";
 
-export default function SectionPage({ params }) {
-  const { section } = params;
+export default async function SectionPage({ params }) {
+  const { section } = await params;
 
   const sectionComponents = {
     reglages: <ReglagesSection />,
-    // securite: <SecuriteSection />,
+    securite: <SecuriteSection />,
     // confidentialite: <ConfidentialiteSection />,
     // blocages: <BlocagesSection />,
     // alertes: <AlertesSection />,

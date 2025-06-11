@@ -7,31 +7,31 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-const fetchUser = async () => {
-  try {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    const data = await res.json();
-    if (data.success) {
-      setUser(data.user);
-      return data.user; // ✅ retourne les données utilisateur
-    } else {
+  const fetchUser = async () => {
+    try {
+      const res = await fetch('/api/me', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.user);
+        return data.user;
+      } else {
+        setUser(null);
+        return null;
+      }
+    } catch (error) {
       setUser(null);
       return null;
     }
-  } catch (error) {
-    setUser(null);
-    return null;
-  }
-};
-
+  };
 
   const logout = async () => {
     await fetch('/api/logout', { credentials: 'include' });
     setUser(null);
   };
-const updateUser = (updatedFields) => {
-  setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
-};
+
+  const updateUser = (updatedFields) => {
+    setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
+  };
 
   useEffect(() => {
     console.log("🔐 AuthProvider monté");
@@ -39,7 +39,7 @@ const updateUser = (updatedFields) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser}}>
+    <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

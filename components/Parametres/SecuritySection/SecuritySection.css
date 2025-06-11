@@ -1,0 +1,55 @@
+.security-section {
+  padding: 2rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+  max-width: 500px;
+  margin: auto;
+}
+
+.security-section h2 {
+  margin-bottom: 1rem;
+}
+
+.password-rules p {
+  font-size: 0.9rem;
+  margin: 0.3rem 0;
+}
+
+.password-change,
+.delete-account {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+input[type="password"],
+input[type="text"] {
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.6rem;
+  border: none;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.valider {
+  background-color: #ff4d4d;
+  color: white;
+  border-radius: 4px;
+}
+
+.supprimer {
+  background-color: #900;
+  color: white;
+  border-radius: 4px;
+}
+
+.message {
+  color: #d00;
+  font-size: 0.9rem;
+}
