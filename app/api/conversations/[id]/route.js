@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
+import { isBlockedBetween } from "../../../../lib/utilsFiltrage";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -55,6 +56,11 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Aucun interlocuteur trouvé" }, { status: 400 });
   }
 
+  const estBloque = await isBlockedBetween(userId, interlocuteur.id);
+  if (estBloque) {
+    return NextResponse.json({ error: "Utilisateur bloqué" }, { status: 403 });
+  }
+
   const blocage = await prisma.blocage.findFirst({
     where: {
       bloqueurId: userId,
@@ -83,6 +89,22 @@ export async function DELETE(req, { params }) {
   }
 
   try {
+    const participants = await prisma.participant.findMany({
+      where: { conversationId },
+      include: { utilisateur: true },
+    });
+
+    const interlocuteur = participants
+      .map((p) => p.utilisateur)
+      .find((u) => u.id !== userId);
+
+    if (interlocuteur) {
+      const estBloque = await isBlockedBetween(userId, interlocuteur.id);
+      if (estBloque) {
+        return NextResponse.json({ error: "Utilisateur bloqué" }, { status: 403 });
+      }
+    }
+
     // 1. Marquer comme supprimé pour l'utilisateur courant
     await prisma.participant.updateMany({
       where: {
@@ -95,11 +117,11 @@ export async function DELETE(req, { params }) {
     });
 
     // 2. Vérifier si tous les participants ont supprimé la conversation
-    const participants = await prisma.participant.findMany({
+    const updatedParticipants = await prisma.participant.findMany({
       where: { conversationId },
     });
 
-    const tousOntSupprimé = participants.every((p) => p.supprimé);
+    const tousOntSupprimé = updatedParticipants.every((p) => p.supprimé);
 
     if (tousOntSupprimé) {
       // 3. Supprimer les messages

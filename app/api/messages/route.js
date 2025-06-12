@@ -1,4 +1,7 @@
 import { prisma } from "../../../lib/prisma";
+import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
+import { getUserFromToken } from "../../../lib/auth";
+import { cookies } from "next/headers";
 import { resend } from "../../../lib/resend";
 
 export async function POST(req) {
@@ -6,16 +9,37 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { conversationId, auteurId, contenu, imageUrl, videoUrl, type } = body;
+    const { conversationId, contenu, imageUrl, videoUrl, type } = body;
 
-    if (!conversationId || !auteurId || (!contenu && !imageUrl && !videoUrl)) {
+    // Récupération de l'utilisateur connecté via cookie JWT
+    const cookieStore = cookies();
+    const user = await getUserFromToken(cookieStore);
+    if (!user) {
+      return Response.json({ success: false, message: "Non autorisé" }, { status: 401 });
+    }
+
+    const auteurId = user.id;
+
+    // Vérifie si l’utilisateur envoie un message à un utilisateur bloqué ou bloquant
+    const participants = await prisma.participant.findMany({
+      where: { conversationId },
+      select: { utilisateurId: true },
+    });
+
+    const autresParticipants = participants
+      .map((p) => p.utilisateurId)
+      .filter((id) => id !== auteurId);
+
+    const exclus = await getIdsUtilisateursExclus(auteurId);
+    const estBloque = autresParticipants.some((id) => exclus.includes(id));
+    if (estBloque) {
       return Response.json(
-        { success: false, message: "Champs manquants" },
-        { status: 400 }
+        { success: false, message: "Impossible d'envoyer un message à un utilisateur bloqué." },
+        { status: 403 }
       );
     }
 
-    // Création du message (lu = false par défaut)
+    // Création du message
     const message = await prisma.message.create({
       data: {
         conversationId,
@@ -35,16 +59,8 @@ export async function POST(req) {
       data: { updatedAt: new Date() },
     });
 
-    // Création des notifications pour tous les participants sauf l'auteur
-    const participants = await prisma.participant.findMany({
-      where: { conversationId },
-      select: { utilisateurId: true },
-    });
-
-    const destinataires = participants
-      .map(p => p.utilisateurId)
-      .filter(id => id !== auteurId);
-
+    // Création des notifications pour les autres
+    const destinataires = autresParticipants;
     const auteur = message.auteur;
 
     await Promise.all(
@@ -60,7 +76,7 @@ export async function POST(req) {
       )
     );
 
-    // Envoi d’e-mail en tâche de fond
+    // Envoi de l’email
     (async () => {
       try {
         const participantsWithUser = await prisma.participant.findMany({
@@ -83,29 +99,15 @@ export async function POST(req) {
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
 
-        const fromAddress = process.env.EMAIL_FROM || "no-reply@votredomaine.com";
-        const expediteurNom = auteur.pseudo || "Utilisateur";
-        const destinataireNom = destinataire.pseudo || "Utilisateur";
-        const messageUrl = `https://votredomaine.com/messages/${message.id}`;
-
         await resend.emails.send({
-          from: fromAddress,
+          from: process.env.EMAIL_FROM || "no-reply@votredomaine.com",
           to: destinataire.email,
-          subject: `[VotreApp] Nouveau message de ${expediteurNom}`,
+          subject: `[VotreApp] Nouveau message de ${auteur.pseudo}`,
           html: `
-            <p>Bonjour ${destinataireNom},</p>
-            <p>Vous avez reçu un nouveau message de <strong>${expediteurNom}</strong> :</p>
-            <blockquote style="padding:10px;background:#f5f5f5;border-left:4px solid #ccc;">
-              ${extrait}…
-            </blockquote>
-            <p><a href="${messageUrl}" style="display:inline-block;padding:10px 20px;background:#0070f3;color:#fff;
-                  text-decoration:none;border-radius:4px;">
-                 Voir le message complet
-               </a>
-            </p>
-            <hr>
-            <p>Si vous ne souhaitez plus recevoir d’e-mails, <a href="https://votredomaine.com/settings/notifications">cliquez ici</a>.</p>
-            <p>Cordialement,<br>L’équipe VotreApp</p>
+            <p>Bonjour ${destinataire.pseudo},</p>
+            <p>Vous avez reçu un nouveau message :</p>
+            <blockquote>${extrait}…</blockquote>
+            <p><a href="https://votredomaine.com/messagerie?conversationId=${conversationId}">Voir le message</a></p>
           `,
         });
       } catch (err) {
@@ -130,10 +132,30 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const conversationId = parseInt(searchParams.get("conversationId"), 10);
 
-    if (!conversationId) {
+    const cookieStore = cookies();
+    const user = await getUserFromToken(cookieStore);
+    if (!user) {
+      return Response.json({ success: false, message: "Non autorisé" }, { status: 401 });
+    }
+
+    const auteurId = user.id;
+
+    // Vérifie blocage
+    const participants = await prisma.participant.findMany({
+      where: { conversationId },
+      select: { utilisateurId: true },
+    });
+
+    const autresParticipants = participants
+      .map((p) => p.utilisateurId)
+      .filter((id) => id !== auteurId);
+
+    const exclus = await getIdsUtilisateursExclus(auteurId);
+    const estBloque = autresParticipants.some((id) => exclus.includes(id));
+    if (estBloque) {
       return Response.json(
-        { success: false, message: "conversationId requis" },
-        { status: 400 }
+        { success: false, message: "Accès refusé à cette conversation." },
+        { status: 403 }
       );
     }
 

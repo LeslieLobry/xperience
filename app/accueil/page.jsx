@@ -5,13 +5,15 @@ import { redirect } from "next/navigation";
 import "./accueil.css";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 import Link from "next/link";
-import DerniersArticles from "../../components/DerniersArticles/DerniersArticles"
-import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements"
+import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
+import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
+import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
+
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function AccueilPage() {
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const token = cookieStore.get("token")?.value;
 
   if (!token) return redirect("/connexion");
@@ -23,10 +25,26 @@ export default async function AccueilPage() {
     return redirect("/connexion");
   }
 
+  // 🔒 Récupère les utilisateurs exclus (bloqués ou bloquants)
+  let exclus = [];
+  try {
+    exclus = await getIdsUtilisateursExclus(decoded.id);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des exclus :", err);
+  }
+
+  const whereCommun = {
+    NOT: {
+      id: {
+        in: [...exclus, decoded.id],
+      },
+    },
+  };
+
   const profilsEnLigne = await prisma.utilisateur.findMany({
     where: {
+      ...whereCommun,
       statut: "en_ligne",
-      NOT: { id: decoded.id },
     },
     select: {
       id: true,
@@ -38,9 +56,7 @@ export default async function AccueilPage() {
   });
 
   const tousLesProfils = await prisma.utilisateur.findMany({
-    where: {
-      NOT: { id: decoded.id },
-    },
+    where: whereCommun,
     select: {
       id: true,
       pseudo: true,
@@ -77,9 +93,10 @@ export default async function AccueilPage() {
           </Link>
         ))}
       </div>
+
       <DerniersArticles />
       <RechercheWrapper />
-      <DerniersEvenements/>
+      <DerniersEvenements />
     </div>
   );
 }

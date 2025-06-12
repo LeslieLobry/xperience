@@ -2,21 +2,25 @@ import { hash, compare } from "bcryptjs";
 import { prisma } from "../../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../../lib/auth";
-import { cookies as getCookies } from "next/headers";
+import { cookies } from "next/headers";
 
 export async function PATCH(req) {
   try {
     const { currentPassword, newPassword } = await req.json();
 
-    const cookieStore = getCookies(); // ✅ ne pas faire await ici
-    const user = getUserFromToken(cookieStore); // ✅ passe l'objet cookies, pas la fonction cookies()
+    const cookieStore = await cookies(); // ✅ await ici !
+    const user = await getUserFromToken(); 
+    console.log("🔍 Utilisateur extrait du token :", user);
 
-    if (!user) {
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const utilisateur = await prisma.utilisateur.findUnique({
       where: { id: user.id },
+      select: {
+        password: true,
+      },
     });
 
     if (!utilisateur) {
@@ -38,7 +42,7 @@ export async function PATCH(req) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Erreur PATCH /update-password:", err);
+    console.error("❌ Erreur PATCH /update-password:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

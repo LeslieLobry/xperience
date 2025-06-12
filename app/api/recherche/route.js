@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
+import { getUserFromToken } from "../../../lib/auth";
+import { cookies } from "next/headers";
 
 const prisma = new PrismaClient();
 
@@ -29,9 +32,25 @@ export async function GET(req) {
   const description = searchParams.get("description");
   const statut = searchParams.get("statut") || "all";
 
+  // 🔒 Exclusion des utilisateurs bloqués/bloquants
+  let exclus = [];
+  try {
+    const cookieStore = cookies();
+    const user = await getUserFromToken(cookieStore);
+    if (user?.id) {
+      exclus = await getIdsUtilisateursExclus(user.id);
+    }
+  } catch (err) {
+    console.error("Erreur lors du filtrage des exclus :", err);
+    exclus = [];
+  }
+
   const where = {
-    ...(pseudo.trim() && { pseudo: { contains: pseudo.trim() } }),
-    ...(localisation.trim() && { localisation: { contains: localisation.trim() } }),
+    id: {
+      notIn: exclus,
+    },
+    ...(pseudo.trim() && { pseudo: { contains: pseudo.trim(), mode: "insensitive" } }),
+    ...(localisation.trim() && { localisation: { contains: localisation.trim(), mode: "insensitive" } }),
     ...(photo === "true" && { photoUrl: { not: null } }),
     ...(description === "true" && { description: { not: null } }),
     ...(statut === "en_ligne" && { statut: "en_ligne" }),

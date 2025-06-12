@@ -14,21 +14,26 @@ export default function SecuritySection() {
   const [deleteMessage, setDeleteMessage] = useState("");
 
   const handleUpdatePassword = async () => {
-    if (newPass !== confirm) return setMessage("Les mots de passe ne correspondent pas.");
+  if (newPass !== confirm) return setMessage("Les mots de passe ne correspondent pas.");
 
-    try {
-      const res = await fetch("/api/utilisateur/update-password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword: current, newPassword: newPass }),
-      });
+  try {
+    const res = await fetch("/api/utilisateur/update-password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // ✅ INDISPENSABLE pour envoyer le cookie token
+      body: JSON.stringify({ currentPassword: current, newPassword: newPass }),
+    });
 
-      if (res.ok) setMessage("Mot de passe mis à jour !");
-      else setMessage("Erreur : mot de passe non mis à jour.");
-    } catch {
-      setMessage("Erreur serveur.");
+    if (res.ok) setMessage("✅ Mot de passe mis à jour !");
+    else {
+      const data = await res.json();
+      setMessage("❌ " + (data.error || "Erreur inconnue."));
     }
-  };
+  } catch {
+    setMessage("❌ Erreur serveur.");
+  }
+};
+
 
   const handleDeleteAccount = async () => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer votre compte ?")) return;

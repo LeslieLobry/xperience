@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./MenuProfilActions.css";
 import Image from "next/image";
 import SignalementModal from "../SignalementModal/SignalementModal";
@@ -10,12 +10,44 @@ export default function MenuProfilActions({ cibleId }) {
   const [bloque, setBloque] = useState(false);
   const [showSignalement, setShowSignalement] = useState(false);
 
+  // 🔎 Vérifie si le membre est déjà bloqué au chargement
+  useEffect(() => {
+    const checkIfBloque = async () => {
+      try {
+        const res = await fetch(`/api/blocage/${cibleId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBloque(data.estBloqué);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la vérification du blocage :", err);
+      }
+    };
+
+    checkIfBloque();
+  }, [cibleId]);
+
+  // 🔒 Bloquer ou débloquer
   const handleBlocage = async () => {
-    await fetch(`/api/blocage/${cibleId}`, { method: "POST" });
-    setBloque((prev) => !prev);
-    setOpen(false);
+    try {
+      const res = await fetch(`/api/blocage`, {
+        method: bloque ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bloquéId: cibleId }),
+      });
+
+      if (res.ok) {
+        setBloque((prev) => !prev);
+        setOpen(false);
+      } else {
+        console.error("Erreur lors du blocage/déblocage");
+      }
+    } catch (err) {
+      console.error("Erreur serveur :", err);
+    }
   };
 
+  // 🚨 Ouvre la modale de signalement
   const handleSignalement = () => {
     setShowSignalement(true);
     setOpen(false);

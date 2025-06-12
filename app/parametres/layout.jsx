@@ -11,12 +11,12 @@ import "./parametres.css";
 const menuItems = [
   { id: "reglages", label: "Réglages", icon: <Settings size={18} /> },
   { id: "securite", label: "Sécurité", icon: <Key size={18} /> },
-  { id: "confidentialite", label: "Confidentialité", icon: <EyeOff size={18} /> },
+  // { id: "confidentialite", label: "Confidentialité", icon: <EyeOff size={18} /> },
   { id: "blocages", label: "Blocages", icon: <Ban size={18} /> },
-  { id: "alertes", label: "Alertes", icon: <Mail size={18} /> },
+  // { id: "alertes", label: "Alertes", icon: <Mail size={18} /> },
   { id: "abonnement", label: "Abonnement", icon: <Wallet size={18} /> },
   { id: "parrainage", label: "Parrainage", icon: <Users size={18} /> },
-  { id: "commandes", label: "Vos commandes", icon: <Euro size={18} /> },
+  // { id: "commandes", label: "Vos commandes", icon: <Euro size={18} /> },
 ];
 
 export default function Layout({ children }) {

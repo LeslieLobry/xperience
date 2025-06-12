@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
 import GaleriePriveePhotos from "../GaleriePriveePhotos/GaleriePriveePhotos";
@@ -16,10 +17,29 @@ import "../Profil/Profil.css";
 import BoutonLike from "../BoutonLike/BoutonLike";
 import Image from "next/image";
 
-
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
+
+  const [canSee, setCanSee] = useState(null); // null = en chargement
+
+  // Vérifie si l'accès est autorisé
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isOwnProfile) {
+        setCanSee(true);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/blocage/visibilite/${user.id}`);
+        const data = await res.json();
+        setCanSee(data.canSee);
+      } catch {
+        setCanSee(false);
+      }
+    };
+    checkAccess();
+  }, [user.id, isOwnProfile]);
 
   const completion = calculateProfileCompletion(user);
 
@@ -67,12 +87,15 @@ export default function Profil({ user, connectedUser }) {
     }
   };
 
+  if (canSee === null) return <p>Chargement du profil...</p>;
+  if (canSee === false) return <p>🚫 Ce profil n’est pas accessible.</p>;
+
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
-       <div className="profil-avatar-horizontal">
-         <PhotoUploader currentUrl={user.photoUrl} isOwnProfile={isOwnProfile} />
-      </div>
+        <div className="profil-avatar-horizontal">
+          <PhotoUploader currentUrl={user.photoUrl} isOwnProfile={isOwnProfile} />
+        </div>
 
         {!isOwnProfile && (
           <>
@@ -87,32 +110,32 @@ export default function Profil({ user, connectedUser }) {
                 height={46}
               />
             </button>
-          {!isOwnProfile && <BoutonLike cibleId={user.id} />}
+            <BoutonLike cibleId={user.id} />
             <MenuProfilActions cibleId={user.id} />
           </>
         )}
       </div>
+
       <h1 className="profil-name">{user.pseudo}</h1>
       {isOwnProfile && <StatutToggle initialStatut={user.statut} />}
       <div className="profil-badge">{user.type} {user.orientation}</div>
 
       {isOwnProfile && (
-  <div className="profil-completion-box">
-    <h2>Devenez irrésistible, complétez votre profil !</h2>
-    <p>
-      Vous valoriserez ainsi davantage vos recherches tout en vous présentant
-      sous votre meilleur jour.
-    </p>
-    <div className="progress-bar">
-      <div
-        className="progress-fill"
-        style={{ width: `${completion}%` }}
-      ></div>
-    </div>
-    <p className="completion-text">{completion}% complété</p>
-  </div>
-)}
-
+        <div className="profil-completion-box">
+          <h2>Devenez irrésistible, complétez votre profil !</h2>
+          <p>
+            Vous valoriserez ainsi davantage vos recherches tout en vous présentant
+            sous votre meilleur jour.
+          </p>
+          <div className="progress-bar">
+            <div
+              className="progress-fill"
+              style={{ width: `${completion}%` }}
+            ></div>
+          </div>
+          <p className="completion-text">{completion}% complété</p>
+        </div>
+      )}
 
       <div className="grid">
         <div className="profil-infos-wrapper">
