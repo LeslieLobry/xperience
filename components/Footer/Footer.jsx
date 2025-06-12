@@ -18,7 +18,7 @@ function Footer(params) {
                 />
             </div>
             <div className="footer-a-propos">
-                <h2 className="footer-apropos-title">À PROPOS</h2>
+                <h2 className="footer-apropos-title">À propos</h2>
                 <ul className="footer-ul">
                     <li>  <Link href="/cgu">CGU</Link></li>
                     <li><Link href="/cookies">Cookies et vie privée</Link></li>
