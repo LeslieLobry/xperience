@@ -22,6 +22,7 @@
 .conversation-item.active{
   border: 1px solid #e0c084;
   background-color: #e0c084;
+  color: white;
  
 }
 

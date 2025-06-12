@@ -25,6 +25,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [waitingAnswer, setWaitingAnswer] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
   const textareaRef = useRef(null);
+  const [isSending, setIsSending] = useState(false);
 
   const adjustTextareaHeight = () => {
     const el = textareaRef.current;
@@ -293,12 +294,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
           <img src={interlocuteur.photoUrl || "/images/default-avatar.png"} alt="avatar" className="avatar" />
           <p>{interlocuteur.pseudo} vous appelle en {incomingCall.callType}...</p>
           <button onClick={acceptCall}>Accepter</button>
-          <button
-            onClick={() => {
-              socket.emit("call_declined", { roomId: conversationId });
-              setIncomingCall(null);
-            }}
-          >
+          <button onClick={() => {
+            socket.emit("call_declined", { roomId: conversationId });
+            setIncomingCall(null);
+          }}>
             Refuser
           </button>
         </div>
@@ -307,7 +306,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       {waitingAnswer && interlocuteur && (
         <div className="incoming-call-toast">
           <img src={interlocuteur.photoUrl || "/images/default-avatar.png"} alt="avatar" className="avatar" />
-          <p>\u23f3 En attente de r\u00e9ponse de {interlocuteur.pseudo}...</p>
+          <p>⏳ En attente de réponse de {interlocuteur.pseudo}...</p>
           <button className="hangup-button" onClick={handleHangup}>Annuler l'appel</button>
         </div>
       )}
@@ -331,40 +330,61 @@ export default function ChatBox({ conversationId, utilisateur }) {
         className="chat-input"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!nouveauTexte.trim()) return;
+          if (!nouveauTexte.trim() && !imageFile) return;
+          if (isSending) return;
+
+          setIsSending(true);
+          const formData = new FormData();
+          formData.append("conversationId", conversationId);
+          formData.append("contenu", nouveauTexte);
+          formData.append("type", imageFile ? "IMAGE" : "TEXTE");
+          if (imageFile) formData.append("image", imageFile);
+
           fetch("/api/messages", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              conversationId,
-              auteurId: utilisateur.id,
-              contenu: nouveauTexte,
-              imageUrl: null,
-              videoUrl: null,
-              type: "TEXTE",
-            }),
+            body: formData,
           })
             .then((res) => res.json())
             .then((data) => {
               socket.emit("send_message", data.message);
               setNouveauTexte("");
+              setImageFile(null);
               if (textareaRef.current) {
                 textareaRef.current.style.height = "auto";
               }
-            });
+            })
+            .finally(() => setIsSending(false));
         }}
       >
         <textarea
           ref={textareaRef}
           className="input-text"
-          placeholder="\écrire un message..."
+          placeholder="Écrire un message..."
           value={nouveauTexte}
           onChange={handleChange}
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
-        <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} />
-        <button type="submit">Envoyer</button>
+        <input
+          type="file"
+          accept="image/*"
+          className="message-image"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) setImageFile(file);
+          }}
+        />
+        {imageFile && (
+          <div className="image-preview">
+            <p style={{ fontSize: "0.8rem", color: "#ccc" }}>📎 {imageFile.name}</p>
+            <img
+              src={URL.createObjectURL(imageFile)}
+              alt="Aperçu"
+              style={{ maxWidth: "120px", maxHeight: "120px", borderRadius: "8px", marginTop: "4px" }}
+            />
+          </div>
+        )}
+        <button type="submit" className="message-btn">Envoyer</button>
       </form>
 
       <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" preload="auto" />

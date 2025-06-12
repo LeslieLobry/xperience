@@ -99,9 +99,9 @@ export default function ListeConversations({ userId, onSelectConversation }) {
               </div>
               <div className="conv-info">
                 <div className="conv-pseudo">{pseudo}</div>
-                <div className="conv-apercu">
+                {/* <div className="conv-apercu">
                   {renderApercu(dernierMsg)}
-                </div>
+                </div> */}
               </div>
             </div>
             <button
