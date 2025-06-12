@@ -6,41 +6,37 @@ import { safeParam, getUserFromToken } from "../../../lib/serverUtils";
 
 const prisma = new PrismaClient();
 
-export default async function ProfilPage(context) {
-  const id = safeParam(context, "id");
+export default async function ProfilPage({ params }) {
+  const id = params.id;
   if (!id) return redirect("/utilisateurs");
 
-  const decoded = getUserFromToken();
+  const decoded = await getUserFromToken(); // ✅ doit être async si tu utilises cookies()
   if (!decoded) return redirect("/connexion");
 
-  const connectedUser = await prisma.utilisateur.findUnique({
+  const connectedUser = await prisma.Utilisateur.findUnique({
     where: { id: decoded.id },
   });
 
- const user = await prisma.utilisateur.findUnique({
-  where: {
-    id: parseInt(id),
-  },
-  include: {
-    recherches: true,
-    envies: true,
-    photos: {
-      where: {
-        galeriePriveeId: null, // ✅ on ne prend que les photos publiques
+  const user = await prisma.Utilisateur.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      recherches: true,
+      envies: true,
+      photos: {
+        where: {
+          galeriePriveeId: null, // ✅ uniquement les photos publiques
+        },
+      },
+      galeriePrivee: { // ✅ nom correct
+        include: { photos: true },
+      },
+      avisRecus: {
+        include: {
+          auteur: true,
+        },
       },
     },
-    galeriesPrivees: {        
-      include: { photos: true },
-      orderBy: { createdAt: 'desc' }
-    },
-    avisRecus: {
-      include: {
-        auteur: true,
-      },
-    },
-  },
-});
-
+  });
 
   if (!user) return redirect("/utilisateurs");
 

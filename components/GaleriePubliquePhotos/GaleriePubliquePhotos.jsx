@@ -3,29 +3,32 @@
 import React, { useState, useEffect } from 'react';
 import PhotoUploader from '../PhotoUploader/PhotoUploader';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import "./GaleriePubliquePhotos.css"
 
-export default function GaleriePhotos({ utilisateurId, editable = false }) {
+function fixPhotoUrl(url) {
+  if (!url) return "/images/default-avatar.png";
+  if (url.startsWith("/uploads/")) return url;
+  if (url.startsWith("http")) return url;
+  return `/uploads/${url.replace(/^.*[\\/]/, '')}`;
+}
+
+export default function GaleriePhotos({ photos = [], editable = false }) {
   const MAX_PHOTOS = 6;
   const [photoList, setPhotoList] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(null);
 
   useEffect(() => {
-    if (!utilisateurId) return;
-
-    fetch(`/api/utilisateur/${utilisateurId}/photos-publics`)
-      .then(res => res.json())
-      .then(data => setPhotoList(data))
-      .catch(err => console.error("Erreur chargement photos publiques :", err));
-  }, [utilisateurId]);
+    if (Array.isArray(photos)) {
+      setPhotoList(photos);
+    }
+  }, [photos]);
 
   const handleNewPhoto = (photo) => {
     setPhotoList(prev => [...prev, photo]);
   };
 
   const handleDelete = async (id) => {
-    const res = await fetch(`/api/photos/${id}`, {
-      method: 'DELETE',
-    });
+    const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setPhotoList(prev => prev.filter(p => p.id !== id));
     }
@@ -57,7 +60,7 @@ export default function GaleriePhotos({ utilisateurId, editable = false }) {
               </button>
             )}
             <img
-              src={photo.url}
+              src={fixPhotoUrl(photo.url)}
               alt={`Photo ${index + 1}`}
               onClick={() => setCurrentIndex(index)}
               style={{ cursor: 'zoom-in' }}
@@ -96,7 +99,7 @@ export default function GaleriePhotos({ utilisateurId, editable = false }) {
               </button>
             )}
 
-            <img src={photoList[currentIndex].url} alt="Agrandissement" />
+            <img src={fixPhotoUrl(photoList[currentIndex].url)} alt="Agrandissement" />
           </div>
         </div>
       )}

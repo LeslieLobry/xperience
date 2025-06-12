@@ -24,6 +24,7 @@
   border: none;
   margin-left: 8px;
   cursor: pointer;
+  color: #e0c084;
 }
 
 .chat-messages {

@@ -34,7 +34,7 @@ export async function POST(req) {
   await fs.mkdir(path.dirname(filepath), { recursive: true });
   await sharp(buffer).resize(600).webp({ quality: 80 }).toFile(filepath);
 
-  const photoUrl = `/uploads/${filename}`;
+  const photoUrl = `public/uploads/${filename}`;
 
   if (galerieId) {
     // Photo pour galerie privée

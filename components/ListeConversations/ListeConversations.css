@@ -1,7 +1,11 @@
 .liste-conversations {
+  display: flex;
+  flex-direction: column;
   width: 30%;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid #e0c084;
   overflow-y: auto;
+  gap: 16px;
+  padding: 8px;
 }
 
 .conversation-item {
@@ -9,8 +13,16 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem;
-  border-bottom: 1px solid #ccc;
   gap: 8px;
+  border-radius: 16px;
+}
+.conversation-item:hover{
+  background-color: #a2b9c1;
+}
+.conversation-item.active{
+  border: 1px solid #e0c084;
+  background-color: #e0c084;
+ 
 }
 
 .conversation-clickable {

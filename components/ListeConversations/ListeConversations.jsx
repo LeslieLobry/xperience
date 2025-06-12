@@ -5,6 +5,7 @@ import "./ListeConversations.css";
 
 export default function ListeConversations({ userId, onSelectConversation }) {
   const [conversations, setConversations] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -46,11 +47,21 @@ export default function ListeConversations({ userId, onSelectConversation }) {
         if (typeof onSelectConversation === "function") {
           onSelectConversation(null);
         }
+        if (selectedId === id) {
+          setSelectedId(null);
+        }
       } else {
         console.error("Erreur suppression conversation :", await res.json());
       }
     } catch (err) {
       console.error("Erreur serveur :", err);
+    }
+  };
+
+  const handleSelect = (id) => {
+    setSelectedId(id);
+    if (typeof onSelectConversation === "function") {
+      onSelectConversation(id);
     }
   };
 
@@ -60,7 +71,7 @@ export default function ListeConversations({ userId, onSelectConversation }) {
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
           <a href="/recherche" className="start-search-link">
-            Trouver des profils à contacter 
+            Trouver des profils à contacter
           </a>
         </div>
       )}
@@ -70,15 +81,18 @@ export default function ListeConversations({ userId, onSelectConversation }) {
           (p) => p.utilisateurId !== userId
         )?.utilisateur;
 
-        const pseudo = autre?.pseudo || "Conversation supprimée par l'autre utilisateur";
+        const pseudo = autre?.pseudo || "Utilisateur supprimé";
         const avatar = autre?.photoUrl || "/default-avatar.png";
         const dernierMsg = conv.messages[0];
 
         return (
-          <div key={conv.id} className="conversation-item">
+          <div
+            key={conv.id}
+            className={`conversation-item ${selectedId === conv.id ? "active" : ""}`}
+          >
             <div
               className="conversation-clickable"
-              onClick={() => onSelectConversation(conv.id)}
+              onClick={() => handleSelect(conv.id)}
             >
               <div className="conv-avatar">
                 <img src={avatar} alt={pseudo} />

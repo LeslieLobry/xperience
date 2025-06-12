@@ -37,10 +37,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
     setNouveauTexte(e.target.value);
     adjustTextareaHeight();
   };
+
   useEffect(() => {
     if (conversationId) {
       socket.emit("join_conversation", conversationId);
-      console.log("🧩 Rejoint la room :", conversationId);
     }
   }, [conversationId]);
 
@@ -63,6 +63,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
   useEffect(() => {
     if (incomingCall) {
       callTimeoutRef.current = setTimeout(() => {
+        socket.emit("call_missed", {
+          conversationId,
+          de: interlocuteur?.id,
+          type: incomingCall.callType,
+        });
         setIncomingCall(null);
       }, 30000);
     } else {
@@ -94,9 +99,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       .then((data) => {
         setInterlocuteur(data.interlocuteur);
       })
-      .catch((err) => {
-        console.error("❌ Erreur chargement interlocuteur :", err);
-      });
+      .catch(console.error);
 
     socket.on("message_received", (msg) => {
       if (msg.conversationId === conversationId) {
@@ -105,8 +108,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
       }
     });
 
+    socket.on("call_missed", ({ type, de }) => {
+      const message = {
+        id: Date.now(),
+        auteurId: de,
+        contenu: ` Appel ${type === "video" ? "vidéo" : "audio"} manqué.`,
+        type: "TEXTE",
+        system: true,
+      };
+      setMessages((prev) => [...prev, message]);
+      scrollToBottom();
+    });
+
     socket.on("webrtc_offer", ({ offer, callType }) => {
-      console.log("📞 Offre WebRTC reçue !", { offer, callType });
       setIncomingCall({ offer, callType });
     });
 
@@ -123,7 +137,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     socket.on("call_accepted", () => {
       setIncomingCall(null);
       setWaitingAnswer(false);
-      setInCall(true); // ✅ Ajout important
+      setInCall(true);
       ringtoneRef.current?.pause();
       ringtoneRef.current.currentTime = 0;
     });
@@ -136,7 +150,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
       pcRef.current = null;
       ringtoneRef.current?.pause();
       ringtoneRef.current.currentTime = 0;
-      alert("📵 Appel refusé");
+
+      socket.emit("call_missed", {
+        conversationId,
+        de: utilisateur.id,
+        type: incomingCall?.callType || "audio",
+      });
+
+      alert(" Appel refusé");
     });
 
     socket.on("call_hangup", () => {
@@ -145,6 +166,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
     return () => {
       socket.off("message_received");
+      socket.off("call_missed");
       socket.off("webrtc_offer");
       socket.off("webrtc_answer");
       socket.off("webrtc_ice_candidate");
@@ -260,7 +282,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   return (
     <div className="chatbox-container">
       <ChatHeader
-        nom="Conversation"
+        nom={interlocuteur?.pseudo}
         onCallAudio={() => startCall("audio")}
         onCallVideo={() => startCall("video")}
         onClose={handleHangup}
@@ -268,11 +290,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
       {incomingCall && interlocuteur && (
         <div className="incoming-call-toast">
-          <img
-            src={interlocuteur.photoUrl || "/images/default-avatar.png"}
-            alt="avatar"
-            className="avatar"
-          />
+          <img src={interlocuteur.photoUrl || "/images/default-avatar.png"} alt="avatar" className="avatar" />
           <p>{interlocuteur.pseudo} vous appelle en {incomingCall.callType}...</p>
           <button onClick={acceptCall}>Accepter</button>
           <button
@@ -288,12 +306,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
       {waitingAnswer && interlocuteur && (
         <div className="incoming-call-toast">
-          <img
-            src={interlocuteur.photoUrl || "/images/default-avatar.png"}
-            alt="avatar"
-            className="avatar"
-          />
-          <p>⏳ En attente de réponse de {interlocuteur.pseudo}...</p>
+          <img src={interlocuteur.photoUrl || "/images/default-avatar.png"} alt="avatar" className="avatar" />
+          <p>\u23f3 En attente de r\u00e9ponse de {interlocuteur.pseudo}...</p>
           <button className="hangup-button" onClick={handleHangup}>Annuler l'appel</button>
         </div>
       )}
@@ -314,48 +328,44 @@ export default function ChatBox({ conversationId, utilisateur }) {
       </div>
 
       <form
-      className="chat-input"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!nouveauTexte.trim()) return;
-        fetch("/api/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId,
-            auteurId: utilisateur.id,
-            contenu: nouveauTexte,
-            imageUrl: null,
-            videoUrl: null,
-            type: "TEXTE",
-          }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            socket.emit("send_message", data.message);
-            setNouveauTexte("");
-            if (textareaRef.current) {
-              textareaRef.current.style.height = "auto";
-            }
-          });
-      }}
-    >
-      <textarea
-        ref={textareaRef}
-        className="input-text"
-        placeholder="Écrire un message..."
-        value={nouveauTexte}
-        onChange={handleChange}
-        rows={1}
-        style={{ overflow: "hidden", resize: "none" }}
-      />
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setImageFile(e.target.files[0])}
-      />
-      <button type="submit">Envoyer</button>
-    </form>
+        className="chat-input"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!nouveauTexte.trim()) return;
+          fetch("/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              conversationId,
+              auteurId: utilisateur.id,
+              contenu: nouveauTexte,
+              imageUrl: null,
+              videoUrl: null,
+              type: "TEXTE",
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              socket.emit("send_message", data.message);
+              setNouveauTexte("");
+              if (textareaRef.current) {
+                textareaRef.current.style.height = "auto";
+              }
+            });
+        }}
+      >
+        <textarea
+          ref={textareaRef}
+          className="input-text"
+          placeholder="\écrire un message..."
+          value={nouveauTexte}
+          onChange={handleChange}
+          rows={1}
+          style={{ overflow: "hidden", resize: "none" }}
+        />
+        <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} />
+        <button type="submit">Envoyer</button>
+      </form>
 
       <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" preload="auto" />
     </div>
