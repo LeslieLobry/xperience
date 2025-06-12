@@ -9,7 +9,7 @@ export default function PhotoUploader({
   onUpload,
   isGallery = false,
   galerieId,
-  isPublic = false,            // ✅ Nouveau : indique si c'est une galerie publique
+  isPublic = false,
   isOwnProfile = false
 }) {
   const fileInputRef = useRef(null);
@@ -22,24 +22,42 @@ export default function PhotoUploader({
     const formData = new FormData();
     formData.append('photo', file);
 
-    // ✅ Ajout des informations contextuelles
-    if (galerieId) formData.append('galerieId', galerieId);
-    if (isPublic) formData.append('isPublic', 'true');
+    let uploadUrl = '/api/upload-photo';
 
-    const res = await fetch('/api/upload-photo', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include', // ✅ pour envoyer le cookie JWT
-    });
+    if (isGallery && isPublic) {
+      // Galerie publique → upload-photo avec flag
+      formData.append('isPublic', 'true');
+    }
 
-    if (res.ok) {
-      const data = await res.json();
-      const url = data.photoUrl || data.url;
-      setPreview(url);
-      if (onUpload) onUpload(isGallery ? data : url);
-    } else {
-      alert("Erreur lors de l'envoi de la photo.");
-      console.error("Upload failed", await res.text());
+    if (isGallery && !isPublic) {
+      // Galerie privée
+      if (!galerieId) {
+        console.error("galerieId manquant pour galerie privée");
+        return alert("Erreur : galerie privée introuvable.");
+      }
+      uploadUrl = `/api/galeries-privees/${galerieId}/photos`;
+    }
+
+    try {
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const url = data.photoUrl?.startsWith("/") ? data.photoUrl : `/${data.photoUrl}`;
+        setPreview(url);
+        if (onUpload) onUpload(isGallery ? data : url);
+      } else {
+        const errorText = await res.text();
+        console.error("Upload failed:", errorText);
+        alert("Erreur lors de l'envoi de la photo.");
+      }
+    } catch (err) {
+      console.error("Erreur réseau:", err);
+      alert("Erreur réseau pendant l'upload.");
     }
   };
 

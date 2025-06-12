@@ -44,14 +44,14 @@ model DemandeAcces {
 }
 
 model Utilisateur {
-   id              Int             @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   nom             String
   prenom          String
   pseudo          String          @unique
   email           String          @unique
   role            Role            @default(USER)
   password        String
-  type            String          // "homme" | "femme" | "couple" | "autre"
+  type            String
   orientation     String
   age             Int
   consent         Boolean
@@ -86,9 +86,12 @@ model Utilisateur {
   likesEnvoyes    Like[]          @relation("LikesEnvoyes")
   likesRecus      Like[]          @relation("LikesRecus")
   notifications   Notification[]
-
-  demandesFaite  DemandeAcces[] @relation("Demandeur")
-  demandesRecues DemandeAcces[] @relation("GalerieProprio")
+  demandesFaite   DemandeAcces[]  @relation("Demandeur")
+  demandesRecues  DemandeAcces[]  @relation("GalerieProprio")
+  galeriePrivee   GaleriePrivee? // relation 1-1
+  recherches      Recherche[]
+  envies          Envie[]
+  photos          Photo[]
 }
 
 model GaleriePrivee {
@@ -204,9 +207,9 @@ model Participant {
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
   lastReadAt DateTime? // Date à laquelle l’utilisateur a lu cette conversation
+  supprimé  Boolean   @default(false)
 
   @@unique([utilisateurId, conversationId])
-  supprimé       Boolean      @default(false)
 }
 
 model Message {

@@ -112,8 +112,19 @@ return (
     {user ? (
     <li className="nav-avatar-wrapper" ref={popupRef}>
       <div className="nav-avatar-container" onClick={handleAvatarClick}>
-        <Image src={user.photoUrl || "/default-avatar.png" } alt="Photo de profil" width={40} height={40}
-          className="nav-avatar" />
+      <Image
+  src={
+    typeof user.photoUrl === "string"
+      ? user.photoUrl.startsWith("/")
+        ? user.photoUrl
+        : `/${user.photoUrl}`
+      : "/default-avatar.png"
+  }
+  alt="Photo de profil"
+  width={40}
+  height={40}
+  className="nav-avatar"
+/>
         {notifCount > 0 && (
         <span className="notif-badge-on-avatar">{notifCount}</span>
         )}
