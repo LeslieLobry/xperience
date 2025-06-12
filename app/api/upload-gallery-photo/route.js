@@ -1,43 +1,32 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import path from 'path';
-import fs from 'fs/promises';
-import sharp from 'sharp';
-import { prisma } from '../../../lib/prisma';
-import { getUserFromToken } from '../../../lib/auth';
+import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
+import { writeFile } from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
 
 export async function POST(req) {
-  const cookieStore = await cookies();
-  const user = await getUserFromToken(cookieStore);
-
-  if (!user || !user.id) {
-    return NextResponse.json({ success: false, message: 'Non autorisé' }, { status: 401 });
-  }
-
   const formData = await req.formData();
-  const file = formData.get('photo');
+  const file = formData.get("photo");
 
-  if (!file || typeof file === 'string') {
-    return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
+  if (!file) {
+    return NextResponse.json({ error: "Aucun fichier fourni." }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = `${Date.now()}-${randomUUID()}.jpg`;
+  const filePath = path.join(process.cwd(), "public", "uploads", fileName);
 
-  const filename = `gallery_${user.id}_${Date.now()}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
+  await writeFile(filePath, buffer);
 
-  await fs.mkdir(path.dirname(filepath), { recursive: true });
-  await sharp(buffer).resize(600).webp({ quality: 80 }).toFile(filepath);
-
-  const photoUrl = `/uploads/${filename}`;
-
+  // Création de la photo en base (galerie publique)
+  const url = `/uploads/${fileName}`;
   const photo = await prisma.photo.create({
     data: {
-      url: photoUrl,
-      utilisateurId: user.id,
-      galeriePriveeId: null,
+      url,
+      estPublique: true,
+      utilisateurId: parseInt(formData.get("utilisateurId")) || 0,
     },
   });
 
-  return NextResponse.json(photo);
+  return NextResponse.json(photo, { status: 201 });
 }

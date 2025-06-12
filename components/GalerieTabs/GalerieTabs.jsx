@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import GaleriePhotos from '../GaleriePhotos/GaleriePhotos';
+import GaleriePhotos from '../GaleriePubliquePhotos/GaleriePubliquePhotos';
 import GaleriePriveePhotos from '../GaleriePriveePhotos/GaleriePriveePhotos';
 import "./GalerieTabs.css";
 

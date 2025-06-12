@@ -8,7 +8,7 @@ import { getUserFromToken } from '../../../lib/auth';
 
 export async function POST(req) {
   const cookieStore = cookies();
-  const user = getUserFromToken(cookieStore);
+  const user = await getUserFromToken(cookieStore);
 
   if (!user || !user.id) {
     return NextResponse.json({ success: false, message: 'Non autorisé' }, { status: 401 });

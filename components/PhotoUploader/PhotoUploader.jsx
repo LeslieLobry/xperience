@@ -9,6 +9,7 @@ export default function PhotoUploader({
   onUpload,
   isGallery = false,
   galerieId,
+  isPublic = false,            // ✅ Nouveau : indique si c'est une galerie publique
   isOwnProfile = false
 }) {
   const fileInputRef = useRef(null);
@@ -21,19 +22,14 @@ export default function PhotoUploader({
     const formData = new FormData();
     formData.append('photo', file);
 
-    // Choix de l'endpoint
-    let endpoint;
-    if (isGallery && galerieId) {
-      endpoint = `/api/galeries-privees/${galerieId}/photos`;
-    } else if (isGallery && !galerieId) {
-      endpoint = '/api/upload-gallery-photo';
-    } else {
-      endpoint = '/api/upload-photo';
-    }
+    // ✅ Ajout des informations contextuelles
+    if (galerieId) formData.append('galerieId', galerieId);
+    if (isPublic) formData.append('isPublic', 'true');
 
-    const res = await fetch(endpoint, {
+    const res = await fetch('/api/upload-photo', {
       method: 'POST',
       body: formData,
+      credentials: 'include', // ✅ pour envoyer le cookie JWT
     });
 
     if (res.ok) {
@@ -48,9 +44,8 @@ export default function PhotoUploader({
   };
 
   const handleClick = () => {
-    if (isOwnProfile) {
-      fileInputRef.current?.click();
-    }
+    if (!isGallery && !isOwnProfile) return;
+    fileInputRef.current?.click();
   };
 
   return (
@@ -60,11 +55,11 @@ export default function PhotoUploader({
     >
       {!isGallery && preview && (
         <div className="photo-preview-wrapper">
-         <img
-          src={preview || "/images/default-avatar.png"}
-          alt="Photo de profil"
-          className="photo-preview"
-        />
+          <img
+            src={preview || "/images/default-avatar.png"}
+            alt="Photo de profil"
+            className="photo-preview"
+          />
           {isOwnProfile && (
             <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
               <Camera className="camera-icon" />

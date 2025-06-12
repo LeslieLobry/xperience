@@ -1,26 +1,33 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PhotoUploader from '../PhotoUploader/PhotoUploader';
-import './GaleriePhotos.css';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function GaleriePhotos({ photos = [], editable = false }) {
+export default function GaleriePhotos({ utilisateurId, editable = false }) {
   const MAX_PHOTOS = 6;
-  const [photoList, setPhotoList] = useState(photos);
-  const [currentIndex, setCurrentIndex] = useState(null); // index de la photo sélectionnée
+  const [photoList, setPhotoList] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(null);
+
+  useEffect(() => {
+    if (!utilisateurId) return;
+
+    fetch(`/api/utilisateur/${utilisateurId}/photos-publics`)
+      .then(res => res.json())
+      .then(data => setPhotoList(data))
+      .catch(err => console.error("Erreur chargement photos publiques :", err));
+  }, [utilisateurId]);
 
   const handleNewPhoto = (photo) => {
     setPhotoList(prev => [...prev, photo]);
   };
 
   const handleDelete = async (id) => {
-    if (!editable) return;
     const res = await fetch(`/api/photos/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     });
     if (res.ok) {
-      setPhotoList(prev => prev.filter(photo => photo.id !== id));
+      setPhotoList(prev => prev.filter(p => p.id !== id));
     }
   };
 
@@ -40,10 +47,10 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
 
   return (
     <div className="profil-section">
-      <h3 className="profil-section-title">Ma galerie</h3>
+      <h3 className="profil-section-title">Galerie publique</h3>
       <div className="gallery-grid">
         {photoList.map((photo, index) => (
-          <div className="gallery-slot filled" key={photo.id || index}>
+          <div className="gallery-slot filled" key={photo.id}>
             {editable && (
               <button className="delete-button" onClick={() => handleDelete(photo.id)}>
                 <Trash2 size={16} />
@@ -53,14 +60,19 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
               src={photo.url}
               alt={`Photo ${index + 1}`}
               onClick={() => setCurrentIndex(index)}
-              style={{ cursor: "zoom-in" }}
+              style={{ cursor: 'zoom-in' }}
             />
           </div>
         ))}
 
-        {editable && Array.from({ length: emptySlots }).map((_, idx) => (
+        {editable && emptySlots > 0 && Array.from({ length: emptySlots }).map((_, idx) => (
           <div className="gallery-slot empty" key={`empty-${idx}`}>
-            <PhotoUploader isGallery onUpload={handleNewPhoto} />
+            <PhotoUploader
+              isGallery={true}
+              isPublic={true}
+              isOwnProfile={true}
+              onUpload={handleNewPhoto}
+            />
           </div>
         ))}
       </div>

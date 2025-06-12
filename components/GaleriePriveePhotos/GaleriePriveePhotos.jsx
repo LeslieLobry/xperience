@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import PhotoUploader from '../PhotoUploader/PhotoUploader';
-import '../GaleriePhotos/GaleriePhotos.css';
+// import '../GaleriePubliquePhotos/GaleriePhotos.css';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function GaleriePriveePhotos({ utilisateurId, editable = false, visiteurId }) {
