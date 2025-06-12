@@ -365,15 +365,29 @@ export default function ChatBox({ conversationId, utilisateur }) {
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
-        <input
-          type="file"
-          accept="image/*"
-          className="message-image"
-          onChange={(e) => {
-            const file = e.target.files[0];
-            if (file) setImageFile(file);
-          }}
-        />
+        <label htmlFor="image-upload" className="upload-label">
+  
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    stroke="#e0c084"    
+  >
+    <path d="M21.44 11.05L12 20.5a5.002 5.002 0 01-7.07-7.07l9.9-9.9a3 3 0 114.24 4.24L8.47 17.5" />
+  </svg>
+</label>
+<input
+  id="image-upload"
+  type="file"
+  accept="image/*"
+  className="message-image"
+  style={{ display: "none" }}
+  onChange={(e) => {
+    const file = e.target.files[0];
+    if (file) setImageFile(file);
+  }}
+/>
+
         {imageFile && (
           <div className="image-preview">
             <p style={{ fontSize: "0.8rem", color: "#ccc" }}>📎 {imageFile.name}</p>
