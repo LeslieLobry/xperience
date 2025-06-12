@@ -8,7 +8,7 @@ import sharp from "sharp";
 
 export async function POST(request, context) {
   const { params } = context;
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const user = await getUserFromToken(cookieStore);
 
   if (!user?.id) {
@@ -20,6 +20,30 @@ export async function POST(request, context) {
     return NextResponse.json({ success: false, message: "Galerie invalide" }, { status: 400 });
   }
 
+  // 🔍 Vérifie si la galerie existe déjà
+  let galerie = await prisma.galeriePrivee.findUnique({
+    where: { id: galeriePriveeId },
+  });
+
+  // ✅ Si la galerie n'existe pas encore → on la crée
+  if (!galerie) {
+    galerie = await prisma.galeriePrivee.create({
+      data: {
+        utilisateurId: user.id,
+        nom: `Galerie de ${user.pseudo || "utilisateur"}`,
+      },
+    });
+  }
+
+  // ⚠️ Sécurité : empêcher un utilisateur d'ajouter une photo dans une galerie qui n'est pas la sienne
+  if (galerie.utilisateurId !== user.id) {
+    return NextResponse.json({
+      success: false,
+      message: "Vous n’êtes pas autorisé à modifier cette galerie.",
+    }, { status: 403 });
+  }
+
+  // ✅ Traitement du fichier
   const formData = await request.formData();
   const file = formData.get("photo");
 
@@ -42,7 +66,7 @@ export async function POST(request, context) {
       data: {
         url: photoUrl,
         utilisateurId: user.id,
-        galeriePriveeId: galeriePriveeId,
+        galeriePriveeId: galerie.id,
       },
     });
 

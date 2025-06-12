@@ -65,6 +65,22 @@ export default function Profil({ user, connectedUser }) {
 
     return Math.round((completed / fields.length) * 100);
   }
+const [demandesAcces, setDemandesAcces] = useState([]);
+
+useEffect(() => {
+  const fetchDemandes = async () => {
+    if (!isOwnProfile) return;
+    try {
+      const res = await fetch(`/api/utilisateur/${user.id}/demandes-acces`);
+      const data = await res.json();
+      setDemandesAcces(data || []);
+    } catch (err) {
+      console.error("Erreur chargement des demandes :", err);
+    }
+  };
+
+  fetchDemandes();
+}, [isOwnProfile, user.id]);
 
   const handleStartConversation = async () => {
     try {
@@ -151,17 +167,44 @@ export default function Profil({ user, connectedUser }) {
         <DescriptionCard editable={isOwnProfile} />
 
         <GalerieTabs
-          publicPhotos={user.photos}
-          galeriePrivee={user.galeriesPrivees?.[0]}
-          editable={isOwnProfile}
-          utilisateurId={user.id}
-        />
+        publicPhotos={user.photos}
+        galeriePrivee={user.galeriesPrivees?.[0]}
+        editable={isOwnProfile}
+        utilisateurId={user.id}
+        visiteurId={connectedUser.id}
+      />
+      {isOwnProfile && demandesAcces.length > 0 && (
+  <div className="profil-section">
+    <h3 className="profil-section-title">Demandes d'accès à la galerie privée</h3>
+    <ul>
+      {demandesAcces.map((demande) => (
+        <li key={demande.id}>
+          <span>{demande.demandeur?.pseudo || "Utilisateur inconnu"}</span>
+          <button
+            onClick={async () => {
+              await fetch(`/api/demandes-acces/${demande.id}/accepter`, { method: "PATCH" });
+              setDemandesAcces((prev) => prev.filter((d) => d.id !== demande.id));
+            }}
+          >
+            Accepter
+          </button>
+          <button
+            onClick={async () => {
+              await fetch(`/api/demandes-acces/${demande.id}/refuser`, { method: "PATCH" });
+              setDemandesAcces((prev) => prev.filter((d) => d.id !== demande.id));
+            }}
+          >
+            Refuser
+          </button>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
 
         <PreferencesSummary editable={isOwnProfile} />
         <ProfilDetailsSummary editable={isOwnProfile} />
-
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-
         {!isOwnProfile && !aDejaCommente && (
           <AvisForm cibleId={user.id} />
         )}

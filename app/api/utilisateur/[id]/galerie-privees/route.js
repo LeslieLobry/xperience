@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET(req, { params }) {
@@ -14,16 +14,24 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "ID visiteur invalide" }, { status: 400 });
   }
 
-  // Cherche la galerie privée du propriétaire
   const galerie = await prisma.galeriePrivee.findUnique({
-    where: { utilisateurId: utilisateurId },
+    where: { utilisateurId },
   });
 
   if (!galerie) {
     return NextResponse.json({ error: "Galerie introuvable" }, { status: 404 });
   }
 
-  // Vérifie si le visiteur a fait une demande d’accès à cette galerie
+  // Si le visiteur est aussi le proprio → accès direct
+  if (visiteurId === utilisateurId) {
+    const photos = await prisma.photo.findMany({
+      where: { galeriePriveeId: galerie.id },
+      select: { id: true, url: true },
+    });
+    return NextResponse.json(photos);
+  }
+
+  // Vérifier la demande d'accès
   const demande = await prisma.demandeAcces.findUnique({
     where: {
       galeriePriveeId_demandeurId: {
@@ -45,7 +53,7 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Demande en attente" }, { status: 403 });
   }
 
-  // Si ACCEPTEE → on renvoie les photos
+  // Si ACCEPTEE
   const photos = await prisma.photo.findMany({
     where: { galeriePriveeId: galerie.id },
     select: { id: true, url: true },

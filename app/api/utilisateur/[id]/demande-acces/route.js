@@ -2,27 +2,23 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(req, { params }) {
-  const proprietaireId = parseInt(params.id); // utilisateur à qui appartient la galerie
+  const utilisateurId = parseInt(params.id);
   const { visiteurId } = await req.json();
 
-  if (!proprietaireId || isNaN(proprietaireId) || !visiteurId || isNaN(visiteurId)) {
-    return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+  if (!utilisateurId || !visiteurId) {
+    return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
   }
 
-  if (proprietaireId === visiteurId) {
-    return NextResponse.json({ error: "Impossible de demander accès à sa propre galerie" }, { status: 400 });
-  }
-
-  // Vérifie que la galerie existe
+  // Récupère la galerie
   const galerie = await prisma.galeriePrivee.findUnique({
-    where: { utilisateurId: proprietaireId },
+    where: { utilisateurId },
   });
 
   if (!galerie) {
-    return NextResponse.json({ error: "Galerie introuvable" }, { status: 404 });
+    return NextResponse.json({ error: "Galerie non trouvée" }, { status: 404 });
   }
 
-  // Vérifie si une demande existe déjà
+  // Vérifie s’il existe déjà une demande
   const existing = await prisma.demandeAcces.findUnique({
     where: {
       galeriePriveeId_demandeurId: {
@@ -33,18 +29,17 @@ export async function POST(req, { params }) {
   });
 
   if (existing) {
-    return NextResponse.json({ error: "Demande déjà existante" }, { status: 409 });
+    return NextResponse.json({ message: "Demande déjà existante" }, { status: 200 });
   }
 
   // Crée la demande
-  const nouvelleDemande = await prisma.demandeAcces.create({
+  const demande = await prisma.demandeAcces.create({
     data: {
       galeriePriveeId: galerie.id,
       demandeurId: visiteurId,
-      proprietaireId: proprietaireId,
       statut: "EN_ATTENTE",
     },
   });
 
-  return NextResponse.json(nouvelleDemande, { status: 201 });
+  return NextResponse.json(demande);
 }

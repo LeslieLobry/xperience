@@ -14,27 +14,31 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   // accessStatus: 'granted' | 'pending' | 'denied' | null
 
   // Charger la galerie privée et vérifier accès
-  useEffect(() => {
-    if (!utilisateurId) return;
+useEffect(() => {
+  if (!utilisateurId) return;
 
-    setLoading(true);
-    fetch(`/api/utilisateur/${utilisateurId}/galerie-privees?visiteurId=${visiteurId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          setAccessStatus('denied');
-          setPhotoList([]);
-        } else {
-          setAccessStatus('granted');
-          setPhotoList(data);
-        }
-      })
-      .catch(() => {
+  const visiteur = visiteurId;
+  if (!utilisateurId || !visiteurId) return;
+
+
+  setLoading(true);
+  fetch(`/api/utilisateur/${utilisateurId}/galerie-privees?visiteurId=${visiteur}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
         setAccessStatus('denied');
         setPhotoList([]);
-      })
-      .finally(() => setLoading(false));
-  }, [utilisateurId, visiteurId]);
+      } else {
+        setAccessStatus('granted');
+        setPhotoList(data);
+      }
+    })
+    .catch(() => {
+      setAccessStatus('denied');
+      setPhotoList([]);
+    })
+    .finally(() => setLoading(false));
+}, [utilisateurId, visiteurId]);
 
   // Demande d'accès si visiteur
   const handleDemandeAcces = async () => {
