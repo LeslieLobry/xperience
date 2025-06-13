@@ -28,7 +28,8 @@ model DemandeAcces {
   id Int @id @default(autoincrement())
 
   galeriePriveeId Int
-  galeriePrivee   GaleriePrivee @relation("GalerieProprio", fields: [galeriePriveeId], references: [id])
+  galeriePrivee   GaleriePrivee @relation("DemandeGalerie", fields: [galeriePriveeId], references: [id])
+
 
   demandeurId Int
   demandeur   Utilisateur @relation("Demandeur", fields: [demandeurId], references: [id])
@@ -102,7 +103,7 @@ model GaleriePrivee {
   photos        Photo[]
   createdAt     DateTime    @default(now())
 
-  demandesAcces DemandeAcces[] @relation("GalerieProprio")
+  demandesAcces DemandeAcces[] @relation("DemandeGalerie")
 }
 
 model Evenement {

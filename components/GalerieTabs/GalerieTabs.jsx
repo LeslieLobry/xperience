@@ -5,7 +5,7 @@ import GaleriePhotos from '../GaleriePubliquePhotos/GaleriePubliquePhotos';
 import GaleriePriveePhotos from '../GaleriePriveePhotos/GaleriePriveePhotos';
 import "./GalerieTabs.css";
 
-export default function GaleriesTabs({ publicPhotos, galeriePrivee, editable, utilisateurId }) {
+export default function GaleriesTabs({ publicPhotos, galeriePrivee, editable, utilisateurId, visiteurId  }) {
   const [activeTab, setActiveTab] = useState('publique'); // ou 'privee'
 
   return (
@@ -34,6 +34,7 @@ export default function GaleriesTabs({ publicPhotos, galeriePrivee, editable, ut
           <GaleriePriveePhotos
             editable={editable}
             utilisateurId={utilisateurId}
+            visiteurId={visiteurId}
           />
         )}
       </div>

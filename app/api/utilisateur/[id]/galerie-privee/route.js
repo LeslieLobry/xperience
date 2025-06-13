@@ -2,16 +2,12 @@ import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET(req, { params }) {
-  const utilisateurId = parseInt(params.id); // propriétaire
+  const utilisateurId = parseInt(params.id);
   const { searchParams } = new URL(req.url);
   const visiteurId = parseInt(searchParams.get("visiteurId"));
 
-  if (!utilisateurId || isNaN(utilisateurId)) {
-    return NextResponse.json({ error: "ID utilisateur invalide" }, { status: 400 });
-  }
-
-  if (!visiteurId || isNaN(visiteurId)) {
-    return NextResponse.json({ error: "ID visiteur invalide" }, { status: 400 });
+  if (!utilisateurId || !visiteurId) {
+    return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
   }
 
   const galerie = await prisma.galeriePrivee.findUnique({
@@ -19,19 +15,18 @@ export async function GET(req, { params }) {
   });
 
   if (!galerie) {
-    return NextResponse.json({ error: "Galerie introuvable" }, { status: 404 });
+    return NextResponse.json({ error: "Galerie non trouvée" }, { status: 404 });
   }
 
-  // Si le visiteur est aussi le proprio → accès direct
-  if (visiteurId === utilisateurId) {
+  // Si le visiteur est le propriétaire, accès direct
+  if (utilisateurId === visiteurId) {
     const photos = await prisma.photo.findMany({
       where: { galeriePriveeId: galerie.id },
       select: { id: true, url: true },
     });
-    return NextResponse.json(photos);
+    return NextResponse.json({ access: "granted", photos });
   }
 
-  // Vérifier la demande d'accès
   const demande = await prisma.demandeAcces.findUnique({
     where: {
       galeriePriveeId_demandeurId: {
@@ -42,22 +37,22 @@ export async function GET(req, { params }) {
   });
 
   if (!demande) {
-    return NextResponse.json({ error: "Aucune demande trouvée" }, { status: 403 });
+    return NextResponse.json({ access: "none" }, { status: 200 });
   }
 
   if (demande.statut === "REFUSEE") {
-    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    return NextResponse.json({ access: "refused" }, { status: 200 });
   }
 
   if (demande.statut === "EN_ATTENTE") {
-    return NextResponse.json({ error: "Demande en attente" }, { status: 403 });
+    return NextResponse.json({ access: "pending" }, { status: 200 });
   }
 
-  // Si ACCEPTEE
+  // Si accepté
   const photos = await prisma.photo.findMany({
     where: { galeriePriveeId: galerie.id },
     select: { id: true, url: true },
   });
 
-  return NextResponse.json(photos);
+  return NextResponse.json({ access: "granted", photos });
 }

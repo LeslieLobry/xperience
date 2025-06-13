@@ -16,6 +16,7 @@ import GalerieTabs from "../GalerieTabs/GalerieTabs";
 import "../Profil/Profil.css";
 import BoutonLike from "../BoutonLike/BoutonLike";
 import Image from "next/image";
+import DemandesAccesGalerie from "../DemandesAccesGalerie/DemandesAccesGalerie";
 
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
@@ -173,6 +174,7 @@ useEffect(() => {
         utilisateurId={user.id}
         visiteurId={connectedUser.id}
       />
+      <DemandesAccesGalerie/>
       {isOwnProfile && demandesAcces.length > 0 && (
   <div className="profil-section">
     <h3 className="profil-section-title">Demandes d'accès à la galerie privée</h3>

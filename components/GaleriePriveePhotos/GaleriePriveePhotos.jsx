@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import PhotoUploader from '../PhotoUploader/PhotoUploader';
-// import '../GaleriePubliquePhotos/GaleriePhotos.css';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function GaleriePriveePhotos({ utilisateurId, editable = false, visiteurId }) {
@@ -10,79 +9,79 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   const [photoList, setPhotoList] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [accessStatus, setAccessStatus] = useState(null);
-  // accessStatus: 'granted' | 'pending' | 'denied' | null
+  const [accessStatus, setAccessStatus] = useState(null); // 'granted' | 'pending' | 'denied' | null
 
-  // Charger la galerie privée et vérifier accès
 useEffect(() => {
   if (!utilisateurId) return;
 
-  const visiteur = visiteurId;
-  if (!utilisateurId || !visiteurId) return;
-
+  const visiteur = visiteurId || utilisateurId;
 
   setLoading(true);
   fetch(`/api/utilisateur/${utilisateurId}/galerie-privees?visiteurId=${visiteur}`)
     .then(res => res.json())
     .then(data => {
-      if (data.error) {
-        setAccessStatus('denied');
+      if (data.access === "pending") {
+        setAccessStatus("pending");
         setPhotoList([]);
-      } else {
-        setAccessStatus('granted');
-        setPhotoList(data);
+      } else if (data.access === "refused" || data.access === "none") {
+        setAccessStatus("denied");
+        setPhotoList([]);
+      } else if (data.access === "granted") {
+        setAccessStatus("granted");
+        setPhotoList(data.photos || []);
       }
     })
-    .catch(() => {
-      setAccessStatus('denied');
+    .catch(err => {
+      console.error("Erreur galerie privée :", err);
+      setAccessStatus("denied");
       setPhotoList([]);
     })
     .finally(() => setLoading(false));
 }, [utilisateurId, visiteurId]);
 
-  // Demande d'accès si visiteur
   const handleDemandeAcces = async () => {
-    if (!utilisateurId) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/utilisateurs/${utilisateurId}/demande-acces`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visiteurId }),
-      });
-      if (res.ok) setAccessStatus('pending');
-      else throw new Error('Erreur');
-    } catch {
-      alert('Erreur lors de la demande d\'accès');
-    }
-    setLoading(false);
-  };
+  const visiteur = visiteurId || utilisateurId;
 
-  // Ajout photo (proprio uniquement)
+  if (!utilisateurId || !visiteur) return;
+
+  setLoading(true);
+  try {
+    const res = await fetch(`/api/utilisateur/${utilisateurId}/demande-acces`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visiteurId: visiteur }),
+    });
+    if (res.ok) setAccessStatus('pending');
+    else throw new Error('Erreur');
+  } catch {
+    alert("Erreur lors de la demande d'accès");
+  }
+  setLoading(false);
+};
+
+
   const handleNewPhoto = (photo) => {
     setPhotoList(prev => [...prev, photo]);
   };
 
-  // Suppression photo (proprio uniquement)
   const handleDelete = async (id) => {
     if (!editable) return;
     const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
     if (res.ok) setPhotoList(prev => prev.filter(p => p.id !== id));
   };
 
-  // Gestion clavier lightbox (idem à ta galerie publique)
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
     if (e.key === 'Escape') setCurrentIndex(null);
     if (e.key === 'ArrowLeft') setCurrentIndex(i => (i > 0 ? i - 1 : i));
     if (e.key === 'ArrowRight') setCurrentIndex(i => (i < photoList.length - 1 ? i + 1 : i));
   };
+
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, photoList.length]);
 
-  // Affichage selon statut d'accès
   if (loading) return <div>Chargement...</div>;
 
   if (!editable && accessStatus === 'pending') {
@@ -102,7 +101,6 @@ useEffect(() => {
     return <div>Accès non autorisé.</div>;
   }
 
-  // Affichage galerie privée (proprio ou visiteur autorisé)
   const emptySlots = MAX_PHOTOS - photoList.length;
 
   return (
