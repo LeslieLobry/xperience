@@ -73,7 +73,17 @@ export default async function AccueilPage() {
         {profilsEnLigne.map((user) => (
           <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
             <div className="profil-card">
-              <img src={user.photoUrl || "/default.jpg"} alt={user.pseudo} className="profil-photo" />
+              <img
+  src={
+    user.photoUrl
+      ? user.photoUrl.startsWith("http")
+        ? user.photoUrl
+        : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
+      : "/default.jpg"
+  }
+  alt={user.pseudo}
+  className="profil-photo"
+/>
               <h2>{user.pseudo}</h2>
               <p>{user.age} ans - {user.localisation}</p>
             </div>
@@ -86,7 +96,17 @@ export default async function AccueilPage() {
         {tousLesProfils.map((user) => (
           <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
             <div className="profil-card">
-              <img src={user.photoUrl || "/default.jpg"} alt={user.pseudo} className="profil-photo" />
+              <img
+  src={
+    user.photoUrl
+      ? user.photoUrl.startsWith("http")
+        ? user.photoUrl
+        : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
+      : "/default.jpg"
+  }
+  alt={user.pseudo}
+  className="profil-photo"
+/>
               <h2>{user.pseudo}</h2>
               <p>{user.age} ans - {user.localisation}</p>
             </div>
