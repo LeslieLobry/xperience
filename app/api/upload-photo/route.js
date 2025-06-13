@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import path from 'path';
-import fs from 'fs/promises';
-import sharp from 'sharp';
 import { prisma } from '../../../lib/prisma';
 import { getUserFromToken } from '../../../lib/auth';
+import { s3 } from '../../../lib/s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 
 export async function POST(req) {
   const cookieStore = cookies();
@@ -21,23 +20,26 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
   }
 
-  // Extra fields to decide where to save the photo
-  const galerieId = formData.get('galerieId');    // present if photo is for private gallery
-  const isPublic = formData.get('isPublic') === 'true'; // 'true' string means public gallery
+  const galerieId = formData.get('galerieId');
+  const isPublic = formData.get('isPublic') === 'true';
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const filename = `photo_${user.id}_${Date.now()}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
+  const filename = `photo_${user.id}_${Date.now()}_${file.name}`;
+  const bucket = process.env.AWS_S3_BUCKET;
 
-  await fs.mkdir(path.dirname(filepath), { recursive: true });
-  await sharp(buffer).resize(600).webp({ quality: 80 }).toFile(filepath);
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: filename,
+    Body: buffer,
+    ContentType: file.type,
+  }));
 
-  const photoUrl = `/uploads/${filename}`; 
+  const photoUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
 
+  // Galerie privée
   if (galerieId) {
-    // Photo pour galerie privée
     const photo = await prisma.photo.create({
       data: {
         url: photoUrl,
@@ -48,33 +50,19 @@ export async function POST(req) {
     return NextResponse.json(photo);
   }
 
+  // Galerie publique
   if (isPublic) {
-    // Photo pour galerie publique
     const photo = await prisma.photo.create({
       data: {
         url: photoUrl,
         utilisateurId: user.id,
-        galeriePriveeId: null, // pas dans galerie privée
+        galeriePriveeId: null,
       }
     });
     return NextResponse.json(photo);
   }
 
-  // Sinon, c'est une photo de profil : on supprime l'ancienne et on met à jour utilisateur
-  const currentUser = await prisma.utilisateur.findUnique({
-    where: { id: user.id },
-    select: { photoUrl: true }
-  });
-
-  if (currentUser.photoUrl) {
-    const oldPath = path.join(process.cwd(), 'public', currentUser.photoUrl);
-    try {
-      await fs.unlink(oldPath);
-    } catch (e) {
-      console.warn("Impossible de supprimer l'ancienne image (peut-être déjà supprimée).");
-    }
-  }
-
+  // Photo de profil
   await prisma.utilisateur.update({
     where: { id: user.id },
     data: { photoUrl }

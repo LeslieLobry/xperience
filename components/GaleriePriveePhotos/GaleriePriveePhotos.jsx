@@ -17,7 +17,7 @@ useEffect(() => {
   const visiteur = visiteurId || utilisateurId;
 
   setLoading(true);
-  fetch(`/api/utilisateur/${utilisateurId}/galerie-privees?visiteurId=${visiteur}`)
+  fetch(`/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`)
     .then(res => res.json())
     .then(data => {
       if (data.access === "pending") {

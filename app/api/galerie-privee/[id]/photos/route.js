@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { getUserFromToken } from "../../../../../lib/auth";
 import { cookies } from "next/headers";
-import path from "path";
-import fs from "fs/promises";
 import sharp from "sharp";
+import { s3 } from "../../../../../lib/s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 export async function POST(request, context) {
   const { params } = context;
@@ -20,12 +20,10 @@ export async function POST(request, context) {
     return NextResponse.json({ success: false, message: "Galerie invalide" }, { status: 400 });
   }
 
-  // 🔍 Vérifie si la galerie existe déjà
   let galerie = await prisma.galeriePrivee.findUnique({
     where: { id: galeriePriveeId },
   });
 
-  // ✅ Si la galerie n'existe pas encore → on la crée
   if (!galerie) {
     galerie = await prisma.galeriePrivee.create({
       data: {
@@ -35,7 +33,6 @@ export async function POST(request, context) {
     });
   }
 
-  // ⚠️ Sécurité : empêcher un utilisateur d'ajouter une photo dans une galerie qui n'est pas la sienne
   if (galerie.utilisateurId !== user.id) {
     return NextResponse.json({
       success: false,
@@ -43,7 +40,6 @@ export async function POST(request, context) {
     }, { status: 403 });
   }
 
-  // ✅ Traitement du fichier
   const formData = await request.formData();
   const file = formData.get("photo");
 
@@ -52,16 +48,20 @@ export async function POST(request, context) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-
   const filename = `gallery_${user.id}_${Date.now()}.webp`;
-  const filepath = path.join(process.cwd(), "public/uploads", filename);
 
-  await fs.mkdir(path.dirname(filepath), { recursive: true });
-  await sharp(buffer).resize(600).webp({ quality: 80 }).toFile(filepath);
-
-  const photoUrl = `/uploads/${filename}`;
+  const compressedBuffer = await sharp(buffer).resize(600).webp({ quality: 80 }).toBuffer();
 
   try {
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET,
+      Key: filename,
+      Body: compressedBuffer,
+      ContentType: "image/webp",
+    }));
+
+    const photoUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+
     const photo = await prisma.photo.create({
       data: {
         url: photoUrl,
@@ -72,7 +72,7 @@ export async function POST(request, context) {
 
     return NextResponse.json(photo);
   } catch (error) {
-    console.error("Erreur création photo:", error);
+    console.error("Erreur upload galerie privée:", error);
     return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
   }
 }
