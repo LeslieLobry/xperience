@@ -5,38 +5,37 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 
 export default function ProfilProtege({ userId, children }) {
-  const { user, fetchUser } = useAuth();
+  const { fetchUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  
-useEffect(() => {
-  let isMounted = true;
 
-  const checkUser = async () => {
-    const fetchedUser = await fetchUser();
+  useEffect(() => {
+    let isMounted = true;
 
-    if (!isMounted) return;
+    const checkUser = async () => {
+      const fetchedUser = await fetchUser();
 
-    if (!fetchedUser) {
-      router.replace("/connexion");
-      return;
-    }
+      if (!isMounted) return;
 
-    if (parseInt(fetchedUser.id) !== parseInt(userId)) {
-      router.replace(`/profil/${fetchedUser.id}`);
-      return;
-    }
+      if (!fetchedUser) {
+        router.replace("/connexion");
+        return;
+      }
 
-    setLoading(false);
-  };
+      if (parseInt(fetchedUser.id) !== parseInt(userId)) {
+        router.replace(`/profil/${fetchedUser.id}`);
+        return;
+      }
 
-  checkUser();
+      setLoading(false);
+    };
 
-  return () => {
-    isMounted = false;
-  };
-}, [userId, router]); // ✅ supprime fetchUser des dépendances
+    checkUser();
 
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, router, fetchUser]); // ✅ Ajout de fetchUser maintenant qu’il est mémoïsé
 
   if (loading) {
     return (

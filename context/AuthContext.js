@@ -1,13 +1,14 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  const fetchUser = async () => {
+  // ✅ Memoïser fetchUser avec useCallback pour stabilité
+  const fetchUser = useCallback(async () => {
     try {
       const res = await fetch('/api/me', { credentials: 'include' });
       const data = await res.json();
@@ -22,7 +23,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       return null;
     }
-  };
+  }, []); // stable tant que rien ne change (ce qui est votre cas ici)
 
   const logout = async () => {
     await fetch('/api/logout', { credentials: 'include' });
@@ -36,7 +37,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     console.log("🔐 AuthProvider monté");
     fetchUser();
-  }, []);
+  }, [fetchUser]); // ✅ fetchUser peut maintenant être dans les dépendances sans warning
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser }}>

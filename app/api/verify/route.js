@@ -1,11 +1,12 @@
-// /pages/api/verify.js
+// /app/api/verify/route.js
 import Stripe from "stripe";
+import { NextResponse } from "next/server";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16", // ou votre version actuelle
+});
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).end("Méthode non autorisée");
-
+export async function POST(req) {
   try {
     const session = await stripe.identity.verificationSessions.create({
       type: "document",
@@ -16,13 +17,13 @@ export default async function handler(req, res) {
         },
       },
       metadata: {
-        user_id: "123", // Vous pouvez le personnaliser avec l'ID utilisateur réel
+        user_id: "123", // remplacez dynamiquement si besoin
       },
     });
 
-    res.status(200).json({ url: session.url });
+    return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error("Erreur Stripe Identity:", err);
-    res.status(500).json({ error: "Erreur serveur" });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

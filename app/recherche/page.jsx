@@ -1,12 +1,12 @@
+import { Suspense } from 'react';
+
 import "./recherche.css";
-import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
-import RechercheResultats from "../../components/RechercheResultats/RechercheResultats";
+import RechercheClient from "../../components/RechercheClient/RechercheClient";
 
 export default function Page() {
-  return (
-    <div className="page-recherche">
-      <RechercheWrapper />
-      <RechercheResultats />
-    </div>
+   return (
+    <Suspense fallback={<div>Chargement...</div>}>
+      <RechercheClient />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 // /api/demandes-acces/[id]/refuser/route.js
-import { prisma } from "../../../../../prisma";
+import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function PATCH(req, { params }) {

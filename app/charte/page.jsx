@@ -5,16 +5,16 @@ export const metadata = {
 
 export default function ChartePage() {
   return (
-    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem", color:"white" }}>
+    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem", color: "white" }}>
       <h1>🤝 Charte de bonne conduite</h1>
 
       <p>
-        En rejoignant Xperiences, chaque membre s'engage à respecter les valeurs de respect, consentement et discrétion.
+        En rejoignant Xperiences, chaque membre s&rsquo;engage à respecter les valeurs de respect, consentement et discrétion.
       </p>
 
       <h2>1. Respect mutuel</h2>
       <p>
-        Chaque membre s'engage à respecter les autres, leurs choix, leurs préférences et leurs limites. Les insultes, pressions ou comportements déplacés ne sont pas tolérés.
+        Chaque membre s&rsquo;engage à respecter les autres, leurs choix, leurs préférences et leurs limites. Les insultes, pressions ou comportements déplacés ne sont pas tolérés.
       </p>
 
       <h2>2. Consentement clair</h2>
@@ -34,7 +34,7 @@ export default function ChartePage() {
 
       <h2>5. Signalement et modération</h2>
       <p>
-        Tout comportement non conforme peut être signalé. L’équipe de modération se réserve le droit de suspendre ou bannir un compte à tout moment.
+        Tout comportement non conforme peut être signalé. L&rsquo;équipe de modération se réserve le droit de suspendre ou bannir un compte à tout moment.
       </p>
     </main>
   );

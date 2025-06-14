@@ -5,7 +5,7 @@ export const metadata = {
 
 export default function ConfidentialitePage() {
   return (
-    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem",color:"white" }}>
+    <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem", color: "white" }}>
       <h1>🔒 Politique de confidentialité</h1>
 
       <p>
@@ -20,46 +20,45 @@ export default function ConfidentialitePage() {
       </p>
 
       <h2>2. Données collectées</h2>
-      <p>Nous collectons uniquement les données strictement nécessaires au fonctionnement du site :</p>
+      <p>Nous collectons uniquement les données strictement nécessaires au fonctionnement du site&nbsp;:</p>
       <ul>
         <li>Informations de profil : pseudo, email, âge, sexe, orientation, préférences</li>
         <li>Contenus fournis : photos, messages, avis, interactions</li>
-        <li>Données de navigation : adresse IP, type d’appareil, pages visitées</li>
-        <li>Données de sécurité : date d’inscription, connexions, vérification email</li>
+        <li>Données de navigation : adresse IP, type d&rsquo;appareil, pages visitées</li>
+        <li>Données de sécurité : date d&rsquo;inscription, connexions, vérification email</li>
       </ul>
 
       <h2>3. Finalité de la collecte</h2>
-      <p>Les données sont utilisées uniquement pour :</p>
+      <p>Les données sont utilisées uniquement pour&nbsp;:</p>
       <ul>
-        <li>Permettre l’accès aux fonctionnalités du site</li>
+        <li>Permettre l&rsquo;accès aux fonctionnalités du site</li>
         <li>Sécuriser les échanges et prévenir les abus</li>
-        <li>Personnaliser l’expérience utilisateur</li>
+        <li>Personnaliser l&rsquo;expérience utilisateur</li>
         <li>Respecter les obligations légales</li>
       </ul>
 
       <h2>4. Partage des données</h2>
       <p>
-        Aucune donnée n’est vendue ou cédée à des tiers. Les seules personnes pouvant accéder à vos informations sont les administrateurs du site à des fins de modération ou de support.
+        Aucune donnée n&rsquo;est vendue ou cédée à des tiers. Les seules personnes pouvant accéder à vos informations sont les administrateurs du site à des fins de modération ou de support.
       </p>
 
       <h2>5. Durée de conservation</h2>
       <p>
-        Les données sont conservées :
+        Les données sont conservées&nbsp;:</p>
         <ul>
           <li>Tant que votre compte est actif</li>
-          <li>Ou jusqu’à votre demande de suppression</li>
+          <li>Ou jusqu&rsquo;à votre demande de suppression</li>
         </ul>
-      </p>
 
       <h2>6. Vos droits</h2>
       <p>
-        Vous disposez à tout moment des droits suivants :
+        Vous disposez à tout moment des droits suivants&nbsp;:
       </p>
       <ul>
-        <li>Droit d’accès à vos données</li>
+        <li>Droit d&rsquo;accès à vos données</li>
         <li>Droit de rectification ou de suppression</li>
         <li>Droit à la portabilité</li>
-        <li>Droit d’opposition ou de limitation du traitement</li>
+        <li>Droit d&rsquo;opposition ou de limitation du traitement</li>
       </ul>
       <p>
         Pour exercer vos droits, écrivez à : <a href="mailto:contact@xperiences.fr">contact@xperiences.fr</a>
@@ -67,12 +66,12 @@ export default function ConfidentialitePage() {
 
       <h2>7. Sécurité</h2>
       <p>
-        Le site met en place des mesures techniques (HTTPS, cryptage, contrôle d’accès) et organisationnelles (modération, permissions) pour protéger vos données.
+        Le site met en place des mesures techniques (HTTPS, cryptage, contrôle d&rsquo;accès) et organisationnelles (modération, permissions) pour protéger vos données.
       </p>
 
       <h2>8. Cookies</h2>
       <p>
-        Pour en savoir plus sur notre utilisation des cookies, veuillez consulter la <a href="/cookies">page dédiée Cookies & vie privée</a>.
+        Pour en savoir plus sur notre utilisation des cookies, veuillez consulter la <a href="/cookies">page dédiée Cookies &amp; vie privée</a>.
       </p>
 
       <h2>9. Modifications</h2>
