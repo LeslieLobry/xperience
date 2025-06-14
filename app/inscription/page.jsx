@@ -124,12 +124,17 @@ export default function RegisterForm() {
 
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          value.forEach((v) => formData.append(`${key}[]`, v));
-        } else {
-          formData.append(key, value);
-        }
-      });
+  if (Array.isArray(value)) {
+    value.forEach((v) => formData.append(`${key}[]`, v));
+  } else if (typeof value === "boolean") {
+    formData.append(key, value ? "true" : "false");
+  } else if (key === "age") {
+    formData.append(key, parseInt(value, 10)); // s'assurer que l'âge est bien un entier
+  } else {
+    formData.append(key, value);
+  }
+});
+
       if (photo) formData.append("photo", photo);
 
       const res = await fetch("/api/register", {

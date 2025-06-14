@@ -113,13 +113,14 @@ return (
     <li className="nav-avatar-wrapper" ref={popupRef}>
       <div className="nav-avatar-container" onClick={handleAvatarClick}>
       <Image
-  src={
+ src={
   user.photoUrl
-    ? user.photoUrl.startsWith("http") // S3 ou URL complète
+    ? user.photoUrl.startsWith("http") || user.photoUrl.startsWith("/uploads")
       ? user.photoUrl
-      : `/uploads/${user.photoUrl}`    // sinon on complète
-    : "/images/default-avatar.png"     // fallback
+      : `/uploads/${user.photoUrl}`
+    : "/images/default-avatar.png"
 }
+
   alt="Photo de profil"
   width={40}
   height={40}

@@ -21,7 +21,7 @@ import DemandesAccesGalerie from "../DemandesAccesGalerie/DemandesAccesGalerie";
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
-
+  const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
   const [canSee, setCanSee] = useState(null); // null = en chargement
 
   // Vérifie si l'accès est autorisé
@@ -111,9 +111,12 @@ useEffect(() => {
     <div className="profil-page">
       <div className="profil-header-horizontal">
         <div className="profil-avatar-horizontal">
-          <PhotoUploader currentUrl={user.photoUrl} isOwnProfile={isOwnProfile} />
+          <PhotoUploader
+            currentUrl={photoUrl}
+            isOwnProfile={isOwnProfile}
+            onUpload={(newUrl) => setPhotoUrl(newUrl)}
+          />
         </div>
-
         {!isOwnProfile && (
           <>
             <button

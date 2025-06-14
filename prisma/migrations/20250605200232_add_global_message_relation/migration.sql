@@ -1,8 +1,0 @@
--- CreateTable
-CREATE TABLE "GlobalMessage" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "auteurId" INTEGER NOT NULL,
-    "contenu" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "GlobalMessage_auteurId_fkey" FOREIGN KEY ("auteurId") REFERENCES "Utilisateur" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);

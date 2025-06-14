@@ -12,7 +12,7 @@ const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({ subsets: ["latin"], weight: ["400", "500", "700"], variable: "--font-raleway" });
 
 export const metadata = {
-  title: "Xpérience",
+  title: "Xpériences",
   description: "site échangiste.",
 };
 

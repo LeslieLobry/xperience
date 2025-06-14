@@ -28,10 +28,11 @@ export default function PhotoUploader({
     }
 
     if (isGallery && !isPublic) {
-      if (!galerieId) {
-        console.error("galerieId manquant pour galerie privée");
-        return alert("Erreur : galerie privée introuvable.");
-      }
+      if (galerieId === undefined || galerieId === null || isNaN(parseInt(galerieId))) {
+  console.error("galerieId invalide pour galerie privée");
+  return alert("Erreur : galerie privée introuvable.");
+}
+
       formData.append('galerieId', galerieId.toString());
     }
 

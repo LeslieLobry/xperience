@@ -116,22 +116,24 @@ export async function POST(req) {
         // Création utilisateur
         const user = await prisma.utilisateur.create({
           data: {
-            nom,
-            prenom,
-            pseudo,
-            email,
-            password: hashedPassword,
-            type,
-            orientation,
-            age,
-            localisation,
-            consentCGU: consent,
-            consentCGUDate,
-            photoUrl: photoPath,
-            recherches: {
-              create: recherche.map((label) => ({ label })),
-            },
+          nom,
+          prenom,
+          pseudo,
+          email,
+          password: hashedPassword,
+          type,
+          orientation,
+          age,
+          localisation,
+          consent, // ✅ AJOUT ICI
+          consentCGU: consent,
+          consentCGUDate,
+          photoUrl: photoPath,
+          recherches: {
+            create: recherche.map((label) => ({ label })),
           },
+        }
+
         });
 
         // Création token de vérification
