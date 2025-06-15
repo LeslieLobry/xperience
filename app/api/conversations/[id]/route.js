@@ -6,9 +6,8 @@ import { isBlockedBetween } from "../../../../lib/utilsFiltrage";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// ✅ Fonction corrigée pour extraire l'utilisateur depuis le cookie
 async function getUserFromToken() {
-  const headerList = await headers();
+  const headerList = headers(); // pas besoin de await ici
   const cookieHeader = headerList.get("cookie") || "";
   const tokenMatch = cookieHeader.match(/token=([^;]+)/);
   const token = tokenMatch?.[1];
@@ -16,21 +15,20 @@ async function getUserFromToken() {
   if (!token || !JWT_SECRET) return null;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded;
+    return jwt.verify(token, JWT_SECRET);
   } catch {
     return null;
   }
 }
 
-export async function GET(req, context) {
+export async function GET(req, { params }) {
   const decoded = await getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(context.params.id, 10); // ✅ Utilisation correcte
+  const conversationId = parseInt(params.id, 10);
 
   if (!conversationId || isNaN(conversationId)) {
     return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
@@ -85,14 +83,14 @@ export async function GET(req, context) {
   });
 }
 
-export async function DELETE(req, context) {
+export async function DELETE(req, { params }) {
   const decoded = await getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(context.params.id, 10); // ✅ Utilisation correcte
+  const conversationId = parseInt(params.id, 10);
 
   if (!conversationId || isNaN(conversationId)) {
     return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
@@ -115,7 +113,6 @@ export async function DELETE(req, context) {
       }
     }
 
-    // 1. Marquer comme supprimé pour l'utilisateur courant
     await prisma.participant.updateMany({
       where: {
         conversationId,
@@ -126,7 +123,6 @@ export async function DELETE(req, context) {
       },
     });
 
-    // 2. Vérifier si tous les participants ont supprimé la conversation
     const updatedParticipants = await prisma.participant.findMany({
       where: { conversationId },
     });

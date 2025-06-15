@@ -34,6 +34,36 @@ export default function ChatBox({ conversationId, utilisateur }) {
     setTexte(e.target.value);
     adjustTextareaHeight();
   };
+useEffect(() => {
+  if (!conversationId) return;
+
+  const channel = ably.channels.get(`conversation-${conversationId}`);
+
+  // 🔁 Chargement initial des messages depuis la BDD
+  fetch(`/api/messages?conversationId=${conversationId}`)
+    .then(res => res.json())
+    .then(data => {
+      setMessages(data.messages); // <-- Assure-toi que l'API renvoie { messages: [...] }
+      scrollToBottom();
+    });
+
+  // 🔔 Écoute des nouveaux messages en temps réel
+  channel.subscribe("message", (msg) => {
+    setMessages((prev) => [...prev, msg.data]);
+    scrollToBottom();
+  });
+
+  // Récupération de l'interlocuteur
+  fetch(`/api/conversations/${conversationId}`)
+    .then((res) => res.json())
+    .then((data) => {
+      setInterlocuteur(data.interlocuteur);
+    });
+
+  return () => {
+    channel.unsubscribe();
+  };
+}, [conversationId]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -64,13 +94,15 @@ export default function ChatBox({ conversationId, utilisateur }) {
     if (!texte.trim() && !imageFile) return;
 
     const messageData = {
-      auteurId: utilisateur.id,
-      pseudo: utilisateur.pseudo,
-      texte,
-      type: imageFile ? "IMAGE" : "TEXTE",
-      date: new Date().toISOString(),
-      conversationId,
-    };
+  auteurId: utilisateur.id,
+  auteur: { pseudo: utilisateur.pseudo,
+      photoUrl: utilisateur.photoUrl || null,
+   }, // ✅ ceci
+  contenu: texte,
+  type: imageFile ? "IMAGE" : "TEXTE",
+  date: new Date().toISOString(),
+  conversationId,
+};
 
     if (imageFile) {
       const formData = new FormData();
@@ -90,7 +122,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
     const channel = ably.channels.get(`conversation-${conversationId}`);
     channel.publish("message", messageData);
-    setMessages((prev) => [...prev, messageData]);
     setTexte("");
     setImageFile(null);
   };
