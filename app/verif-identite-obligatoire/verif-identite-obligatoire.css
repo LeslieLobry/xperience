@@ -1,0 +1,35 @@
+.verif-obligatoire-container {
+  max-width: 600px;
+  margin: 4rem auto;
+  padding: 2rem;
+  text-align: center;
+  background-color: #fff8e1;
+  border: 1px solid #ffe58f;
+  border-radius: 10px;
+  font-family: sans-serif;
+}
+
+.verif-obligatoire-container h1 {
+  color: #d48806;
+  margin-bottom: 1rem;
+}
+
+.verif-obligatoire-container p {
+  font-size: 16px;
+  color: #444;
+  margin-bottom: 2rem;
+}
+
+.verif-obligatoire-container button {
+  background-color: #1890ff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.verif-obligatoire-container button:hover {
+  background-color: #096dd9;
+}

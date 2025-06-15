@@ -34,6 +34,9 @@ export default async function AccueilPage() {
     verificationDeadline: true,
   },
 });
+if (!user.verificationIdentite && user.verificationDeadline && new Date() > new Date(user.verificationDeadline)) {
+  return redirect("/verif-identite-obligatoire");
+}
 
 
   // 🔒 Récupère les utilisateurs exclus (bloqués ou bloquants)

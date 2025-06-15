@@ -16,6 +16,13 @@ export default async function ProfilPage({ params }) {
   const connectedUser = await prisma.Utilisateur.findUnique({
     where: { id: decoded.id },
   });
+if (
+  !connectedUser.verificationIdentite &&
+  connectedUser.verificationDeadline &&
+  new Date() > new Date(connectedUser.verificationDeadline)
+) {
+  return redirect("/verif-identite-obligatoire");
+}
 
   const user = await prisma.Utilisateur.findUnique({
     where: { id: parseInt(id) },
