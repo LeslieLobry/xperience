@@ -13,7 +13,7 @@ export default function RechercheSidebar({ onSearch }) {
   });
 
   const [openSections, setOpenSections] = useState({
-    identite: true,
+    identite: false,
     criteres: false,
     envies: false,
     experience: false,
@@ -134,14 +134,15 @@ export default function RechercheSidebar({ onSearch }) {
     );
   }
 
-  function Section({ title, open, toggle, children }) {
-    return (
-      <div className="section-group">
-        <h3 onClick={toggle} className="section-toggle">
-          {open ? "−" : "+"} {title}
-        </h3>
-        {open && <div className="section-content">{children}</div>}
-      </div>
-    );
-  }
+function Section({ title, open, toggle, children }) {
+  return (
+    <div className={`section-group ${open ? "open" : ""}`}>
+      <h3 onClick={toggle} className="section-toggle">
+        {open ? "−" : "+"} {title}
+      </h3>
+      {open && <div className="section-content">{children}</div>}
+    </div>
+  );
+}
+
 }

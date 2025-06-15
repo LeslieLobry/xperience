@@ -117,7 +117,7 @@
   position: absolute;
   top: -6px;
   right: -6px;
-  background: red;
+  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
   color: white;
   border-radius: 50%;
   padding: 2px 7px;
@@ -140,8 +140,8 @@
   right: 0;
   width: 320px;
   max-height: 500px;
-  background: white;
-  color: black;
+   background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
+  color: #e0c084;
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -181,10 +181,6 @@
   font-weight: 500;
 }
 
-.nav-combined-popup a:hover {
-  text-decoration: underline;
-}
-
 .nav-combined-popup small {
   color: #666;
   font-size: 11px;
@@ -222,7 +218,7 @@
   color: #333;
 }
 
-.profil-actions a:hover,
-.profil-actions button:hover {
-  background-color: #f0f0f0;
+
+.btn-dec{
+  color:#e0c084 !important;
 }

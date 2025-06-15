@@ -6,6 +6,8 @@ import Footer from "../components/Footer/Footer"
 import ChatBubble from "../components/ChatBubble/ChatBubble"
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper"
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies"
+import LoaderAnnonce from "../components/LoaderAnnonce/LoaderAnnonce"; 
+
 
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
@@ -22,6 +24,7 @@ export default function RootLayout({ children }) {
       <body className="font-raleway">
         <AuthProvider>
         <ClientWrapper>
+          <LoaderAnnonce />
           <ConditionalNavbar />
           {children}
           <ChatBubble />

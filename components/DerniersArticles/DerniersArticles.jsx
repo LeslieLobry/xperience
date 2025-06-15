@@ -59,6 +59,10 @@ export default function DerniersArticles() {
           </Link>
         ))}
       </div>
+      <Link href="/blog" className="afficher-plus-articles">
+  Afficher plus
+</Link>
+
     </section>
   );
 }

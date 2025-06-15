@@ -5,7 +5,7 @@
 .dernier-articles-title {
   margin-bottom: 1.5rem;
   font-size: 2rem;
-  color: #523f2e;
+  color: #e0c084
 }
 
 .dernier-articles-list {
@@ -17,14 +17,15 @@
 .dernier-article-link {
   text-decoration: none;
   color: inherit;
+  width: 100%;
 }
 
 .dernier-article-card {
-  border: 1px solid #eee;
+  border: 1px solid #e0c084;
   border-radius: 10px;
   padding: 15px;
-  width: 240px;
-  background: #faf7f3;
+  /* width: 240px; */
+  width: 100%;
   transition: box-shadow .2s;
   box-shadow: 0 2px 8px #0001;
   display: flex;
@@ -72,4 +73,7 @@
 .dernier-article-date {
   color: #a08e7a;
   font-size: 0.9rem;
+}
+.afficher-plus-articles{
+  color: #e0c084;
 }

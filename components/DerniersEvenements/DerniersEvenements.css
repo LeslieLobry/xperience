@@ -1,0 +1,65 @@
+.events-title{
+    color: #e0c084;
+}
+derniers-event-contenaire{
+    border: 1px solid #e0c084;
+}.evenements-section {
+  padding: 1rem 0;
+}
+
+.evenements-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.evenement-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0c084;
+  border-radius: 8px;
+  padding: 1rem;
+  text-decoration: none;
+  background-color: rgba(255, 255, 255, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.evenement-card:hover {
+  box-shadow: 0 0 10px rgba(224, 192, 132, 0.3);
+}
+
+.evenement-image-wrapper {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.evenement-no-image {
+  width: 250px;
+  height: 150px;
+  background-color: #2a2a2a;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #999;
+  font-style: italic;
+}
+
+.evenement-infos h3 {
+  margin: 0.2rem 0;
+  color: #f5ece0;
+}
+
+.evenement-infos small {
+  color: #a6a6a6;
+}
+
+.evenement-infos div {
+  color: #e0c084;
+}
+.evenement-infos small {
+  margin: 0.2rem 0;
+  color: #f5ece0;
+}
+.afficher-plus-evenements{
+  color: #e0c084;
+}

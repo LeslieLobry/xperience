@@ -78,6 +78,7 @@ export default function SecuritySection() {
           placeholder="Mot de passe actuel"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
+          className="password-change-input"
         />
         <button onClick={() => toggleVisibility("current")}>👁️</button>
 

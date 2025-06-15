@@ -42,7 +42,7 @@ export default function BlocagesSection() {
 
   return (
     <div className="blocages-section">
-      <h2 style={{ color: "red" }}>Blocages de personnes indésirables</h2>
+      <h2>Blocages de personnes indésirables</h2>
       <p>Qui ai-je bloqué ?</p>
 
       {blocages.length === 0 ? (

@@ -1,0 +1,8 @@
+.blocages-section h2{
+    color: #e0c084;
+}
+.blocages-section{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}

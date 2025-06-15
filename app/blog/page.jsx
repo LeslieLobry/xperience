@@ -58,27 +58,24 @@ export default async function BlogPage() {
         <ul className="blog-list">
           {articles.map((article) => (
             <li key={article.id} className="blog-article">
-              <Link
-                href={`/blog/${article.slug}`}
-                className="blog-article-link"
-              >
-                <h2>{article.titre}</h2>
-                <p>{article.description}</p>
-                <small>
-                  Publié le{" "}
-                  {new Date(article.createdAt).toLocaleDateString("fr-FR")}
-                </small>
-              </Link>
+  <Link href={`/blog/${article.slug}`} className="blog-article-link">
+    <div className="blog-article-content">
+      <h2>{article.titre}</h2>
+      <p>{article.description}</p>
+      <small>
+        Publié le{" "}
+        {new Date(article.createdAt).toLocaleDateString("fr-FR")}
+      </small>
+    </div>
+  </Link>
 
-              {isAdmin && (
-                <div className="admin-actions">
-                  <Link href={`/admin/blog/editer/${article.id}`}>
-                    ✏️ Modifier
-                  </Link>
-                  <DeleteArticleButton articleId={article.id} />
-                </div>
-              )}
-            </li>
+  {isAdmin && (
+    <div className="admin-actions">
+      <Link href={`/admin/blog/editer/${article.id}`}>✏️ Modifier</Link>
+      <DeleteArticleButton articleId={article.id} />
+    </div>
+  )}
+</li>
           ))}
         </ul>
       )}

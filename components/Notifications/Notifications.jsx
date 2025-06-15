@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import "./Notifications.css"
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);

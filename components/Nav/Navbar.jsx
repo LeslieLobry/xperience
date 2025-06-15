@@ -162,7 +162,7 @@ return (
           <Settings size={16} style={{ marginRight: '6px' }} />
           Paramètres
           </Link>
-          <button onClick={handleLogout}>Déconnexion</button>
+          <button onClick={handleLogout} className="btn-dec">Déconnexion</button>
         </div>
       </div>
       )}

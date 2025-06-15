@@ -1,6 +1,6 @@
 .security-section {
   padding: 2rem;
-  background: #f9f9f9;
+  background:transparent;
   border-radius: 8px;
   max-width: 500px;
   margin: auto;
@@ -28,6 +28,7 @@ input[type="text"] {
   padding: 0.6rem;
   border: 1px solid #ccc;
   border-radius: 4px;
+  color: #e0c084;
 }
 
 button {
@@ -38,7 +39,7 @@ button {
 }
 
 .valider {
-  background-color: #ff4d4d;
+  background-color: #e0c084;
   color: white;
   border-radius: 4px;
 }
@@ -52,4 +53,8 @@ button {
 .message {
   color: #d00;
   font-size: 0.9rem;
+}
+.security-section input::placeholder {
+  color: #e0c084;
+  opacity: 1;
 }

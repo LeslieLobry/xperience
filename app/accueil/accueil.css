@@ -32,6 +32,7 @@
   display: grid;
   grid-template-columns: 1fr 2fr 1fr; 
   width: 100%;
+  gap: 16px;
 }
   .profil-list1 {
     display: flex;
@@ -61,11 +62,33 @@
   .profil-list2{
     grid-column: 2;
   }
-  .recherche-sidebar{
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
+ .recherche-sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
   .grid-event{
     grid-column: 3;
     grid-row: 1;
   }
+  .profil-list1-title{
+    color: #e0c084;
+  }
+  .profil-card-title{
+     color: #e0c084;
+  }
+  .profil-card-details{
+    color: #8c6a5d;
+  }
+  .afficher-plus{
+    color: #e0c084;
+  }
+
+@media (max-width: 768px){
+  .grid-accueil{
+  display: flex;
+  flex-direction: column;
+  }
+  
+}

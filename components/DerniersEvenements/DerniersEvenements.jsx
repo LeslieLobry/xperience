@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import "./DerniersEvenements.css";
 
 export default function DerniersEvenements() {
   const [evenements, setEvenements] = useState([]);
@@ -26,33 +27,38 @@ export default function DerniersEvenements() {
   if (!evenements.length) return <p>Aucun événement récent.</p>;
 
   return (
-    <section>
-      <h2>Derniers événements</h2>
-      <div>
+    <section className="evenements-section">
+      <h2 className="events-title">Derniers événements</h2>
+      <div className="evenements-liste">
         {evenements.map((event) => (
           <Link
             href={`/evenements/${event.id}`}
             key={event.id}
+            className="evenement-card"
           >
-            <div>
-              <div>
-                {event.imageUrl ? (
-                  <Image
-                    src={event.imageUrl}
-                    alt={event.titre}
-                    width={250}
-                    height={150}
-                  />
-                ) : (
-                  <div>Pas d'image</div>
-                )}
-              </div>
+            <div className="evenement-image-wrapper">
+              {event.imageUrl ? (
+                <Image
+                  src={event.imageUrl}
+                  alt={event.titre}
+                  width={250}
+                  height={150}
+                />
+              ) : (
+                <div className="evenement-no-image">Pas d'image</div>
+              )}
+            </div>
+            <div className="evenement-infos">
               <h3>{event.titre}</h3>
-              <small>{new Date(event.date).toLocaleDateString()}</small>
+              <small >{new Date(event.date).toLocaleDateString()}</small>
               <div>{event.lieu}</div>
             </div>
           </Link>
         ))}
+        <Link href="/evenements" className="afficher-plus-evenements">
+  Afficher plus
+</Link>
+
       </div>
     </section>
   );
