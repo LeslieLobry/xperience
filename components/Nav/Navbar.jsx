@@ -15,7 +15,7 @@ const navLinks = [
 { label: "Événements", href: "/evenements" },
 { label: "Messagerie", href: "/messagerie" },
 { label: "Blog", href: "/blog" },
-{ label: "À votre service", href: "/partenaire" },
+{ label: "Nos partenaires", href: "/partenaires" },
 ];
 
 export default function Navbar() {

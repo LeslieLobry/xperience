@@ -3,3 +3,43 @@
     border: none;
     cursor: pointer;
 }
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip {
+  visibility: hidden;
+  background-color: #fff;
+  color: #000;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  white-space: nowrap;
+  position: absolute;
+  z-index: 999;
+  bottom: 125%; /* au-dessus de l'élément */
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%; /* flèche en bas du tooltip */
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #fff transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+}

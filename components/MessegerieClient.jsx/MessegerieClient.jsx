@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import ListeConversations from "../ListeConversations/ListeConversations";
 import ChatBox from "../ChatBox/ChatBox";
-
+import "../../app/messagerie/messagerie.css"
 
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();

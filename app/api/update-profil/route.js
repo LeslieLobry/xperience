@@ -25,28 +25,40 @@ export async function POST(req) {
   }
 
   const body = await req.json();
+  console.log("📥 Données reçues :", body);
+
+  // Champs attendus
+  const champs = {
+    localisation: body.localisation,
+    experience: body.experience,
+    rechercheType: body.rechercheType,
+    sexe: body.sexe,
+    age: isNaN(Number(body.age)) ? null : Number(body.age),
+    fumeur: body.fumeur,
+    silhouette: body.silhouette,
+    taille: isNaN(Number(body.taille)) ? null : Number(body.taille),
+    origines: body.origines,
+    yeux: body.yeux,
+    cheveux: body.cheveux,
+  };
+
+  // Supprimer les champs vides ou undefined
+  const data = {};
+  for (const key in champs) {
+    if (champs[key] !== undefined && champs[key] !== "") {
+      data[key] = champs[key];
+    }
+  }
 
   try {
     await prisma.utilisateur.update({
       where: { id: decoded.id },
-      data: {
-        localisation: body.localisation,
-        experience: body.experience,
-        rechercheType: body.rechercheType,
-        sexe: body.sexe,
-        age: Number(body.age),
-        fumeur: body.fumeur,
-        silhouette: body.silhouette,
-        taille: body.taille,
-        origines: body.origines,
-        yeux: body.yeux,
-        cheveux: body.cheveux
-      }
+      data,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Erreur update-profil :", err);
+    console.error("❌ Erreur update-profil :", err);
     return NextResponse.json({ success: false, message: 'Erreur serveur.' }, { status: 500 });
   }
 }

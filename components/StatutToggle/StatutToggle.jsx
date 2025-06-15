@@ -1,12 +1,14 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import "./StatutToggle.css";
 
-export default function StatutToggle({ initialStatut }) {
+export default function StatutToggle({ initialStatut, editable = false }) {
   const [statut, setStatut] = useState(initialStatut);
 
   const toggleStatut = async () => {
+    if (!editable) return;
+
     const newStatut = statut === "en_ligne" ? "hors_ligne" : "en_ligne";
     const res = await fetch("/api/utilisateur/statut", {
       method: "POST",
@@ -21,10 +23,12 @@ export default function StatutToggle({ initialStatut }) {
   };
 
   return (
-    <button className={`statut-button ${statut}`} onClick={toggleStatut}>
-      {statut === "en_ligne"
-        ? "🟢 En ligne"
-        : "⚫ Hors ligne"}
+    <button
+      className={`statut-button ${statut} ${editable ? "" : "disabled"}`}
+      onClick={toggleStatut}
+      title={editable ? "Changer le statut" : "Statut visible uniquement"}
+    >
+      {statut === "en_ligne" ? "🟢 En ligne" : "⚫ Hors ligne"}
     </button>
   );
 }

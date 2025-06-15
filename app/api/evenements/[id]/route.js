@@ -2,9 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import fs from "fs";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { randomUUID } from "crypto"; // ✅ Ajout ici
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
 
 async function getUserFromCookie() {
   const cookieStore = await cookies();
@@ -17,7 +25,7 @@ async function getUserFromCookie() {
   }
 }
 
-// 📘 GET : récupérer un événement (avec participants et créateur)
+// 📘 GET : récupérer un événement
 export async function GET(_req, contextPromise) {
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
@@ -40,19 +48,23 @@ export async function GET(_req, contextPromise) {
   }
 }
 
-// ✏️ PUT : modifier un événement (support FormData pour image)
+// ✏️ PUT : modifier un événement (image S3 supportée)
 export async function PUT(req, contextPromise) {
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
-  const formData = await req.formData();
+  const user = await getUserFromCookie();
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  }
 
-  // On récupère tous les champs attendus
+  const formData = await req.formData();
   const data = {};
+
   for (const key of formData.keys()) {
     data[key] = formData.get(key);
   }
 
-  // Correction date : passage en ISO si besoin
+  // Formatage de la date
   if (data.date) {
     try {
       data.date = new Date(data.date).toISOString();
@@ -61,61 +73,69 @@ export async function PUT(req, contextPromise) {
     }
   }
 
-  // Gestion de l’image (si fournie)
-  if (formData.get("image") && formData.get("image").size > 0) {
-    const image = formData.get("image");
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const filename = `${Date.now()}_${image.name}`;
-    fs.writeFileSync(`public/uploads/${filename}`, buffer);
-    data.imageUrl = `/uploads/${filename}`;
-  }
-  delete data.imageFile;
-
-  // Correction des types (Float)
   const fieldsToFloat = ["tarifCouple", "tarifFemme", "tarifHomme", "latitude", "longitude"];
   fieldsToFloat.forEach((field) => {
-    if (
-      data[field] !== undefined &&
-      data[field] !== null &&
-      data[field] !== "" &&
-      data[field] !== "null"
-    ) {
-      data[field] = parseFloat(data[field]);
+    const value = data[field];
+    if (value !== undefined && value !== null && value !== "" && value !== "null") {
+      data[field] = parseFloat(value);
       if (isNaN(data[field])) data[field] = null;
     } else {
       data[field] = null;
     }
   });
 
-  // Champ string "null" ou "" → null
   ["lien", "imageUrl"].forEach((field) => {
     if (data[field] === "null" || data[field] === "") data[field] = null;
   });
 
-  // Enlève les champs non éditables
-  ["id", "participants", "createur", "createurId"].forEach((field) => {
-    delete data[field];
-  });
+  // Champs non autorisés
+  delete data.id;
+  delete data.participants;
+  delete data.createur;
+  delete data.createurId;
+  delete data.image;
+
+  const image = formData.get("image");
+  if (image && typeof image.name === "string" && image.size > 0) {
+    try {
+      const extension = image.name.split(".").pop();
+      const filename = `evenements/${Date.now()}_${randomUUID()}.${extension}`;
+      const buffer = Buffer.from(await image.arrayBuffer());
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.AWS_S3_BUCKET,
+          Key: filename,
+          Body: buffer,
+          ContentType: image.type,
+        })
+      );
+
+      data.imageUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+    } catch (err) {
+      console.error("Erreur S3 PUT événement :", err);
+      return NextResponse.json({ error: "Erreur lors de l’upload image" }, { status: 500 });
+    }
+  }
 
   try {
-    const evenement = await prisma.evenement.update({
+    const updated = await prisma.evenement.update({
       where: { id },
       data,
     });
-    return NextResponse.json(evenement);
+    return NextResponse.json(updated);
   } catch (err) {
     console.error("Erreur PUT événement :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
-// PATCH : optionnel (pour update partiel via JSON)
+// PATCH : update partiel
 export async function PATCH(req, contextPromise) {
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
   const data = await req.json();
 
-  // Correction date : passage en ISO si besoin
   if (data.date) {
     try {
       data.date = new Date(data.date).toISOString();
@@ -124,15 +144,9 @@ export async function PATCH(req, contextPromise) {
     }
   }
 
-  // Correction des types (Float)
   const fieldsToFloat = ["tarifCouple", "tarifFemme", "tarifHomme", "latitude", "longitude"];
   fieldsToFloat.forEach((field) => {
-    if (
-      data[field] !== undefined &&
-      data[field] !== null &&
-      data[field] !== "" &&
-      data[field] !== "null"
-    ) {
+    if (data[field] !== undefined && data[field] !== null && data[field] !== "" && data[field] !== "null") {
       data[field] = parseFloat(data[field]);
       if (isNaN(data[field])) data[field] = null;
     } else {
@@ -160,7 +174,7 @@ export async function PATCH(req, contextPromise) {
   }
 }
 
-// 🗑️ DELETE : supprimer ou se désinscrire
+// DELETE : désinscription ou suppression
 export async function DELETE(req, contextPromise) {
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
@@ -168,7 +182,6 @@ export async function DELETE(req, contextPromise) {
   const action = req.headers.get("x-action");
 
   if (action === "leave" && user) {
-    // ✅ Se désinscrire
     try {
       await prisma.evenement.update({
         where: { id },
@@ -183,7 +196,6 @@ export async function DELETE(req, contextPromise) {
     }
   }
 
-  // 🗑️ Suppression complète
   try {
     await prisma.evenement.delete({ where: { id } });
     return NextResponse.json({ message: "Événement supprimé" });
@@ -193,7 +205,7 @@ export async function DELETE(req, contextPromise) {
   }
 }
 
-// 📨 POST : inscription à un événement
+// POST : inscription
 export async function POST(_req, contextPromise) {
   const user = await getUserFromCookie();
   if (!user) {
@@ -201,6 +213,7 @@ export async function POST(_req, contextPromise) {
   }
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
+
   try {
     const alreadyRegistered = await prisma.evenement.findFirst({
       where: {
@@ -211,12 +224,14 @@ export async function POST(_req, contextPromise) {
     if (alreadyRegistered) {
       return NextResponse.json({ success: true, message: "Déjà inscrit" });
     }
+
     await prisma.evenement.update({
       where: { id },
       data: {
         participants: { connect: { id: user.id } },
       },
     });
+
     return NextResponse.json({ success: true, message: "Inscription enregistrée" });
   } catch (err) {
     console.error("Erreur inscription événement :", err);

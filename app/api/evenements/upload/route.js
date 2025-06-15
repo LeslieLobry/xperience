@@ -1,33 +1,61 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import path from 'path';
-import fs from 'fs/promises';
-import sharp from 'sharp';
-import { getUserFromToken } from "../../../../lib/auth"
+import { getUserFromToken } from "../../../../lib/auth";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import sharp from "sharp";
+import { randomUUID } from "crypto";
+
+// Config AWS
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+const BUCKET = process.env.AWS_S3_BUCKET;
+
 export async function POST(req) {
   const cookieStore = cookies();
-  const user = getUserFromToken(cookieStore);
+  const user = await getUserFromToken(cookieStore);
 
-  if (!user || user.role !== 'ADMIN') {
-    return NextResponse.json({ success: false, message: 'Non autorisé' }, { status: 401 });
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
   }
 
   const formData = await req.formData();
-  const file = formData.get('image');
+  const file = formData.get("image");
 
-  if (!file || typeof file === 'string') {
-    return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
+  if (!file || typeof file === "string") {
+    return NextResponse.json({ success: false, message: "Fichier invalide" }, { status: 400 });
   }
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-  const filename = `event_${Date.now()}.webp`;
-  const filepath = path.join(process.cwd(), 'public/uploads', filename);
+    // Compression avec sharp en webp
+    const webpBuffer = await sharp(buffer)
+      .resize(800)
+      .webp({ quality: 80 })
+      .toBuffer();
 
-  await fs.mkdir(path.dirname(filepath), { recursive: true });
-  await sharp(buffer).resize(800).webp({ quality: 80 }).toFile(filepath);
+    const fileName = `evenements/${randomUUID()}.webp`;
 
-  const imageUrl = `/uploads/${filename}`;
-  return NextResponse.json({ success: true, imageUrl });
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: fileName,
+        Body: webpBuffer,
+        ContentType: "image/webp",
+      })
+    );
+
+    const imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+    return NextResponse.json({ success: true, imageUrl });
+
+  } catch (err) {
+    console.error("Erreur upload S3 :", err);
+    return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
+  }
 }

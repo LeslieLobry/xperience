@@ -55,15 +55,22 @@ export default function BoutonLike({ cibleId }) {
     }
   };
 
-  return (
+return (
   <button onClick={toggleLike} disabled={loading} className="btn-like">
+  <div className="tooltip-container">
     <img
-      src={hasLiked ? "/images/coeurnon.svg":"/images/coeur.svg"  }
-      alt={hasLiked ? "" : ""}
-      style={{ width: "46px", height: "46px",}}
+      src={hasLiked ? "/images/coeurnon.svg" : "/images/coeur.svg"}
+      alt={hasLiked ? "Je n'aime plus" : "J'aime"}
+      className="btn-like-icon"
+      style={{ width: "46px", height: "46px" }}
     />
-    {hasLiked ? "" : ""}
-  </button>
+    <span className="tooltip">
+      {hasLiked ? "Je n'aime plus" : "J'aime"}
+    </span>
+  </div>
+</button>
+
 );
+
 
 }

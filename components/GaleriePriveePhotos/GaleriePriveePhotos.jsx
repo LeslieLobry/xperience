@@ -88,18 +88,19 @@ useEffect(() => {
     return <div>Votre demande d'accès est en attente de validation.</div>;
   }
 
-  if (!editable && accessStatus === 'denied') {
-    return (
-      <div>
-        <p>Cette galerie est privée. Vous devez en faire la demande pour y accéder.</p>
-        <button onClick={handleDemandeAcces}>Demander accès</button>
-      </div>
-    );
-  }
+if (!editable && (accessStatus === 'denied' || accessStatus === null)) {
+  return (
+    <div>
+      <p>Cette galerie est privée. Vous devez en faire la demande pour y accéder.</p>
+      <button onClick={handleDemandeAcces}>Demander accès</button>
+    </div>
+  );
+}
 
-  if (!editable && accessStatus !== 'granted') {
-    return <div>Accès non autorisé.</div>;
-  }
+if (!editable && accessStatus !== 'granted') {
+  return <div>Accès non autorisé.</div>;
+}
+
 
   const emptySlots = MAX_PHOTOS - photoList.length;
 

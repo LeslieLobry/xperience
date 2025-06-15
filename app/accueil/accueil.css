@@ -28,10 +28,18 @@
     opacity: 0.3; 
     z-index: -1; 
 } 
-  .profil-list {
+.grid-accueil{
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr; 
+  width: 100%;
+}
+  .profil-list1 {
     display: flex;
+    flex-direction: column;
     flex-wrap: wrap;
     gap: 20px;
+    grid-column: 2;
+    grid-row: 1;
   }
   
   .profil-card {
@@ -50,4 +58,14 @@
     object-fit: cover;
     border-radius: 8px;
   }
-  
+  .profil-list2{
+    grid-column: 2;
+  }
+  .recherche-sidebar{
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .grid-event{
+    grid-column: 3;
+    grid-row: 2;
+  }

@@ -13,110 +13,101 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function AccueilPage() {
-  const cookieStore = cookies();
-  const token = cookieStore.get("token")?.value;
+const cookieStore = cookies();
+const token = cookieStore.get("token")?.value;
 
-  if (!token) return redirect("/connexion");
+if (!token) return redirect("/connexion");
 
-  let decoded;
-  try {
-    decoded = jwt.verify(token, secret);
-  } catch {
-    return redirect("/connexion");
-  }
+let decoded;
+try {
+decoded = jwt.verify(token, secret);
+} catch {
+return redirect("/connexion");
+}
 
-  // 🔒 Récupère les utilisateurs exclus (bloqués ou bloquants)
-  let exclus = [];
-  try {
-    exclus = await getIdsUtilisateursExclus(decoded.id);
-  } catch (err) {
-    console.error("Erreur lors de la récupération des exclus :", err);
-  }
+// 🔒 Récupère les utilisateurs exclus (bloqués ou bloquants)
+let exclus = [];
+try {
+exclus = await getIdsUtilisateursExclus(decoded.id);
+} catch (err) {
+console.error("Erreur lors de la récupération des exclus :", err);
+}
 
-  const whereCommun = {
-    NOT: {
-      id: {
-        in: [...exclus, decoded.id],
-      },
-    },
-  };
+const whereCommun = {
+NOT: {
+id: {
+in: [...exclus, decoded.id],
+},
+},
+};
 
-  const profilsEnLigne = await prisma.utilisateur.findMany({
-    where: {
-      ...whereCommun,
-      statut: "en_ligne",
-    },
-    select: {
-      id: true,
-      pseudo: true,
-      photoUrl: true,
-      age: true,
-      localisation: true,
-    },
-  });
+const profilsEnLigne = await prisma.utilisateur.findMany({
+where: {
+...whereCommun,
+statut: "en_ligne",
+},
+select: {
+id: true,
+pseudo: true,
+photoUrl: true,
+age: true,
+localisation: true,
+},
+});
 
-  const tousLesProfils = await prisma.utilisateur.findMany({
-    where: whereCommun,
-    select: {
-      id: true,
-      pseudo: true,
-      photoUrl: true,
-      age: true,
-      localisation: true,
-    },
-  });
+const tousLesProfils = await prisma.utilisateur.findMany({
+where: whereCommun,
+select: {
+id: true,
+pseudo: true,
+photoUrl: true,
+age: true,
+localisation: true,
+},
+});
 
-  return (
-    <div className="accueil-page">
+return (
+<div className="accueil-page">
+  <div className="grid-accueil">
+
+    <div className="profil-list1">
       <h1>Profils en ligne</h1>
-      <div className="profil-list">
-        {profilsEnLigne.map((user) => (
-          <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
-            <div className="profil-card">
-              <img
-  src={
-    user.photoUrl
-      ? user.photoUrl.startsWith("http")
-        ? user.photoUrl
-        : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
-      : "/default.jpg"
-  }
-  alt={user.pseudo}
-  className="profil-photo"
-/>
-              <h2>{user.pseudo}</h2>
-              <p>{user.age} ans - {user.localisation}</p>
-            </div>
-          </Link>
-        ))}
+      {profilsEnLigne.map((user) => (
+      <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
+      <div className="profil-card">
+        <img src={ user.photoUrl ? user.photoUrl.startsWith("http") ? user.photoUrl :
+          `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "" )}` : "/default.jpg" } alt={user.pseudo}
+          className="profil-photo" />
+        <h2>{user.pseudo}</h2>
+        <p>{user.age} ans - {user.localisation}</p>
       </div>
+      </Link>
+      ))}
+    </div>
 
+    <div className="profil-list2">
       <h1>Tous les profils</h1>
-      <div className="profil-list">
-        {tousLesProfils.map((user) => (
-          <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
-            <div className="profil-card">
-              <img
-  src={
-    user.photoUrl
-      ? user.photoUrl.startsWith("http")
-        ? user.photoUrl
-        : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
-      : "/default.jpg"
-  }
-  alt={user.pseudo}
-  className="profil-photo"
-/>
-              <h2>{user.pseudo}</h2>
-              <p>{user.age} ans - {user.localisation}</p>
-            </div>
-          </Link>
-        ))}
+      {tousLesProfils.map((user) => (
+      <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
+      <div className="profil-card">
+        <img src={ user.photoUrl ? user.photoUrl.startsWith("http") ? user.photoUrl :
+          `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "" )}` : "/default.jpg" } alt={user.pseudo}
+          className="profil-photo" />
+        <h2>{user.pseudo}</h2>
+        <p>{user.age} ans - {user.localisation}</p>
       </div>
-
+      </Link>
+      ))}
+    </div>
+    <div className="grid-articles">
       <DerniersArticles />
-      <RechercheWrapper />
+    </div>
+    <RechercheWrapper />
+    <div className="grid-event">
       <DerniersEvenements />
     </div>
-  );
+
+  </div>
+</div>
+);
 }

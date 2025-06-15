@@ -1,8 +1,11 @@
 'use client';
-import "../AProposCard/AProposCard.css"
+import "../AProposCard/AProposCard.css";
+
 export default function AProposCard({ createdAt, lastLogin }) {
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
+    if (!dateString) return "Non disponible";
+    const date = new Date(dateString);
+    return isNaN(date) ? "Date invalide" : date.toLocaleDateString("fr-FR");
   };
 
   return (

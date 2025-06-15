@@ -1,7 +1,17 @@
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+
+// S3 configuration
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const BUCKET = process.env.AWS_S3_BUCKET;
 
 export async function POST(req) {
   const formData = await req.formData();
@@ -13,18 +23,24 @@ export async function POST(req) {
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  const fileName = `${randomUUID()}-${file.name}`;
-  const uploadDir = join(process.cwd(), "public", "uploads", "articles");
+  const ext = file.name.split(".").pop();
+  const fileName = `articles/${randomUUID()}.${ext}`;
 
   try {
-    await mkdir(uploadDir, { recursive: true }); // au cas où le dossier n’existe pas encore
-    const filePath = join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: fileName,
+        Body: buffer,
+        ContentType: file.type,
+        ACL: "public-read", // ou private si accès restreint
+      })
+    );
 
-    const imageUrl = `/uploads/articles/${fileName}`;
+    const imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
     return NextResponse.json({ success: true, imageUrl });
   } catch (error) {
-    console.error("Erreur upload:", error);
-    return NextResponse.json({ success: false, message: "Erreur lors de l’upload." }, { status: 500 });
+    console.error("Erreur upload S3:", error);
+    return NextResponse.json({ success: false, message: "Erreur S3." }, { status: 500 });
   }
 }

@@ -55,14 +55,19 @@ export default function MenuProfilActions({ cibleId }) {
 
   return (
     <div className="profil-menu">
-      <button className="menu-button" onClick={() => setOpen((o) => !o)}>
-        <Image
-          src="/images/warning.svg"
-          alt="signaler"
-          width={46}
-          height={46}
-        />
-      </button>
+     <button className="menu-button" onClick={() => setOpen((o) => !o)}>
+  <div className="tooltip-container">
+    <Image
+      src="/images/warning.svg"
+      alt="signaler"
+      width={46}
+      height={46}
+    />
+    <span className="tooltip">{open ? "Fermer le menu" : "Signaler ou bloquer"}</span>
+  </div>
+</button>
+
+
 
       {open && (
         <div className="menu-dropdown">

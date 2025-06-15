@@ -1,13 +1,10 @@
 import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function POST(req) {
+export async function POST(req, { params }) {
   try {
-    const url = new URL(req.url);
-    const utilisateurId = parseInt(url.pathname.split("/")[3]); // récupère l'ID de l'URL
-
+    const utilisateurId = parseInt(params.id, 10);
     const { visiteurId } = await req.json();
-    console.log("🔍 Reçu :", { visiteurId, utilisateurId });
 
     if (!utilisateurId || !visiteurId) {
       return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
@@ -42,13 +39,14 @@ export async function POST(req) {
         statut: "EN_ATTENTE",
       },
     });
-await prisma.notification.create({
-  data: {
-    utilisateurId: utilisateurId, // le propriétaire
-    message: `Nouvelle demande d'accès à votre galerie privée`,
-    lien: `/profil/${visiteurId}`,
-  },
-});
+
+    await prisma.notification.create({
+      data: {
+        utilisateurId,
+        message: "Nouvelle demande d'accès à votre galerie privée",
+        lien: `/profil/${visiteurId}`,
+      },
+    });
 
     return NextResponse.json(demande);
   } catch (error) {
