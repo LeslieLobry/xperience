@@ -1,0 +1,35 @@
+.verif-identite-container {
+  max-width: 600px;
+  margin: 3rem auto;
+  padding: 2rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #fefefe;
+  text-align: center;
+}
+
+.verif-identite-container h1 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.verif-identite-container p {
+  font-size: 16px;
+  margin-bottom: 2rem;
+  color: #555;
+}
+
+.verif-identite-container button {
+  padding: 0.8rem 1.5rem;
+  font-size: 16px;
+  background-color: #6772e5;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.verif-identite-container button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -94,6 +94,8 @@ model Utilisateur {
   recherches      Recherche[]
   envies          Envie[]
   photos          Photo[]
+  verificationIdentite   Boolean   @default(false)
+  verificationDeadline   DateTime? // Date limite à laquelle l'utilisateur doit avoir terminé la vérification
 }
 
 model GaleriePrivee {

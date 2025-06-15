@@ -8,6 +8,8 @@ import Link from "next/link";
 import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
 import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
+import RappelVerification from "../../components/RappelVerification/RappelVerification";
+
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -24,6 +26,15 @@ export default async function AccueilPage() {
   } catch {
     return redirect("/connexion");
   }
+  const user = await prisma.utilisateur.findUnique({
+  where: { id: decoded.id },
+  select: {
+    id: true,
+    verificationIdentite: true,
+    verificationDeadline: true,
+  },
+});
+
 
   // 🔒 Récupère les utilisateurs exclus (bloqués ou bloquants)
   let exclus = [];
@@ -70,6 +81,10 @@ export default async function AccueilPage() {
 
   return (
     <div className="accueil-page">
+      {!user.verificationIdentite && user.verificationDeadline && (
+  <RappelVerification deadline={user.verificationDeadline} />
+)}
+
       <div className="grid-accueil">
 
         <div className="profil-list1">
