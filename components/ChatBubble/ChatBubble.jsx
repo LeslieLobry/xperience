@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { io } from "socket.io-client";
+import { Realtime } from "ably";
 import { useRouter } from "next/navigation";
 import "./ChatBubble.css";
 import Image from "next/image";
 import masque from "../../public/masque.png";
+
+const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
 export default function ChatBubble() {
   const { user } = useAuth();
@@ -14,7 +16,6 @@ export default function ChatBubble() {
   const [unreadPrivate, setUnreadPrivate] = useState(0);
   const [unreadGlobal, setUnreadGlobal] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
-  const [socket, setSocket] = useState(null);
   const router = useRouter();
 
   const sonGlobal = useRef(null);
@@ -41,56 +42,34 @@ export default function ChatBubble() {
   };
 
   useEffect(() => {
-    if (!user || socket) return;
+    if (!user) return;
 
-    const newSocket = io("http://localhost:4000");
-    setSocket(newSocket);
-    console.log("🔌 Socket connecté");
-
-    return () => {
-      newSocket.disconnect();
-      console.log("❌ Socket déconnecté");
-    };
-  }, [user, socket]);
-
-  useEffect(() => {
     fetchUnreadCounts();
-  }, [user?.id]);
 
-  useEffect(() => {
-    if (!user || !socket) return;
-
-    socket.on("notification", () => {
-      fetchUnreadCounts();
-      sonPrive.current?.play().catch(() => {});
-    });
-
-    socket.on("refresh_unread", ({ userId }) => {
-      if (userId === user.id) {
-        fetchUnreadCounts();
-        sonPrive.current?.play().catch(() => {});
-      }
-    });
-
-    socket.on("receive_global_message", (msg) => {
-      if (msg.auteurId !== user.id) {
-        fetchUnreadCounts();
+    const globalChannel = ably.channels.get("global");
+    globalChannel.subscribe("message", (msg) => {
+      if (msg.data.auteurId !== user.id) {
         sonGlobal.current?.play().catch(() => {});
+        fetchUnreadCounts();
       }
+    });
+
+    const privateChannel = ably.channels.get(`notification-${user.id}`);
+    privateChannel.subscribe("message", () => {
+      sonPrive.current?.play().catch(() => {});
+      fetchUnreadCounts();
     });
 
     return () => {
-      socket.off("notification");
-      socket.off("refresh_unread");
-      socket.off("receive_global_message");
+      globalChannel.unsubscribe();
+      privateChannel.unsubscribe();
     };
-  }, [user, socket]);
+  }, [user?.id]);
 
   if (!user) return null;
 
   const handleToggleMenu = () => {
     setShowMenu(!showMenu);
-    console.log("🟡 Toggle menu", !showMenu);
   };
 
   const goToGlobalChat = () => {
@@ -107,7 +86,7 @@ export default function ChatBubble() {
     <div className="chat-bubble-wrapper">
       <audio ref={sonGlobal} src="/sounds/message-global.mp3" />
       <audio ref={sonPrive} src="/sounds/message-prive.mp3" />
-      
+
       <div className="chat-bubble-container" onClick={handleToggleMenu}>
         <Image
           src={masque}

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
-import { Room } from 'livekit-client';
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import "./ChatBox.css";
+import { Room, createLocalTracks } from "livekit-client";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
@@ -95,34 +95,85 @@ export default function ChatBox({ conversationId, utilisateur }) {
     setImageFile(null);
   };
 
-  const startCall = async (video = false) => {
+
+const startCall = async (video = false) => {
+  try {
+    console.log("🔄 Démarrage de l'appel...", { video });
+
     const res = await fetch("/api/livekit-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: utilisateur.pseudo, room: conversationId }),
+      body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
     });
+
     const { token } = await res.json();
 
-    const newRoom = new Room();
-    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token, {
-      video,
+    if (!token) {
+      console.error("❌ Token manquant !");
+      return;
+    }
+
+    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+    if (!livekitUrl || !livekitUrl.startsWith("wss://")) {
+      console.error("❌ LIVEKIT_URL invalide :", livekitUrl);
+      return;
+    }
+
+    console.log("✅ Token reçu. Connexion à LiveKit avec URL :", livekitUrl);
+
+    const tracks = await createLocalTracks({
       audio: true,
+      video: video, // false si appel audio seulement
     });
 
+    console.log("🎥 Tracks créés :", tracks);
+
+    const newRoom = new Room();
+    await newRoom.connect(livekitUrl, token, {
+      tracks, // ✅ Très important : on passe les tracks ici
+    });
+
+    console.log("✅ Connexion LiveKit réussie !");
+
+    // Active le micro et la caméra s'ils ne le sont pas déjà
+    await newRoom.localParticipant.setMicrophoneEnabled(true);
+    if (video) {
+      await newRoom.localParticipant.setCameraEnabled(true);
+    }
+
     newRoom.on("trackSubscribed", (track, publication, participant) => {
+      console.log("📹 Track distant abonné :", track.kind);
       if (track.kind === "video") {
         track.attach(remoteVideoRef.current);
       }
     });
 
-    newRoom.localParticipant.videoTracks.forEach((pub) => {
-      pub.track.attach(localVideoRef.current);
-    });
+    // ✅ Attache le flux local à la caméra locale
+    setTimeout(() => {
+  const videoTracksMap = newRoom?.localParticipant?.videoTracks;
+if (videoTracksMap && videoTracksMap.size > 0) {
+  const trackPublication = [...videoTracksMap.values()][0];
+  if (trackPublication?.track) {
+    trackPublication.track.attach(localVideoRef.current);
+  }
+}
+    const trackPublication = [...videoTracksMap.values()][0];
+
+      if (trackPublication?.track) {
+        console.log("📷 Attachement du flux local !");
+        trackPublication.track.attach(localVideoRef.current);
+      } else {
+        console.warn("⚠️ Track publication sans track.");
+      }
+    }, 1000);
 
     setRoom(newRoom);
     setInCall(true);
-  };
-
+  } catch (err) {
+    console.error("❌ Erreur lors de la connexion à LiveKit :", err);
+  }
+};
   const hangupCall = () => {
     room?.disconnect();
     setRoom(null);

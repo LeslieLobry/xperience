@@ -120,3 +120,15 @@ flex-basis: 20%;
   display: flex;
   flex-basis: 20%;
 }
+.chat-actions button {
+  background: none;
+  border: none;
+  color: #e0c084;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+}
+
+.chat-actions button:hover {
+  opacity: 0.8;
+}

@@ -7,7 +7,7 @@ import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 // POST /api/conversations
 export async function POST(req) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const currentUser = await getUserFromToken(cookieStore);
 
     if (!currentUser) {
@@ -40,9 +40,7 @@ export async function POST(req) {
     const conversationsPotentielles = await prisma.conversation.findMany({
       where: {
         participants: {
-          some: {
-            utilisateurId: currentUser.id,
-          },
+          some: { utilisateurId: currentUser.id },
         },
       },
       include: {
@@ -60,7 +58,7 @@ export async function POST(req) {
       return NextResponse.json({ conversation: existingConversation, existed: true });
     }
 
-    // Crée la nouvelle conversation
+    // Crée une nouvelle conversation
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
@@ -95,9 +93,7 @@ export async function GET(req) {
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
-          some: {
-            utilisateurId: userId,
-          },
+          some: { utilisateurId: userId },
         },
       },
       include: {
@@ -107,9 +103,7 @@ export async function GET(req) {
           take: 1,
         },
       },
-      orderBy: {
-        updatedAt: "desc",
-      },
+      orderBy: { updatedAt: "desc" },
     });
 
     const filtrées = conversations.filter((conv) =>

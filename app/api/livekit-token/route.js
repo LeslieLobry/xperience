@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 
@@ -10,7 +9,11 @@ export async function POST(req) {
   }
 
   const apiKey = process.env.NEXT_PUBLIC_LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const apiSecret = process.env.NEXT_PUBLIC_LIVEKIT_API_SECRET;
+
+  if (!apiKey || !apiSecret) {
+    return NextResponse.json({ error: 'Clé API ou secret manquant' }, { status: 500 });
+  }
 
   const at = new AccessToken(apiKey, apiSecret, {
     identity,
