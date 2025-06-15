@@ -33,7 +33,6 @@ export async function POST(req) {
         Key: fileName,
         Body: buffer,
         ContentType: file.type,
-        ACL: "public-read", // ou private si accès restreint
       })
     );
 
