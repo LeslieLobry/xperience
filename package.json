@@ -11,11 +11,13 @@
     "create-users": "node scripts/create-users.js"
   },
   "dependencies": {
+    "@ably/chat": "^0.8.0",
     "@aws-sdk/client-s3": "^3.828.0",
     "@aws-sdk/s3-request-presigner": "^3.828.0",
     "@prisma/client": "^6.6.0",
     "@stripe/stripe-js": "^7.3.1",
     "@tailwindcss/postcss": "^4.0.14",
+    "ably": "^2.9.0",
     "adm-zip": "^0.5.16",
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
@@ -24,6 +26,7 @@
     "formidable": "^3.5.2",
     "framer-motion": "^12.5.0",
     "jsonwebtoken": "^9.0.2",
+    "livekit-client": "^2.13.4",
     "lucide-react": "^0.507.0",
     "micro": "^10.0.1",
     "next": "15.2.3",

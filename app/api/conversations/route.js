@@ -25,24 +25,23 @@ export async function POST(req) {
       return NextResponse.json({ error: "Tu dois faire partie des participants." }, { status: 403 });
     }
 
-    // Vérifie les utilisateurs exclus (bloqués ou bloquants)
+    // Vérifie les utilisateurs exclus
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = participantIds.filter((id) => id !== currentUser.id);
 
-    const estBloque = autres.some((id) => exclus.includes(id));
-    if (estBloque) {
+    if (autres.some((id) => exclus.includes(id))) {
       return NextResponse.json(
         { error: "Impossible de créer une conversation avec un utilisateur bloqué." },
         { status: 403 }
       );
     }
 
-    // Vérifie si une conversation existe déjà
-    const existingConversation = await prisma.conversation.findFirst({
+    // Vérifie si une conversation avec exactement les mêmes participants existe déjà
+    const conversationsPotentielles = await prisma.conversation.findMany({
       where: {
         participants: {
-          every: {
-            utilisateurId: { in: participantIds },
+          some: {
+            utilisateurId: currentUser.id,
           },
         },
       },
@@ -51,11 +50,17 @@ export async function POST(req) {
       },
     });
 
+    const existingConversation = conversationsPotentielles.find((conv) => {
+      const ids = conv.participants.map((p) => p.utilisateurId).sort();
+      const inputIds = [...participantIds].sort();
+      return JSON.stringify(ids) === JSON.stringify(inputIds);
+    });
+
     if (existingConversation) {
       return NextResponse.json({ conversation: existingConversation, existed: true });
     }
 
-    // Crée la conversation
+    // Crée la nouvelle conversation
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
@@ -85,7 +90,6 @@ export async function GET(req) {
       return NextResponse.json({ error: "Paramètre userId requis ou invalide" }, { status: 400 });
     }
 
-    // Filtrer les conversations avec utilisateurs exclus
     const exclus = await getIdsUtilisateursExclus(userId);
 
     const conversations = await prisma.conversation.findMany({
@@ -108,12 +112,11 @@ export async function GET(req) {
       },
     });
 
-    // Filtrer côté serveur pour retirer celles avec utilisateurs exclus
-    const conversationsFiltrees = conversations.filter((conv) =>
+    const filtrées = conversations.filter((conv) =>
       conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    return NextResponse.json({ conversations: conversationsFiltrees });
+    return NextResponse.json({ conversations: filtrées });
   } catch (err) {
     console.error("❌ Erreur GET /api/conversations :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

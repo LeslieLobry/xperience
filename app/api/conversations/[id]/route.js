@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
 import { isBlockedBetween } from "../../../../lib/utilsFiltrage";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// ✅ Fonction corrigée pour extraire l'utilisateur depuis le cookie
 async function getUserFromToken() {
-  const token = cookies().get("token")?.value;
+  const headerList = await headers();
+  const cookieHeader = headerList.get("cookie") || "";
+  const tokenMatch = cookieHeader.match(/token=([^;]+)/);
+  const token = tokenMatch?.[1];
+
   if (!token || !JWT_SECRET) return null;
 
   try {
@@ -18,14 +23,18 @@ async function getUserFromToken() {
   }
 }
 
-export async function GET(req, { params }) {
+export async function GET(req, context) {
   const decoded = await getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(params.id, 10);
+  const conversationId = parseInt(context.params.id, 10); // ✅ Utilisation correcte
+
+  if (!conversationId || isNaN(conversationId)) {
+    return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
+  }
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -53,7 +62,7 @@ export async function GET(req, { params }) {
     .find((u) => u.id !== userId);
 
   if (!interlocuteur) {
-    return NextResponse.json({ error: "Aucun interlocuteur trouvé" }, { status: 400 });
+    return NextResponse.json({ error: "Aucun autre participant trouvé" }, { status: 400 });
   }
 
   const estBloque = await isBlockedBetween(userId, interlocuteur.id);
@@ -76,14 +85,15 @@ export async function GET(req, { params }) {
   });
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(req, context) {
   const decoded = await getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(params.id, 10);
+  const conversationId = parseInt(context.params.id, 10); // ✅ Utilisation correcte
+
   if (!conversationId || isNaN(conversationId)) {
     return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
   }
@@ -124,13 +134,8 @@ export async function DELETE(req, { params }) {
     const tousOntSupprimé = updatedParticipants.every((p) => p.supprimé);
 
     if (tousOntSupprimé) {
-      // 3. Supprimer les messages
       await prisma.message.deleteMany({ where: { conversationId } });
-
-      // 4. Supprimer les participants
       await prisma.participant.deleteMany({ where: { conversationId } });
-
-      // 5. Supprimer la conversation
       await prisma.conversation.delete({ where: { id: conversationId } });
 
       return NextResponse.json({
