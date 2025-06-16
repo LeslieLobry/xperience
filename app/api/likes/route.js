@@ -40,7 +40,7 @@ export async function POST(req) {
     await prisma.notification.create({
       data: {
         utilisateurId: Number(cibleId), // destinataire de la notif = cible du like
-        message: `${user.pseudo} a aimé votre profil`,
+        message: `${user.pseudo} veut vivre une x-periences avec vous  `,
         lien: `/profil/${user.id}`, // lien vers le profil de celui qui like
         lu: false,
       },

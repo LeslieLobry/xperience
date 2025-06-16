@@ -289,3 +289,15 @@ model Notification {
 
   utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
 }
+model AbonneNewsletter {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Newsletter {
+  id        Int      @id @default(autoincrement())
+  titre     String
+  contenu   String   // HTML ou texte
+  createdAt DateTime @default(now())
+}

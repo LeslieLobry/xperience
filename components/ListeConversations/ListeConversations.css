@@ -1,44 +1,69 @@
 .liste-conversations {
   display: flex;
   flex-direction: column;
-  width: 30%;
+  width: 100%;
+  max-width: 350px;
   border-right: 1px solid #e0c084;
   overflow-y: auto;
-  gap: 16px;
-  padding: 8px;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: transparent;
+  box-shadow: inset -2px 0 6px rgba(224, 192, 132, 0.05);
+}
+
+.conversation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #e0c084;
+  font-size: 2.2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.new-conv-button {
+  background-color: transparent;
+  border: 1px solid #e0c084;
+  color: #e0c084;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.new-conv-button:hover {
+  background-color: #e0c084;
+  color: #0d0f2a;
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
-  gap: 8px;
-  border-radius: 16px;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  transition: background-color 0.2s ease;
+  background-color: #2c3e50;
+  border: 1px solid transparent;
 }
-.conversation-item:hover{
-  background-color: #a2b9c1;
+
+.conversation-item:hover {
+  background-color: #2c3e50;
 }
-.conversation-item.active{
-  border: 1px solid #e0c084;
+
+.conversation-item.active {
   background-color: #e0c084;
-  color: white;
- 
+  color: #0d0f2a;
+  border-color: #e0c084;
 }
 
 .conversation-clickable {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.8rem;
   flex: 1;
   cursor: pointer;
-}
-
-.conv-avatar img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
 }
 
 .conv-info {
@@ -46,12 +71,23 @@
 }
 
 .conv-pseudo {
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 1rem;
+  color: inherit;
 }
 
 .conv-apercu {
-  font-size: 0.9rem;
-  color: #666;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+/* Avatar (si activé plus tard) */
+.conv-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e0c084;
 }
 
 /* Bouton suppression */
@@ -62,26 +98,28 @@
   font-size: 18px;
   cursor: pointer;
   padding: 4px;
+  transition: color 0.2s;
 }
 
 .delete-conv-button:hover {
-  color: darkred;
+  color: #a1261e;
 }
 
 /* Message si aucune conversation */
 .no-conversation-message {
   text-align: center;
   padding: 2rem 1rem;
-  color: #f5ece0;
-  font-size: 16px;
+  color: #e0c084;
+  font-size: 1rem;
 }
 
 .start-search-link {
   display: inline-block;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   color: #e0c084;
   text-decoration: none;
   font-weight: 500;
+  transition: text-decoration 0.2s ease;
 }
 
 .start-search-link:hover {

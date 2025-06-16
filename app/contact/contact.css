@@ -1,0 +1,74 @@
+.contact-page {
+  position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 2rem;
+    box-sizing: border-box;
+    z-index: 1; 
+    overflow: hidden; 
+    color:#f5ece0;
+    gap: 25px;
+}
+
+.contact-page::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('../Assets/skin.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3; 
+    z-index: -1; 
+}
+.contact-page h1 {
+  text-align: center;
+  color: #e0c084;
+  margin-bottom: 1.5rem;
+}
+
+.contact-page form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.contact-page input,
+.contact-page textarea {
+  padding: 0.8rem 1rem;
+  border: 1px solid #e0c084;
+  border-radius: 8px;
+  font-size: 1rem;
+  background-color: #12172a;
+  color: #fff;
+  resize: none;
+}
+
+.contact-page button {
+  background-color: #e0c084;
+  color: #0d0f2a;
+  border: none;
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.contact-page button:hover {
+  background-color: #f0d8a0;
+}
+
+.contact-page .success {
+  color: #67d672;
+  text-align: center;
+}
+
+.contact-page .error {
+  color: #ff5a5f;
+  text-align: center;
+}

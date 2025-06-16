@@ -147,7 +147,6 @@ if (!user.verificationIdentite && user.verificationDeadline && new Date() > new 
         <div className="grid-event">
           <DerniersEvenements />
         </div>
-
       </div>
     </div>
   );

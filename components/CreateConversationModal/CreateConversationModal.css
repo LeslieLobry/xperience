@@ -1,8 +1,67 @@
-.select-utilisateurs {
-  margin-bottom: 1rem;
-  color: black;
+.modal-conversation {
+  background-color: #0d0f2a;
+  border-radius: 12px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 450px;
+  margin: auto;
+  color: #f8f8f8;
+  box-shadow: 0 0 20px rgba(224, 192, 132, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
+
+.modal-conversation h3 {
+  font-size: 2.5rem !important;
+  color: #e0c084;
+  margin-bottom: 1rem;
+  text-align: center;
+
+}
+
+.select-utilisateurs {
+  color: #000;
+}
+
+.select-utilisateurs .react-select__control {
+  border-radius: 6px;
+  border: 1px solid #e0c084;
+}
+
+.select-utilisateurs .react-select__menu {
+  z-index: 100;
+}
+
 .modal-conversation .erreur {
   color: #ff4444;
-  margin-bottom: 1rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.modal-conversation button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: #e0c084;
+  color: #0d0f2a;
+  transition: background-color 0.2s ease;
+  margin-right: 0.5rem;
+}
+
+.modal-conversation button:hover {
+  background-color: #f0d8a0;
+}
+
+.modal-conversation .annuler {
+  background-color: transparent;
+  border: 1px solid #e0c084;
+  color: #e0c084;
+}
+
+.modal-conversation .annuler:hover {
+  background-color: rgba(224, 192, 132, 0.1);
 }

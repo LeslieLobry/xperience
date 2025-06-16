@@ -226,7 +226,11 @@
   right: 10px;
   z-index: 1000;
 }
-
+.emoji-btn{
+      border: none;
+    background-color: transparent;
+    font-size: 25px;
+}
 /* ----- Typing Indicator ----- */
 .typing-indicator {
   font-size: 0.85rem;

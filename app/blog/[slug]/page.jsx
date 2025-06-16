@@ -39,7 +39,6 @@ export default async function ArticlePage({ params }) {
       <ArticleWrapper articleId={article.id} />
       <h1 className="article-title">{article.titre}</h1>
       <p className="article-meta">
-        Par {article.auteur.pseudo} –{" "}
         {new Date(article.createdAt).toLocaleDateString("fr-FR")} –{" "}
         {article.vues} vues
       </p>
