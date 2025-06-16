@@ -16,7 +16,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [messages, setMessages] = useState([]);
   const [texte, setTexte] = useState("");
   const [imageFile, setImageFile] = useState(null);
-  const [interlocuteur, setInterlocuteur] = useState(null);
+  const [participantsAutres, setParticipantsAutres] = useState([]);
   const [room, setRoom] = useState(null);
   const [inCall, setInCall] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
@@ -90,7 +90,13 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
     fetch(`/api/conversations/${conversationId}`)
       .then((res) => res.json())
-      .then((data) => setInterlocuteur(data.interlocuteur));
+      .then((data) => {
+        const autres = (data.conversation?.participants || []).filter(
+          (p) => p.utilisateurId !== utilisateur.id
+        ).map((p) => p.utilisateur);
+
+        setParticipantsAutres(autres);
+      });
 
     return () => {
       channel.unsubscribe("message", handleMessage);
@@ -224,7 +230,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" loop preload="auto" />
 
       <ChatHeader
-        nom={interlocuteur?.pseudo}
+        nom={
+          Array.isArray(participantsAutres)
+            ? participantsAutres.map((u) => u.pseudo).join(", ")
+            : ""
+        }
         onCallAudio={() => startCall(false)}
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}

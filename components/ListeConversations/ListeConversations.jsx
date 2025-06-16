@@ -3,70 +3,53 @@
 import { useEffect, useState } from "react";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
+import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
 export default function ListeConversations({ userId, onSelectConversation }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
-  // 🔁 Fonction de chargement des conversations
-const fetchConversations = async () => {
-  console.log("🔄 fetchConversations appelé avec userId:", userId);
+  const fetchConversations = async () => {
+    try {
+      const res = await fetch(`/api/conversations?userId=${userId}`);
+      const data = await res.json();
 
-  try {
-    const res = await fetch(`/api/conversations?userId=${userId}`);
-    const data = await res.json();
-    console.log("📥 Réponse brute de /api/conversations :", data);
-    console.log("✅ Conversations reçues :", data.conversations);
+      const visibles = (data.conversations || []).filter((conv) =>
+        conv.participants.some((p) => p.utilisateurId === userId)
+      );
 
-    const visibles = (data.conversations || []).filter((conv) =>
-  conv.participants.some((p) => p.utilisateurId === userId)
-);
-
-
-    console.log("👀 Conversations visibles :", visibles);
-    setConversations(visibles);
-  } catch (err) {
-    console.error("❌ Erreur chargement conversations :", err);
-  }
-};
-
-
-  useEffect(() => {
-  console.log("👤 userId reçu dans ListeConversations :", userId);
-
-  if (!userId) return;
-
-  // 🟡 Ajoutez cet appel direct :
-  fetchConversations();
-
-  console.log("📡 Abonnement Ably au canal notification-" + userId);
-  const channel = ably.channels.get(`notification-${userId}`);
-
-  const handleNewMessage = (msg) => {
-    console.log("📩 Message reçu sur canal :", msg.name, msg.data);
-    if (msg.name === "message" || msg.name === "refresh-conversations") {
-      fetchConversations();
+      setConversations(visibles);
+    } catch (err) {
+      console.error("❌ Erreur chargement conversations :", err);
     }
   };
 
-  channel.subscribe("message", handleNewMessage);
-  channel.subscribe("refresh-conversations", handleNewMessage);
+  useEffect(() => {
+    if (!userId) return;
 
-  return () => {
-    console.log("❌ Désabonnement Ably du canal notification-" + userId);
-    channel.unsubscribe("message", handleNewMessage);
-    channel.unsubscribe("refresh-conversations", handleNewMessage);
-  };
-}, [userId]);
+    fetchConversations();
 
+    const channel = ably.channels.get(`notification-${userId}`);
+
+    const handleNewMessage = () => {
+      fetchConversations();
+    };
+
+    channel.subscribe("message", handleNewMessage);
+    channel.subscribe("refresh-conversations", handleNewMessage);
+
+    return () => {
+      channel.unsubscribe("message", handleNewMessage);
+      channel.unsubscribe("refresh-conversations", handleNewMessage);
+    };
+  }, [userId]);
 
   const handleDelete = async (id) => {
-    const confirmDelete = confirm("Supprimer cette conversation ?");
-    if (!confirmDelete) return;
+    if (!confirm("Supprimer cette conversation ?")) return;
 
-    console.log("🗑️ Suppression de la conversation :", id);
     try {
       const res = await fetch(`/api/conversations/${id}`, {
         method: "DELETE",
@@ -74,13 +57,12 @@ const fetchConversations = async () => {
       });
 
       if (res.ok) {
-        console.log("✅ Conversation supprimée :", id);
         setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (typeof onSelectConversation === "function") {
-          onSelectConversation(null);
-        }
         if (selectedId === id) {
           setSelectedId(null);
+        }
+        if (typeof onSelectConversation === "function") {
+          onSelectConversation(null);
         }
       } else {
         const error = await res.json();
@@ -92,7 +74,6 @@ const fetchConversations = async () => {
   };
 
   const handleSelect = (id) => {
-    console.log("💬 Conversation sélectionnée :", id);
     setSelectedId(id);
     if (typeof onSelectConversation === "function") {
       onSelectConversation(id);
@@ -101,6 +82,13 @@ const fetchConversations = async () => {
 
   return (
     <aside className="liste-conversations">
+      <div className="conversation-header">
+        <h3>Conversations</h3>
+        <button onClick={() => setShowModal(true)} className="new-conv-button">
+          ➕ Nouvelle
+        </button>
+      </div>
+
       {conversations.length === 0 && (
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
@@ -111,22 +99,27 @@ const fetchConversations = async () => {
       )}
 
       {conversations.map((conv) => {
-        const autre = conv.participants.find(
-          (p) => p.utilisateurId !== userId
-        )?.utilisateur;
+        const autres = conv.participants
+          .filter((p) => p.utilisateurId !== userId)
+          .map((p) => p.utilisateur)
+          .filter(Boolean);
 
-        const pseudo = autre?.pseudo || "Utilisateur supprimé";
-        const avatar = autre?.photoUrl || "/default-avatar.png";
+        const pseudo =
+          autres.length === 1
+            ? autres[0].pseudo
+            : autres.map((u) => u.pseudo).join(", ");
+
+        const avatar =
+          autres.length === 1
+            ? autres[0].photoUrl || "/default-avatar.png"
+            : "/group-avatar.png";
 
         return (
           <div
             key={conv.id}
             className={`conversation-item ${selectedId === conv.id ? "active" : ""}`}
           >
-            <div
-              className="conversation-clickable"
-              onClick={() => handleSelect(conv.id)}
-            >
+            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-avatar">
                 <img src={avatar} alt={pseudo} />
               </div>
@@ -144,6 +137,17 @@ const fetchConversations = async () => {
           </div>
         );
       })}
+
+      {showModal && (
+        <CreateConversationModal
+          currentUserId={userId}
+          onClose={() => setShowModal(false)}
+          onCreated={(conv) => {
+            setConversations((prev) => [conv, ...prev]);
+            setShowModal(false);
+          }}
+        />
+      )}
     </aside>
   );
 }

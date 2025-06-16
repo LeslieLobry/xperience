@@ -1,0 +1,8 @@
+.select-utilisateurs {
+  margin-bottom: 1rem;
+  color: black;
+}
+.modal-conversation .erreur {
+  color: #ff4444;
+  margin-bottom: 1rem;
+}

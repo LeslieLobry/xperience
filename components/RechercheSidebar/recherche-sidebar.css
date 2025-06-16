@@ -54,7 +54,9 @@
 .section-toggle {
   cursor: pointer;
   margin-bottom: 0.5rem;
-  font-weight: bold;
+  /* font-weight: bold; */
+  font-weight: normal;
+  font-size: 26px;
 }
 
 .section-content {
