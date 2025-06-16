@@ -18,26 +18,26 @@ const partenaires = [
     type: "Sextoy français",
     lien: "http://puissante.co",
   },
-  {
-    nom: "La tentation",
-    type: "Club libertin",
-    lien: "http://la-tentation.fr",
-  },
-  {
-    nom: "Mi-noi",
-    type: "Club libertin",
-    lien: "http://mi-noi.be",
-  },
-  {
-    nom: "Acanthus Wellness",
-    type: "Club libertin",
-    lien: "https://www.acanthuswellness.be/fr/",
-  },
-  {
-    nom: "Acanthus Club",
-    type: "Club libertin",
-    lien: "https://www.acanthus.be/",
-  },
+  // {
+  //   nom: "La tentation",
+  //   type: "Club libertin",
+  //   lien: "http://la-tentation.fr",
+  // },
+  // {
+  //   nom: "Mi-noi",
+  //   type: "Club libertin",
+  //   lien: "http://mi-noi.be",
+  // },
+  // {
+  //   nom: "Acanthus Wellness",
+  //   type: "Club libertin",
+  //   lien: "https://www.acanthuswellness.be/fr/",
+  // },
+  // {
+  //   nom: "Acanthus Club",
+  //   type: "Club libertin",
+  //   lien: "https://www.acanthus.be/",
+  // },
 ];
 
 export default function PagePartenaires() {

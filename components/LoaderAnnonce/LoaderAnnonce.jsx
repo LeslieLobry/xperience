@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./LoaderAnnonce.css";
 
 export default function LoaderAnnonce() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const contenuRef = useRef(null);
 
   useEffect(() => {
-    const aDejaVu = localStorage.getItem("aVuLoaderAnnonce");
-
-    const maintenant = new Date();
-    const limite = new Date("2024-07-17T00:00:00");
-
-    if (true) {
-      console.log("Loader visible");
-      setVisible(true);
-      localStorage.setItem("aVuLoaderAnnonce", "true");
-
-      setTimeout(() => {
+    const handleClick = (e) => {
+      if (contenuRef.current && !contenuRef.current.contains(e.target)) {
         setVisible(false);
-      }, 3000);
+      }
+    };
+
+    if (visible) {
+      window.addEventListener("click", handleClick);
     }
-  }, []);
+
+    return () => {
+      window.removeEventListener("click", handleClick);
+    };
+  }, [visible]);
 
   if (!visible) return null;
 
   return (
     <div className="loader-annonce">
-      <div className="loader-contenu">
+      <div className="loader-contenu" ref={contenuRef}>
         <p className="fade-in">
           🎉 Jusqu'au <strong>16/07</strong>, l'accès au site est <strong>totalement gratuit</strong> !
         </p>
