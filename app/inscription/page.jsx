@@ -3,7 +3,6 @@ import React, { useState, useRef } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
-import axios from "axios";
 import Select from "react-select";
 import { useRouter } from "next/navigation";
 
@@ -102,63 +101,56 @@ export default function RegisterForm() {
     return true;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSuccess("");
 
-    if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
-    if (!validateStep()) return;
+  if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
+  if (!validateStep()) return;
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const captchaRes = await fetch("/api/verify-recaptcha", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ captchaToken }),
-      });
-      const captchaData = await captchaRes.json();
-      if (!captchaData.success)
-        return setError("Vérification reCAPTCHA échouée. Veuillez réessayer.");
+    const formData = new FormData();
 
-      const formData = new FormData();
-      Object.entries(form).forEach(([key, value]) => {
-  if (Array.isArray(value)) {
-    value.forEach((v) => formData.append(`${key}[]`, v));
-  } else if (typeof value === "boolean") {
-    formData.append(key, value ? "true" : "false");
-  } else if (key === "age") {
-    formData.append(key, parseInt(value, 10)); // s'assurer que l'âge est bien un entier
-  } else {
-    formData.append(key, value);
-  }
-});
+    Object.entries(form).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((v) => formData.append(`${key}[]`, v));
+      } else if (typeof value === "boolean") {
+        formData.append(key, value ? "true" : "false");
+      } else if (key === "age") {
+        formData.append(key, parseInt(value, 10));
+      } else {
+        formData.append(key, value);
+      }
+    });
 
-      if (photo) formData.append("photo", photo);
+    if (photo) formData.append("photo", photo);
+    formData.append("captchaToken", captchaToken); // ✅ Ajout du token reCAPTCHA
 
-      const res = await fetch("/api/register", {
-        method: "POST",
-        body: formData,
-      });
+    const res = await fetch("/api/register", {
+      method: "POST",
+      body: formData,
+    });
 
-      const result = await res.json();
-      if (result.success) {
+    const result = await res.json();
+    if (result.success) {
       setSuccess("Inscription réussie !");
       setTimeout(() => {
-        router.push("/connexion"); // ou la route que tu veux, ex: /dashboard
-      }, 1500); // délai pour laisser apparaître le message de succès
+        router.push("/connexion");
+      }, 1500);
     } else {
       setError(result.message || "Erreur lors de l'inscription.");
     }
+  } catch (err) {
+    console.error("Erreur lors de l'envoi du formulaire :", err);
+    setError("Erreur serveur pendant l'enregistrement.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-    } catch (err) {
-      console.error("Erreur lors de l'envoi du formulaire :", err);
-      setError("Erreur serveur pendant l'enregistrement.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLocalisationChange = (e) => {
   const value = e.target.value;
@@ -360,7 +352,7 @@ export default function RegisterForm() {
                 <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
                 J’accepte les CGU et j’ai plus de 18 ans.
               </label>
-              <ReCAPTCHA sitekey="6LdGPAcrAAAAAAwtoUNaMatRyS2ZXYsYY09G0YQA" onChange={setCaptchaToken} />
+              <ReCAPTCHA  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}  onChange={setCaptchaToken}/>
               <div className="form-buttons">
                 <Button type="button" title="Retour" onClick={prevStep} color="#888" />
                 <Button title="Créer mon compte" type="submit" color="#e0c084" disabled={loading} />

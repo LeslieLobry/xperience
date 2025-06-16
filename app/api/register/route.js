@@ -1,12 +1,26 @@
-import { IncomingForm } from "formidable";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { PrismaClient } from "@prisma/client";
+import {
+  IncomingForm
+} from "formidable";
+import {
+  mkdir,
+  readFile,
+  writeFile
+} from "fs/promises";
+import {
+  PrismaClient
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { Readable } from "stream";
+import {
+  Readable
+} from "stream";
 import crypto from "crypto";
 import path from "path";
-import { resend } from "../../../lib/resend";
-import { v4 as uuidv4 } from "uuid";
+import {
+  resend
+} from "../../../lib/resend";
+import {
+  v4 as uuidv4
+} from "uuid";
 
 export const config = {
   api: {
@@ -23,7 +37,10 @@ function streamFromRequest(request) {
   const reader = request.body.getReader();
   return new Readable({
     async read() {
-      const { done, value } = await reader.read();
+      const {
+        done,
+        value
+      } = await reader.read();
       if (done) return this.push(null);
       this.push(value);
     }
@@ -47,7 +64,12 @@ export async function POST(req) {
     form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
         console.error("Erreur formidable :", err);
-        return resolve(new Response(JSON.stringify({ success: false, message: "Erreur parsing" }), { status: 500 }));
+        return resolve(new Response(JSON.stringify({
+          success: false,
+          message: "Erreur parsing"
+        }), {
+          status: 500
+        }));
       }
 
       try {
@@ -64,27 +86,69 @@ export async function POST(req) {
         const consent = getField(fields.consent) === "true" || getField(fields.consent) === true;
         const localisation = getField(fields.localisation);
         const consentCGUDate = consent ? new Date() : null;
+        // 🔐 Vérification reCAPTCHA
+        const captchaToken = getField(fields["captchaToken"]);
+
+        if (!captchaToken) {
+          return resolve(new Response(JSON.stringify({
+            success: false,
+            message: "Captcha manquant"
+          }), {
+            status: 400
+          }));
+        }
+
+        const captchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+        const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: `secret=${captchaSecret}&response=${captchaToken}`,
+        });
+
+        const captchaData = await captchaRes.json();
+
+        if (!captchaData.success) {
+          return resolve(new Response(JSON.stringify({
+            success: false,
+            message: "Échec de la vérification reCAPTCHA"
+          }), {
+            status: 400
+          }));
+        }
 
         // Vérifie unicité
         const exists = await prisma.utilisateur.findFirst({
           where: {
-            OR: [{ email }, { pseudo }],
+            OR: [{
+              email
+            }, {
+              pseudo
+            }],
           },
         });
 
         if (exists) {
-          return resolve(new Response(JSON.stringify({ success: false, message: "Email ou pseudo déjà utilisé" }), { status: 400 }));
+          return resolve(new Response(JSON.stringify({
+            success: false,
+            message: "Email ou pseudo déjà utilisé"
+          }), {
+            status: 400
+          }));
         }
 
-        const recherche = fields["recherche[]"]
-          ? Array.isArray(fields["recherche[]"]) ? fields["recherche[]"] : [fields["recherche[]"]]
-          : [];
+        const recherche = fields["recherche[]"] ?
+          Array.isArray(fields["recherche[]"]) ? fields["recherche[]"] : [fields["recherche[]"]] :
+          [];
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Upload photo
         const uploadDir = path.join(process.cwd(), "public", "uploads");
-        await mkdir(uploadDir, { recursive: true });
+        await mkdir(uploadDir, {
+          recursive: true
+        });
 
         let photoPath = null;
         if (files.photo && files.photo[0]) {
@@ -94,14 +158,18 @@ export async function POST(req) {
             return resolve(new Response(JSON.stringify({
               success: false,
               message: "Format de fichier non autorisé (JPEG, PNG, WEBP uniquement)"
-            }), { status: 400 }));
+            }), {
+              status: 400
+            }));
           }
 
           if (file.size > MAX_FILE_SIZE) {
             return resolve(new Response(JSON.stringify({
               success: false,
               message: "Fichier trop volumineux (max 2 Mo)"
-            }), { status: 400 }));
+            }), {
+              status: 400
+            }));
           }
 
           const buffer = await readFile(file.filepath);
@@ -115,27 +183,29 @@ export async function POST(req) {
 
         // Création utilisateur
         const user = await prisma.utilisateur.create({
-  data: {
-    nom,
-    prenom,
-    pseudo,
-    email,
-    password: hashedPassword,
-    type,
-    orientation,
-    age,
-    localisation,
-    consent,
-    consentCGU: consent,
-    consentCGUDate,
-    photoUrl: photoPath,
-    verificationIdentite: false, // ✅ Ajouté
-    verificationDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000), // ✅ Ajouté (dans 48h)
-    recherches: {
-      create: recherche.map((label) => ({ label })),
-    },
-  }
-});
+          data: {
+            nom,
+            prenom,
+            pseudo,
+            email,
+            password: hashedPassword,
+            type,
+            orientation,
+            age,
+            localisation,
+            consent,
+            consentCGU: consent,
+            consentCGUDate,
+            photoUrl: photoPath,
+            verificationIdentite: false, // ✅ Ajouté
+            verificationDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000), // ✅ Ajouté (dans 48h)
+            recherches: {
+              create: recherche.map((label) => ({
+                label
+              })),
+            },
+          }
+        });
 
         // Création token de vérification
         const token = uuidv4();
@@ -162,10 +232,20 @@ export async function POST(req) {
           `,
         });
 
-        return resolve(new Response(JSON.stringify({ success: true, user }), { status: 200 }));
+        return resolve(new Response(JSON.stringify({
+          success: true,
+          user
+        }), {
+          status: 200
+        }));
       } catch (error) {
         console.error("Erreur backend :", error);
-        return resolve(new Response(JSON.stringify({ success: false, message: "Erreur serveur" }), { status: 500 }));
+        return resolve(new Response(JSON.stringify({
+          success: false,
+          message: "Erreur serveur"
+        }), {
+          status: 500
+        }));
       }
     });
   });
