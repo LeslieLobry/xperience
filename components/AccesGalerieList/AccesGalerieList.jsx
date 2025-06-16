@@ -26,6 +26,7 @@ export default function AccesGalerieList({ userId }) {
             <button onClick={() => handleRevoke(a.id)}>Supprimer l'accès</button>
           </li>
         ))}
+        
       </ul>
     </div>
   );
