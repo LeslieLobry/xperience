@@ -14,7 +14,6 @@ export default function ChatBubble() {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadPrivate, setUnreadPrivate] = useState(0);
-  const [unreadGlobal, setUnreadGlobal] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
 
@@ -46,14 +45,6 @@ export default function ChatBubble() {
 
     fetchUnreadCounts();
 
-    const globalChannel = ably.channels.get("global");
-    globalChannel.subscribe("message", (msg) => {
-      if (msg.data.auteurId !== user.id) {
-        sonGlobal.current?.play().catch(() => {});
-        fetchUnreadCounts();
-      }
-    });
-
     const privateChannel = ably.channels.get(`notification-${user.id}`);
     privateChannel.subscribe("message", () => {
       sonPrive.current?.play().catch(() => {});
@@ -61,7 +52,6 @@ export default function ChatBubble() {
     });
 
     return () => {
-      globalChannel.unsubscribe();
       privateChannel.unsubscribe();
     };
   }, [user?.id]);
@@ -72,10 +62,6 @@ export default function ChatBubble() {
     setShowMenu(!showMenu);
   };
 
-  const goToGlobalChat = () => {
-    router.push("/chat-global");
-    setShowMenu(false);
-  };
 
   const goToPrivateMessages = () => {
     router.push("/messagerie");
@@ -84,8 +70,8 @@ export default function ChatBubble() {
 
   return (
     <div className="chat-bubble-wrapper">
-      <audio ref={sonGlobal} src="/sounds/message-global.mp3" />
-      <audio ref={sonPrive} src="/sounds/message-prive.mp3" />
+      
+      <audio ref={sonPrive} src="/sounds/sonGlobal.mp3" />
 
       <div className="chat-bubble-container" onClick={handleToggleMenu}>
         <Image
@@ -102,10 +88,7 @@ export default function ChatBubble() {
 
       {showMenu && (
         <div className="chat-menu">
-          <button onClick={goToGlobalChat}>
-            Chat global {unreadGlobal > 0 && `(${unreadGlobal})`}
-          </button>
-          <button onClick={goToPrivateMessages}>
+            <button onClick={goToPrivateMessages}>
             Messagerie privée {unreadPrivate > 0 && `(${unreadPrivate})`}
           </button>
         </div>

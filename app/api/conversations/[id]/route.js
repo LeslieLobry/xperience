@@ -20,7 +20,6 @@ async function getUserFromToken() {
     return null;
   }
 }
-
 export async function GET(req, { params }) {
   const decoded = await getUserFromToken();
   if (!decoded) {
@@ -61,22 +60,21 @@ export async function GET(req, { params }) {
   }
 
   const idsParticipants = conversation.participants.map(p => p.utilisateur.id);
-
   const estBloque = await Promise.any(
-    idsParticipants
-      .filter((id) => id !== userId)
-      .map((id) => isBlockedBetween(userId, id))
+    idsParticipants.filter(id => id !== userId).map(id => isBlockedBetween(userId, id))
   ).catch(() => false);
 
   if (estBloque) {
     return NextResponse.json({ error: "Un participant est bloqué" }, { status: 403 });
   }
 
+  // ✅ Inclure lastReadAt dans la réponse
   return NextResponse.json({
     participants: conversation.participants.map((p) => ({
       id: p.utilisateur.id,
       pseudo: p.utilisateur.pseudo,
       photoUrl: p.utilisateur.photoUrl,
+      lastReadAt: p.lastReadAt, // <-- C'EST ICI
     })),
   });
 }

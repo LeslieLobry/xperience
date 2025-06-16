@@ -186,14 +186,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
       />
 
       <div className="chat-messages">
-        {messages.map((msg, i) => (
-          <MessageBubble
-            key={msg.id}
-            msg={msg}
-            utilisateur={utilisateur}
-            previousMsg={messages[i - 1]}
-          />
-        ))}
+       {messages.map((msg, i) => (
+  <MessageBubble
+    key={msg.id}
+    msg={msg}
+    utilisateur={utilisateur}
+    previousMsg={messages[i - 1]}
+    lastReads={participantsAutres.map(p => ({
+      utilisateurId: p.id,
+      lastReadAt: p.lastReadAt,
+    }))}
+  />
+))}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -217,6 +222,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
+        <button
+  type="button"
+  className="emoji-btn"
+  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+>
+  😊
+</button>
+
         <button type="submit" className="message-btn">Envoyer</button>
       </form>
 
