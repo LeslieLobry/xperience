@@ -9,7 +9,7 @@
     "start": "next start",
     "socket-server": "node server.js",
     "create-users": "node scripts/create-users.js",
-     "postinstall": "prisma generate",
+     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@ably/chat": "^0.8.0",
