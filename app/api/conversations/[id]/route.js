@@ -60,31 +60,24 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
   }
 
-  const interlocuteur = conversation.participants
-    .map((p) => p.utilisateur)
-    .find((u) => u.id !== userId);
+  const idsParticipants = conversation.participants.map(p => p.utilisateur.id);
 
-  if (!interlocuteur) {
-    return NextResponse.json({ error: "Aucun autre participant trouvé" }, { status: 400 });
-  }
+  const estBloque = await Promise.any(
+    idsParticipants
+      .filter((id) => id !== userId)
+      .map((id) => isBlockedBetween(userId, id))
+  ).catch(() => false);
 
-  const estBloque = await isBlockedBetween(userId, interlocuteur.id);
   if (estBloque) {
-    return NextResponse.json({ error: "Utilisateur bloqué" }, { status: 403 });
+    return NextResponse.json({ error: "Un participant est bloqué" }, { status: 403 });
   }
-
-  const blocage = await prisma.blocage.findFirst({
-    where: {
-      bloqueurId: userId,
-      bloquéId: interlocuteur.id,
-    },
-  });
 
   return NextResponse.json({
-    interlocuteur: {
-      ...interlocuteur,
-      estBloqueParUtilisateur: !!blocage,
-    },
+    participants: conversation.participants.map((p) => ({
+      id: p.utilisateur.id,
+      pseudo: p.utilisateur.pseudo,
+      photoUrl: p.utilisateur.photoUrl,
+    })),
   });
 }
 
@@ -110,17 +103,6 @@ export async function DELETE(req, { params }) {
     const estParticipant = participants.some(p => p.utilisateur.id === userId);
     if (!estParticipant) {
       return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
-    }
-
-    const interlocuteur = participants
-      .map((p) => p.utilisateur)
-      .find((u) => u.id !== userId);
-
-    if (interlocuteur) {
-      const estBloque = await isBlockedBetween(userId, interlocuteur.id);
-      if (estBloque) {
-        return NextResponse.json({ error: "Utilisateur bloqué" }, { status: 403 });
-      }
     }
 
     await prisma.participant.updateMany({

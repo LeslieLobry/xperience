@@ -120,9 +120,7 @@ export default function ListeConversations({ userId, onSelectConversation }) {
             className={`conversation-item ${selectedId === conv.id ? "active" : ""}`}
           >
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
-              <div className="conv-avatar">
-                <img src={avatar} alt={pseudo} />
-              </div>
+              
               <div className="conv-info">
                 <div className="conv-pseudo">{pseudo}</div>
               </div>

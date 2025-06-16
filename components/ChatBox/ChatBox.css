@@ -4,29 +4,62 @@
   height: 100%;
 }
 
+/* ----- Header ----- */
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  background-color: transparent;
-  border-bottom: 1px solid #e0c084;
-  font-size: 25px;
-  color: #e0c084;
+  padding: 0.5rem 1rem;
+  background: rgba(163, 73, 73, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.chat-title {
-  font-weight: bold;
+.chat-participants {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 80%;
+}
+
+.participant-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.participant-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: #444;
+}
+
+.participant-name {
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #f0e6d2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .chat-actions button {
   background: none;
   border: none;
-  margin-left: 8px;
-  cursor: pointer;
   color: #e0c084;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.5rem;
 }
 
+.chat-actions button:hover {
+  opacity: 0.8;
+}
+
+/* ----- Messages ----- */
 .chat-messages {
   flex-grow: 1;
   overflow-y: auto;
@@ -37,28 +70,51 @@
 
 .message-bubble {
   max-width: 70%;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  position: relative;
+  margin: 4px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  word-wrap: break-word;
 }
 
-.message-bubble.sent {
+.message-bubble.own {
+  background-color: #daf1ff;
   align-self: flex-end;
-  background-color: #e0c084;
-  color: white;
+  border-top-right-radius: 0;
 }
 
-.message-bubble.received {
+.message-bubble.other {
+  background-color: #eee;
   align-self: flex-start;
-  background-color: #e4e6eb;
-  color: black;
+  border-top-left-radius: 0;
+}
+
+.author-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.author-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.author-name {
+  font-size: 0.85rem;
+  color: #555;
 }
 
 .message-meta {
   font-size: 0.75em;
   margin-top: 6px;
   opacity: 0.6;
+}
+
+.message-image {
+  max-width: 100%;
+  border-radius: 8px;
 }
 
 .audio-bubble {
@@ -73,11 +129,49 @@
   cursor: pointer;
 }
 
+/* ----- Webcam ----- */
+.mini-webcam {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 160px;
+  height: 120px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: #000;
+  z-index: 1000;
+  object-fit: cover;
+  visibility: visible;
+  opacity: 1;
+}
+
 .mini-webcam.remote {
   bottom: 80px;
   right: 200px;
 }
-.chat-input{
+
+/* ----- Appel entrant ----- */
+.appel-entrant-box {
+  position: fixed;
+  bottom: 150px;
+  right: 20px;
+  background: #fff;
+  color: #333;
+  padding: 16px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  z-index: 2000;
+}
+
+.appel-entrant-box button {
+  margin: 6px;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* ----- Zone de texte ----- */
+.chat-input {
   display: flex;
   align-items: center;
 }
@@ -96,64 +190,18 @@
   color: #e0c084;
 }
 
-/* Optionnel : un focus plus visible */
 .input-text:focus {
   border-color: #e0c084;
   outline: none;
   box-shadow: 0 0 3px #e0c084;
 }
-.message-image{
-display: flex;
-flex-basis: 20%;
-}
-.message-btn{
+
+.message-btn {
   display: flex;
   flex-basis: 20%;
 }
-.chat-actions button {
-  background: none;
-  border: none;
-  color: #e0c084;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0.5rem;
-}
 
-.chat-actions button:hover {
-  opacity: 0.8;
-}
-.mini-webcam {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  width: 160px;
-  height: 120px;
-  border-radius: 10px;
-  border: 2px solid #fff;
-  background: #000;
-  z-index: 1000;
-  object-fit: cover;
-  visibility: visible;
-  opacity: 1;
-}
-.appel-entrant-box {
-  position: fixed;
-  bottom: 150px;
-  right: 20px;
-  background: #fff;
-  color: #333;
-  padding: 16px;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-  z-index: 2000;
-}
-.appel-entrant-box button {
-  margin: 6px;
-  padding: 8px 12px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
+/* ----- Emoji Picker ----- */
 .emoji-picker-container {
   position: absolute;
   bottom: 60px;

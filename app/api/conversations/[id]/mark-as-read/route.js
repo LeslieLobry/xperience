@@ -31,6 +31,15 @@ export async function POST(req, { params }) {
       { status: 404 }
     );
   }
+// Marque tous les messages comme "lu" pour cet utilisateur (sauf les siens)
+await prisma.message.updateMany({
+  where: {
+    conversationId,
+    auteurId: { not: userId },
+    lu: false,
+  },
+  data: { lu: true },
+});
 
   return NextResponse.json({ success: true });
 }
