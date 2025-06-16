@@ -2,13 +2,13 @@ import { PrismaClient } from "@prisma/client";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
-import "./accueil.css";
-import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
+// import "./accueil.css";
+import RechercheWrapper from "../components/RechercheWrapper/RechercheWrapper";
 import Link from "next/link";
-import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
-import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
-import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
-import RappelVerification from "../../components/RappelVerification/RappelVerification";
+import DerniersArticles from "../components/DerniersArticles/DerniersArticles";
+import DerniersEvenements from "../components/DerniersEvenements/DerniersEvenements";
+import { getIdsUtilisateursExclus } from "../lib/utilsFiltrage";
+import RappelVerification from "../components/RappelVerification/RappelVerification";
 
 
 
