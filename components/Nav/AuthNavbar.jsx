@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Button from "../Button/Button"; 
-import logo from "../../app/Assets/logo.png";
+import logo from "../../public/images/logo.png";
 import "./AuthNavbar.css"
 
 export default function AuthNavbar() {

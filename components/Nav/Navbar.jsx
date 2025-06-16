@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
-import logo from "../../app/Assets/logo.png";
+import logo from "../../public/images/logo.png";
 import { LogIn } from "lucide-react";
 import "../Nav/Navbar.css";
 import { Settings } from "lucide-react";

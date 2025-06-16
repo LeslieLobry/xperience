@@ -1,8 +1,8 @@
-import logo from "../../app/Assets/logo.png"
+import logo from "../../public/images/logo.png"
 import Image from "next/image";
-import insta from "../../app/Assets/insta.png"
+import insta from "../../public/images/insta.png"
 import tik from "../../public/images/tik.png"
-import facebook from "../../app/Assets/facebook.png"
+import facebook from "../../public/images/facebook.png"
 import Link from "next/link";
 import "../Footer/Footer.css"
 import NewsletterForm from "../NewsLetterForm/NewsLetterForm";
