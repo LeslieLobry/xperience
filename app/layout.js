@@ -23,15 +23,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={`${allura.variable} ${raleway.variable}`}>
       <body className="font-raleway">
-        {/* <AuthProvider>
+        <AuthProvider>
           <ClientWrapper>
-            <ConditionalNavbar /> */}
+            <ConditionalNavbar />
             {children}
-            {/* <ChatBubble />
+            <ChatBubble />
             <Footer />
             <BandeauCookies />
           </ClientWrapper>
-        </AuthProvider> */}
+        </AuthProvider>
       </body>
     </html>
   );
