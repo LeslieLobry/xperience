@@ -19,5 +19,6 @@ export async function GET() {
   } catch (err) {
     console.error("Erreur GET /api/evenements/derniers :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    
   }
 }
