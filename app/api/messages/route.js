@@ -144,7 +144,14 @@ export async function POST(req) {
       }
     })();
 
-    return NextResponse.json({ success: true, message }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: {
+        ...message,
+        conversationId: message.conversationId,
+      },
+    }, { status: 200 });
+
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
     return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
@@ -161,7 +168,7 @@ export async function GET(req) {
     const cookieStore = cookies();
     const user = await getUserFromToken(cookieStore);
     if (!user) {
-      return Response.json({ success: false, message: "Non autorisé" }, { status: 401 });
+      return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
 
     const auteurId = user.id;
@@ -179,7 +186,7 @@ export async function GET(req) {
     const exclus = await getIdsUtilisateursExclus(auteurId);
     const estBloque = autresParticipants.some((id) => exclus.includes(id));
     if (estBloque) {
-      return Response.json(
+      return NextResponse.json(
         { success: false, message: "Accès refusé à cette conversation." },
         { status: 403 }
       );
@@ -191,10 +198,11 @@ export async function GET(req) {
       orderBy: { createdAt: "asc" },
     });
 
-    return Response.json({ success: true, messages }, { status: 200 });
+    return NextResponse.json({ success: true, messages }, { status: 200 });
+
   } catch (error) {
     console.error("Erreur dans GET /api/messages :", error);
-    return Response.json(
+    return NextResponse.json(
       { success: false, message: "Impossible de récupérer les messages." },
       { status: 500 }
     );

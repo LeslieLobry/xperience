@@ -1,89 +1,173 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { io } from 'socket.io-client';
+"use client";
 
-export default function ChatGlobal({ userId }) {
+import { useEffect, useRef, useState } from "react";
+import { Realtime } from "ably";
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
+import "./ChatGlobal.css";
+
+const ably = new Realtime({
+  key: process.env.NEXT_PUBLIC_ABLY_API_KEY,
+  clientId: typeof window !== "undefined" ? `client-${Math.random()}` : undefined,
+});
+
+export default function ChatGlobal({ utilisateur }) {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const socketRef = useRef(null);
-  const messagesEndRef = useRef(null); // Pour autoscroll
+  const [input, setInput] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  // Scrolle automatiquement en bas à chaque nouveau message
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Callback stable pour recevoir un message
-  const handleReceive = useCallback((message) => {
-    setMessages((prev) => [...prev, message]);
+  useEffect(() => {
+    const fetchMessages = async () => {
+      const res = await fetch("/api/global-messages");
+      const data = await res.json();
+      setMessages(Array.isArray(data) ? data : data.messages || []);
+    };
+    fetchMessages();
   }, []);
 
   useEffect(() => {
-    if (!socketRef.current) {
-      socketRef.current = io("http://localhost:4000");
-    }
+    if (!utilisateur?.id) return;
 
-    // Charger les anciens messages depuis l'API
-    const fetchMessages = async () => {
-      const res = await fetch('/api/global-messages');
-      const data = await res.json();
-      setMessages(data);
+    fetch("/api/unread-global-messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: utilisateur.id }),
+    });
+  }, [utilisateur?.id]);
+
+  useEffect(() => {
+    if (!utilisateur) return;
+
+    const channel = ably.channels.get("chat-global");
+    const presence = channel.presence;
+
+    const handleMessage = (msg) => {
+      setMessages((prev) => [...prev, msg.data]);
     };
 
-    fetchMessages();
+    channel.subscribe("message-global", handleMessage);
 
-    // S'abonner aux nouveaux messages
-    socketRef.current.off('receive_global_message', handleReceive); // 🔁 attention au nom correct ici
-    socketRef.current.on('receive_global_message', handleReceive);
+    presence.enter({
+      clientId: ably.auth.clientId,
+      pseudo: utilisateur.pseudo,
+      photoUrl: utilisateur.photoUrl || null,
+    });
+
+    presence.subscribe("enter", (member) => {
+      if (member.clientId !== ably.auth.clientId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `presence-${Date.now()}-${Math.random()}`,
+            type: "system",
+            contenu: `${member.data.pseudo} a rejoint le chat.`,
+          },
+        ]);
+      }
+    });
 
     return () => {
-      socketRef.current?.off('receive_global_message', handleReceive);
+      channel.unsubscribe("message-global", handleMessage);
+      presence.leave();
     };
-  }, [handleReceive]);
+  }, [utilisateur]);
 
-  // Autoscroll dès qu’un message est ajouté
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = async () => {
+    if (!input.trim() || !utilisateur) return;
 
-    socketRef.current?.emit('send_global_message', {
-      auteurId: userId,
+    const message = {
+      auteurId: utilisateur.id,
+      auteur: {
+        pseudo: utilisateur.pseudo,
+        photoUrl: utilisateur.photoUrl || null,
+      },
       contenu: input,
+      createdAt: new Date().toISOString(),
+    };
+
+    const channel = ably.channels.get("chat-global");
+    channel.publish("message-global", message);
+
+    await fetch("/api/global-messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contenu: message.contenu }),
     });
 
-    setInput('');
+    setInput("");
+    setShowEmojiPicker(false);
+  };
+
+  const addEmoji = (emoji) => {
+    setInput((prev) => prev + emoji.native);
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px', maxHeight: '300px' }}>
-        {messages.map((m, i) => (
-          <div key={m.id || i}>
-            <b>{m.auteur?.pseudo || 'Moi'}:</b> {m.contenu}
-            {m.createdAt && (
-              <span style={{ marginLeft: 8, fontSize: '0.75em', color: 'gray' }}>
-                {new Date(m.createdAt).toLocaleTimeString('fr-FR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+    <div className="chat-container">
+    <div className="chat-messages">
+  {Array.isArray(messages) &&
+    messages.map((m, i) => (
+      <div key={m.id ?? `sys-${i}`} className={m.type === "system" ? "system-message" : "message-item"}>
+        {m.type !== "system" ? (
+          <>
+            {m.auteur?.photoUrl && (
+              <img src={m.auteur.photoUrl} alt="avatar" className="message-avatar" />
             )}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+            <div>
+              <div className="message-meta">
+                <strong>{m.auteur?.pseudo || "Anonyme"}</strong>{" "}
+                {m.createdAt && (
+                  <span>
+                    {new Date(m.createdAt).toLocaleTimeString("fr-FR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+              </div>
+              <div className="message-bubble">{m.contenu}</div>
+            </div>
+          </>
+        ) : (
+          <div className="system-message">{m.contenu}</div>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: '8px', padding: '10px' }}>
+    ))}
+  <div ref={messagesEndRef} />
+</div>
+
+
+      {showEmojiPicker && (
+        <div style={{ position: "absolute", bottom: "60px", right: "10px", zIndex: 10 }}>
+          <Picker data={data} onEmojiSelect={addEmoji} />
+        </div>
+      )}
+
+      <form
+        className="chat-input"
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendMessage();
+        }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Message public"
-          style={{ flex: 1 }}
         />
-        <button onClick={sendMessage}>Envoyer</button>
-      </div>
+        <button type="button" onClick={() => setShowEmojiPicker((prev) => !prev)}>😊</button>
+        <button type="submit">Envoyer</button>
+      </form>
     </div>
   );
 }

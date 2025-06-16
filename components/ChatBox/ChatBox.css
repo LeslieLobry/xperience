@@ -72,17 +72,7 @@
   margin-right: 8px;
   cursor: pointer;
 }
-.mini-webcam {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  width: 160px;
-  height: 120px;
-  border-radius: 10px;
-  border: 2px solid #fff;
-  background: #000;
-  z-index: 1000;
-}
+
 .mini-webcam.remote {
   bottom: 80px;
   right: 200px;
@@ -131,4 +121,42 @@ flex-basis: 20%;
 
 .chat-actions button:hover {
   opacity: 0.8;
+}
+.mini-webcam {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 160px;
+  height: 120px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: #000;
+  z-index: 1000;
+  object-fit: cover;
+  visibility: visible;
+  opacity: 1;
+}
+.appel-entrant-box {
+  position: fixed;
+  bottom: 150px;
+  right: 20px;
+  background: #fff;
+  color: #333;
+  padding: 16px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  z-index: 2000;
+}
+.appel-entrant-box button {
+  margin: 6px;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.emoji-picker-container {
+  position: absolute;
+  bottom: 60px;
+  right: 10px;
+  z-index: 1000;
 }

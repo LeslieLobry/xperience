@@ -34,15 +34,13 @@ export async function POST(req) {
     },
   });
 
-  const formattedMessage = {
+  return NextResponse.json({
     ...message,
     createdAtFormatted: new Date(message.createdAt).toLocaleTimeString("fr-FR", {
       hour: "2-digit",
       minute: "2-digit",
     }),
-  };
-
-  return NextResponse.json(formattedMessage);
+  });
 }
 
 export async function GET() {
@@ -56,7 +54,7 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ messages }); // ✅ important pour le frontend
+    return NextResponse.json({ messages }); // ✅ Encapsulé dans un objet
   } catch (error) {
     console.error("Erreur récupération messages globaux :", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

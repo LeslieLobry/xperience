@@ -1,6 +1,7 @@
 import { prisma } from "../../../lib/prisma";
 
-export async function POST(req) {
+export async function PATCH(req) {
+ 
   const { userId } = await req.json();
 
   if (!userId) {

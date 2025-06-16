@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
+import { Room, createLocalTracks } from "livekit-client";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import "./ChatBox.css";
-import { Room, createLocalTracks } from "livekit-client";
+
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
@@ -16,12 +19,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [interlocuteur, setInterlocuteur] = useState(null);
   const [room, setRoom] = useState(null);
   const [inCall, setInCall] = useState(false);
-  const [waitingAnswer, setWaitingAnswer] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const messagesEndRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const textareaRef = useRef(null);
+  const ringtoneRef = useRef(null);
 
   const adjustTextareaHeight = () => {
     const el = textareaRef.current;
@@ -34,55 +39,63 @@ export default function ChatBox({ conversationId, utilisateur }) {
     setTexte(e.target.value);
     adjustTextareaHeight();
   };
-useEffect(() => {
-  if (!conversationId) return;
-
-  const channel = ably.channels.get(`conversation-${conversationId}`);
-
-  // 🔁 Chargement initial des messages depuis la BDD
-  fetch(`/api/messages?conversationId=${conversationId}`)
-    .then(res => res.json())
-    .then(data => {
-      setMessages(data.messages); // <-- Assure-toi que l'API renvoie { messages: [...] }
-      scrollToBottom();
-    });
-
-  // 🔔 Écoute des nouveaux messages en temps réel
-  channel.subscribe("message", (msg) => {
-    setMessages((prev) => [...prev, msg.data]);
-    scrollToBottom();
-  });
-
-  // Récupération de l'interlocuteur
-  fetch(`/api/conversations/${conversationId}`)
-    .then((res) => res.json())
-    .then((data) => {
-      setInterlocuteur(data.interlocuteur);
-    });
-
-  return () => {
-    channel.unsubscribe();
-  };
-}, [conversationId]);
 
   useEffect(() => {
     if (!conversationId) return;
 
     const channel = ably.channels.get(`conversation-${conversationId}`);
 
-    channel.subscribe("message", (msg) => {
-      setMessages((prev) => [...prev, msg.data]);
+    const chargerMessages = async () => {
+      const res = await fetch(`/api/messages?conversationId=${conversationId}`);
+      const data = await res.json();
+      setMessages(data.messages || []);
       scrollToBottom();
-    });
+
+      if (utilisateur?.id) {
+        fetch(`/api/conversations/${conversationId}/mark-as-read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: utilisateur.id }),
+        }).catch((err) => console.error("❌ Erreur mark-as-read :", err));
+      }
+    };
+
+    const handleMessage = (msg) => {
+      if (msg.data.conversationId === conversationId) {
+        setMessages((prev) => [...prev, msg.data]);
+        scrollToBottom();
+      }
+    };
+
+    const handleAppelEntrant = (msg) => {
+      const data = msg.data;
+      if (data.expediteur.id === utilisateur.id) return;
+      setIncomingCall(data);
+      ringtoneRef.current?.play();
+    };
+
+    const handleAppelTermine = () => {
+      if (room) room.disconnect();
+      setRoom(null);
+      setInCall(false);
+      setIncomingCall(null);
+      ringtoneRef.current?.pause();
+      ringtoneRef.current.currentTime = 0;
+    };
+
+    channel.subscribe("message", handleMessage);
+    channel.subscribe("appel-entrant", handleAppelEntrant);
+    channel.subscribe("appel-termine", handleAppelTermine);
+    chargerMessages();
 
     fetch(`/api/conversations/${conversationId}`)
       .then((res) => res.json())
-      .then((data) => {
-        setInterlocuteur(data.interlocuteur);
-      });
+      .then((data) => setInterlocuteur(data.interlocuteur));
 
     return () => {
-      channel.unsubscribe();
+      channel.unsubscribe("message", handleMessage);
+      channel.unsubscribe("appel-entrant", handleAppelEntrant);
+      channel.unsubscribe("appel-termine", handleAppelTermine);
     };
   }, [conversationId]);
 
@@ -93,16 +106,10 @@ useEffect(() => {
   const envoyerMessage = async () => {
     if (!texte.trim() && !imageFile) return;
 
-    const messageData = {
-  auteurId: utilisateur.id,
-  auteur: { pseudo: utilisateur.pseudo,
-      photoUrl: utilisateur.photoUrl || null,
-   }, // ✅ ceci
-  contenu: texte,
-  type: imageFile ? "IMAGE" : "TEXTE",
-  date: new Date().toISOString(),
-  conversationId,
-};
+    const convChannel = ably.channels.get(`conversation-${conversationId}`);
+    const notifChannel = ably.channels.get(`notification-${utilisateur.id}`);
+
+    let data;
 
     if (imageFile) {
       const formData = new FormData();
@@ -116,103 +123,106 @@ useEffect(() => {
         body: formData,
       });
 
-      const data = await res.json();
-      messageData.imageUrl = data.message.imageUrl;
+      const json = await res.json();
+      data = json.message;
+    } else {
+      const payload = {
+        auteurId: utilisateur.id,
+        contenu: texte,
+        type: "TEXTE",
+        conversationId,
+      };
+
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      data = json.message;
     }
 
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("message", messageData);
+    convChannel.publish("message", data);
+    notifChannel.publish("message", { type: "refresh-conversations" });
+
     setTexte("");
     setImageFile(null);
   };
 
+  const startCall = async (video = false) => {
+    ringtoneRef.current?.pause();
+    ringtoneRef.current.currentTime = 0;
 
-const startCall = async (video = false) => {
-  try {
-    console.log("🔄 Démarrage de l'appel...", { video });
+    try {
+      const res = await fetch("/api/livekit-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
+      });
 
-    const res = await fetch("/api/livekit-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
-    });
+      const { token } = await res.json();
+      const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-    const { token } = await res.json();
+      const tracks = await createLocalTracks({ audio: true, video });
+      const newRoom = new Room();
+      await newRoom.connect(livekitUrl, token, { tracks });
 
-    if (!token) {
-      console.error("❌ Token manquant !");
-      return;
+      await newRoom.localParticipant.setMicrophoneEnabled(true);
+      if (video) await newRoom.localParticipant.setCameraEnabled(true);
+
+      newRoom.on("trackSubscribed", (track) => {
+        if (track.kind === "video" && remoteVideoRef.current) {
+          track.attach(remoteVideoRef.current);
+        }
+      });
+
+      setTimeout(() => {
+        const videoPub = newRoom.localParticipant.getTrackPublications()
+          .find(pub => pub.track?.kind === "video");
+
+        if (videoPub?.track && localVideoRef.current) {
+          videoPub.track.attach(localVideoRef.current);
+        }
+      }, 500);
+
+      setRoom(newRoom);
+      setInCall(true);
+      setIncomingCall(null);
+
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("appel-entrant", {
+        type: video ? "video" : "audio",
+        expediteur: {
+          id: utilisateur.id,
+          pseudo: utilisateur.pseudo,
+          photoUrl: utilisateur.photoUrl || null,
+        },
+        conversationId,
+      });
+    } catch (err) {
+      console.error("Erreur LiveKit :", err);
     }
+  };
 
-    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-
-    if (!livekitUrl || !livekitUrl.startsWith("wss://")) {
-      console.error("❌ LIVEKIT_URL invalide :", livekitUrl);
-      return;
-    }
-
-    console.log("✅ Token reçu. Connexion à LiveKit avec URL :", livekitUrl);
-
-    const tracks = await createLocalTracks({
-      audio: true,
-      video: video, // false si appel audio seulement
-    });
-
-    console.log("🎥 Tracks créés :", tracks);
-
-    const newRoom = new Room();
-    await newRoom.connect(livekitUrl, token, {
-      tracks, // ✅ Très important : on passe les tracks ici
-    });
-
-    console.log("✅ Connexion LiveKit réussie !");
-
-    // Active le micro et la caméra s'ils ne le sont pas déjà
-    await newRoom.localParticipant.setMicrophoneEnabled(true);
-    if (video) {
-      await newRoom.localParticipant.setCameraEnabled(true);
-    }
-
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      console.log("📹 Track distant abonné :", track.kind);
-      if (track.kind === "video") {
-        track.attach(remoteVideoRef.current);
-      }
-    });
-
-    // ✅ Attache le flux local à la caméra locale
-    setTimeout(() => {
-  const videoTracksMap = newRoom?.localParticipant?.videoTracks;
-if (videoTracksMap && videoTracksMap.size > 0) {
-  const trackPublication = [...videoTracksMap.values()][0];
-  if (trackPublication?.track) {
-    trackPublication.track.attach(localVideoRef.current);
-  }
-}
-    const trackPublication = [...videoTracksMap.values()][0];
-
-      if (trackPublication?.track) {
-        console.log("📷 Attachement du flux local !");
-        trackPublication.track.attach(localVideoRef.current);
-      } else {
-        console.warn("⚠️ Track publication sans track.");
-      }
-    }, 1000);
-
-    setRoom(newRoom);
-    setInCall(true);
-  } catch (err) {
-    console.error("❌ Erreur lors de la connexion à LiveKit :", err);
-  }
-};
   const hangupCall = () => {
     room?.disconnect();
     setRoom(null);
     setInCall(false);
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("appel-termine", { conversationId });
+  };
+
+  const accepterAppel = (type) => {
+    ringtoneRef.current?.pause();
+    ringtoneRef.current.currentTime = 0;
+    startCall(type === "video");
   };
 
   return (
     <div className="chatbox-container">
+      <audio ref={ringtoneRef} src="/sounds/ringtone.mp3" loop preload="auto" />
+
       <ChatHeader
         nom={interlocuteur?.pseudo}
         onCallAudio={() => startCall(false)}
@@ -226,6 +236,18 @@ if (videoTracksMap && videoTracksMap.size > 0) {
           <video ref={remoteVideoRef} autoPlay playsInline className="mini-webcam remote" />
           <button className="hangup-button" onClick={hangupCall}>Raccrocher</button>
         </>
+      )}
+
+      {incomingCall && !inCall && !room && (
+        <div className="appel-entrant-box">
+          <p>📞 Appel {incomingCall.type} de {incomingCall.expediteur.pseudo}</p>
+          <button onClick={() => accepterAppel(incomingCall.type)}>Accepter</button>
+          <button onClick={() => {
+            setIncomingCall(null);
+            ringtoneRef.current?.pause();
+            ringtoneRef.current.currentTime = 0;
+          }}>Refuser</button>
+        </div>
       )}
 
       <div className="chat-messages">
@@ -251,34 +273,24 @@ if (videoTracksMap && videoTracksMap.size > 0) {
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
-        <label htmlFor="image-upload" className="upload-label">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" stroke="#e0c084">
-            <path d="M21.44 11.05L12 20.5a5.002 5.002 0 01-7.07-7.07l9.9-9.9a3 3 0 114.24 4.24L8.47 17.5" />
-          </svg>
-        </label>
-        <input
-          id="image-upload"
-          type="file"
-          accept="image/*"
-          className="message-image"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const file = e.target.files[0];
-            if (file) setImageFile(file);
-          }}
-        />
-        {imageFile && (
-          <div className="image-preview">
-            <p style={{ fontSize: "0.8rem", color: "#ccc" }}>📎 {imageFile.name}</p>
-            <img
-              src={URL.createObjectURL(imageFile)}
-              alt="Aperçu"
-              style={{ maxWidth: "120px", maxHeight: "120px", borderRadius: "8px", marginTop: "4px" }}
-            />
-          </div>
-        )}
+        <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+          😊
+        </button>
         <button type="submit" className="message-btn">Envoyer</button>
       </form>
+
+      {showEmojiPicker && (
+        <div className="emoji-picker-container">
+          <Picker
+            data={data}
+            onEmojiSelect={(emoji) => {
+              setTexte((prev) => prev + emoji.native);
+              setShowEmojiPicker(false);
+            }}
+            theme="light"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { isBlockedBetween } from "../../../../lib/utilsFiltrage";
 const JWT_SECRET = process.env.JWT_SECRET;
 
 async function getUserFromToken() {
-  const headerList = headers(); // pas besoin de await ici
+  const headerList = headers();
   const cookieHeader = headerList.get("cookie") || "";
   const tokenMatch = cookieHeader.match(/token=([^;]+)/);
   const token = tokenMatch?.[1];
@@ -53,6 +53,11 @@ export async function GET(req, { params }) {
 
   if (!conversation) {
     return NextResponse.json({ error: "Conversation introuvable" }, { status: 404 });
+  }
+
+  const estParticipant = conversation.participants.some(p => p.utilisateurId === userId);
+  if (!estParticipant) {
+    return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
   }
 
   const interlocuteur = conversation.participants
@@ -101,6 +106,11 @@ export async function DELETE(req, { params }) {
       where: { conversationId },
       include: { utilisateur: true },
     });
+
+    const estParticipant = participants.some(p => p.utilisateur.id === userId);
+    if (!estParticipant) {
+      return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
+    }
 
     const interlocuteur = participants
       .map((p) => p.utilisateur)
