@@ -157,7 +157,7 @@ export async function POST(req) {
           html: `
             <p>Bienvenue sur X-periences, ${pseudo} 👋</p>
             <p>Merci de vous être inscrit. Pour confirmer votre adresse email, cliquez sur le lien ci-dessous :</p>
-            <p><a href="http://localhost:3000/verify?token=${token}&email=${email}">Confirmer mon adresse</a></p>
+            <p><a href="http://x-periences.fr/verify?token=${token}&email=${email}">Confirmer mon adresse</a></p>
             <p>Ce lien expire dans 24 heures.</p>
           `,
         });

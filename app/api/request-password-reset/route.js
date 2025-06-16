@@ -28,7 +28,7 @@ export async function POST(req) {
     },
   });
 
-  const resetUrl = `http://localhost:3000/reinitialiser?token=${token}`;
+  const resetUrl = `http://x-periences.fr/reinitialiser?token=${token}`;
 
   await resend.emails.send({
     from: process.env.EMAIL_FROM,

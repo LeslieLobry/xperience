@@ -42,7 +42,7 @@ export async function POST(req) {
 
   try {
     await resend.emails.send({
-  from: process.env.EMAIL_FROM,
+  from: MODERATOR_EMAIL,
   to: ["moderation@xperience.fr"], // <-- ou même process.env.EMAIL_FROM si besoin
   subject: "🚨 Signalement...",
   html,
