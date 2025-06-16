@@ -11,7 +11,7 @@ import { Settings } from "lucide-react";
 
 
 const navLinks = [
-{ label: "Accueil", href: "/accueilcoonec" },
+{ label: "Accueil", href: "/accueilconnec" },
 { label: "Événements", href: "/evenements" },
 { label: "Messagerie", href: "/messagerie" },
 { label: "Blog", href: "/blog" },

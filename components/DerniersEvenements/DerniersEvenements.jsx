@@ -25,7 +25,7 @@ export default function DerniersEvenements() {
 
   if (loading) return <p>Chargement des événements...</p>;
   if (!evenements.length) return <div>
-    <h2 className="events-title">Derniers événements</h2> <span class="teasing">Préparez-vous... de nouvelles <strong>x-périences</strong> arrivent <span class="pulse">💫</span></span>
+    <h2 className="events-title">Derniers événements</h2> <span class="teasing">Préparez-vous... de nouvelles <strong>xperiences</strong> arrivent <span class="pulse">💫</span></span>
 
   </div>
   

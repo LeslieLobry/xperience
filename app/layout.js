@@ -20,7 +20,7 @@ const raleway = Raleway({
 
 export default function RootLayout({ children }) {
   const pathname = usePathname();
-  const estAccueil = pathname === "/accueil";
+  const estAccueil = pathname === "/accueilconnec";
 
   return (
     <html lang="fr" className={`${allura.variable} ${raleway.variable}`}>
