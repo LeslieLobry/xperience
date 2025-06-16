@@ -20,7 +20,7 @@ export default function ConnexionPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace("/accueil");
+      router.replace("/accueilconnec");
     }
   }, [user]);
 

@@ -1,13 +1,13 @@
 import Image from "next/image";
 import "../app/page.css";
 
-import xperience3 from "../app/Assets/xperience3.png"
-import masque from "../app/Assets/masque.png";
+import xperience3 from "../public/images/xperience3.png"
+import masque from "../public/images//masque.png";
 import { Crimson_Text } from "next/font/google";
 import Banniere from "../components/Banniere/Banniere"
-import woman from "../app/Assets/woman.jpg"
+import woman from "../public/images/woman.jpg"
 import Button from "../components/Button/Button";
-import bannierehome from "../app/Assets/bannierehome.png"
+import bannierehome from "../public/images/bannierehome.png"
 const crimsonText = Crimson_Text({
   subsets: ["latin"],
   weight: ["400", "600", "700"],
