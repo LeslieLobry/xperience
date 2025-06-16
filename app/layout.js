@@ -8,8 +8,7 @@ import Footer from "../components/Footer/Footer";
 import ChatBubble from "../components/ChatBubble/ChatBubble";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
-import LoaderAnnonce from "../components/LoaderAnnonce/LoaderAnnonce";
-import { usePathname } from "next/navigation";
+
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -19,22 +18,20 @@ const raleway = Raleway({
 });
 
 export default function RootLayout({ children }) {
-  const pathname = usePathname();
-  const estAccueil = pathname === "/";
+
 
   return (
     <html lang="fr" className={`${allura.variable} ${raleway.variable}`}>
       <body className="font-raleway">
-        <AuthProvider>
+        {/* <AuthProvider>
           <ClientWrapper>
-            {estAccueil && <LoaderAnnonce />}
-            <ConditionalNavbar />
+            <ConditionalNavbar /> */}
             {children}
-            <ChatBubble />
+            {/* <ChatBubble />
             <Footer />
             <BandeauCookies />
           </ClientWrapper>
-        </AuthProvider>
+        </AuthProvider> */}
       </body>
     </html>
   );
