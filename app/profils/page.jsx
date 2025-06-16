@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import "../accueilconnec/accueil.css";
+// import "../accueilconnec/accueil.css";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 const prisma = new PrismaClient();
