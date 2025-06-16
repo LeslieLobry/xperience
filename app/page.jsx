@@ -73,5 +73,5 @@
 //   );
 // }
 export default function Page() {
-  return <h1>Bienvenue sur Xpérience</h1>;
+  return <h1>Bienvenue sur Xperience</h1>;
 }
