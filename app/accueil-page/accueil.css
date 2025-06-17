@@ -46,11 +46,12 @@
  
   .profil-card {
     height: 300px;
-    border: 1px solid #ccc;
+    border: 1px solid #e0c084;
     border-radius: 10px;
     padding: 1rem;
     text-align: center;
-    background: white;
+    background-color: transparent;
+    /* background-color: white; */
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   }
  
@@ -85,7 +86,7 @@ grid-row: 1;
      color: #e0c084;
   }
   .profil-card-details{
-    color: #8c6a5d;
+    color: #f5ece0;
   }
   .afficher-plus{
     color: #e0c084;
