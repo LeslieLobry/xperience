@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"; // 🔁 désactive le cache Vercel
+
 import { redirect } from "next/navigation";
 import { PrismaClient } from "@prisma/client";
 import Profil from "../../../components/Profil/Profil";
@@ -10,46 +12,54 @@ export default async function ProfilPage({ params }) {
   const id = params.id;
   if (!id) return redirect("/utilisateurs");
 
-  const decoded = await getUserFromToken(); // ✅ doit être async si tu utilises cookies()
+  const decoded = await getUserFromToken();
   if (!decoded) return redirect("/connexion");
 
-  const connectedUser = await prisma.Utilisateur.findUnique({
-    where: { id: decoded.id },
-  });
-if (
-  !connectedUser.verificationIdentite &&
-  connectedUser.verificationDeadline &&
-  new Date() > new Date(connectedUser.verificationDeadline)
-) {
-  return redirect("/verif-identite-obligatoire");
-}
+  try {
+    const connectedUser = await prisma.Utilisateur.findUnique({
+      where: { id: decoded.id },
+    });
 
-  const user = await prisma.Utilisateur.findUnique({
-    where: { id: parseInt(id) },
-    include: {
-      recherches: true,
-      envies: true,
-      photos: {
-        where: {
-          galeriePriveeId: null, // ✅ uniquement les photos publiques
+    if (
+      !connectedUser.verificationIdentite &&
+      connectedUser.verificationDeadline &&
+      new Date() > new Date(connectedUser.verificationDeadline)
+    ) {
+      return redirect("/verif-identite-obligatoire");
+    }
+
+    const user = await prisma.Utilisateur.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        recherches: true,
+        envies: true,
+        photos: {
+          where: {
+            galeriePriveeId: null,
+          },
+        },
+        galeriePrivee: {
+          include: { photos: true },
+        },
+        avisRecus: {
+          include: {
+            auteur: true,
+          },
         },
       },
-      galeriePrivee: { // ✅ nom correct
-        include: { photos: true },
-      },
-      avisRecus: {
-        include: {
-          auteur: true,
-        },
-      },
-    },
-  });
+    });
 
-  if (!user) return redirect("/utilisateurs");
+    if (!user) return redirect("/utilisateurs");
 
-  return (
-    <ProfilProtege userId={decoded.id}>
-      <Profil user={user} connectedUser={connectedUser} />
-    </ProfilProtege>
-  );
+    return (
+      <ProfilProtege userId={decoded.id}>
+        <Profil user={user} connectedUser={connectedUser} />
+      </ProfilProtege>
+    );
+  } catch (error) {
+    console.error("❌ Erreur Prisma sur /profil/[id] :", error);
+    return redirect("/erreur-serveur"); // tu peux créer une page custom si tu veux
+  } finally {
+    await prisma.$disconnect(); // ✅ évite les erreurs de connexions mortes
+  }
 }
