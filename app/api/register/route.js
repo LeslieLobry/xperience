@@ -159,7 +159,7 @@ export async function POST(req) {
         });
 
         console.log("✅ Utilisateur inscrit :", newUser.id);
-        return resolve(NextResponse.json({ success: true, user: newUser }));
+        return resolve(NextResponse.json({ success: true, user: newUser,photoUrl }));
       } catch (e) {
         console.error("❌ Erreur d'inscription :", e);
         console.error("🧾 Données utilisées :", {
