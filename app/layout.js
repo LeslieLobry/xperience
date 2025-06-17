@@ -1,4 +1,3 @@
-"use client";
 
 import "../app/globals.css";
 import { AuthProvider } from "../context/AuthContext";
@@ -16,7 +15,13 @@ const raleway = Raleway({
   weight: ["400", "500", "700"],
   variable: "--font-raleway",
 });
-
+export const metadata = {
+  title: "Xperiences",
+  description: "Site échangiste, libertinage",
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
 export default function RootLayout({ children }) {
 
 
