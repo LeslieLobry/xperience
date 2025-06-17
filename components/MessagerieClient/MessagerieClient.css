@@ -1,0 +1,50 @@
+.messagerie-page {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Liste à gauche sur desktop */
+.messagerie-page .liste-conversations {
+  width: 30%;
+  min-width: 250px;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+/* Section chat à droite */
+.messagerie-page .chat-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.no-conversation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+/* Responsive mobile */
+@media screen and (max-width: 768px) {
+  .messagerie-page {
+    flex-direction: column;
+  }
+
+  .messagerie-page .liste-conversations {
+    width: 100%;
+    min-width: unset;
+    max-height: 300px;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .messagerie-page .chat-section {
+    flex: 1;
+    height: calc(100vh - 300px);
+  }
+}

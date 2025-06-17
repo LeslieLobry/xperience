@@ -80,7 +80,7 @@
     align-items: center;
     gap: 16px;
 }
-@media (max-width: 768px){
+@media (min-width: 768px){
   .grid-evenements{
   display: flex;
   flex-direction: column;

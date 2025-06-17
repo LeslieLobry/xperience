@@ -8,6 +8,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { IncomingForm } from "formidable";
 import { Readable } from "stream";
 import fs from "fs/promises";
+
 export const config = {
   api: { bodyParser: false },
 };
@@ -45,7 +46,6 @@ export async function POST(req) {
         console.log("📥 Champs reçus :", fields);
         console.log("📷 Fichiers reçus :", files);
 
-        // ⚠️ Casts sécurisés
         const nom = String(fields.nom || "");
         const prenom = String(fields.prenom || "");
         const pseudo = String(fields.pseudo || "");
@@ -64,12 +64,10 @@ export async function POST(req) {
             : [fields["recherche[]"]]
           : [];
 
-        console.log("🧪 Vérification des types email/pseudo :", { email, pseudo });
         if (!captchaToken) {
           return resolve(NextResponse.json({ success: false, message: "Captcha manquant" }, { status: 400 }));
         }
 
-        // ✅ reCAPTCHA
         const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -93,27 +91,37 @@ export async function POST(req) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // ✅ Upload vers S3
+        // ✅ Gestion de la photo
         let photoUrl = null;
         const photo = files.photo;
 
-        if (photo && photo.filepath) {
-          console.log("⬆️ Upload photo :", photo.originalFilename);
-          const buffer = await fs.readFile(photo.filepath);
-          const filename = `photo_${Date.now()}_${photo.originalFilename}`;
-          const bucket = process.env.AWS_S3_BUCKET;
+        if (!photo) {
+          console.warn("❌ Aucun fichier photo reçu.");
+        } else if (!photo.filepath) {
+          console.warn("❌ Fichier photo reçu mais sans 'filepath'.", photo);
+        } else {
+          try {
+            const buffer = await fs.readFile(photo.filepath);
+            const filename = `photo_${Date.now()}_${photo.originalFilename}`;
+            const bucket = process.env.AWS_S3_BUCKET;
 
-          await s3.send(new PutObjectCommand({
-            Bucket: bucket,
-            Key: filename,
-            Body: Buffer.from(buffer),
-            ContentType: photo.mimetype,
-          }));
+            await s3.send(
+              new PutObjectCommand({
+                Bucket: bucket,
+                Key: filename,
+                Body: Buffer.from(buffer),
+                ContentType: photo.mimetype,
+              })
+            );
 
-          photoUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+            photoUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+            console.log("✅ Photo uploadée :", photoUrl);
+          } catch (uploadErr) {
+            console.error("❌ Erreur lors de l'upload S3 :", uploadErr);
+          }
         }
 
-        // ✅ Création utilisateur
+        // ✅ Création de l’utilisateur
         const newUser = await prisma.utilisateur.create({
           data: {
             nom,
@@ -158,23 +166,9 @@ export async function POST(req) {
           `,
         });
 
-        console.log("✅ Utilisateur inscrit :", newUser.id);
-        return resolve(NextResponse.json({ success: true, user: newUser,photoUrl }));
+        return resolve(NextResponse.json({ success: true, user: newUser, photoUrl }));
       } catch (e) {
         console.error("❌ Erreur d'inscription :", e);
-        console.error("🧾 Données utilisées :", {
-          nom,
-          prenom,
-          pseudo,
-          email,
-          type,
-          orientation,
-          age,
-          localisation,
-          consent,
-          photo: files.photo?.originalFilename,
-          recherches: recherche,
-        });
         return resolve(
           NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 })
         );

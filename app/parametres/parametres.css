@@ -92,3 +92,10 @@
   margin-bottom: 1rem;
   text-transform: uppercase;
 }
+@media (max-width: 768px){
+  .parametres-container{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+}

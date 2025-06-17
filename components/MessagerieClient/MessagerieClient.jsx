@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import ListeConversations from "../ListeConversations/ListeConversations";
 import ChatBox from "../ChatBox/ChatBox";
 import "../../app/messagerie/messagerie.css";
+import "./MessagerieClient.css"
 
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
@@ -37,6 +38,7 @@ export default function MessagerieClient({ user }) {
       <ListeConversations
         userId={user.id}
         onSelectConversation={handleSelectConversation}
+        className="liste-conversations"
       />
 
       <div className="chat-section">
