@@ -19,7 +19,7 @@ function streamFromRequest(request) {
       const { done, value } = await reader.read();
       if (done) return this.push(null);
       this.push(value);
-    }
+    },
   });
 }
 
@@ -42,19 +42,21 @@ export async function POST(req) {
       }
 
       try {
-        const {
-          nom,
-          prenom,
-          pseudo,
-          email,
-          password,
-          type,
-          orientation,
-          age,
-          localisation,
-          consent,
-          captchaToken
-        } = fields;
+        console.log("📥 Champs reçus :", fields);
+        console.log("📷 Fichiers reçus :", files);
+
+        // ⚠️ Casts sécurisés
+        const nom = String(fields.nom || "");
+        const prenom = String(fields.prenom || "");
+        const pseudo = String(fields.pseudo || "");
+        const email = String(fields.email || "");
+        const password = String(fields.password || "");
+        const type = String(fields.type || "");
+        const orientation = String(fields.orientation || "");
+        const age = parseInt(fields.age || "0", 10);
+        const localisation = String(fields.localisation || "");
+        const consent = fields.consent === "true";
+        const captchaToken = String(fields.captchaToken || "");
 
         const recherche = fields["recherche[]"]
           ? Array.isArray(fields["recherche[]"])
@@ -62,6 +64,7 @@ export async function POST(req) {
             : [fields["recherche[]"]]
           : [];
 
+        console.log("🧪 Vérification des types email/pseudo :", { email, pseudo });
         if (!captchaToken) {
           return resolve(NextResponse.json({ success: false, message: "Captcha manquant" }, { status: 400 }));
         }
@@ -75,6 +78,7 @@ export async function POST(req) {
 
         const captchaData = await captchaRes.json();
         if (!captchaData.success) {
+          console.warn("🛑 reCAPTCHA échoué :", captchaData);
           return resolve(NextResponse.json({ success: false, message: "Échec reCAPTCHA" }, { status: 400 }));
         }
 
@@ -83,6 +87,7 @@ export async function POST(req) {
         });
 
         if (exists) {
+          console.warn("🔁 Utilisateur déjà existant :", exists.email, exists.pseudo);
           return resolve(NextResponse.json({ success: false, message: "Email ou pseudo déjà utilisé" }, { status: 400 }));
         }
 
@@ -93,6 +98,7 @@ export async function POST(req) {
         const photo = files.photo;
 
         if (photo && photo.filepath) {
+          console.log("⬆️ Upload photo :", photo.originalFilename);
           const buffer = await Bun.file(photo.filepath).arrayBuffer();
           const filename = `photo_${Date.now()}_${photo.originalFilename}`;
           const bucket = process.env.AWS_S3_BUCKET;
@@ -117,10 +123,10 @@ export async function POST(req) {
             password: hashedPassword,
             type,
             orientation,
-            age: parseInt(age),
+            age,
             localisation,
-            consent: consent === "true",
-            consentCGU: consent === "true",
+            consent,
+            consentCGU: consent,
             consentCGUDate: new Date(),
             photoUrl,
             verificationIdentite: false,
@@ -152,9 +158,23 @@ export async function POST(req) {
           `,
         });
 
+        console.log("✅ Utilisateur inscrit :", newUser.id);
         return resolve(NextResponse.json({ success: true, user: newUser }));
       } catch (e) {
         console.error("❌ Erreur d'inscription :", e);
+        console.error("🧾 Données utilisées :", {
+          nom,
+          prenom,
+          pseudo,
+          email,
+          type,
+          orientation,
+          age,
+          localisation,
+          consent,
+          photo: files.photo?.originalFilename,
+          recherches: recherche,
+        });
         return resolve(
           NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 })
         );
