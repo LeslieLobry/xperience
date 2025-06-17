@@ -43,7 +43,7 @@ export default async function PageTousLesProfils() {
   return (
     <div className="accueil-page">
       <h1 className="profil-list1-title">Tous les profils</h1>
-      <div className="profil-list2">
+      <div className="profils-complet">
         {utilisateurs.map((user) => (
           <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
             <div className="profil-card">
