@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/Button/Button";
-import "../connexion/connexion.css"
+import "../connexion/connexion.css";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect } from "react";
-
 
 export default function ConnexionPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -15,7 +13,6 @@ export default function ConnexionPage() {
   const [success, setSuccess] = useState("");
   const router = useRouter();
   const { fetchUser } = useAuth();
-
   const { user } = useAuth();
 
   useEffect(() => {
@@ -28,30 +25,30 @@ export default function ConnexionPage() {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
-  setSuccess("");
 
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(form),
-  });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
 
-  const data = await res.json();
-  if (data.success) {
-    setSuccess("Connexion réussie !");
-    const userData = await fetchUser(); // ✅ on récupère l'user avec l'id
-    if (userData?.id) {
-      router.push(`/profil/${userData.id}`);
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      setSuccess("Connexion réussie !");
+      const userData = await fetchUser(); // ✅ on récupère l'user avec l'id
+      if (userData?.id) {
+        router.push(`/profil/${userData.id}`);
+      }
+    } else {
+      setError(data.message);
     }
-  } else {
-    setError(data.message);
-  }
-};
+  };
 
- 
   return (
     <div className="connexion-contenant">
       <h1 className="connexion-title">Connexion</h1>
@@ -78,17 +75,17 @@ const handleSubmit = async (e) => {
           required
         />
         <Button
-  type="submit"
-  title="Se connecter"
-  color="var(--primary-color)"
-/>
+          type="submit"
+          title="Se connecter"
+          color="var(--primary-color)"
+        />
       </form>
-      <div style={{ marginTop: "1rem", textAlign: "center" }}>
-  <Link href="/mot-de-passe-oublie" className="forgot-link">
-    Mot de passe oublié ?
-  </Link>
-</div>
 
+      <div style={{ marginTop: "1rem", textAlign: "center" }}>
+        <Link href="/mot-de-passe-oublie" className="forgot-link">
+          Mot de passe oublié ?
+        </Link>
+      </div>
     </div>
   );
 }

@@ -2,19 +2,20 @@ import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { use } from "react";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function GET() {
-  const headersList = await headers(); // ✅ ici on attend headers()
+  const headersList = headers(); // ✅ pas de await
   const cookieHeader = headersList.get("cookie") || "";
   const token = cookieHeader
     .split("; ")
-    .find(row => row.startsWith("token="))
+    .find((row) => row.startsWith("token="))
     ?.split("=")[1];
-console.log("📥 /api/me – Token reçu :", token);
+
+  console.log("📥 /api/me – Token reçu :", token);
+
   if (!token) {
     return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
   }

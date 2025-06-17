@@ -35,9 +35,8 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    console.log("🔐 AuthProvider monté");
     fetchUser();
-  }, [fetchUser]); // ✅ fetchUser peut maintenant être dans les dépendances sans warning
+  }, [fetchUser]); 
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser }}>
