@@ -1,41 +1,14 @@
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
-const secret = process.env.JWT_SECRET;
+import { getUserFromToken } from "../../../lib/auth";
 
 export async function GET() {
   try {
-    const headersList = headers(); // ✅ pas besoin de await ici
-    const cookieHeader = headersList.get("cookie") || "";
-
-    const token = cookieHeader
-      .split("; ")
-      .find((row) => row.startsWith("token="))
-      ?.split("=")[1];
-
-    console.log("📥 /api/me – Token reçu :", token);
-
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: "Non authentifié." },
-        { status: 401 }
-      );
-    }
-
-    const decoded = jwt.verify(token, secret);
-
-    const user = await prisma.utilisateur.findUnique({
-      where: { id: decoded.id },
-      include: { recherches: true, envies: true },
-    });
+    const user = await getUserFromToken();
 
     if (!user) {
       return NextResponse.json(
-        { success: false, message: "Utilisateur introuvable." },
-        { status: 404 }
+        { success: false, message: "Non authentifié." },
+        { status: 401 }
       );
     }
 
@@ -48,7 +21,7 @@ export async function GET() {
         pseudo: user.pseudo,
         photoUrl: user.photoUrl,
         recherches: user.recherches,
-        envies: user.ennvies,
+        envies: user.envies,
         age: user.age,
         description: user.description,
         localisation: user.localisation,
@@ -68,8 +41,8 @@ export async function GET() {
   } catch (err) {
     console.error("❌ Erreur API /me :", err.message);
     return NextResponse.json(
-      { success: false, message: "Token invalide ou erreur serveur." },
-      { status: 403 }
+      { success: false, message: "Erreur serveur ou token invalide." },
+      { status: 500 }
     );
   }
 }
