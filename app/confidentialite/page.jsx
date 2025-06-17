@@ -16,7 +16,7 @@ export default function ConfidentialitePage() {
       <p>
         Le responsable du traitement des données est :  
         <br />
-        <strong>Xperiences</strong> – contact@xperiences.fr
+        <strong>Xperiences</strong> – contact@x-periences.fr
       </p>
 
       <h2>2. Données collectées</h2>
@@ -61,7 +61,7 @@ export default function ConfidentialitePage() {
         <li>Droit d&rsquo;opposition ou de limitation du traitement</li>
       </ul>
       <p>
-        Pour exercer vos droits, écrivez à : <a href="mailto:contact@xperiences.fr">contact@xperiences.fr</a>
+        Pour exercer vos droits, écrivez à : <a href="mailto:contact@x-periences.fr">contact@x-periences.fr</a>
       </p>
 
       <h2>7. Sécurité</h2>

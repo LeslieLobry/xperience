@@ -54,7 +54,7 @@ export default function CookiesPage() {
       </ul>
       <p>
         Vous pouvez exercer vos droits à tout moment en nous contactant à&nbsp;:{" "}
-        <a href="mailto:contact@xperiences.fr">contact@xperiences.fr</a>
+        <a href="mailto:contact@x-periences.fr">contact@x-periences.fr</a>
       </p>
 
       <h2>5. Modification de la politique</h2>

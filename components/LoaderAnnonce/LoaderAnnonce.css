@@ -15,6 +15,9 @@
   text-align: center;
   max-width: 90%;
 }
+.loader-contenu p {
+  font-size: 36px;
+}
 
 .fade-in {
   animation: fadeIn 1s ease-in-out;

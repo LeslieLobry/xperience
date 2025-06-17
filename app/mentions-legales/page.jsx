@@ -13,7 +13,7 @@ export default function MentionsLegalesPage() {
         <strong>Xperiences</strong><br />
         [Raison sociale ou nom du responsable]<br />
         [Adresse postale]<br />
-        Email : <a href="mailto:contact@xperiences.fr">contact@xperiences.fr</a>
+        Email : <a href="mailto:contact@x-periences.fr">contact@x-periences.fr</a>
       </p>
 
       <h2>Hébergement</h2>

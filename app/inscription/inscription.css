@@ -126,7 +126,7 @@ select {
   cursor: pointer;
   color: #ccc;
 }
-
+   
   
 /* Responsiveness */
 @media screen and (max-width: 768px) {
