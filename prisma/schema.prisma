@@ -84,6 +84,7 @@ model GaleriePrivee {
   demandesAcces DemandeAcces[] @relation("DemandeGalerie")
   utilisateur   Utilisateur    @relation(fields: [utilisateurId], references: [id])
   photos        Photo[]
+  @@map("GaleriePrivee")
 }
 
 model Evenement {
@@ -106,6 +107,7 @@ model Evenement {
   createurId   Int
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   participants Utilisateur[] @relation("Participation")
+  @@map("Evenement")
 }
 
 model Article {
@@ -120,6 +122,7 @@ model Article {
   vues        Int            @default(0)
   auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
   images      ImageArticle[]
+  @@map("Article")
 }
 
 model ImageArticle {
@@ -127,6 +130,7 @@ model ImageArticle {
   url       String
   articleId String
   article   Article @relation(fields: [articleId], references: [id])
+  @@map("ImageArticle")
 }
 
 model Recherche {
@@ -134,6 +138,7 @@ model Recherche {
   label         String
   utilisateurId Int
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  @@map("Recherche")
 }
 
 model Envie {
@@ -141,6 +146,7 @@ model Envie {
   label         String
   utilisateurId Int
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+    @@map("Envie")
 }
 
 model EmailVerificationToken {
@@ -149,6 +155,7 @@ model EmailVerificationToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
+    @@map("EmailVerificationToken")
 }
 
 model PasswordResetToken {
@@ -157,6 +164,7 @@ model PasswordResetToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
+    @@map("PasswordResetToken")
 }
 
 model Avis {
@@ -167,6 +175,7 @@ model Avis {
   cibleId     Int
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
+    @@map("Avis")
 
   @@unique([auteurId, cibleId])
 }
@@ -177,6 +186,7 @@ model Conversation {
   createdAt    DateTime      @default(now())
   messages     Message[]
   participants Participant[]
+    @@map("Conversation")
 }
 
 model Participant {
@@ -189,6 +199,7 @@ model Participant {
   utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
 
   @@unique([utilisateurId, conversationId])
+    @@map("Participant")
 }
 
 model Message {
@@ -203,6 +214,7 @@ model Message {
   createdAt      DateTime     @default(now())
   auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id])
+    @@map("Message")
 }
 
 model Photo {
@@ -213,6 +225,7 @@ model Photo {
   createdAt       DateTime       @default(now())
   galeriePrivee   GaleriePrivee? @relation(fields: [galeriePriveeId], references: [id])
   utilisateur     Utilisateur    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+    @@map("Photo")
 }
 
 model GlobalMessage {
@@ -221,6 +234,7 @@ model GlobalMessage {
   contenu   String
   createdAt DateTime    @default(now())
   auteur    Utilisateur @relation(fields: [auteurId], references: [id])
+    @@map("GlobalMessage")
 }
 
 model GlobalChatRead {
@@ -228,6 +242,7 @@ model GlobalChatRead {
   userId   Int         @unique
   lastRead DateTime
   user     Utilisateur @relation(fields: [userId], references: [id])
+    @@map("GlobalChatRead")
 }
 
 model Blocage {
@@ -239,6 +254,7 @@ model Blocage {
   bloque     Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
 
   @@unique([bloqueurId, bloquéId])
+    @@map("Blocage")
 }
 
 model Like {
@@ -250,6 +266,7 @@ model Like {
   cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
 
   @@unique([auteurId, cibleId])
+    @@map("Like")
 }
 
 model Notification {
@@ -260,12 +277,14 @@ model Notification {
   lu            Boolean     @default(false)
   createdAt     DateTime    @default(now())
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+    @@map("Notification")
 }
 
 model AbonneNewsletter {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   createdAt DateTime @default(now())
+    @@map("AbonneNewsletterRecherche")
 }
 
 model Newsletter {
@@ -273,6 +292,7 @@ model Newsletter {
   titre     String
   contenu   String
   createdAt DateTime @default(now())
+    @@map("Newsletter")
 }
 
 enum Role {
