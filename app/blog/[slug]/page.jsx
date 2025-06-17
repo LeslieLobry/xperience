@@ -1,5 +1,5 @@
 import { prisma } from "../../../lib/prisma";
-import { getUserFromToken } from "../../../lib/getUserFromToken";
+import { getUserFromToken } from "../../../lib/auth";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
