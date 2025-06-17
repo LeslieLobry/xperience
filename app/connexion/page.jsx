@@ -12,6 +12,8 @@ export default function ConnexionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+
  const { user, fetchUser } = useAuth();
 
   useEffect(() => {
@@ -66,15 +68,25 @@ export default function ConnexionPage() {
           className="form-input"
           required
         />
-        <input
-          type="password"
-          name="password"
-          placeholder="Mot de passe"
-          value={form.password}
-          onChange={handleChange}
-          className="form-input"
-          required
-        />
+        <div className="input-wrapper">
+  <input
+    type={showPassword ? "text" : "password"}
+    name="password"
+    placeholder="Mot de passe"
+    value={form.password}
+    onChange={handleChange}
+    className="form-input"
+    required
+  />
+  <button
+    type="button"
+    className="toggle-password"
+    onClick={() => setShowPassword((prev) => !prev)}
+  >
+    {showPassword ? "🙈" : "👁️"}
+  </button>
+</div>
+
         <Button
           type="submit"
           title="Se connecter"

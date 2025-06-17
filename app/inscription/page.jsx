@@ -31,6 +31,8 @@ export default function RegisterForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+const [showPassword, setShowPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
@@ -255,23 +257,81 @@ const handleSubmit = async (e) => {
           {success && <p className="form-success">{success}</p>}
 
           {step === 1 && (
-            <>
-              <input type="text" name="nom" placeholder="Nom" onChange={handleChange} className="form-input" />
-              <input type="text" name="prenom" placeholder="Prénom" onChange={handleChange} className="form-input" />
-              <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} className="form-input" />
-              <input type="email" name="email" placeholder="Email" onChange={handleChange} className="form-input" />
-              <input type="password" name="password" placeholder="Mot de passe" onChange={handleChange} className="form-input" />
-              <input type="password" name="confirmPassword" placeholder="Confirmer mot de passe" onChange={handleChange} className="form-input" />
-              <div className="form-buttons">
-                <Button
-                  type="button"
-                  title="Suivant"
-                  onClick={() => validateStep() && nextStep()}
-                  color="var(--primary-color)"
-                />
-              </div>
-            </>
-          )}
+  <>
+    <input
+      type="text"
+      name="nom"
+      placeholder="Nom"
+      onChange={handleChange}
+      className="form-input"
+    />
+    <input
+      type="text"
+      name="prenom"
+      placeholder="Prénom"
+      onChange={handleChange}
+      className="form-input"
+    />
+    <input
+      type="text"
+      name="pseudo"
+      placeholder="Pseudo"
+      onChange={handleChange}
+      className="form-input"
+    />
+    <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      onChange={handleChange}
+      className="form-input"
+    />
+
+    <div className="input-wrapper">
+      <input
+        type={showPassword ? "text" : "password"}
+        name="password"
+        placeholder="Mot de passe"
+        onChange={handleChange}
+        className="form-input"
+      />
+      <button
+        type="button"
+        className="toggle-password"
+        onClick={() => setShowPassword((prev) => !prev)}
+      >
+        {showPassword ? "🙈" : "👁️"}
+      </button>
+    </div>
+
+    <div className="input-wrapper">
+      <input
+        type={showConfirmPassword ? "text" : "password"}
+        name="confirmPassword"
+        placeholder="Confirmer mot de passe"
+        onChange={handleChange}
+        className="form-input"
+      />
+      <button
+        type="button"
+        className="toggle-password"
+        onClick={() => setShowConfirmPassword((prev) => !prev)}
+      >
+        {showConfirmPassword ? "🙈" : "👁️"}
+      </button>
+    </div>
+
+    <div className="form-buttons">
+      <Button
+        type="button"
+        title="Suivant"
+        onClick={() => validateStep() && nextStep()}
+        color="var(--primary-color)"
+      />
+    </div>
+  </>
+)}
+
 
           {step === 2 && (
   <>

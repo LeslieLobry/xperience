@@ -49,3 +49,23 @@
 .form-connexion :not(:placeholder-shown){
     background-color: transparent;
 }
+.input-wrapper {
+  position: relative;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding-right: 40px; /* pour ne pas cacher le texte sous l’icône */
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #ccc;
+}

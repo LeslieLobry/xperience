@@ -26,7 +26,6 @@ export default function ChatBubble() {
     try {
       const [privateRes, globalRes] = await Promise.all([
         fetch(`/api/unread-messages-count?userId=${user.id}`),
-        fetch(`/api/unread-global-messages?userId=${user.id}`),
       ]);
 
       const { unreadCount: privateCount = 0 } = await privateRes.json();

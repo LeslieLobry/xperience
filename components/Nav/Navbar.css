@@ -77,13 +77,13 @@
     right: 0;
     flex-direction: column;
     background-color: #0e1a2b;
-    width: 220px;
     transform: translateX(100%);
     padding: 1rem;
     border-left: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     z-index: 998;
     overflow: visible; /* ✅ Pour éviter que le menu soit masqué */
+    gap: 0;
   }
 
   .navLinks.active {

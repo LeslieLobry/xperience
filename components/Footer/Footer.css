@@ -60,7 +60,9 @@
 .footer-reseau a:hover img {
     transform: scale(1.1);
 }
-
+.footer-contact-link{
+margin-left: 3px;
+}
 /* 🎯 RESPONSIVE VERSION */
 @media screen and (max-width: 768px) {
     .footer-contenant {

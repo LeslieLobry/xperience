@@ -33,25 +33,40 @@ return(
         </ul>
     </div>
     <div className="footer-contact">
-        <Link href="/contact" className="footer-contact-link">
+        <Link href="/contact"  target="_blank" rel="noopener noreferrer" className="footer-contact-link">
          <h2>Nous Contacter</h2>
         </Link>
 
         <NewsletterForm />
     </div>
     <div className="footer-reseau">
-        <h2>Nos réseaux</h2>
-        <a href="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR">
-            <Image src={facebook} alt="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR" width={50}
-                className="footer-facebook" />
-        </a>
-        <a href="https://www.instagram.com/x.p.eriences/">
-            <Image src={insta} alt="liens insta" width={50} className="footer-insta" />
-        </a>
-        <a href="https://www.tiktok.com/@xperiences1">
-            <Image src={tik} alt="liens insta" width={50} className="footer-insta" />
-        </a>
-    </div>
+  <h2>Nos réseaux</h2>
+
+  <a
+    href="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <Image src={facebook} alt="Facebook" width={50} className="footer-facebook" />
+  </a>
+
+  <a
+    href="https://www.instagram.com/x.p.eriences/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <Image src={insta} alt="Instagram" width={50} className="footer-insta" />
+  </a>
+
+  <a
+    href="https://www.tiktok.com/@xperiences1"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <Image src={tik} alt="TikTok" width={50} className="footer-insta" />
+  </a>
+</div>
+
 </div>
 )
 }
