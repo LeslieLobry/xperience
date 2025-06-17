@@ -15,6 +15,8 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function AccueilPage() {
+  console.log("🔍 COOKIE TOKEN RECU SERVER :", cookies().get("token"));
+
   const cookieStore = cookies();
   const token = cookieStore.get("token")?.value;
   if (!token) return redirect("/connexion");

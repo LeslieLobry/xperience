@@ -45,7 +45,9 @@ export async function POST(req) {
       secure: process.env.NODE_ENV === "production", // ✅ true en prod
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 jours
+      maxAge: 60 * 60 * 24 * 7, // 7 joursdomain: ",
+     domain: ".x-periences.fr",
+
     });
 
     return response;
