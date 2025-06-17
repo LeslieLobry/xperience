@@ -30,6 +30,8 @@ export default function ConnexionPage() {
     e.preventDefault();
     setError("");
     setSuccess("");
+    router.push("/accueil-page");
+
 
     const res = await fetch("/api/login", {
       method: "POST",
@@ -40,7 +42,8 @@ export default function ConnexionPage() {
     const data = await res.json();
     if (data.success) {
       setSuccess("Connexion réussie !");
-      const userData = await fetchUser(); // ✅ on récupère l'user avec l'id
+      const userData = await fetchUser(); 
+      console.log("✅ userData :", userData);
       if (userData?.id) {
         router.push(`/profil/${userData.id}`);
       }

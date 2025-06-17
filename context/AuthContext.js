@@ -8,22 +8,24 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   // ✅ Memoïser fetchUser avec useCallback pour stabilité
-  const fetchUser = useCallback(async () => {
-    try {
-      const res = await fetch('/api/me', { credentials: 'include' });
-      const data = await res.json();
-      if (data.success) {
-        setUser(data.user);
-        return data.user;
-      } else {
-        setUser(null);
-        return null;
-      }
-    } catch (error) {
+const fetchUser = useCallback(async () => {
+  try {
+    const res = await fetch('/api/me', { credentials: 'include' });
+    const data = await res.json();
+    console.log("🔁 fetchUser() - data:", data);
+    if (data.success && data.user) {
+      setUser(data.user);
+      return data.user;
+    } else {
       setUser(null);
       return null;
     }
-  }, []); // stable tant que rien ne change (ce qui est votre cas ici)
+  } catch (err) {
+    console.error("❌ fetchUser() error :", err);
+    setUser(null);
+    return null;
+  }
+}, []);
 
   const logout = async () => {
     await fetch('/api/logout', { credentials: 'include' });
