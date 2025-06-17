@@ -1,10 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { prisma } from "../../../lib/prisma"; // ✅ chemin à adapter si besoin
 
-const prisma = new PrismaClient();
+
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 

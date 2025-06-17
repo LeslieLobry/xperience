@@ -7,106 +7,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-enum Role {
-  USER
-  ADMIN
-}
-
-enum MessageType {
-  TEXTE
-  IMAGE
-  VIDEO
-}
-
-enum DemandeStatut {
-  EN_ATTENTE
-  ACCEPTEE
-  REFUSEE
-}
-
 model DemandeAcces {
-  id Int @id @default(autoincrement())
-
+  id              Int           @id @default(autoincrement())
   galeriePriveeId Int
+  demandeurId     Int
+  proprietaireId  Int
+  statut          DemandeStatut @default(EN_ATTENTE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  demandeur       Utilisateur   @relation("Demandeur", fields: [demandeurId], references: [id])
   galeriePrivee   GaleriePrivee @relation("DemandeGalerie", fields: [galeriePriveeId], references: [id])
-
-
-  demandeurId Int
-  demandeur   Utilisateur @relation("Demandeur", fields: [demandeurId], references: [id])
-
-  proprietaireId Int // <- le propriétaire de la galerie
-  proprietaire   Utilisateur @relation("GalerieProprio", fields: [proprietaireId], references: [id])
-
-  statut    DemandeStatut @default(EN_ATTENTE)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  proprietaire    Utilisateur   @relation("GalerieProprio", fields: [proprietaireId], references: [id])
 
   @@unique([galeriePriveeId, demandeurId])
 }
 
 model Utilisateur {
-  id              Int             @id @default(autoincrement())
-  nom             String
-  prenom          String
-  pseudo          String          @unique
-  email           String          @unique
-  role            Role            @default(USER)
-  password        String
-  type            String
-  orientation     String
-  age             Int
-  consent         Boolean
-  localisation    String
-  photoUrl        String?
-  createdAt       DateTime        @default(now())
-  lastLogin       DateTime?
-  emailVerified   DateTime?
-  description     String?
-  experience      String?
-  rechercheType   String?
-  fumeur          String?
-  silhouette      String?
-  taille          Int?
-  origines        String?
-  yeux            String?
-  cheveux         String?
-  statut          String          @default("en_ligne")
-  avisRecus       Avis[]          @relation("AvisCible")
-  avisLaisses     Avis[]          @relation("AvisAuteur")
-  evenements      Evenement[]     @relation("Participation")
-  evenementsCrees Evenement[]     @relation("EvenementCreateur")
-  articles        Article[]
-  messages        Message[]       @relation("MessageAuteur")
-  participants    Participant[]
-  messagesGlobaux GlobalMessage[]
-  globalChatRead  GlobalChatRead?
-  consentCGU      Boolean         @default(false)
-  consentCGUDate  DateTime?
-  blocagesFaits   Blocage[]       @relation("BlocagesFaits")
-  blocagesRecus   Blocage[]       @relation("BlocagesRecus")
-  likesEnvoyes    Like[]          @relation("LikesEnvoyes")
-  likesRecus      Like[]          @relation("LikesRecus")
-  notifications   Notification[]
-  demandesFaite   DemandeAcces[]  @relation("Demandeur")
-  demandesRecues  DemandeAcces[]  @relation("GalerieProprio")
-  galeriePrivee   GaleriePrivee? // relation 1-1
-  recherches      Recherche[]
-  envies          Envie[]
-  photos          Photo[]
-  verificationIdentite   Boolean   @default(false)
-  verificationDeadline   DateTime? // Date limite à laquelle l'utilisateur doit avoir terminé la vérification
+  id                   Int             @id @default(autoincrement())
+  nom                  String
+  prenom               String
+  pseudo               String          @unique
+  email                String          @unique
+  role                 Role            @default(USER)
+  password             String
+  type                 String
+  orientation          String
+  age                  Int
+  consent              Boolean
+  localisation         String
+  photoUrl             String?
+  createdAt            DateTime        @default(now())
+  lastLogin            DateTime?
+  emailVerified        DateTime?
+  description          String?
+  experience           String?
+  rechercheType        String?
+  fumeur               String?
+  silhouette           String?
+  taille               Int?
+  origines             String?
+  yeux                 String?
+  cheveux              String?
+  statut               String          @default("en_ligne")
+  consentCGU           Boolean         @default(false)
+  consentCGUDate       DateTime?
+  verificationDeadline DateTime?
+  verificationIdentite Boolean         @default(false)
+  articles             Article[]
+  avisLaisses          Avis[]          @relation("AvisAuteur")
+  avisRecus            Avis[]          @relation("AvisCible")
+  blocagesFaits        Blocage[]       @relation("BlocagesFaits")
+  blocagesRecus        Blocage[]       @relation("BlocagesRecus")
+  demandesFaite        DemandeAcces[]  @relation("Demandeur")
+  demandesRecues       DemandeAcces[]  @relation("GalerieProprio")
+  envies               Envie[]
+  evenementsCrees      Evenement[]     @relation("EvenementCreateur")
+  galeriePrivee        GaleriePrivee?
+  globalChatRead       GlobalChatRead?
+  messagesGlobaux      GlobalMessage[]
+  likesEnvoyes         Like[]          @relation("LikesEnvoyes")
+  likesRecus           Like[]          @relation("LikesRecus")
+  messages             Message[]       @relation("MessageAuteur")
+  notifications        Notification[]
+  participants         Participant[]
+  photos               Photo[]
+  recherches           Recherche[]
+  evenements           Evenement[]     @relation("Participation")
 }
 
 model GaleriePrivee {
-  id            Int         @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   nom           String
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
-  utilisateurId Int         @unique
-  photos        Photo[]
-  createdAt     DateTime    @default(now())
-
+  utilisateurId Int            @unique
+  createdAt     DateTime       @default(now())
   demandesAcces DemandeAcces[] @relation("DemandeGalerie")
+  utilisateur   Utilisateur    @relation(fields: [utilisateurId], references: [id])
+  photos        Photo[]
 }
 
 model Evenement {
@@ -126,8 +102,8 @@ model Evenement {
   latitude     Float?
   longitude    Float?
   lien         String?
-  createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   createurId   Int
+  createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   participants Utilisateur[] @relation("Participation")
 }
 
@@ -137,33 +113,33 @@ model Article {
   titre       String
   description String?
   contenu     String
-  images      ImageArticle[]
   auteurId    Int
-  auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   vues        Int            @default(0)
+  auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
+  images      ImageArticle[]
 }
 
 model ImageArticle {
   id        String  @id @default(cuid())
   url       String
-  article   Article @relation(fields: [articleId], references: [id])
   articleId String
+  article   Article @relation(fields: [articleId], references: [id])
 }
 
 model Recherche {
   id            Int         @id @default(autoincrement())
   label         String
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
 }
 
 model Envie {
   id            Int         @id @default(autoincrement())
   label         String
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
 }
 
 model EmailVerificationToken {
@@ -196,58 +172,54 @@ model Avis {
 
 model Conversation {
   id           Int           @id @default(autoincrement())
-  participants Participant[]
-  messages     Message[]
   updatedAt    DateTime      @updatedAt
   createdAt    DateTime      @default(now())
+  messages     Message[]
+  participants Participant[]
 }
 
 model Participant {
-  id             Int @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   utilisateurId  Int
   conversationId Int
-
-  utilisateur  Utilisateur  @relation(fields: [utilisateurId], references: [id])
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-
-  lastReadAt DateTime? // Date à laquelle l’utilisateur a lu cette conversation
-  supprimé  Boolean   @default(false)
+  lastReadAt     DateTime?
+  supprimé      Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
 
   @@unique([utilisateurId, conversationId])
 }
 
 model Message {
-  id             Int         @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   conversationId Int
   auteurId       Int
   contenu        String?
   imageUrl       String?
   videoUrl       String?
-  type           MessageType @default(TEXTE)
-  lu             Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-  auteur       Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
+  type           MessageType  @default(TEXTE)
+  lu             Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
 }
 
 model Photo {
   id              Int            @id @default(autoincrement())
   url             String
-  utilisateur     Utilisateur    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
   utilisateurId   Int
-  galeriePrivee   GaleriePrivee? @relation(fields: [galeriePriveeId], references: [id])
   galeriePriveeId Int?
   createdAt       DateTime       @default(now())
+  galeriePrivee   GaleriePrivee? @relation(fields: [galeriePriveeId], references: [id])
+  utilisateur     Utilisateur    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
 }
 
 model GlobalMessage {
-  id        Int      @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   auteurId  Int
   contenu   String
-  createdAt DateTime @default(now())
-
-  auteur Utilisateur @relation(fields: [auteurId], references: [id])
+  createdAt DateTime    @default(now())
+  auteur    Utilisateur @relation(fields: [auteurId], references: [id])
 }
 
 model GlobalChatRead {
@@ -259,11 +231,11 @@ model GlobalChatRead {
 
 model Blocage {
   id         Int         @id @default(autoincrement())
-  bloqueur   Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
   bloqueurId Int
-  bloque     Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
   bloquéId  Int
   createdAt  DateTime    @default(now())
+  bloqueur   Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
+  bloque     Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
 
   @@unique([bloqueurId, bloquéId])
 }
@@ -276,19 +248,19 @@ model Like {
   auteur    Utilisateur @relation("LikesEnvoyes", fields: [auteurId], references: [id])
   cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
 
-  @@unique([auteurId, cibleId]) // un seul like possible par paire
+  @@unique([auteurId, cibleId])
 }
 
 model Notification {
-  id            Int      @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   utilisateurId Int
   message       String
-  lien          String? // par ex. lien vers profil ou message
-  lu            Boolean  @default(false)
-  createdAt     DateTime @default(now())
-
-  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id])
+  lien          String?
+  lu            Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
 }
+
 model AbonneNewsletter {
   id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -298,6 +270,23 @@ model AbonneNewsletter {
 model Newsletter {
   id        Int      @id @default(autoincrement())
   titre     String
-  contenu   String   // HTML ou texte
+  contenu   String
   createdAt DateTime @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MessageType {
+  TEXTE
+  IMAGE
+  VIDEO
+}
+
+enum DemandeStatut {
+  EN_ATTENTE
+  ACCEPTEE
+  REFUSEE
 }
