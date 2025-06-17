@@ -46,8 +46,6 @@ export async function POST(req) {
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 joursdomain: ",
-     domain: ".x-periences.fr",
-
     });
 
     return response;

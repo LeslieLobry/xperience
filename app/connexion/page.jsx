@@ -40,8 +40,10 @@ export default function ConnexionPage() {
 
   if (data.success) {
   setSuccess("Connexion réussie !");
-  await fetchUser(); // 🔁 Mets à jour le contexte utilisateur
+  await fetchUser().then(() => {
   router.push("/accueil-page");
+});
+
 }
  else {
     setError(data.message);
