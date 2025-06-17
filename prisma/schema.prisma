@@ -73,6 +73,7 @@ model Utilisateur {
   photos               Photo[]
   recherches           Recherche[]
   evenements           Evenement[]     @relation("Participation")
+    @@map("Utilisateur")
 }
 
 model GaleriePrivee {
