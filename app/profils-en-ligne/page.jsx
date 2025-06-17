@@ -1,11 +1,10 @@
-import { PrismaClient } from "../../lib/prisma";
+import { prisma } from "../../lib/prisma"; // ✅ Correct
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function PageProfilsEnLigne() {
