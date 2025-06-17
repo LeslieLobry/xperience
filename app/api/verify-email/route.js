@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../../lib/prisma";
+import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ export async function GET(request) {
   const email = searchParams.get("email");
 
   if (!token || !email) {
-    return Response.json({ success: false, message: "Lien invalide ou incomplet." }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Lien invalide ou incomplet." }, { status: 400 });
   }
 
   try {
@@ -17,11 +18,11 @@ export async function GET(request) {
     });
 
     if (!record || record.email !== email) {
-      return Response.json({ success: false, message: "Lien invalide." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "Lien invalide." }, { status: 401 });
     }
 
     if (record.expiresAt < new Date()) {
-      return Response.json({ success: false, message: "Lien expiré." }, { status: 410 });
+      return NextResponse.json({ success: false, message: "Lien expiré." }, { status: 410 });
     }
 
     await prisma.utilisateur.update({
@@ -31,9 +32,9 @@ export async function GET(request) {
 
     await prisma.emailVerificationToken.delete({ where: { token } });
 
-    return Response.json({ success: true, message: "Email confirmé." }, { status: 200 });
+    return NextResponse.json({ success: true, message: "Email confirmé." }, { status: 200 });
   } catch (error) {
     console.error("Erreur vérification :", error);
-    return Response.json({ success: false, message: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500 });
   }
 }

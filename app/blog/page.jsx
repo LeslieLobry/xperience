@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { prisma } from "../../lib/prisma";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 import DeleteArticleButton from "../../components/DeleteArticleButton/DeleteArticleButton";
 import "./blog.css";
 import { redirect } from "next/navigation";
+import { getUserFromToken } from "../../lib/auth";
+
+
 
 
 const secret = process.env.JWT_SECRET;
@@ -12,20 +13,8 @@ if (!secret) throw new Error("JWT_SECRET non défini");
 
 export default async function BlogPage() {
   // 🔐 Vérifier l'utilisateur connecté
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  let user = null;
-
-  if (token) {
-    try {
-      user = jwt.verify(token, secret);
-    } catch {
-      // token invalide
-    }
-  }if (!user) {
-    // Si pas connecté, redirection vers la page de connexion
-    redirect("/connexion");
-  }
+ const user = await getUserFromToken();
+if (!user) redirect("/connexion");
 
 
   const isAdmin = user?.role === "ADMIN";

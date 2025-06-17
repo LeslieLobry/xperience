@@ -9,7 +9,7 @@ import DerniersArticles from "../../components/DerniersArticles/DerniersArticles
 import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
-import LoaderAnnonce from "../..LoaderAnnonce/components/LoaderAnnonce/LoaderAnnonce";
+import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
 import "./accueil.css";
 
 export default async function AccueilPage() {
@@ -33,7 +33,8 @@ export default async function AccueilPage() {
   try {
     exclus = await getIdsUtilisateursExclus(user.id);
   } catch (err) {
-    console.error("❌ Erreur récupération exclusions :", err);
+    console.error("Erreur récupération des profils :", err.message, err.stack);
+
   }
 
   const whereCommun = {
@@ -60,6 +61,8 @@ export default async function AccueilPage() {
     ]);
   } catch (err) {
     console.error("❌ Erreur récupération des profils :", err);
+    console.error("Erreur récupération des profils :", err.message, err.stack);
+
   }
 
   const renderProfilCard = (user) => (

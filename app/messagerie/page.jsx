@@ -1,15 +1,15 @@
-import dynamic from 'next/dynamic';
 import { cookies } from "next/headers";
 import { getUserFromToken } from "../../lib/auth";
-import MessagerieClient from '../../components/MessegerieClient/MessegerieClient';
-import "../../app/messagerie/messagerie.css"
+import MessagerieClient from "../../components/MessegerieClient/MessegerieClient";
+import { redirect } from "next/navigation";
+import "../../app/messagerie/messagerie.css";
 
 export default async function MessageriePage() {
   const cookieStore = cookies();
   const user = await getUserFromToken(cookieStore);
 
   if (!user) {
-    return <p>Connecte-toi pour accéder à la messagerie.</p>;
+    redirect("/connexion");
   }
 
   return <MessagerieClient user={user} />;

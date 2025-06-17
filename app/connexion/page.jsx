@@ -12,8 +12,7 @@ export default function ConnexionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
-  const { fetchUser } = useAuth();
-  const { user } = useAuth();
+ const { user, fetchUser } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -40,10 +39,11 @@ export default function ConnexionPage() {
   const data = await res.json();
 
   if (data.success) {
-    setSuccess("Connexion réussie !");
-    // ✅ Pas besoin de fetchUser : le serveur s’en chargera via le cookie HttpOnly
-    router.push("/accueil-page");
-  } else {
+  setSuccess("Connexion réussie !");
+  await fetchUser(); // 🔁 Mets à jour le contexte utilisateur
+  router.push("/accueil-page");
+}
+ else {
     setError(data.message);
   }
 };

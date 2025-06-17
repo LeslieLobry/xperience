@@ -1,13 +1,10 @@
-// app/profils/page.jsx
-import { PrismaClient } from "@prisma/client";
 import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
+import jwt from "jsonwebtoken";
 import Link from "next/link";
-// import "../accueilconnec/accueil.css";
+import { prisma } from "../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export default async function PageTousLesProfils() {
@@ -23,12 +20,7 @@ export default async function PageTousLesProfils() {
     return redirect("/connexion");
   }
 
-  let exclus = [];
-  try {
-    exclus = await getIdsUtilisateursExclus(decoded.id);
-  } catch (err) {
-    console.error("Erreur exclusions :", err);
-  }
+  const exclus = await getIdsUtilisateursExclus(decoded.id);
 
   const utilisateurs = await prisma.utilisateur.findMany({
     where: {
@@ -56,13 +48,7 @@ export default async function PageTousLesProfils() {
           <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
             <div className="profil-card">
               <img
-                src={
-                  user.photoUrl
-                    ? user.photoUrl.startsWith("http")
-                      ? user.photoUrl
-                      : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
-                    : "/default.jpg"
-                }
+                src={user.photoUrl?.startsWith("http") ? user.photoUrl : "/default.jpg"}
                 alt={user.pseudo}
                 className="profil-photo"
               />

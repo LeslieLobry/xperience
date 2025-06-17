@@ -1,9 +1,8 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 const prisma = new PrismaClient();
@@ -22,28 +21,18 @@ export default async function PageProfilsEnLigne() {
     return redirect("/connexion");
   }
 
-  let exclus = [];
-  try {
-    exclus = await getIdsUtilisateursExclus(decoded.id);
-  } catch (err) {
+  const exclusions = await getIdsUtilisateursExclus(decoded.id).catch((err) => {
     console.error("Erreur exclusions :", err);
-  }
-
-  const exclusions = [...exclus, decoded.id];
-
-  const where = exclusions.length > 0
-    ? {
-        NOT: {
-          id: { in: exclusions },
-        },
-        statut: "en_ligne",
-      }
-    : {
-        statut: "en_ligne",
-      };
+    return [];
+  });
 
   const utilisateurs = await prisma.utilisateur.findMany({
-    where,
+    where: {
+      NOT: {
+        id: { in: [...exclusions, decoded.id] },
+      },
+      statut: "en_ligne",
+    },
     select: {
       id: true,
       pseudo: true,
@@ -52,9 +41,8 @@ export default async function PageProfilsEnLigne() {
       localisation: true,
     },
     orderBy: {
-  createdAt: "desc",
-},
-
+      createdAt: "desc",
+    },
   });
 
   return (
@@ -62,21 +50,25 @@ export default async function PageProfilsEnLigne() {
       <h1 className="profil-list1-title">Profils en ligne</h1>
       <div className="profil-list1">
         {utilisateurs.map((user) => (
-          <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
+          <Link
+            href={`/profil/${user.id}`}
+            key={user.id}
+            className="profil-card-link"
+          >
             <div className="profil-card">
               <img
                 src={
-                  user.photoUrl
-                    ? user.photoUrl.startsWith("http")
-                      ? user.photoUrl
-                      : `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
+                  user.photoUrl?.startsWith("http")
+                    ? user.photoUrl
                     : "/default.jpg"
                 }
                 alt={user.pseudo}
                 className="profil-photo"
               />
               <h2>{user.pseudo}</h2>
-              <p>{user.age} ans - {user.localisation}</p>
+              <p>
+                {user.age} ans - {user.localisation}
+              </p>
             </div>
           </Link>
         ))}

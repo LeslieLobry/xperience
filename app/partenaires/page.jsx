@@ -1,4 +1,4 @@
-// app/partenaires/page.jsx
+
 import Link from "next/link";
 import "./partenaires.css";
 

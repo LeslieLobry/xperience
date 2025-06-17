@@ -1,6 +1,5 @@
 import { prisma } from "../../../lib/prisma";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+import { getUserFromToken } from "../../../lib/getUserFromToken";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
@@ -14,15 +13,8 @@ export default async function ArticlePage({ params }) {
 
   if (!slug) return notFound();
 
-  const token = cookies().get("token")?.value;
-  if (!token) return redirect("/connexion");
-
-  let decoded;
-  try {
-    decoded = jwt.verify(token, secret);
-  } catch {
-    return redirect("/connexion");
-  }
+  const user = await getUserFromToken();
+if (!user) return redirect("/connexion");
 
   const article = await prisma.article.findUnique({
     where: { slug },
