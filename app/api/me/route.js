@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../lib/auth";
+import { cookies } from "next/headers";
 
 export async function GET() {
   try {
-    const user = await getUserFromToken();
+    const user = await getUserFromToken(cookies()); // ✅ injecte le cookieStore
 
     if (!user) {
       return NextResponse.json(
