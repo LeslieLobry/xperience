@@ -1,25 +1,20 @@
-import React from "react"; 
+// components/Banniere/Banniere.jsx
 import "../Banniere/Banniere.css";
-import Image from "next/image";
 
-function Banniere({ image, title }) {
-    return (
-        <div className="baniere-components">
-            <div className="baniere-img">
-                <Image 
-                    src={image}
-                    alt="Bannière"
-                    width={1920} 
-                    height={500} 
-                    style={{ width: "100%", height: "" }} 
-                    priority
-                />
-                <div className="baniere-text">
-                    <h1><span>{title}</span></h1>
-                </div>
-            </div>
+export default function Banniere({ image, title, style }) {
+  return (
+    <div
+      className="banniere"
+      style={{
+        backgroundImage: `url(${image.src})`,
+        ...style,
+      }}
+    >
+      {title && (
+        <div className="banniere-text">
+          <h1>{title}</h1>
         </div>
-    );
+      )}
+    </div>
+  );
 }
-
-export default Banniere;
