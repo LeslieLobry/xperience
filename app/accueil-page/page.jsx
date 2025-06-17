@@ -1,15 +1,15 @@
 export const dynamic = "force-dynamic"; // 🔁 important sur Vercel
 
-import { prisma } from "@/lib/client";
+import { prisma } from "../../lib/prisma";
 import { redirect } from "next/navigation";
-import { getUserFromToken } from "@/lib/getUserFromToken";
-import RechercheWrapper from "@/components/RechercheWrapper/RechercheWrapper";
+import { getUserFromToken } from "../../lib/getUserFromToken";
+import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 import Link from "next/link";
-import DerniersArticles from "@/components/DerniersArticles/DerniersArticles";
-import DerniersEvenements from "@/components/DerniersEvenements/DerniersEvenements";
-import RappelVerification from "@/components/RappelVerification/RappelVerification";
-import { getIdsUtilisateursExclus } from "@/lib/utilsFiltrage";
-import LoaderAnnonce from "@/components/LoaderAnnonce/LoaderAnnonce";
+import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
+import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
+import RappelVerification from "../../components/RappelVerification/RappelVerification";
+import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
+import LoaderAnnonce from "../..LoaderAnnonce/components/LoaderAnnonce/LoaderAnnonce";
 import "./accueil.css";
 
 export default async function AccueilPage() {
