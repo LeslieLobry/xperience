@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"; // 🔁 important sur Vercel
 
 import { prisma } from "../../lib/prisma";
 import { redirect } from "next/navigation";
-import { getUserFromToken } from "../../lib/getUserFromToken";
+import { getUserFromToken } from "../../lib/auth";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 import Link from "next/link";
 import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
