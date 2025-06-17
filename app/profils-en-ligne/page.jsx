@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
-
+import "./profles-en-ligne.css"
 const secret = process.env.JWT_SECRET;
 
 export default async function PageProfilsEnLigne() {
@@ -46,8 +46,8 @@ export default async function PageProfilsEnLigne() {
 
   return (
     <div className="accueil-page">
-      <h1 className="profil-list1-title">Profils en ligne</h1>
-      <div className="profil-list1">
+      <h1 className="profils-list1-title">Profils en ligne</h1>
+      <div className="profils-complet">
         {utilisateurs.map((user) => (
           <Link
             href={`/profil/${user.id}`}
