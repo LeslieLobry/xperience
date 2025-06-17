@@ -26,6 +26,8 @@
   padding: 0.5rem;
   border-radius: 4px;
   border: 1px solid #ccc;
+  color: #e0c084;
+  font-size: 24px;
 }
 
 .filters-group {
@@ -73,6 +75,8 @@
   .recherche-sidebar {
     max-width: 300px;
     padding: 1rem;
+    color: white;
+    font-size: 26px;
   }
 }
 .section-group {

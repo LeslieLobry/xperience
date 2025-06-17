@@ -7,7 +7,7 @@ import { s3 } from "../../../lib/s3";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { IncomingForm } from "formidable";
 import { Readable } from "stream";
-
+import fs from "fs/promises";
 export const config = {
   api: { bodyParser: false },
 };
@@ -99,7 +99,7 @@ export async function POST(req) {
 
         if (photo && photo.filepath) {
           console.log("⬆️ Upload photo :", photo.originalFilename);
-          const buffer = await Bun.file(photo.filepath).arrayBuffer();
+          const buffer = await fs.readFile(photo.filepath);
           const filename = `photo_${Date.now()}_${photo.originalFilename}`;
           const bucket = process.env.AWS_S3_BUCKET;
 
