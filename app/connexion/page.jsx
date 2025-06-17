@@ -26,31 +26,27 @@ export default function ConnexionPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSuccess("");
+
+  const res = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(form),
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    setSuccess("Connexion réussie !");
+    // ✅ Pas besoin de fetchUser : le serveur s’en chargera via le cookie HttpOnly
     router.push("/accueil-page");
-
-
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      setSuccess("Connexion réussie !");
-      const userData = await fetchUser(); 
-      console.log("✅ userData :", userData);
-      if (userData?.id) {
-        router.push(`/profil/${userData.id}`);
-      }
-    } else {
-      setError(data.message);
-    }
-  };
+  } else {
+    setError(data.message);
+  }
+};
 
   return (
     <div className="connexion-contenant">

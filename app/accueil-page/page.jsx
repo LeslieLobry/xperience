@@ -1,7 +1,8 @@
-import { PrismaClient } from "@prisma/client";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+export const dynamic = "force-dynamic"; // 🔁 important sur Vercel pour désactiver le cache SSR
+
+import { PrismaClient } from "../../lib/client";
 import { redirect } from "next/navigation";
+import { getUserFromToken } from "../../lib/auth";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 import Link from "next/link";
 import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
@@ -12,47 +13,12 @@ import "./accueil.css";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
 
 const prisma = new PrismaClient();
-const secret = process.env.JWT_SECRET;
 
 export default async function AccueilPage() {
-  console.log("🔍 COOKIE TOKEN RECU SERVER :", cookies().get("token"));
-
-  const cookieStore = cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) return redirect("/connexion");
-
-  let decoded;
-  try {
-    decoded = jwt.verify(token, secret);
-    if (!decoded?.id || isNaN(Number(decoded.id))) {
-      console.error("❌ ID JWT manquant ou invalide :", decoded);
-      return redirect("/connexion");
-    }
-  } catch (err) {
-    console.error("❌ Erreur JWT :", err);
-    return redirect("/connexion");
-  }
-
-  const userId = Number(decoded.id);
-
-  let user;
-  try {
-    user = await prisma.utilisateur.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        verificationIdentite: true,
-        verificationDeadline: true,
-      },
-    });
-  } catch (err) {
-    console.error("❌ Erreur Prisma findUnique :", err);
-    return redirect("/connexion");
-  }
-
+  const user = await getUserFromToken();
   if (!user) return redirect("/connexion");
 
-  // Vérification identité obligatoire
+  // Redirection si identité non vérifiée et délai dépassé
   if (
     !user.verificationIdentite &&
     user.verificationDeadline &&
@@ -64,14 +30,14 @@ export default async function AccueilPage() {
   // Utilisateurs à exclure
   let exclus = [];
   try {
-    exclus = await getIdsUtilisateursExclus(userId);
+    exclus = await getIdsUtilisateursExclus(user.id);
   } catch (err) {
     console.error("❌ Erreur récupération exclusions :", err);
   }
 
   const whereCommun = {
     NOT: {
-      id: { in: [...exclus, userId] },
+      id: { in: [...exclus, user.id] },
     },
   };
 
@@ -109,12 +75,11 @@ export default async function AccueilPage() {
   );
 
   return (
-
     <div className="accueil-page">
       {!user.verificationIdentite && user.verificationDeadline && (
         <RappelVerification deadline={user.verificationDeadline} />
       )}
-   <LoaderAnnonce />
+      <LoaderAnnonce />
       <div className="grid-accueil">
         <div className="profil-list1">
           <h1 className="profil-list1-title">Profils en ligne</h1>
@@ -131,7 +96,9 @@ export default async function AccueilPage() {
         <div className="grid-articles">
           <DerniersArticles />
         </div>
+
         <RechercheWrapper />
+
         <div className="grid-event">
           <DerniersEvenements />
         </div>

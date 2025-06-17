@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic"; // 🔁 désactive le cache Vercel
 
 import { redirect } from "next/navigation";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../../lib/prisma";
 import Profil from "../../../components/Profil/Profil";
 import ProfilProtege from "../../../components/ProfilProtege/ProfilProtege";
-import { safeParam, getUserFromToken } from "../../../lib/serverUtils";
+import {  getUserFromToken } from "../../../lib/auth";
 
 const prisma = new PrismaClient();
 
