@@ -9,6 +9,7 @@ import DerniersEvenements from "../../components/DerniersEvenements/DerniersEven
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 import "./accueil.css";
+import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
@@ -106,11 +107,12 @@ export default async function AccueilPage() {
   );
 
   return (
+
     <div className="accueil-page">
       {!user.verificationIdentite && user.verificationDeadline && (
         <RappelVerification deadline={user.verificationDeadline} />
       )}
-
+   <LoaderAnnonce />
       <div className="grid-accueil">
         <div className="profil-list1">
           <h1 className="profil-list1-title">Profils en ligne</h1>

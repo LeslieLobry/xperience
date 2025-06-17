@@ -24,7 +24,7 @@ const emailsManuels = [
   "teamantoine59@gmail.com",
   "frederique.lettoli@gmail.com",
   "aure62300@hotmail.fr",
- " jeremy@charles.co"
+ "jeremy@charles.co"
 ];
 
 // 🔁 fusionne et supprime les doublons
