@@ -21,18 +21,31 @@ export default async function AccueilPage() {
   let decoded;
   try {
     decoded = jwt.verify(token, secret);
-  } catch {
+    if (!decoded?.id || isNaN(Number(decoded.id))) {
+      console.error("❌ ID JWT manquant ou invalide :", decoded);
+      return redirect("/connexion");
+    }
+  } catch (err) {
+    console.error("❌ Erreur JWT :", err);
     return redirect("/connexion");
   }
 
-  const user = await prisma.utilisateur.findUnique({
-    where: { id: decoded.id },
-    select: {
-      id: true,
-      verificationIdentite: true,
-      verificationDeadline: true,
-    },
-  });
+  const userId = Number(decoded.id);
+
+  let user;
+  try {
+    user = await prisma.utilisateur.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        verificationIdentite: true,
+        verificationDeadline: true,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Erreur Prisma findUnique :", err);
+    return redirect("/connexion");
+  }
 
   if (!user) return redirect("/connexion");
 
@@ -48,14 +61,14 @@ export default async function AccueilPage() {
   // Utilisateurs à exclure
   let exclus = [];
   try {
-    exclus = await getIdsUtilisateursExclus(decoded.id);
+    exclus = await getIdsUtilisateursExclus(userId);
   } catch (err) {
-    console.error("Erreur récupération exclusions :", err);
+    console.error("❌ Erreur récupération exclusions :", err);
   }
 
   const whereCommun = {
     NOT: {
-      id: { in: [...exclus, decoded.id] },
+      id: { in: [...exclus, userId] },
     },
   };
 
@@ -114,9 +127,7 @@ export default async function AccueilPage() {
         <div className="grid-articles">
           <DerniersArticles />
         </div>
-
         <RechercheWrapper />
-
         <div className="grid-event">
           <DerniersEvenements />
         </div>
