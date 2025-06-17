@@ -32,7 +32,7 @@ export async function POST(req) {
   });
 
   return new Promise((resolve) => {
-    const form = new IncomingForm({ keepExtensions: true });
+    const form = new IncomingForm({ keepExtensions: true, multiples: false });
 
     form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
@@ -93,16 +93,16 @@ export async function POST(req) {
 
         // ✅ Gestion de la photo
         let photoUrl = null;
-        const photo = files.photo;
+        const photoFile = Array.isArray(files.photo) ? files.photo[0] : files.photo;
 
-        if (!photo) {
+        if (!photoFile) {
           console.warn("❌ Aucun fichier photo reçu.");
-        } else if (!photo.filepath) {
-          console.warn("❌ Fichier photo reçu mais sans 'filepath'.", photo);
+        } else if (!photoFile.filepath) {
+          console.warn("❌ Fichier photo reçu mais sans 'filepath'.", photoFile);
         } else {
           try {
-            const buffer = await fs.readFile(photo.filepath);
-            const filename = `photo_${Date.now()}_${photo.originalFilename}`;
+            const buffer = await fs.readFile(photoFile.filepath);
+            const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
             const bucket = process.env.AWS_S3_BUCKET;
 
             await s3.send(
@@ -110,7 +110,7 @@ export async function POST(req) {
                 Bucket: bucket,
                 Key: filename,
                 Body: Buffer.from(buffer),
-                ContentType: photo.mimetype,
+                ContentType: photoFile.mimetype,
               })
             );
 
