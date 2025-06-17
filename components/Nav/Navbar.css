@@ -70,7 +70,16 @@
   .burger {
     display: flex;
   }
-
+.nav-combined-popup{
+    position: static !important;     
+    top: auto !important;            
+    right: auto !important;          
+    width: 100% !important;          
+    max-height: none;     
+    border: none; 
+    box-shadow: none;
+ 
+}
   .navLinks {
     position: absolute;
     top: 100%;
@@ -140,7 +149,7 @@
   right: 0;
   width: 320px;
   max-height: 500px;
-   background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
+  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
   color: #e0c084;
   border: 1px solid #ddd;
   border-radius: 8px;

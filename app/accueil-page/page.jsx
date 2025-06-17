@@ -96,18 +96,22 @@ export default async function AccueilPage() {
       <div className="grid-accueil">
         <div className="profil-list1">
           <h1 className="profil-list1-title">Profils en ligne</h1>
+          <div className="grid-profil">
           {profilsEnLigne.map(renderProfilCard)}
           <Link href="/profils-en-ligne" className="afficher-plus">
             Afficher plus
           </Link>
+          </div>
         </div>
 
         <div className="profil-list2">
           <h1 className="profil-list1-title">Tous les profils</h1>
+          <div className="grid-profil">
           {tousLesProfils.map(renderProfilCard)}
           <Link href="/profils" className="afficher-plus">
             Afficher plus
           </Link>
+          </div>
         </div>
 
         <div className="grid-articles">

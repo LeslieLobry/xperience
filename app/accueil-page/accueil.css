@@ -45,7 +45,7 @@
   }
  
   .profil-card {
-    width: 200px;
+    height: 300px;
     border: 1px solid #ccc;
     border-radius: 10px;
     padding: 1rem;
@@ -56,7 +56,6 @@
  
   .profil-photo {
     width: 100%;
-    height: 200px;
     object-fit: cover;
     border-radius: 8px;
   }
@@ -91,7 +90,12 @@ grid-row: 1;
   .afficher-plus{
     color: #e0c084;
   }
-
+.grid-profil{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr ;
+  gap: 10px;
+  align-items: center;
+}
 .profil-card-title {
   font-size: clamp(1rem, 4vw, 2.2rem); /* taille fluide */
   text-align: center;

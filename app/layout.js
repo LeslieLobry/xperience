@@ -32,7 +32,7 @@ export default function RootLayout({ children }) {
           <ClientWrapper>
             <ConditionalNavbar />
             {children}
-            <ChatBubble />
+            {/* <ChatBubble /> */}
             <Footer />
             <BandeauCookies />
           </ClientWrapper>

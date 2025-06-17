@@ -1,6 +1,8 @@
 .banniere {
-  width: 100%;
-  min-height: 60vh; /* ou 400px */
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  position: relative;
+  min-height: 40vh;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -8,27 +10,30 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  text-align: center;
-  position: relative;
   box-sizing: border-box;
+  overflow: hidden;
+}
+
+.banniere-text {
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  text-align: center;
 }
 
 .banniere-text h1 {
-  color: white;
   font-size: 2.5rem;
-  background: rgba(0, 0, 0, 0.4); /* lisibilité sur fond clair */
-  padding: 1rem 2rem;
-  border-radius: 8px;
+  color: #fff;
+  margin: 0;
 }
 
 @media (max-width: 768px) {
   .banniere {
-    min-height: 21vh;
+    min-height: 30vh;
     padding: 1rem;
   }
 
   .banniere-text h1 {
     font-size: 1.5rem;
-    padding: 0.5rem 1rem;
   }
 }
