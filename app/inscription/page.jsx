@@ -392,7 +392,7 @@ export default function RegisterForm() {
               <input type="number" name="age" placeholder="Âge" onChange={handleChange} className="form-input" />
               <div className="form-group">
                 <label>Photo de profil :</label><br />
-                <input type="file" accept="image/*" onChange={handlePhotoChange} className="form-input" />
+                <input type="file"name="photo" accept="image/*" onChange={handlePhotoChange} className="form-input" />
               </div>
               <label className="form-checkbox">
                 <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
