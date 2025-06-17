@@ -8,6 +8,7 @@ const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
 export async function POST(req) {
+  console.log("🔐 SECRET =", process.env.JWT_SECRET)
   try {
     const { email, password } = await req.json();
 

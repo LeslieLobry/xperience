@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 export async function GET() {
   try {
     const user = await getUserFromToken(cookies()); // ✅ injecte le cookieStore
-
+console.log("🔐 SECRET =", process.env.JWT_SECRET)
     if (!user) {
       return NextResponse.json(
         { success: false, message: "Non authentifié." },
