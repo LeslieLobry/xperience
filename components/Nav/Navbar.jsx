@@ -89,7 +89,7 @@ markAllRead();
 return (
 <nav className="navbar">
   <div className="navbar-left">
-    <Link href="/accueil">
+    <Link href="/accueil-page">
     <Image src={logo} alt="logo xpérience" width={120} height={120} className="navbar-logo" priority />
     </Link>
     {user && <h3 className="navbar-pseudo">Bienvenue, {user.pseudo}</h3>}
@@ -118,7 +118,7 @@ return (
     ? user.photoUrl.startsWith("http") || user.photoUrl.startsWith("/uploads")
       ? user.photoUrl
       : `/uploads/${user.photoUrl}`
-    : "/images/default-avatar.png"
+    : "/images/default.jpg"
 }
 
   alt="Photo de profil"
