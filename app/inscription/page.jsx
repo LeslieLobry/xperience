@@ -1,45 +1,42 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
 import Select from "react-select";
 import { useRouter } from "next/navigation";
 
-
-
 export default function RegisterForm() {
   const [step, setStep] = useState(1);
   const [captchaToken, setCaptchaToken] = useState(null);
   const [form, setForm] = useState({
-  nom: "",
-  prenom: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
-  pseudo: "",
-  type: "",
-  orientation: "",
-  sexe: "",
-  recherche: [],
-  localisation: "",
-  age: "",
-  consent: false,
-});
+    nom: "",
+    prenom: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    pseudo: "",
+    type: "",
+    orientation: "",
+    sexe: "",
+    recherche: [],
+    localisation: "",
+    age: "",
+    consent: false,
+  });
 
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
   const debounceTimeout = useRef(null);
   const router = useRouter();
-
-  const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -103,90 +100,90 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     return true;
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
-  setSuccess("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
 
-  if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
-  if (!validateStep()) return;
+    if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
+    if (!validateStep()) return;
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
+      const formData = new FormData();
 
-    const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((v) => formData.append(`${key}[]`, v));
+        } else if (typeof value === "boolean") {
+          formData.append(key, value ? "true" : "false");
+        } else if (key === "age") {
+          formData.append(key, parseInt(value, 10));
+        } else {
+          formData.append(key, value);
+        }
+      });
 
-    Object.entries(form).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach((v) => formData.append(`${key}[]`, v));
-      } else if (typeof value === "boolean") {
-        formData.append(key, value ? "true" : "false");
-      } else if (key === "age") {
-        formData.append(key, parseInt(value, 10));
+      if (photo) formData.append("photo", photo);
+      formData.append("captchaToken", captchaToken);
+
+      const res = await fetch("/api/register", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        setSuccess("Inscription réussie !");
+        setShowModal(true);
       } else {
-        formData.append(key, value);
+        setError(result.message || "Erreur lors de l'inscription.");
       }
-    });
-
-    if (photo) formData.append("photo", photo);
-    formData.append("captchaToken", captchaToken); // ✅ Ajout du token reCAPTCHA
-
-    const res = await fetch("/api/register", {
-      method: "POST",
-      body: formData,
-    });
-
-    const result = await res.json();
-    if (result.success) {
-      setSuccess("Inscription réussie !");
-      setTimeout(() => {
-        router.push("/connexion");
-      }, 1500);
-    } else {
-      setError(result.message || "Erreur lors de l'inscription.");
+    } catch (err) {
+      console.error("Erreur lors de l'envoi du formulaire :", err);
+      setError("Erreur serveur pendant l'enregistrement.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Erreur lors de l'envoi du formulaire :", err);
-    setError("Erreur serveur pendant l'enregistrement.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
+  const handleModalConfirm = () => {
+    setShowModal(false);
+    router.push("/connexion");
+  };
 
   const handleLocalisationChange = (e) => {
-  const value = e.target.value;
-  setLocalisationInput(value);
-  setForm((prev) => ({ ...prev, localisation: value }));
+    const value = e.target.value;
+    setLocalisationInput(value);
+    setForm((prev) => ({ ...prev, localisation: value }));
 
-  if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
-  if (value.length >= 2) {
-    debounceTimeout.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
-            value
-          )}&fields=nom&boost=population&limit=5`
-        );
-        const data = await res.json();
-        const villes = data.map((v) => v.nom);
-        setSuggestions(villes);
-      } catch (err) {
-        console.error("Erreur geo.api.gouv.fr :", err);
-        setSuggestions([]);
-      }
-    }, 400);
-  } else {
-    setSuggestions([]);
-  }
-};
+    if (value.length >= 2) {
+      debounceTimeout.current = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(value)}&fields=nom&boost=population&limit=5`
+          );
+          const data = await res.json();
+          const villes = data.map((v) => v.nom);
+          setSuggestions(villes);
+        } catch (err) {
+          console.error("Erreur geo.api.gouv.fr :", err);
+          setSuggestions([]);
+        }
+      }, 400);
+    } else {
+      setSuggestions([]);
+    }
+  };
 
   const handleVilleSelect = (ville) => {
     setForm((prev) => ({ ...prev, localisation: ville }));
     setLocalisationInput(ville);
     setSuggestions([]);
   };
+
   const typeLabel = (value) => {
     switch (value) {
       case "homme":
@@ -201,7 +198,7 @@ const handleSubmit = async (e) => {
         return "";
     }
   };
-  
+
   const orientationLabel = (value) => {
     switch (value) {
       case "hetero":
@@ -216,7 +213,7 @@ const handleSubmit = async (e) => {
         return "";
     }
   };
-  
+
   const customSelectStyles = {
     control: (base) => ({
       ...base,
@@ -232,21 +229,11 @@ const handleSubmit = async (e) => {
       color: "white",
       zIndex: 10,
     }),
-    singleValue: (base) => ({
-      ...base,
-      color: "white",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "white",
-      opacity: 0.7,
-    }),
-    input: (base) => ({
-      ...base,
-      color: "white",
-    }),
+    singleValue: (base) => ({ ...base, color: "white" }),
+    placeholder: (base) => ({ ...base, color: "white", opacity: 0.7 }),
+    input: (base) => ({ ...base, color: "white" }),
   };
-  
+
   return (
     <div className="register-contenant">
       <div className="register-background">
@@ -255,7 +242,6 @@ const handleSubmit = async (e) => {
         <form onSubmit={handleSubmit} className="form-container">
           {error && <p className="form-error">{error}</p>}
           {success && <p className="form-success">{success}</p>}
-
           {step === 1 && (
   <>
     <input
@@ -418,6 +404,18 @@ const handleSubmit = async (e) => {
                 <Button title="Créer mon compte" type="submit" color="#e0c084" disabled={loading} />
               </div>
             </>
+          )}
+{showModal && (
+            <div className="modal-overlay">
+              <div className="modal-content">
+                <h3>🎉 Inscription réussie !</h3>
+                <p>Un email de confirmation vous a été envoyé.</p>
+                <p>Merci de cliquer sur le lien pour activer votre compte.</p>
+                <button onClick={handleModalConfirm} className="btn-modal">
+                  OK
+                </button>
+              </div>
+            </div>
           )}
         </form>
       </div>
