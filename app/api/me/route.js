@@ -7,20 +7,24 @@ const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function GET() {
-  const headersList = headers(); // ✅ pas de await
-  const cookieHeader = headersList.get("cookie") || "";
-  const token = cookieHeader
-    .split("; ")
-    .find((row) => row.startsWith("token="))
-    ?.split("=")[1];
-
-  console.log("📥 /api/me – Token reçu :", token);
-
-  if (!token) {
-    return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
-  }
-
   try {
+    const headersList = headers(); // ✅ pas besoin de await ici
+    const cookieHeader = headersList.get("cookie") || "";
+
+    const token = cookieHeader
+      .split("; ")
+      .find((row) => row.startsWith("token="))
+      ?.split("=")[1];
+
+    console.log("📥 /api/me – Token reçu :", token);
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: "Non authentifié." },
+        { status: 401 }
+      );
+    }
+
     const decoded = jwt.verify(token, secret);
 
     const user = await prisma.utilisateur.findUnique({
@@ -29,7 +33,10 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ success: false, message: "Utilisateur introuvable." }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: "Utilisateur introuvable." },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({
@@ -41,7 +48,7 @@ export async function GET() {
         pseudo: user.pseudo,
         photoUrl: user.photoUrl,
         recherches: user.recherches,
-        envies: user.envies,
+        envies: user.ennvies,
         age: user.age,
         description: user.description,
         localisation: user.localisation,
@@ -59,7 +66,10 @@ export async function GET() {
       },
     });
   } catch (err) {
-    console.error("❌ Erreur vérification JWT :", err.message);
-    return NextResponse.json({ success: false, message: "Token invalide." }, { status: 403 });
+    console.error("❌ Erreur API /me :", err.message);
+    return NextResponse.json(
+      { success: false, message: "Token invalide ou erreur serveur." },
+      { status: 403 }
+    );
   }
 }

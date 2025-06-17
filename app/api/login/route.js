@@ -1,10 +1,8 @@
-
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
-import { prisma } from "../../../lib/prisma"; 
-
+import { prisma } from "../../../lib/prisma";
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
@@ -13,9 +11,7 @@ export async function POST(req) {
   try {
     const { email, password } = await req.json();
 
-    const user = await prisma.utilisateur.findUnique({
-      where: { email },
-    });
+    const user = await prisma.utilisateur.findUnique({ where: { email } });
 
     if (!user) {
       return NextResponse.json({ success: false, message: "Utilisateur introuvable" }, { status: 401 });
@@ -30,31 +26,26 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Mot de passe incorrect" }, { status: 401 });
     }
 
-    // ✅ Mise à jour de la dernière connexion  
     await prisma.utilisateur.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
 
     const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        pseudo: user.pseudo,
-        role: user.role,
-      },
+      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role },
       secret,
       { expiresIn: "7d" }
     );
 
     const response = NextResponse.json({ success: true });
 
+    // ✅ Envoie cookie sécurisé
     response.cookies.set("token", token, {
       httpOnly: true,
-      secure: false,
-      path: "/",
+      secure: process.env.NODE_ENV === "production", // ✅ true en prod
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 jours
     });
 
     return response;
@@ -66,4 +57,3 @@ export async function POST(req) {
     );
   }
 }
-
