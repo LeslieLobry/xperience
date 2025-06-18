@@ -116,3 +116,8 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(22px);
 }
+@media (max-width: 768px){
+  .grid-profil{
+    grid-template-columns: 1fr;
+  }
+}
