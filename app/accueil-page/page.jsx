@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic"; // 🔁 important sur Vercel
 
-import { prisma } from "../../lib/prisma"; // ✅ correct
+import { prisma } from "../../lib/prisma";
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
@@ -10,8 +10,8 @@ import DerniersEvenements from "../../components/DerniersEvenements/DerniersEven
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
+import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDiplay";
 import "./accueil.css";
-
 export default async function AccueilPage() {
   const user = await getUserFromToken();
 
@@ -28,13 +28,11 @@ export default async function AccueilPage() {
     return redirect("/verif-identite-obligatoire");
   }
 
-  // 🔐 Exclusions
   let exclus = [];
   try {
     exclus = await getIdsUtilisateursExclus(user.id);
   } catch (err) {
     console.error("Erreur récupération des profils :", err.message, err.stack);
-
   }
 
   const whereCommun = {
@@ -43,26 +41,22 @@ export default async function AccueilPage() {
     },
   };
 
-  let profilsEnLigne = [];
   let tousLesProfils = [];
-
   try {
-    [profilsEnLigne, tousLesProfils] = await Promise.all([
-      prisma.utilisateur.findMany({
-        where: { ...whereCommun, statut: "en_ligne" },
-        select: { id: true, pseudo: true, photoUrl: true, age: true, localisation: true },
-        take: 15,
-      }),
-      prisma.utilisateur.findMany({
-        where: whereCommun,
-        select: { id: true, pseudo: true, photoUrl: true, age: true, localisation: true },
-        take: 15,
-      }),
-    ]);
+    tousLesProfils = await prisma.utilisateur.findMany({
+      where: whereCommun,
+      select: {
+        id: true,
+        pseudo: true,
+        photoUrl: true,
+        age: true,
+        localisation: true,
+        statut: true,
+      },
+      take: 30,
+    });
   } catch (err) {
     console.error("❌ Erreur récupération des profils :", err);
-    console.error("Erreur récupération des profils :", err.message, err.stack);
-
   }
 
   const renderProfilCard = (user) => (
@@ -94,32 +88,11 @@ export default async function AccueilPage() {
       )}
       <LoaderAnnonce />
       <div className="grid-accueil">
-        <div className="profil-list1">
-          <h1 className="profil-list1-title">Profils en ligne</h1>
-          <div className="grid-profil">
-          {profilsEnLigne.map(renderProfilCard)}
-          <Link href="/profils-en-ligne" className="afficher-plus">
-            Afficher plus
-          </Link>
-          </div>
-        </div>
-
-        <div className="profil-list2">
-          <h1 className="profil-list1-title">Tous les profils</h1>
-          <div className="grid-profil">
-          {tousLesProfils.map(renderProfilCard)}
-          <Link href="/profils" className="afficher-plus">
-            Afficher plus
-          </Link>
-          </div>
-        </div>
-
+        <ProfilsDisplay profils={tousLesProfils} />
         <div className="grid-articles">
           <DerniersArticles />
         </div>
-
         <RechercheWrapper />
-
         <div className="grid-event">
           <DerniersEvenements />
         </div>

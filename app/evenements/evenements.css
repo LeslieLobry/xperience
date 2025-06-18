@@ -34,7 +34,8 @@
     font-size: 64px;
 }
 .btn-create {
-  display: inline-block;
+  display: flex;
+  justify-content: center;
   padding: 12px 24px;
   background-color: #e0c084;
   color: #f5ece0;
@@ -45,8 +46,11 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
   font-size: 25px;
+  border-radius: 16px;
 }
-
+.pagination{
+    text-align: center;
+}
 .btn-create:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
@@ -80,12 +84,11 @@
     align-items: center;
     gap: 16px;
 }
-@media (min-width: 768px){
+@media (max-width: 768px){
   .grid-evenements{
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap:16px ; 
+  grid-template-columns: 1fr;
+    gap: 16px;
   }
+
   
 }

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "../../../lib/prisma"; // ✅ utilise l'instance réutilisable
 import Profil from "../../../components/Profil/Profil";
 import ProfilProtege from "../../../components/ProfilProtege/ProfilProtege";
-import { getUserFromToken } from "../../../lib/auth"; // ✅ déjà bon
+import { getUserFromToken } from "../../../lib/auth" // ✅ déjà bon
 
 export default async function ProfilPage({ params }) {
   const id = parseInt(params.id);

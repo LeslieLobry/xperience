@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from "react";
-
+import "./AvisForm.css"
 export default function AvisForm({ cibleId }) {
   const [commentaire, setCommentaire] = useState("");
   const [success, setSuccess] = useState(false);
@@ -37,7 +37,7 @@ export default function AvisForm({ cibleId }) {
       {success && <p className="success">Merci pour votre avis !</p>}
       {error && <p className="error">{error}</p>}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="form-css">
         <label>Commentaire :</label>
         <textarea
           placeholder="Votre message..."

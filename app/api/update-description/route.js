@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getUserFromToken } from '../../../lib/auth';
-import {prisma} from '../../../lib/prisma'
+import { prisma } from '../../../lib/prisma';
 
 export async function POST(req) {
-  const cookieStore = cookies();
-  const user = getUserFromToken(cookieStore);
+  // ✅ utilise cookies() par défaut dans getUserFromToken()
+  const user = await getUserFromToken();
 
   if (!user || !user.id) {
     return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
@@ -18,7 +17,8 @@ export async function POST(req) {
     if (typeof description !== 'string') {
       return NextResponse.json({ message: 'Description invalide' }, { status: 400 });
     }
-    await prisma.Utilisateur.update({
+
+    await prisma.utilisateur.update({
       where: { id: user.id },
       data: { description },
     });

@@ -11,7 +11,9 @@ export async function POST(req) {
     if (!identity) {
       return NextResponse.json({ error: "Missing user" }, { status: 400 });
     }
-
+console.log("✅ API_KEY:", API_KEY);
+console.log("✅ API_SECRET:", API_SECRET);
+console.log("✅ identity reçu:", identity);
     const token = new AccessToken(API_KEY, API_SECRET, {
       identity,
       ttl: "10m",

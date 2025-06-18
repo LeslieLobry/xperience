@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../../context/AuthContext";
 import FiltreEvenements from "../../components/FiltreEvenements/FiltreEvenements";
-import "../evenements/evenements.css";
+import "./evenements.css";
 import { useRouter } from "next/navigation";
 
 export default function EvenementsPage() {
@@ -102,7 +102,7 @@ export default function EvenementsPage() {
                 </Link>
               ))
             ) : (
-              <p>Aucun événement trouvé.</p>
+              <p>Le calme avant les Xperiences les plus intenses... Patientez, le désir monte.</p>
             )}
           </div>
 

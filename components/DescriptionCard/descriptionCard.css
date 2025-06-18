@@ -4,3 +4,27 @@
     align-items: center;
     gap: 16px;
 }
+/* Pour le message de confirmation */
+.description-message {
+  margin-top: 0.5rem;
+  color: #2e7d32;
+  background-color: #e6f4ea;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  animation: fadein 0.3s ease-in;
+}
+
+/* Picker emoji */
+.emoji-picker-container {
+  margin-top: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Animation légère */
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

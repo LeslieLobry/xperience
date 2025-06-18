@@ -45,7 +45,7 @@
   }
  
   .profil-card {
-    height: 300px;
+    height: 350px;
     border: 1px solid #e0c084;
     border-radius: 10px;
     padding: 1rem;
@@ -103,6 +103,18 @@ grid-row: 1;
   word-break: break-word;
   margin: 0.5rem 0;
   font-family: "Allura", cursive; /* ou ta font stylisée */
+}
+.profil-toggle-wrapper {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.profil-toggle-wrapper input[type="checkbox"] {
+  transform: scale(1.2);
+  cursor: pointer;
 }
 
 @media (max-width: 768px){

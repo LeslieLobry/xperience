@@ -29,35 +29,78 @@ export default function ProfilDetailsSummary({ editable = false }) {
   };
 
   if (!profil) return null;
+return (
+  <div className="preference-sum-contenant">
+    <h2>Profil</h2>
 
-  return (
-    <div>
-      <h2>Profil</h2>
-      <p><strong>Ville :</strong> {profil.localisation || "Non défini"}</p>
-      <p><strong>Expérience :</strong> {profil.experience || "Non défini"}</p>
-      <p><strong>Type de recherche :</strong> {profil.rechercheType || "Non défini"}</p>
-      <p><strong>Sexe :</strong> {profil.sexe || "Non défini"}</p>
-
-      <h3>Informations personnelles</h3>
-      <p><strong>Âge :</strong> {profil.age ? `${profil.age} ans` : "Non défini"}</p>
-      <p><strong>Fume :</strong> {profil.fumeur || "Non défini"}</p>
-
-      <h3>Description physique</h3>
-      <p><strong>Silhouette :</strong> {profil.silhouette || "Non défini"}</p>
-      <p><strong>Taille :</strong> {profil.taille || "Non défini"}</p>
-      <p><strong>Origines :</strong> {profil.origines || "Non défini"}</p>
-      <p><strong>Yeux :</strong> {profil.yeux || "Non défini"}</p>
-      <p><strong>Cheveux :</strong> {profil.cheveux || "Non défini"}</p>
-
-      {editable && (
-        <>
-          <button onClick={() => setIsModalOpen(true)}>Modifier</button>
-          {confirmation && <p>{confirmation}</p>}
-          <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-            <ProfilDetailsForm onClose={handleCloseModal} />
-          </Modal>
-        </>
-      )}
+    <div className="pref-details">
+      <p className="pref-nom">Ville :</p>
+      <p className="pref-rep">{profil.localisation || "Non défini"}</p>
     </div>
-  );
+
+    <div className="pref-details">
+      <p className="pref-nom">Expérience :</p>
+      <p className="pref-rep">{profil.experience || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Type de recherche :</p>
+      <p className="pref-rep">{profil.rechercheType || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Sexe :</p>
+      <p className="pref-rep">{profil.sexe || "Non défini"}</p>
+    </div>
+
+    <h3>Informations personnelles</h3>
+
+    <div className="pref-details">
+      <p className="pref-nom">Âge :</p>
+      <p className="pref-rep">{profil.age ? `${profil.age} ans` : "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Fume :</p>
+      <p className="pref-rep">{profil.fumeur || "Non défini"}</p>
+    </div>
+
+    <h3>Description physique</h3>
+
+    <div className="pref-details">
+      <p className="pref-nom">Silhouette :</p>
+      <p className="pref-rep">{profil.silhouette || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Taille :</p>
+      <p className="pref-rep">{profil.taille || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Origines :</p>
+      <p className="pref-rep">{profil.origines || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Yeux :</p>
+      <p className="pref-rep">{profil.yeux || "Non défini"}</p>
+    </div>
+
+    <div className="pref-details">
+      <p className="pref-nom">Cheveux :</p>
+      <p className="pref-rep">{profil.cheveux || "Non défini"}</p>
+    </div>
+
+    {editable && (
+      <>
+        <button onClick={() => setIsModalOpen(true)}>Modifier</button>
+        {confirmation && <p>{confirmation}</p>}
+        <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
+          <ProfilDetailsForm onClose={handleCloseModal} />
+        </Modal>
+      </>
+    )}
+  </div>
+);
 }
