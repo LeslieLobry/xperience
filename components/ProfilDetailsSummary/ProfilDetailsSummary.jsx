@@ -53,8 +53,8 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
       </div>
 
       <div className="pref-details">
-        <p className="pref-nom">Sexe :</p>
-        <p className="pref-rep">{profil.sexe || "Non défini"}</p>
+        <p className="pref-nom">Type :</p>
+        <p className="pref-rep">{profil.type || "Non défini"}</p>
       </div>
 
       <h3>Informations personnelles</h3>
@@ -97,6 +97,54 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
         <p className="pref-nom">Cheveux :</p>
         <p className="pref-rep">{profil.cheveux || "Non défini"}</p>
       </div>
+
+      {profil.type === "couple" && (
+        <>
+          <h3>Informations du/de la partenaire</h3>
+
+          <div className="pref-details">
+            <p className="pref-nom">Âge :</p>
+            <p className="pref-rep">
+              {profil.age2 ? `${profil.age2} ans` : "Non défini"}
+            </p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Fume :</p>
+            <p className="pref-rep">{profil.fumeur2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Silhouette :</p>
+            <p className="pref-rep">{profil.silhouette2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Taille :</p>
+            <p className="pref-rep">{profil.taille2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Origines :</p>
+            <p className="pref-rep">{profil.origines2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Yeux :</p>
+            <p className="pref-rep">{profil.yeux2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Cheveux :</p>
+            <p className="pref-rep">{profil.cheveux2 || "Non défini"}</p>
+          </div>
+
+          <div className="pref-details">
+            <p className="pref-nom">Description :</p>
+            <p className="pref-rep">{profil.description2 || "Non définie"}</p>
+          </div>
+        </>
+      )}
 
       {editable && (
         <>

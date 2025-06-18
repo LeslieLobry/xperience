@@ -21,7 +21,6 @@ model DemandeAcces {
 
   @@unique([galeriePriveeId, demandeurId])
 }
-
 model Utilisateur {
   id                   Int             @id @default(autoincrement())
   nom                  String
@@ -48,11 +47,25 @@ model Utilisateur {
   origines             String?
   yeux                 String?
   cheveux              String?
+
+  // ✅ Champs supplémentaires pour les couples
+
+  age2                 Int?
+  dateNaissance2       DateTime?
+  fumeur2              String?
+  silhouette2          String?
+  taille2              Int?
+  origines2            String?
+  yeux2                String?
+  cheveux2             String?
+  description2         String?
+
   statut               String          @default("en_ligne")
   consentCGU           Boolean         @default(false)
   consentCGUDate       DateTime?
   verificationDeadline DateTime?
   verificationIdentite Boolean         @default(false)
+
   articles             Article[]
   avisLaisses          Avis[]          @relation("AvisAuteur")
   avisRecus            Avis[]          @relation("AvisCible")
@@ -73,7 +86,8 @@ model Utilisateur {
   photos               Photo[]
   recherches           Recherche[]
   evenements           Evenement[]     @relation("Participation")
-    @@map("Utilisateur")
+
+  @@map("Utilisateur")
 }
 
 model GaleriePrivee {

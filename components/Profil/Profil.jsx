@@ -161,6 +161,16 @@ return (
         <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
         <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
       </div>
+      {user.type === "couple" && (
+  <div className="info-block">
+    <h4>Membre 2</h4>
+    <p><span className="info-label">Âge :</span> <span className="info-value">{user.age2 || "Non défini"}</span></p>
+    <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette2 || "Non défini"}</span></p>
+    <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines2 || "Non défini"}</span></p>
+    <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille2 ? `${user.taille2} cm` : "Non défini"}</span></p>
+  </div>
+)}
+
     </div>
 
    <DescriptionCard editable={isOwnProfile} description={user.description} />
@@ -168,34 +178,12 @@ return (
 
     <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriesPrivees?.[0]} editable={isOwnProfile}
       utilisateurId={user.id} visiteurId={connectedUser.id} />
-    <DemandesAccesGalerie />
-    {isOwnProfile && demandesAcces.length > 0 && (
-    <div className="profil-section">
-      <h3 className="profil-section-title">Demandes d'accès à la galerie privée</h3>
-      <ul>
-        {demandesAcces.map((demande) => (
-        <li key={demande.id}>
-          <span>{demande.demandeur?.pseudo || "Utilisateur inconnu"}</span>
-          <button onClick={async ()=> {
-            await fetch(`/api/demandes-acces/${demande.id}/accepter`, { method: "PATCH" });
-            setDemandesAcces((prev) => prev.filter((d) => d.id !== demande.id));
-            }}
-            >
-            Accepter
-          </button>
-          <button onClick={async ()=> {
-            await fetch(`/api/demandes-acces/${demande.id}/refuser`, { method: "PATCH" });
-            setDemandesAcces((prev) => prev.filter((d) => d.id !== demande.id));
-            }}
-            >
-            Refuser
-          </button>
-        </li>
-        ))}
-      </ul>
-    </div>
-    )}
-
+    {isOwnProfile && (
+  <DemandesAccesGalerie
+    isOwnProfile={isOwnProfile}
+    connectedUserId={connectedUser.id}
+  />
+)}
     <PreferencesSummary editable={isOwnProfile} user={user} />
     <ProfilDetailsSummary editable={isOwnProfile} user={user} />
     <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />

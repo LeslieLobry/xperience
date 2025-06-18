@@ -27,12 +27,11 @@ export async function POST(req) {
   const body = await req.json();
   console.log("📥 Données reçues :", body);
 
-  // Champs attendus
-  const champs = {
+  const champsCommun = {
     localisation: body.localisation,
     experience: body.experience,
     rechercheType: body.rechercheType,
-    sexe: body.sexe,
+    type: body.type,
     age: isNaN(Number(body.age)) ? null : Number(body.age),
     fumeur: body.fumeur,
     silhouette: body.silhouette,
@@ -40,13 +39,33 @@ export async function POST(req) {
     origines: body.origines,
     yeux: body.yeux,
     cheveux: body.cheveux,
+    description: body.description,
   };
 
-  // Supprimer les champs vides ou undefined
+  // Ajout des champs du second membre seulement si couple
+  if (body.type === "Couple") {
+    champsCommun.age2 = isNaN(Number(body.age2)) ? null : Number(body.age2);
+    champsCommun.dateNaissance2 = body.dateNaissance2 ? new Date(body.dateNaissance2) : null;
+    champsCommun.fumeur2 = body.fumeur2;
+    champsCommun.silhouette2 = body.silhouette2;
+    champsCommun.taille2 = isNaN(Number(body.taille2)) ? null : Number(body.taille2);
+    champsCommun.origines2 = body.origines2;
+    champsCommun.yeux2 = body.yeux2;
+    champsCommun.cheveux2 = body.cheveux2;
+    champsCommun.description2 = body.description2;
+  }
+
+  // Nettoyage des champs
   const data = {};
-  for (const key in champs) {
-    if (champs[key] !== undefined && champs[key] !== "") {
-      data[key] = champs[key];
+  for (const key in champsCommun) {
+    const value = champsCommun[key];
+    if (
+      value !== undefined &&
+      value !== "" &&
+      value !== null &&
+      !(typeof value === "number" && isNaN(value))
+    ) {
+      data[key] = value;
     }
   }
 

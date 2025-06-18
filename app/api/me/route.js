@@ -18,6 +18,7 @@ console.log("🔐 SECRET =", process.env.JWT_SECRET)
       user: {
         id: user.id,
         email: user.email,
+        type:user.type,
         role: user.role,
         pseudo: user.pseudo,
         photoUrl: user.photoUrl,

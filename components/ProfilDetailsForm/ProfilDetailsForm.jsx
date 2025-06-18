@@ -8,8 +8,8 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
     localisation: "",
     experience: "",
     rechercheType: "",
-    sexe: "",
     age: "",
+    type: "",
     dateNaissance: "",
     fumeur: "",
     silhouette: "",
@@ -17,6 +17,15 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
     origines: "",
     yeux: "",
     cheveux: "",
+    age2: "",
+    dateNaissance2: "",
+    fumeur2: "",
+    silhouette2: "",
+    taille2: "",
+    origines2: "",
+    yeux2: "",
+    cheveux2: "",
+    description2: "",
   });
 
   const [message, setMessage] = useState("");
@@ -154,23 +163,6 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
         <option value="Relation secrète">Relation secrète</option>
         <option value="Relation à long terme">Relation à long terme</option>
       </select>
-
-    <label htmlFor="sexe">Sexe</label>
-<select
-  id="sexe"
-  name="sexe"
-  value={form.sexe}
-  onChange={handleChange}
-  disabled={!editable}
->
-  <option value="">Sélectionner</option>
-  <option value="Homme">Homme</option>
-  <option value="Femme">Femme</option>
-  <option value="Couple">Couple</option>
-  <option value="Autre">Autre</option>
-</select>
-
-
       <input
         type="number"
         name="age"
@@ -283,7 +275,124 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
         <option value="Chauve">Chauve</option>
         <option value="Crâne rasé">Crâne rasé</option>
       </select>
+     {form.type?.toLowerCase() === "couple" && (
 
+  <>
+    <h3>Membre 2</h3>
+
+    <input
+      type="number"
+      name="age2"
+      placeholder="Âge du/de la partenaire"
+      value={form.age2}
+      onChange={handleChange}
+      disabled={!editable}
+    />
+
+    <input
+      type="date"
+      name="dateNaissance2"
+      placeholder="Date de naissance partenaire"
+      value={form.dateNaissance2}
+      onChange={handleChange}
+      disabled={!editable}
+    />
+
+    <label htmlFor="fumeur2">Fumeur(se)</label>
+    <select
+      id="fumeur2"
+      name="fumeur2"
+      value={form.fumeur2}
+      onChange={handleChange}
+      disabled={!editable}
+    >
+      <option value="">Sélectionner</option>
+      <option value="Non fumeur">Non fumeur</option>
+      <option value="De temps en temps">De temps en temps</option>
+      <option value="Fumeur">Fumeur</option>
+      <option value="Vapoteur">Vapoteur</option>
+    </select>
+
+    <label htmlFor="silhouette2">Silhouette</label>
+    <select
+      id="silhouette2"
+      name="silhouette2"
+      value={form.silhouette2}
+      onChange={handleChange}
+      disabled={!editable}
+    >
+      <option value="">Sélectionner</option>
+      <option value="Mince">Mince</option>
+      <option value="Athlétique">Athlétique</option>
+      <option value="Dans la moyenne">Dans la moyenne</option>
+      <option value="Quelques rondeurs">Quelques rondeurs</option>
+      <option value="Rond(e)">Rond(e)</option>
+    </select>
+
+    <input
+      type="number"
+      name="taille2"
+      placeholder="Taille (cm)"
+      min="130"
+      max="220"
+      value={form.taille2}
+      onChange={handleChange}
+      disabled={!editable}
+    />
+
+    <label htmlFor="origines2">Origines</label>
+    <select
+      id="origines2"
+      name="origines2"
+      value={form.origines2}
+      onChange={handleChange}
+      disabled={!editable}
+    >
+      <option value="">Sélectionner</option>
+      <option value="Caucasien(ne)">Caucasien(ne)</option>
+      <option value="Africain(e)">Africain(e)</option>
+      <option value="Arabe">Arabe</option>
+      <option value="Asiatique">Asiatique</option>
+      <option value="Latine">Latine</option>
+      <option value="Caribéen(ne)">Caribéen(ne)</option>
+      <option value="Autre">Autre</option>
+      <option value="Je le garde pour moi">Je le garde pour moi</option>
+    </select>
+
+    <label htmlFor="yeux2">Yeux</label>
+    <select
+      id="yeux2"
+      name="yeux2"
+      value={form.yeux2}
+      onChange={handleChange}
+      disabled={!editable}
+    >
+      <option value="">Sélectionner</option>
+      <option value="Marron">Marron</option>
+      <option value="Verts">Verts</option>
+      <option value="Bleus">Bleus</option>
+      <option value="Noirs">Noirs</option>
+    </select>
+
+    <label htmlFor="cheveux2">Cheveux</label>
+    <select
+      id="cheveux2"
+      name="cheveux2"
+      value={form.cheveux2}
+      onChange={handleChange}
+      disabled={!editable}
+    >
+      <option value="">Sélectionner</option>
+      <option value="Bruns">Bruns</option>
+      <option value="Châtains">Châtains</option>
+      <option value="Blonds">Blonds</option>
+      <option value="Roux">Roux</option>
+      <option value="Poivre et sel">Poivre et sel</option>
+      <option value="Chauve">Chauve</option>
+      <option value="Crâne rasé">Crâne rasé</option>
+    </select>
+  </>
+)}
       {editable && (
         <div className="form-actions">
           <button type="submit">Enregistrer</button>
