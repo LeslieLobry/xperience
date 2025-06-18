@@ -48,6 +48,12 @@ const handleLogout = async () => {
 
     const data = await res.json();
     console.log("🔁 Logout API response:", res.status, data);
+
+    // 🧼 Mets à jour le state utilisateur côté client
+    logout();
+
+    // 🔁 Redirige vers la page de connexion
+    router.push("/connexion");
   } catch (err) {
     console.error("❌ Erreur logout :", err);
   }
