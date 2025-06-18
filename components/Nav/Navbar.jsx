@@ -39,18 +39,20 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
   try {
-    await fetch("/api/logout", {
+    const res = await fetch("/api/logout", {
       method: "POST",
       credentials: "include",
     });
-    logout();
-    router.push("/connexion");
+
+    const data = await res.json();
+    console.log("🔁 Logout API response:", res.status, data);
   } catch (err) {
-    console.error("Erreur lors de la déconnexion", err);
+    console.error("❌ Erreur logout :", err);
   }
 };
+
 
 
   const fetchNotifications = async () => {
