@@ -282,3 +282,29 @@
   font-weight: bold;
   cursor: pointer;
 }
+.video-box {
+  position: relative;
+  display: inline-block;
+  margin: 0.5rem;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.video-box video {
+  width: 240px;
+  height: 180px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.video-label {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}

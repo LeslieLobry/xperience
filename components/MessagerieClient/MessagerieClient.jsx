@@ -42,14 +42,19 @@ export default function MessagerieClient({ user }) {
       />
 
       <div className="chat-section">
-        {conversationId ? (
-          <ChatBox conversationId={conversationId} utilisateur={user} />
-        ) : (
-          <div className="no-conversation">
-            <p>Sélectionne une conversation</p>
-          </div>
-        )}
-      </div>
+  {conversationId ? (
+     <>
+      {console.log("🧩 conversationId envoyé à ChatBox :", conversationId)}
+      <ChatBox conversationId={conversationId} utilisateur={user} />
+    </>
+
+  ) : (
+    <div className="no-conversation">
+      <p>Sélectionne une conversation</p>
+    </div>
+  )}
+</div>
+
     </div>
   );
 }

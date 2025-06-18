@@ -1,11 +1,3 @@
-// ✅ Voici ton fichier corrigé avec :
-// - Audio activé pour les appels
-// - Raccrochage synchronisé via Ably
-// - Caméra distante bien attachée
-
-// J'ai corrigé toutes les backticks manquants et les erreurs de syntaxe.
-// → Code complet modifié dans le fichier ci-dessous.
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -96,8 +88,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
       newRoom.on("trackSubscribed", (track, publication, participant) => {
         if (track.kind === "video" && track instanceof RemoteVideoTrack) {
           setRemoteTracks((prev) => {
-            if (prev.find(t => t.id === participant.identity)) return prev;
-            return [...prev, { id: participant.identity, track }];
+            if (prev.find((t) => t.id === participant.identity)) return prev;
+            return [...prev, { id: participant.identity, track, nom: participant.identity }];
           });
         }
         if (track.kind === "audio") {
@@ -129,14 +121,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
         setTimeout(() => clearInterval(tryAttach), 3000);
       }
 
-      // Publier appel à l'autre participant
       const channel = ably.channels.get(`conversation-${conversationId}`);
       channel.publish("start-call", {
         auteurId: utilisateur.id,
         video,
         conversationId,
       });
-
     } catch (err) {
       console.error("❌ Erreur lors de l'appel :", err);
       alert("Impossible d'accéder à la caméra/micro. Vérifie les autorisations.");
@@ -179,12 +169,49 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }
   };
 
+  const handleChange = (e) => {
+    setTexte(e.target.value);
+    adjustTextareaHeight();
+    notifyTyping();
+  };
+
+  const envoyerMessage = async () => {
+    if (!texte.trim()) return;
+    const nouveauMessage = {
+      auteurId: utilisateur.id,
+      contenu: texte,
+      conversationId,
+      date: new Date().toISOString(),
+    };
+
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("message", nouveauMessage);
+
+    setMessages((prev) => [...prev, { ...nouveauMessage, id: Date.now() }]);
+    setTexte("");
+    textareaRef.current.style.height = "auto";
+  };
+
   useEffect(() => {
     if (!conversationId) return;
+console.log("📥 Conversation ID reçu :", conversationId);
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/messages?conversationId=${conversationId}`);
+        const data = await res.json();
+        setMessages(data.messages || []);
+        setParticipantsAutres(data.participants || []);
+      } catch (err) {
+        console.error("❌ Erreur chargement messages :", err);
+      }
+    };
+
+    fetchMessages();
+
     const channel = ably.channels.get(`conversation-${conversationId}`);
 
     const handleStartCall = (msg) => {
-      if (msg.data.auteurId !== utilisateur.id) {
+      if (msg.data.auteurId !== utilisateur.id && !inCall) {
         console.log("📞 Appel reçu");
         startCall(msg.data.video);
       }
@@ -197,13 +224,27 @@ export default function ChatBox({ conversationId, utilisateur }) {
       }
     };
 
+    const handleTyping = (msg) => {
+      if (msg.data.auteurId !== utilisateur.id) {
+        setIsTyping(`${msg.data.pseudo}`);
+        setTimeout(() => setIsTyping(null), 2000);
+      }
+    };
+
     channel.subscribe("start-call", handleStartCall);
     channel.subscribe("end-call", handleEndCall);
+    channel.subscribe("typing", handleTyping);
+
     return () => {
       channel.unsubscribe("start-call", handleStartCall);
       channel.unsubscribe("end-call", handleEndCall);
+      channel.unsubscribe("typing", handleTyping);
     };
-  }, [conversationId]);
+  }, [conversationId, inCall]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     remoteTracks.forEach(({ id, track }) => {
@@ -212,8 +253,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
   }, [remoteTracks]);
 
- 
-  
   return (
     <div className="chatbox-container">
       <ChatHeader
@@ -226,9 +265,15 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
       {inCall && (
         <div className="video-call-container">
-          <video id="local-video" autoPlay muted playsInline />
-          {remoteTracks.map(({ id }) => (
-            <video key={id} id={`remote-video-${id}`} autoPlay playsInline />
+          <div className="video-box local floating">
+            <video id="local-video" autoPlay muted playsInline />
+            <div className="video-label">Moi</div>
+          </div>
+          {remoteTracks.map(({ id, nom }) => (
+            <div className="video-box" key={id}>
+              <video id={`remote-video-${id}`} autoPlay playsInline />
+              <div className="video-label">{nom || "Participant"}</div>
+            </div>
           ))}
           <button onClick={hangupCall} className="hangup-button">🛑 Raccrocher</button>
         </div>
@@ -237,7 +282,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <div className="chat-messages">
         {messages.map((msg, i) => (
           <MessageBubble
-          key={msg.id}
+            key={msg.id}
             msg={msg}
             utilisateur={utilisateur}
             previousMsg={messages[i - 1]}
@@ -280,4 +325,3 @@ export default function ChatBox({ conversationId, utilisateur }) {
     </div>
   );
 }
-
