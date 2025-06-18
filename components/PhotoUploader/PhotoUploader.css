@@ -1,20 +1,24 @@
-
-.photo-preview-wrapper img{
-  border-radius: 100%;
-}
 .photo-upload-contenant {
   position: relative;
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  overflow: hidden;
   cursor: pointer;
+  border: 2px solid #e0c084;
+  transition: box-shadow 0.3s ease;
+}
+
+.photo-upload-contenant:hover {
+  box-shadow: 0 0 10px #e0c084;
 }
 
 .photo-preview-wrapper {
   width: 100%;
   height: 100%;
-  position: relative;
+}
+
+.photo-preview-wrapper img {
+  border-radius: 100%;
 }
 
 .photo-preview {
@@ -22,15 +26,27 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  z-index: 1;
+  position: relative;
 }
 
+/* ✅ Icône en surcouche */
 .camera-label {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  background-color: rgba(255, 255, 255, 0.8);
+  bottom: 6px;
+  right: 6px;
+  background-color: rgba(255, 255, 255, 0.85);
   border-radius: 50%;
-  padding: 4px;
+  padding: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.photo-upload-contenant:hover .camera-label {
+  transform: scale(1.1);
 }
 
 .camera-icon {

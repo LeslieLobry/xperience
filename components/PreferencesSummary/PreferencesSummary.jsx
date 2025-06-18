@@ -6,37 +6,30 @@ import PreferencesForm from '../PreferencesForm/PreferencesForm';
 import Button from '../Button/Button';
 import "../PreferencesSummary/PreferencesSummary.css";
 
-export default function PreferencesSummary({ editable = false }) {
-  const [recherches, setRecherches] = useState([]);
-  const [envies, setEnvies] = useState([]);
+export default function PreferencesSummary({ editable = false, user }) {
+  const [recherches, setRecherches] = useState(user?.recherches || []);
+  const [envies, setEnvies] = useState(user?.envies || []);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); 
-  const [confirmation, setConfirmation] = useState('');
-
-  const fetchPreferences = async () => {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      setRecherches(data.user.recherches || []);
-      setEnvies(data.user.envies || []);
-    }
-  };
-
-  useEffect(() => {
-    fetchPreferences();
-  }, [refreshKey]);
-
-  const handleOpenModal = () => setIsModalOpen(true);
+  const [confirmation, setConfirmation] = useState("");
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setRefreshKey(prev => prev + 1); 
     setConfirmation("Préférences mises à jour ✅");
-    setTimeout(() => setConfirmation(''), 3000);
+    setTimeout(() => setConfirmation(""), 3000);
+
+    // Refresh les préférences à jour si besoin (optionnel)
+    if (editable) {
+      fetch("/api/me", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          setRecherches(data.user.recherches || []);
+          setEnvies(data.user.envies || []);
+        });
+    }
   };
 
   return (
-    <div className='preference-contenant'>
+    <div className="preference-contenant">
       <h2>Préférences</h2>
       <div className="ref">
         <div>
@@ -67,7 +60,7 @@ export default function PreferencesSummary({ editable = false }) {
 
       {editable && (
         <>
-          <Button onClick={handleOpenModal} title="Modifier" color="#8c6a5d" />
+          <Button onClick={() => setIsModalOpen(true)} title="Modifier" color="#8c6a5d" />
           {confirmation && (
             <p style={{ color: "#e0c084", fontWeight: "bold", marginTop: "1rem" }}>
               {confirmation}

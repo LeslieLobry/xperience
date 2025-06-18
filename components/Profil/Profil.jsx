@@ -164,7 +164,8 @@ return (
       </div>
     </div>
 
-    <DescriptionCard editable={isOwnProfile} />
+   <DescriptionCard editable={isOwnProfile} description={user.description} />
+
 
     <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriesPrivees?.[0]} editable={isOwnProfile}
       utilisateurId={user.id} visiteurId={connectedUser.id} />
@@ -196,8 +197,8 @@ return (
     </div>
     )}
 
-    <PreferencesSummary editable={isOwnProfile} />
-    <ProfilDetailsSummary editable={isOwnProfile} />
+    <PreferencesSummary editable={isOwnProfile} user={user} />
+    <ProfilDetailsSummary editable={isOwnProfile} user={user} />
     <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
     {!isOwnProfile && !aDejaCommente && (
     <AvisForm cibleId={user.id} />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Modal from '../Modal/Modal';
 import Button from '../Button/Button';
 import '../DescriptionCard/descriptionCard.css';
@@ -8,29 +8,13 @@ import '../DescriptionCard/descriptionCard.css';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 
-export default function DescriptionCard({ editable = false }) {
-  const [currentDescription, setCurrentDescription] = useState('');
+export default function DescriptionCard({ editable = false, description = "" }) {
+  const [currentDescription, setCurrentDescription] = useState(description);
   const [tempDescription, setTempDescription] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    async function fetchDescription() {
-      try {
-        const res = await fetch('/api/me', { credentials: 'include' });
-        const data = await res.json();
-        if (res.ok && data.user) {
-          setCurrentDescription(data.user.description || '');
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement du profil :', error);
-      }
-    }
-
-    fetchDescription();
-  }, []);
 
   const handleSave = async () => {
     setSaving(true);

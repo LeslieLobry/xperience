@@ -1,80 +1,28 @@
-.profil-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  padding: 1rem;
+.profil-list1 {
+  margin-bottom: 3rem;
+}
+
+.profil-list1-title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
   text-align: center;
-  position: relative;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
-  height: 280px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-
-.profil-card:hover {
-  transform: translateY(-5px);
-}
-
-.profil-photo {
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 50%;
-  margin: 0 auto 0.8rem;
-  border: 2px solid #fff;
-}
-
-.profil-card-title {
-  font-size: 1.3rem;
   color: #e0c084;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-
-.profil-card-details {
-  font-size: 0.95rem;
-  color: #ddd;
+.profil-toggle-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
 }
 
-.statut-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid white;
-  z-index: 5;
-}
-
-.statut-badge.en-ligne {
-  background-color: #4caf50;
-}
-
-.statut-badge.hors-ligne {
-  background-color: #9e9e9e;
-}
 .switch-container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.2rem;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: #fff;
+  font-weight: 500;
 }
 
-.switch-label {
-  color: #eee;
-  font-size: 0.95rem;
-}
-
-/* Le switch */
 .switch {
   position: relative;
   display: inline-block;
@@ -91,9 +39,12 @@
 .slider {
   position: absolute;
   cursor: pointer;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: #ccc;
-  transition: 0.4s;
+  transition: 0.3s;
   border-radius: 24px;
 }
 
@@ -105,19 +56,95 @@
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: 0.4s;
+  transition: 0.3s;
   border-radius: 50%;
 }
 
-input:checked + .slider {
-  background-color: #4caf50;
+.switch input:checked + .slider {
+  background-color: #8c6a5d;
 }
 
-input:checked + .slider:before {
+.switch input:checked + .slider:before {
   transform: translateX(22px);
 }
-@media (max-width: 768px){
-  .grid-profil{
-    grid-template-columns: 1fr;
-  }
+
+.grid-profil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.profil-card-link {
+  text-decoration: none;
+}
+
+.profil-card {
+  width: 180px;
+  height: 350px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 1rem;
+  position: relative;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profil-card:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.profil-photo {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0c084;
+  margin-bottom: 0.8rem;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.profil-card-title {
+  font-family: 'Pacifico', cursive;
+  font-size: 1.2rem;
+  color: #e0c084;
+  margin-bottom: 0.4rem;
+}
+
+.profil-card-details {
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.statut-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background-color: gray;
+}
+
+.statut-badge.en-ligne {
+  background-color: #00ff75;
+}
+
+.statut-badge.hors-ligne {
+  background-color: #999;
+}
+
+.afficher-plus {
+  margin-top: 2rem;
+  font-weight: bold;
+  color: #e0c084;
+  text-align: center;
+  display: block;
+  font-size: 1.1rem;
+  text-decoration: underline;
 }

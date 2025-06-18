@@ -22,17 +22,15 @@ export default function PhotoUploader({
     const formData = new FormData();
     formData.append('photo', file);
 
-    // on garde /api/upload-photo dans tous les cas
     if (isGallery && isPublic) {
       formData.append('isPublic', 'true');
     }
 
     if (isGallery && !isPublic) {
-      if (galerieId === undefined || galerieId === null || isNaN(parseInt(galerieId))) {
-  console.error("galerieId invalide pour galerie privée");
-  return alert("Erreur : galerie privée introuvable.");
-}
-
+      if (!galerieId || isNaN(parseInt(galerieId))) {
+        console.error("galerieId invalide pour galerie privée");
+        return alert("Erreur : galerie privée introuvable.");
+      }
       formData.append('galerieId', galerieId.toString());
     }
 
@@ -55,7 +53,6 @@ export default function PhotoUploader({
 
       setPreview(url);
       if (onUpload) onUpload(isGallery ? data : url);
-
     } catch (err) {
       console.error("Erreur réseau :", err);
       alert("Erreur réseau pendant l'upload.");
@@ -73,18 +70,21 @@ export default function PhotoUploader({
       onClick={handleClick}
     >
       {!isGallery && preview && (
-        <div className="photo-preview-wrapper">
-          <img
-            src={preview || "/images/default-avatar.png"}
-            alt="Photo de profil"
-            className="photo-preview"
-          />
+        <>
+          <div className="photo-preview-wrapper">
+            <img
+              src={preview || "/images/default-avatar.png"}
+              alt="Photo de profil"
+              className="photo-preview"
+            />
+          </div>
+
           {isOwnProfile && (
             <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
               <Camera className="camera-icon" />
             </label>
           )}
-        </div>
+        </>
       )}
 
       {isGallery && (
@@ -94,6 +94,7 @@ export default function PhotoUploader({
       )}
 
       <input
+        id="photo-upload"
         type="file"
         ref={fileInputRef}
         accept="image/*"
