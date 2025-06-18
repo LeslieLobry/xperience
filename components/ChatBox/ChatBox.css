@@ -6,8 +6,8 @@
   overflow: visible;
 }
 #local-video {
-  width: 320px;
-  height: 240px;
+  width: 100%;
+  height: 100%;
   background-color: black;
 }
 
@@ -263,12 +263,14 @@
 }
 
 .video-call-container video {
-  width: 300px;
-  height: 200px;
+  width: 100%;
+  max-height: 60vh; /* ✅ max hauteur raisonnable */
   border-radius: 8px;
   margin: 5px;
   background: #000;
+  overflow: auto;
 }
+
 
 .hangup-button {
   background: red;
