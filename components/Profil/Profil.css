@@ -65,7 +65,7 @@
     display: inline-block;
     margin-top: 0.5rem;
     font-size: 0.9rem;
-    color: #9effa0;
+    color: #298c2b;
     font-weight: bold;
   }
   .profil-badge {
@@ -150,7 +150,7 @@
 .preference-sum-contenant{
 display: flex;
 flex-direction: column;
-align-items: center;
+align-items:flex-start;
 gap: 8px;
 }
 .preference-sum-contenant h2 {
@@ -166,6 +166,20 @@ gap: 8px;
 }
 .pref-rep{
   color: white;
+}
+.tabs-content{
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
+}
+.profil-section{
+  width: 100%;
+  margin-top: 0;
+}
+.info-block{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 @media (max-width: 768px){
   .grid{

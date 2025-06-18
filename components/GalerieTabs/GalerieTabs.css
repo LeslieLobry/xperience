@@ -6,17 +6,19 @@
   display: flex;
   gap: 10px;
   margin-bottom: 1rem;
+  
 }
 
 .tabs-buttons button {
   padding: 8px 16px;
   border: none;
-  background: #ccc;
+  background: #8c6a5d;
   cursor: pointer;
   font-weight: bold;
+  border-radius: 16px;
 }
 
 .tabs-buttons button.active {
-  background: #222;
+  background: #e0c084;
   color: #fff;
 }

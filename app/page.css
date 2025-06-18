@@ -36,7 +36,9 @@ button {
   width: 50%;
   text-align: justify;
 }
-
+ul {
+  list-style-type: none;
+}
 .text{
   display: flex;
   justify-content: center;

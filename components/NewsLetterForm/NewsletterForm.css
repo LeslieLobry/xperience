@@ -47,7 +47,7 @@ button[type="submit"]:hover {
   background-color: #f0d8a0;
 }
 
-p {
+.newsletter-form p {
   margin-top: 0.5rem;
   font-size: 0.95rem;
   color: #e0c084;

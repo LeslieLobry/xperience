@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import GaleriePhotos from '../GaleriePubliquePhotos/GaleriePubliquePhotos';
 import GaleriePriveePhotos from '../GaleriePriveePhotos/GaleriePriveePhotos';
+import Button from '../Button/Button';
 import "./GalerieTabs.css";
 
 export default function GaleriesTabs({ publicPhotos, galeriePrivee, editable, utilisateurId, visiteurId  }) {

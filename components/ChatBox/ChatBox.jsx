@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
-import { Room, createLocalTracks } from "livekit-client";
+import {
+  Room,
+  createLocalTracks,
+  RemoteVideoTrack,
+} from "livekit-client";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import "./ChatBox.css";
@@ -17,7 +21,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [participantsAutres, setParticipantsAutres] = useState([]);
   const [room, setRoom] = useState(null);
   const [inCall, setInCall] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null);
+  const [remoteTracks, setRemoteTracks] = useState([]);
   const [isTyping, setIsTyping] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
@@ -95,21 +99,16 @@ export default function ChatBox({ conversationId, utilisateur }) {
     channel.subscribe("typing", handleTyping);
     chargerMessages();
 
-    // charge participants
     fetch(`/api/conversations/${conversationId}`)
-  .then((res) => res.json())
-  .then((data) => {
-    console.log("✅ Participants chargés :", data.participants);
-    const autres = (data.participants || []).filter(
-      (p) => p.id !== utilisateur.id
-    );
-    setParticipantsAutres(autres);
-  });
-
+      .then((res) => res.json())
+      .then((data) => {
+        const autres = (data.participants || []).filter(
+          (p) => p.id !== utilisateur.id
+        );
+        setParticipantsAutres(autres);
+      });
 
     return () => {
-      console.log("📢 ChatHeader rendu !");
-
       channel.unsubscribe("message", handleMessage);
       channel.unsubscribe("typing", handleTyping);
     };
@@ -146,12 +145,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
   };
 
   const startCall = async (video = false) => {
-  if (ringtoneRef.current) {
-  ringtoneRef.current.pause();
-  ringtoneRef.current.currentTime = 0;
-}
-
-
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+    }
 
     try {
       const res = await fetch("/api/livekit-token", {
@@ -165,7 +162,28 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
       const tracks = await createLocalTracks({ audio: true, video });
       const newRoom = new Room();
+
+      newRoom.on("trackSubscribed", (track, publication, participant) => {
+        if (track.kind === "video" && track instanceof RemoteVideoTrack) {
+          setRemoteTracks((prev) => {
+            if (prev.find(t => t.id === participant.identity)) return prev;
+            return [...prev, { id: participant.identity, track }];
+          });
+        }
+      });
+
+      newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+        setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+      });
+
       await newRoom.connect(livekitUrl, token, { tracks });
+
+      const localTrack = tracks.find((t) => t.kind === "video");
+      if (localTrack) {
+        const el = document.getElementById("local-video");
+        localTrack.attach(el);
+        console.log("Local track attached:", localTrack, el);
+      }
 
       setRoom(newRoom);
       setInCall(true);
@@ -174,13 +192,49 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }
   };
 
-  const hangupCall = () => {
-    if (room) {
-      room.disconnect();
-      setRoom(null);
-      setInCall(false);
+const hangupCall = () => {
+  if (room && room.localParticipant && room.localParticipant.tracks) {
+    for (const publication of room.localParticipant.tracks.values()) {
+      const track = publication.track;
+      if (track) {
+        track.stop();
+        track.detach().forEach((el) => el.remove());
+      }
     }
-  };
+  } else {
+    console.warn("room.localParticipant.tracks is undefined or room not connected");
+  }
+
+  if (room) {
+    room.disconnect();
+  }
+
+  setRoom(null);
+  setRemoteTracks([]);
+  setInCall(false);
+
+  const localVideo = document.getElementById("local-video");
+  if (localVideo) {
+    localVideo.srcObject = null;
+    localVideo.pause();
+    localVideo.removeAttribute("src");
+  }
+
+  if (ringtoneRef.current) {
+    ringtoneRef.current.pause();
+    ringtoneRef.current.currentTime = 0;
+  }
+};
+
+
+  useEffect(() => {
+    remoteTracks.forEach(({ id, track }) => {
+      const el = document.getElementById(`remote-video-${id}`);
+      if (el && track) {
+        track.attach(el);
+      }
+    });
+  }, [remoteTracks]);
 
   return (
     <div className="chatbox-container">
@@ -189,36 +243,35 @@ export default function ChatBox({ conversationId, utilisateur }) {
         onCallAudio={() => startCall(false)}
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}
+        inCall={inCall}
       />
 
-      <div className="chat-messages">
-       {messages.map((msg, i) => (
-  <MessageBubble
-    key={msg.id}
-    msg={msg}
-    utilisateur={utilisateur}
-    previousMsg={messages[i - 1]}
-    lastReads={participantsAutres.map(p => ({
-      utilisateurId: p.id,
-      lastReadAt: p.lastReadAt,
-    }))}
-  />
-))}
+      {inCall && (
+        <div className="video-call-container">
+          <video id="local-video" autoPlay muted playsInline />
+          {remoteTracks.map(({ id }) => (
+            <video key={id} id={`remote-video-${id}`} autoPlay playsInline />
+          ))}
+          <button onClick={hangupCall} className="hangup-button">🛑 Raccrocher</button>
+        </div>
+      )}
 
+      <div className="chat-messages">
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={msg.id}
+            msg={msg}
+            utilisateur={utilisateur}
+            previousMsg={messages[i - 1]}
+            lastReads={participantsAutres.map(p => ({ utilisateurId: p.id, lastReadAt: p.lastReadAt }))}
+          />
+        ))}
         <div ref={messagesEndRef} />
       </div>
 
-      {isTyping && (
-        <div className="typing-indicator">{isTyping} est en train d’écrire...</div>
-      )}
+      {isTyping && <div className="typing-indicator">{isTyping} est en train d’écrire...</div>}
 
-      <form
-        className="chat-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          envoyerMessage();
-        }}
-      >
+      <form className="chat-input" onSubmit={(e) => { e.preventDefault(); envoyerMessage(); }}>
         <textarea
           ref={textareaRef}
           className="input-text"
@@ -228,14 +281,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
-        <button
-  type="button"
-  className="emoji-btn"
-  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
->
-  😊
-</button>
-
+        <button type="button" className="emoji-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
         <button type="submit" className="message-btn">Envoyer</button>
       </form>
 
@@ -251,6 +297,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
           />
         </div>
       )}
+
+      <audio ref={ringtoneRef} src="/ringtone.mp3" loop />
     </div>
   );
 }

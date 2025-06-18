@@ -2,6 +2,7 @@
 
 import AvisCard from "../AvisCard/AvisCard";
 import { useState, useEffect } from "react";
+import "./AvisList.css"
 
 export default function AvisList({ cibleId, connectedUserId }) {
   const [avisRecus, setAvisRecus] = useState([]);
@@ -19,7 +20,7 @@ export default function AvisList({ cibleId, connectedUserId }) {
   }, [cibleId]);
 
   if (!avisRecus || avisRecus.length === 0) {
-    return <p>Aucun avis reçu pour l'instant.</p>;
+    return <p className="avis-text-p">Aucun avis reçu pour l'instant.</p>;
   }
 
   return (
