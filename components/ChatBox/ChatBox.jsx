@@ -12,16 +12,14 @@ import MessageBubble from "./MessageBubble";
 import "./ChatBox.css";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
+
 function cleanupLocalTracks(room) {
   if (!room?.localParticipant?.tracks) return;
 
   for (const pub of room.localParticipant.tracks.values?.() || []) {
     const track = pub?.track;
     if (track) {
-      // 🛑 LiveKit track stop
       track.stop();
-
-      // ✅ On arrête aussi le MediaStreamTrack sous-jacent (audio ou vidéo brut)
       if (track.mediaStreamTrack) {
         try {
           track.mediaStreamTrack.stop();
@@ -40,7 +38,6 @@ function cleanupLocalTracks(room) {
     }
   }
 }
-
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
@@ -124,8 +121,17 @@ export default function ChatBox({ conversationId, utilisateur }) {
       }
     };
 
+    const handleEndCall = (msg) => {
+      if (msg.data.auteurId !== utilisateur.id) {
+        console.log("📞 Appel terminé par l’autre utilisateur");
+        hangupCall();
+      }
+    };
+
     channel.subscribe("message", handleMessage);
     channel.subscribe("typing", handleTyping);
+    channel.subscribe("end-call", handleEndCall);
+
     chargerMessages();
 
     fetch(`/api/conversations/${conversationId}`)
@@ -140,6 +146,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     return () => {
       channel.unsubscribe("message", handleMessage);
       channel.unsubscribe("typing", handleTyping);
+      channel.unsubscribe("end-call", handleEndCall);
     };
   }, [conversationId]);
 
@@ -172,114 +179,108 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
     setTexte("");
   };
-const startCall = async (video = false) => {
-  if (ringtoneRef.current) {
-    ringtoneRef.current.pause();
-    ringtoneRef.current.currentTime = 0;
-  }
 
-  try {
-    // 1. Récupération du token LiveKit
-    const res = await fetch("/api/livekit-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
-    });
-
-    const { token } = await res.json();
-    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-
-    // 2. Création des tracks (audio + video si demandé)
-    const tracks = await createLocalTracks({ audio: true, video });
-    localTracksRef.current = tracks;
-    const newRoom = new Room();
-
-    // 3. Abonnement aux tracks distants
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      if (track.kind === "video" && track instanceof RemoteVideoTrack) {
-        setRemoteTracks((prev) => {
-          if (prev.find(t => t.id === participant.identity)) return prev;
-          return [...prev, { id: participant.identity, track }];
-        });
-      }
-    });
-
-    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-      setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
-    });
-
-    // 4. Connexion à la room
-    await newRoom.connect(livekitUrl, token, { tracks });
-
-    setRoom(newRoom);
-    setInCall(true);
-
-    // 5. Attachement de la caméra locale **attendu avec délai**
-    const localVideoTrack = tracks.find((t) => t.kind === "video");
-    if (localVideoTrack) {
-      // Attente que #local-video soit dans le DOM
-      const tryAttach = setInterval(() => {
-        const el = document.getElementById("local-video");
-        if (el) {
-          localVideoTrack.attach(el);
-          clearInterval(tryAttach);
-        }
-      }, 100);
-
-      // Timeout au bout de 3 secondes
-      setTimeout(() => clearInterval(tryAttach), 3000);
-    }
-
-  } catch (err) {
-    console.error("❌ Erreur lors de l'appel :", err);
-    alert("Impossible d'accéder à la caméra/micro. Vérifie les autorisations.");
-  }
-};
-
-const hangupCall = () => {
-  try {
-    // Nettoyage des tracks (caméra, micro)
-    cleanupLocalTracks(room);
-    // ✅ Nettoyage explicite des MediaStreamTracks non gérés par LiveKit
-localTracksRef.current.forEach((track) => {
-  try {
-    track.stop(); // stop LiveKit wrapper
-    track.mediaStreamTrack?.stop(); // stop brut
-  } catch (e) {
-    console.warn("Erreur arrêt localTrack direct :", e);
-  }
-});
-localTracksRef.current = [];
-
-
-    // Déconnexion LiveKit
-    if (room) {
-      room.disconnect();
-    }
-
-    setRoom(null);
-    setRemoteTracks([]);
-    setInCall(false);
-
-    // Réinitialise proprement la balise vidéo
-    const localVideo = document.getElementById("local-video");
-    if (localVideo) {
-      localVideo.pause();
-      localVideo.srcObject = null;
-      localVideo.removeAttribute("src");
-      localVideo.load();
-    }
-
+  const startCall = async (video = false) => {
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
     }
 
-  } catch (error) {
-    console.error("❌ Erreur pendant le raccrochage :", error);
-  }
-};
+    try {
+      const res = await fetch("/api/livekit-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
+      });
 
+      const { token } = await res.json();
+      const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+      const tracks = await createLocalTracks({ audio: true, video });
+      localTracksRef.current = tracks;
+      const newRoom = new Room();
+
+      newRoom.on("trackSubscribed", (track, publication, participant) => {
+        if (track.kind === "video" && track instanceof RemoteVideoTrack) {
+          setRemoteTracks((prev) => {
+            if (prev.find(t => t.id === participant.identity)) return prev;
+            return [...prev, { id: participant.identity, track }];
+          });
+        }
+        if (track.kind === "audio") {
+          track.attach(document.createElement("audio")).play().catch(console.error);
+        }
+      });
+
+      newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+        setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+      });
+
+      await newRoom.connect(livekitUrl, token, { tracks });
+
+      setRoom(newRoom);
+      setInCall(true);
+
+      const localVideoTrack = tracks.find((t) => t.kind === "video");
+      if (localVideoTrack) {
+        const tryAttach = setInterval(() => {
+          const el = document.getElementById("local-video");
+          if (el) {
+            localVideoTrack.attach(el);
+            clearInterval(tryAttach);
+          }
+        }, 100);
+        setTimeout(() => clearInterval(tryAttach), 3000);
+      }
+
+    } catch (err) {
+      console.error("❌ Erreur lors de l'appel :", err);
+      alert("Impossible d'accéder à la caméra/micro. Vérifie les autorisations.");
+    }
+  };
+
+  const hangupCall = () => {
+    try {
+      cleanupLocalTracks(room);
+      localTracksRef.current.forEach((track) => {
+        try {
+          track.stop();
+          track.mediaStreamTrack?.stop();
+        } catch (e) {
+          console.warn("Erreur arrêt localTrack direct :", e);
+        }
+      });
+      localTracksRef.current = [];
+
+      if (room) {
+        room.disconnect();
+      }
+
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("end-call", {
+        auteurId: utilisateur.id,
+      });
+
+      setRoom(null);
+      setRemoteTracks([]);
+      setInCall(false);
+
+      const localVideo = document.getElementById("local-video");
+      if (localVideo) {
+        localVideo.pause();
+        localVideo.srcObject = null;
+        localVideo.removeAttribute("src");
+        localVideo.load();
+      }
+
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      }
+    } catch (error) {
+      console.error("❌ Erreur pendant le raccrochage :", error);
+    }
+  };
 
   useEffect(() => {
     remoteTracks.forEach(({ id, track }) => {
