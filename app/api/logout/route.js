@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  return NextResponse.json(
-    { success: true, message: "Déconnecté avec succès." },
-    {
-      status: 200,
-      headers: {
-        "Set-Cookie": `token=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`,
-      },
-    }
-  );
+  const response = NextResponse.json({ success: true, message: "Déconnecté avec succès." });
+
+  response.cookies.set("token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return response;
 }
