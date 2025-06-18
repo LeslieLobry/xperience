@@ -28,9 +28,17 @@ const fetchUser = useCallback(async () => {
 }, []);
 
   const logout = async () => {
-    await fetch('/api/logout', { credentials: 'include' });
+  try {
+    await fetch('/api/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
     setUser(null);
-  };
+  } catch (err) {
+    console.error("❌ Erreur logout :", err);
+  }
+};
+
 
   const updateUser = (updatedFields) => {
     setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
