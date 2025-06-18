@@ -27,15 +27,17 @@ export default function StatutToggle({ initialStatut, editable = false }) {
       <span className="statut-label">
         {statut === "en_ligne" ? "🟢 En ligne" : "⚫ Hors ligne"}
       </span>
-      <label className={`statut-switch ${editable ? "" : "disabled"}`}>
-        <input
-          type="checkbox"
-          checked={statut === "en_ligne"}
-          onChange={toggleStatut}
-          disabled={!editable}
-        />
-        <span className="slider"></span>
-      </label>
+
+      {editable && (
+        <label className="statut-switch">
+          <input
+            type="checkbox"
+            checked={statut === "en_ligne"}
+            onChange={toggleStatut}
+          />
+          <span className="slider"></span>
+        </label>
+      )}
     </div>
   );
 }

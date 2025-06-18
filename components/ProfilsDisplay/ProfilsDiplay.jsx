@@ -48,7 +48,10 @@ return (
       <img src={ user.photoUrl?.startsWith('http') ? user.photoUrl : user.photoUrl ?
         `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '' )}` : '/default.jpg' } alt={user.pseudo}
         className="profil-photo" />
-      <h2 className="profil-card-title">{user.pseudo}</h2>
+      <h2 className="profil-card-title">
+  {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+</h2>
+
       <p className="profil-card-details">
         {user.age} ans - {user.localisation}
       </p>

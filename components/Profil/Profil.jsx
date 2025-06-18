@@ -134,8 +134,7 @@ return (
     </>
     )}
   </div>
-
-  <h1 className="profil-name">{user.pseudo}</h1>
+  <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
   <StatutToggle initialStatut={user.statut} editable={isOwnProfile} />
   <div className="profil-badge">{user.type} {user.orientation}</div>
   {isOwnProfile && (

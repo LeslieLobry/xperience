@@ -1,25 +1,106 @@
+.preferences-form {
+  padding: 2rem;
+  background-color: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.preferences-form h2 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  color: #333;
+}
+
 .preferences-columns {
-    display: flex;
-    gap: 2rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .preferences-columns {
+    flex-direction: row;
+    justify-content: space-between;
   }
-  
+}
+
+.preferences-section {
+  flex: 1;
+  min-width: 100%;
+}
+
+@media (min-width: 768px) {
   .preferences-section {
-    flex: 1;
-    min-width: 250px;
+    min-width: 280px;
   }
-  
-  .checkbox-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+}
+
+.preferences-section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  color: #444;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  word-break: break-word;
+}
+
+.checkbox-item input[type="checkbox"] {
+  transform: scale(1.1);
+  accent-color: #8c6a5d;
+}
+
+.form-actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (max-width: 700px) {
+  .form-actions {
+    flex-direction: column;
+    justify-content: center;
   }
-  
-  .checkbox-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
-  }
-  
+}
+
+.form-actions button {
+  background-color: #8c6a5d;
+  color: white;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+  width: 100%;
+  max-width: 200px;
+}
+
+.form-actions button:hover {
+  background-color: #a37c6d;
+}
+
+.message {
+  text-align: center;
+  color: #3c763d;
+  font-weight: bold;
+  margin-top: 1rem;
+}

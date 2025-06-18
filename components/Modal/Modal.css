@@ -4,16 +4,17 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-image: url('../../public/images/skin.jpg'); /* ton image de fond */
+  background-image: url('../../public/images/skin.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-color: rgba(0, 0, 0, 0.5); /* en cas d’erreur de chargement image */
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  padding: 2rem;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
 .modal-content {
@@ -25,13 +26,18 @@
   overflow-y: auto;
   color: #f5ece0;
   z-index: 1;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
+  box-sizing: border-box;
 }
 
 .modal-content::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-   background-image: url('../../public/images/skin.jpg');
+  background-image: url('../../public/images/skin.jpg');
   background-size: cover;
   background-position: center;
   opacity: 0.2;
@@ -47,10 +53,22 @@
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--gold);
+  color: var(--gold, #e0c084);
   cursor: pointer;
+  z-index: 10;
 }
-.modal-buttons{
+
+.modal-buttons {
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width:960px) {
+  .modal-buttons {
+    
+    flex-direction: column;
+    justify-content: flex-end;
+  }
 }

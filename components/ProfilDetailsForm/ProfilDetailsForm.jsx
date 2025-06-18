@@ -155,14 +155,21 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
         <option value="Relation à long terme">Relation à long terme</option>
       </select>
 
-      <input
-        type="text"
-        name="sexe"
-        placeholder="Sexe"
-        value={form.sexe}
-        onChange={handleChange}
-        disabled={!editable}
-      />
+    <label htmlFor="sexe">Sexe</label>
+<select
+  id="sexe"
+  name="sexe"
+  value={form.sexe}
+  onChange={handleChange}
+  disabled={!editable}
+>
+  <option value="">Sélectionner</option>
+  <option value="Homme">Homme</option>
+  <option value="Femme">Femme</option>
+  <option value="Couple">Couple</option>
+  <option value="Autre">Autre</option>
+</select>
+
 
       <input
         type="number"
