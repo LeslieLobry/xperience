@@ -6,7 +6,7 @@ export async function POST() {
   // 🛠 Force la suppression du cookie local, même sans HTTPS
   response.cookies.set("token", "", {
     httpOnly: true,
-    secure: false, // ⛔ obligatoire pour que ça fonctionne en local
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 0,
