@@ -75,7 +75,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       const res = await fetch("/api/livekit-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identity: utilisateur.pseudo, room: String(conversationId) }),
+       body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
       });
 
       const { token } = await res.json();
@@ -87,10 +87,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
       newRoom.on("trackSubscribed", (track, publication, participant) => {
         if (track.kind === "video" && track instanceof RemoteVideoTrack) {
-          setRemoteTracks((prev) => {
-            if (prev.find((t) => t.id === participant.identity)) return prev;
-            return [...prev, { id: participant.identity, track, nom: participant.identity }];
-          });
+          console.log("🎥 Nouveau remote track :", participant.identity, track);
+setRemoteTracks((prev) => {
+  if (prev.some((t) => t.id === participant.identity)) return prev;
+  return [...prev, { id: participant.identity, track, nom: participant.identity }];
+});
+
         }
         if (track.kind === "audio") {
           const audio = document.createElement("audio");
@@ -249,7 +251,11 @@ console.log("📥 Conversation ID reçu :", conversationId);
   useEffect(() => {
     remoteTracks.forEach(({ id, track }) => {
       const el = document.getElementById(`remote-video-${id}`);
-      if (el && track) track.attach(el);
+     if (el && track) {
+  console.log("📷 Attaching remote track", track, "to element", el);
+  track.attach(el);
+}
+
     });
   }, [remoteTracks]);
 

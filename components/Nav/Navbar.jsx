@@ -40,9 +40,18 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
+  try {
+    await fetch("/api/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    logout();
     router.push("/connexion");
-  };
+  } catch (err) {
+    console.error("Erreur lors de la déconnexion", err);
+  }
+};
+
 
   const fetchNotifications = async () => {
     try {

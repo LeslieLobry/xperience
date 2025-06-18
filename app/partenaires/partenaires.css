@@ -34,7 +34,7 @@
 
 .cartes-partenaires {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 2rem;
   max-width: 1200px;
   width: 100%;
@@ -85,4 +85,9 @@ justify-content: space-between;
 
 .partenaire-lien:hover {
   background-color: #cfb276;
+}
+@media (max-width: 768px){
+.carte-partenaire{
+  grid-template-columns: 1fr;
+}
 }
