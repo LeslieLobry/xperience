@@ -108,6 +108,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
 
     return () => {
+      console.log("📢 ChatHeader rendu !");
+
       channel.unsubscribe("message", handleMessage);
       channel.unsubscribe("typing", handleTyping);
     };
@@ -144,8 +146,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
   };
 
   const startCall = async (video = false) => {
-    ringtoneRef.current?.pause();
-    ringtoneRef.current.currentTime = 0;
+  if (ringtoneRef.current) {
+  ringtoneRef.current.pause();
+  ringtoneRef.current.currentTime = 0;
+}
+
+
 
     try {
       const res = await fetch("/api/livekit-token", {
