@@ -65,7 +65,7 @@ const handleLogout = async () => {
         const data = await res.json();
         setNotifications(data);
         setNotifCount(data.length);
-      }
+      } 
     } catch (err) {
       console.error("Erreur fetch notifications", err);
     }
