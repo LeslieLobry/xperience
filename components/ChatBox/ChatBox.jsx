@@ -65,84 +65,117 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
   };
 
-  const startCall = async (video = false) => {
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true, video });
-console.log("🎯 Appel room =", conversationId, " | utilisateur.id =", utilisateur.id);
+const startCall = async (video = false) => {
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    console.log("🎯 Appel room =", conversationId, " | utilisateur.id =", utilisateur.id);
 
-      const res = await fetch("/api/livekit-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
-      });
+    const res = await fetch("/api/livekit-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
+    });
 
-      const { token } = await res.json();
-      const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+    const { token } = await res.json();
+    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-      const tracks = await createLocalTracks({ audio: true, video });
-      localTracksRef.current = tracks;
-      const newRoom = new Room();
+    console.log("🔑 Token reçu :", token);
+    console.log("🌍 URL LiveKit :", livekitUrl);
+    if (!token || !livekitUrl) {
+      console.warn("❌ Token ou URL LiveKit manquant !");
+      return;
+    }
 
-      newRoom.on("trackSubscribed", (track, publication, participant) => {
-        const id = participant.identity;
+    const tracks = await createLocalTracks({ audio: true, video });
+    console.log("🎬 Tracks locaux créés :", tracks.map(t => t.kind));
+    localTracksRef.current = tracks;
 
-        if (track.kind === "video" && track instanceof RemoteVideoTrack) {
-          setRemoteTracks((prev) => {
-            const exists = prev.find((t) => t.id === id);
-            if (exists) return prev;
-            return [...prev, { id, track, nom: id }];
-          });
-        }
+    const newRoom = new Room();
 
-        if (track.kind === "audio") {
-          document.querySelectorAll(`[data-participant="${id}"]`).forEach((el) => el.remove());
-          const audio = document.createElement("audio");
-          audio.autoplay = true;
-          audio.srcObject = new MediaStream([track.mediaStreamTrack]);
-          audio.setAttribute("data-participant", id);
-          document.body.appendChild(audio);
-        }
-      });
+    // 🔄 Liste des événements à écouter
+    newRoom.on("participantConnected", (participant) => {
+      console.log("👤 Participant connecté :", participant.identity);
+    });
 
-      newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-        setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
-      });
+    newRoom.on("participantDisconnected", (participant) => {
+      console.log("🚪 Participant déconnecté :", participant.identity);
+    });
 
-     await newRoom.connect(livekitUrl, token, { tracks });
+    newRoom.on("trackPublished", (publication, participant) => {
+      console.log("📢 Track publié :", publication.trackName, "de", participant.identity);
+    });
+
+    newRoom.on("trackSubscribed", (track, publication, participant) => {
+      const id = participant.identity;
+      console.log("✅ Track abonné :", track.kind, "de", id);
+
+      if (track.kind === "video" && track instanceof RemoteVideoTrack) {
+        setRemoteTracks((prev) => {
+          const exists = prev.find((t) => t.id === id);
+          if (exists) return prev;
+          return [...prev, { id, track, nom: id }];
+        });
+      }
+
+      if (track.kind === "audio") {
+        document.querySelectorAll(`[data-participant="${id}"]`).forEach((el) => el.remove());
+        const audio = document.createElement("audio");
+        audio.autoplay = true;
+        audio.srcObject = new MediaStream([track.mediaStreamTrack]);
+        audio.setAttribute("data-participant", id);
+        document.body.appendChild(audio);
+      }
+    });
+
+    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+      console.log("🚫 Track désabonné :", track.kind, "de", participant.identity);
+      setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+    });
+
+    newRoom.on("connectionStateChanged", (state) => {
+      console.log("📶 État de la connexion :", state);
+    });
+
+    newRoom.on("disconnected", () => {
+      console.log("🔌 Déconnecté de la room");
+    });
+
+    // 🔗 Connexion à LiveKit
+    await newRoom.connect(livekitUrl, token, { tracks });
     console.log("✅ Connecté à la room LiveKit !");
     console.log("🧾 Mon utilisateur ID :", utilisateur.id);
 
-      setRoom(newRoom);
-      newRoom.on('Connected', () => {
-  console.log("✅ [LiveKit] Connexion réussie à la room.");
-});
+    setRoom(newRoom);
+    setInCall(true);
+    inCallRef.current = true;
 
-      setInCall(true);
-      inCallRef.current = true;
-
-      const localVideoTrack = tracks.find((t) => t.kind === "video");
-      if (localVideoTrack) {
-        const tryAttach = setInterval(() => {
-          const el = document.getElementById("local-video");
-          if (el) {
-            localVideoTrack.attach(el);
-            clearInterval(tryAttach);
-          }
-        }, 100);
-        setTimeout(() => clearInterval(tryAttach), 3000);
-      }
-
-      ably.channels.get(`conversation-${conversationId}`).publish("start-call", {
-        auteurId: utilisateur.id,
-        auteurPseudo: utilisateur.pseudo,
-        video,
-        conversationId,
-      });
-    } catch (err) {
-      console.error("❌ Erreur lors de l'appel :", err);
-      alert("❌ Erreur pendant l’appel : " + err.message);
+    // 📹 Affichage de la caméra locale
+    const localVideoTrack = tracks.find((t) => t.kind === "video");
+    if (localVideoTrack) {
+      const tryAttach = setInterval(() => {
+        const el = document.getElementById("local-video");
+        if (el) {
+          localVideoTrack.attach(el);
+          clearInterval(tryAttach);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(tryAttach), 3000);
     }
-  };
+
+    // 📢 Notifier l'autre via Ably
+    ably.channels.get(`conversation-${conversationId}`).publish("start-call", {
+      auteurId: utilisateur.id,
+      auteurPseudo: utilisateur.pseudo,
+      video,
+      conversationId,
+    });
+
+  } catch (err) {
+    console.error("❌ Erreur lors de l'appel :", err);
+    alert("❌ Erreur pendant l’appel : " + err.message);
+  }
+};
+
 
   const hangupCall = () => {
     if (!inCallRef.current) return;
