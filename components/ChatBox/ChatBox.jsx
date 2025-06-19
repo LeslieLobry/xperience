@@ -76,7 +76,7 @@ const startCall = async (video = false) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        identity: String(utilisateur.id),
+        identity: `user-${utilisateur.id}`,
         room: String(conversationId),
       }),
     });

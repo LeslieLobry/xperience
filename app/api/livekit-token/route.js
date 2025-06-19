@@ -16,10 +16,10 @@ console.log("✅ API_SECRET:", !!API_SECRET);
 console.log("✅ identity reçu:", identity);
 console.log("🎟️ Token demandé pour : identity =", identity, "| room =", room);
 
-    const token = new AccessToken(API_KEY, API_SECRET, {
-      identity,
-      ttl: "10m",
-    });
+   const token = new AccessToken(API_KEY, API_SECRET, {
+  identity: `user-${identity}`, // 🔥 ici on "string-ifie" l'ID utilisateur
+  ttl: "10m",
+});
 
     token.addGrant({ roomJoin: true, room });
 
