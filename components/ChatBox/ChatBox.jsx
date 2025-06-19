@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
 import {
   Room,
-  connect,
   createLocalTracks,
   RemoteVideoTrack,
 } from "livekit-client";
@@ -92,10 +91,9 @@ const startCall = async (video = false) => {
     console.log("🎬 Tracks locaux créés :", tracks.map(t => t.kind));
     localTracksRef.current = tracks;
 
-    const newRoom = await connect(livekitUrl, token, { tracks });
+    const newRoom = new Room(); // ✅ on utilise bien Room ici
 
-
-    // 🔄 Liste des événements à écouter
+    // 🔄 Événements avant la connexion
     newRoom.on("participantConnected", (participant) => {
       console.log("👤 Participant connecté :", participant.identity);
     });
@@ -143,13 +141,7 @@ const startCall = async (video = false) => {
       console.log("🔌 Déconnecté de la room");
     });
 
-    try {
-      console.log("🔗 Connexion réussie pour :", utilisateur.id);
-    } catch (err) {
-      console.error("❌ Échec de connexion pour :", utilisateur.id, err);
-      return;
-    }
-
+    await newRoom.connect(livekitUrl, token, { tracks }); // ✅ connexion manuelle avec Room
     setRoom(newRoom);
     setInCall(true);
     inCallRef.current = true;
@@ -157,18 +149,15 @@ const startCall = async (video = false) => {
     console.log("✅ Connecté à la room LiveKit !");
     console.log("🧾 Mon utilisateur ID :", utilisateur.id);
 
-    // 📊 Affiche les participants après délai
     setTimeout(() => {
-  if (newRoom.participants) {
-    const participants = Array.from(newRoom.participants.values()).map(p => p.identity);
-    console.log("👥 Participants dans la room :", participants);
-  } else {
-    console.warn("⚠️ Room.participants est toujours undefined après 2s");
-  }
-}, 2000);
+      if (newRoom.participants) {
+        const participants = Array.from(newRoom.participants.values()).map(p => p.identity);
+        console.log("👥 Participants dans la room :", participants);
+      } else {
+        console.warn("⚠️ Room.participants est toujours undefined après 2s");
+      }
+    }, 2000);
 
-
-    // 📹 Affichage de la caméra locale
     const localVideoTrack = tracks.find((t) => t.kind === "video");
     if (localVideoTrack) {
       const tryAttach = setInterval(() => {
@@ -181,7 +170,6 @@ const startCall = async (video = false) => {
       setTimeout(() => clearInterval(tryAttach), 3000);
     }
 
-    // 📢 Notifier l'autre via Ably
     ably.channels.get(`conversation-${conversationId}`).publish("start-call", {
       auteurId: utilisateur.id,
       auteurPseudo: utilisateur.pseudo,
@@ -194,9 +182,6 @@ const startCall = async (video = false) => {
     alert("❌ Erreur pendant l’appel : " + err.message);
   }
 };
-
-
-
 
   const hangupCall = () => {
     if (!inCallRef.current) return;
