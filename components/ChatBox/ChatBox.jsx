@@ -130,7 +130,7 @@ const envoyerMessage = async () => {
   const nouveauMessage = {
     contenu: texte,
     conversationId,
-    type: "texte", // ou "text", selon ton modèle
+    type: "TEXTE", // ou "text", selon ton modèle
   };
 
   try {
@@ -156,13 +156,6 @@ const envoyerMessage = async () => {
   }
 };
 
-
-  useEffect(() => {
-    if (!conversationId) return;
-    const fetchMessages = async () => {
-      const res = await fetch(`/api/messages?conversationId=${conversationId}`);
-      const data = await res.json();
-      setMessages(data.messages || []);
       setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
     };
     fetchMessages();
