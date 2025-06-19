@@ -107,8 +107,13 @@ export default function ChatBox({ conversationId, utilisateur }) {
         setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
       });
 
-      await newRoom.connect(livekitUrl, token, { tracks });
+     await newRoom.connect(livekitUrl, token, { tracks });
+    console.log("✅ Connecté à la room LiveKit !");
       setRoom(newRoom);
+      newRoom.on('Connected', () => {
+  console.log("✅ [LiveKit] Connexion réussie à la room.");
+});
+
       setInCall(true);
       inCallRef.current = true;
 
