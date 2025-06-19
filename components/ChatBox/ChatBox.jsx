@@ -67,60 +67,54 @@ export default function ChatBox({ conversationId, utilisateur }) {
   };
 const startCall = async (video = false) => {
   try {
-    console.log("🟢 Lancement startCall pour :", utilisateur.id);
+    console.log("🟢 startCall lancé - ID utilisateur:", utilisateur.id, "| vidéo activée:", video);
 
-    await navigator.mediaDevices.getUserMedia({ audio: true, video });
-    console.log("🎯 Appel room =", conversationId, " | utilisateur.id =", utilisateur.id);
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    console.log("🎥 MediaDevices OK - Périphériques captés");
 
     const res = await fetch("/api/livekit-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
+      body: JSON.stringify({
+        identity: String(utilisateur.id),
+        room: String(conversationId),
+      }),
     });
 
     const { token } = await res.json();
     const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-
-    console.log("🔑 Token reçu :", token);
-    console.log("🌍 URL LiveKit :", livekitUrl);
     if (!token || !livekitUrl) {
-      console.warn("❌ Token ou URL LiveKit manquant !");
+      console.warn("❌ Token ou URL manquant");
       return;
     }
 
+    console.log("🔑 Token reçu:", token.slice(0, 30), "...", "| 🔗 URL:", livekitUrl);
+
     const tracks = await createLocalTracks({ audio: true, video });
-    console.log("🎬 Tracks locaux créés :", tracks.map(t => t.kind));
     localTracksRef.current = tracks;
+    console.log("📹 Tracks locaux:", tracks.map(t => t.kind));
 
-    const newRoom = new Room(); // ✅ on utilise bien Room ici
+    const newRoom = new Room();
+    setRoom(newRoom);
 
-    // 🔄 Événements avant la connexion
-    newRoom.on("participantConnected", (participant) => {
-      console.log("👤 Participant connecté :", participant.identity);
-    });
+    newRoom.on("participantConnected", (p) => console.log("👤 Connecté:", p.identity));
+    newRoom.on("participantDisconnected", (p) => console.log("🚪 Déconnecté:", p.identity));
+    newRoom.on("connectionStateChanged", (state) => console.log("📶 Connexion:", state));
+    newRoom.on("disconnected", () => console.log("🔌 Déconnecté de la room"));
 
-    newRoom.on("participantDisconnected", (participant) => {
-      console.log("🚪 Participant déconnecté :", participant.identity);
-    });
-
-    newRoom.on("trackPublished", (publication, participant) => {
-      console.log("📢 Track publié :", publication.trackName, "de", participant.identity);
-    });
-
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
+    newRoom.on("trackSubscribed", (track, pub, participant) => {
       const id = participant.identity;
-      console.log("✅ Track abonné :", track.kind, "de", id);
+      console.log("✅ trackSubscribed", track.kind, id);
 
       if (track.kind === "video" && track instanceof RemoteVideoTrack) {
-        setRemoteTracks((prev) => {
-          const exists = prev.find((t) => t.id === id);
+        setRemoteTracks(prev => {
+          const exists = prev.find(t => t.id === id);
           if (exists) return prev;
           return [...prev, { id, track, nom: id }];
         });
       }
 
       if (track.kind === "audio") {
-        document.querySelectorAll(`[data-participant="${id}"]`).forEach((el) => el.remove());
         const audio = document.createElement("audio");
         audio.autoplay = true;
         audio.srcObject = new MediaStream([track.mediaStreamTrack]);
@@ -129,37 +123,12 @@ const startCall = async (video = false) => {
       }
     });
 
-    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-      console.log("🚫 Track désabonné :", track.kind, "de", participant.identity);
-      setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
-    });
-
-    newRoom.on("connectionStateChanged", (state) => {
-      console.log("📶 État de la connexion :", state);
-    });
-
-    newRoom.on("disconnected", () => {
-      console.log("🔌 Déconnecté de la room");
-    });
-
-    await newRoom.connect(livekitUrl, token, { tracks }); // ✅ connexion manuelle avec Room
-    setRoom(newRoom);
+    await newRoom.connect(livekitUrl, token, { tracks });
     setInCall(true);
     inCallRef.current = true;
+    console.log("🎉 Appel actif | utilisateur:", utilisateur.id);
 
-    console.log("✅ Connecté à la room LiveKit !");
-    console.log("🧾 Mon utilisateur ID :", utilisateur.id);
-
-    setTimeout(() => {
-      if (newRoom.participants) {
-        const participants = Array.from(newRoom.participants.values()).map(p => p.identity);
-        console.log("👥 Participants dans la room :", participants);
-      } else {
-        console.warn("⚠️ Room.participants est toujours undefined après 2s");
-      }
-    }, 2000);
-
-    const localVideoTrack = tracks.find((t) => t.kind === "video");
+    const localVideoTrack = tracks.find(t => t.kind === "video");
     if (localVideoTrack) {
       const tryAttach = setInterval(() => {
         const el = document.getElementById("local-video");
@@ -178,11 +147,21 @@ const startCall = async (video = false) => {
       conversationId,
     });
 
+    setTimeout(() => {
+      console.log("⏱️ DEBUG post-connexion - Participants actuels:");
+      if (newRoom.participants) {
+        console.log("👥", Array.from(newRoom.participants.values()).map(p => p.identity));
+      } else {
+        console.warn("⚠️ Room.participants toujours undefined");
+      }
+    }, 2000);
+
   } catch (err) {
-    console.error("❌ Erreur lors de l'appel :", err);
-    alert("❌ Erreur pendant l’appel : " + err.message);
+    console.error("💥 Erreur dans startCall:", err);
+    alert("Erreur pendant l’appel : " + err.message);
   }
 };
+
 
   const hangupCall = () => {
     if (!inCallRef.current) return;

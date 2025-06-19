@@ -11,8 +11,8 @@ export async function POST(req) {
 if (!identity || !room) {
   return NextResponse.json({ error: "Missing user or room" }, { status: 400 });
 }
-console.log("✅ API_KEY:", API_KEY);
-console.log("✅ API_SECRET:", API_SECRET);
+console.log("✅ API_KEY:", !!API_KEY);
+console.log("✅ API_SECRET:", !!API_SECRET);
 console.log("✅ identity reçu:", identity);
 console.log("🎟️ Token demandé pour : identity =", identity, "| room =", room);
 
