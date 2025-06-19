@@ -13,6 +13,8 @@ import "./ChatBox.css";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
+const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+
 function cleanupLocalTracks(room) {
   if (!room?.localParticipant?.tracks) return;
   for (const pub of room.localParticipant.tracks.values?.() || []) {
@@ -38,8 +40,6 @@ function cleanupLocalTracks(room) {
   }
 }
 
-const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
-
 export default function ChatBox({ conversationId, utilisateur }) {
   const [messages, setMessages] = useState([]);
   const [texte, setTexte] = useState("");
@@ -62,7 +62,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   };
 
   const notifyTyping = () => {
-    const channel = ably.channels.get(conversation-${conversationId});
+    const channel = ably.channels.get(`conversation-${conversationId}`);
     channel.publish("typing", {
       auteurId: utilisateur.id,
       pseudo: utilisateur.pseudo,
@@ -72,10 +72,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   const startCall = async (video = false) => {
     try {
+      console.log("📞 Lancement d’un appel", { video });
+
       const res = await fetch("/api/livekit-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
+        body: JSON.stringify({ identity: String(utilisateur.id), room: String(conversationId) }),
       });
 
       const { token } = await res.json();
@@ -88,11 +90,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
       newRoom.on("trackSubscribed", (track, publication, participant) => {
         if (track.kind === "video" && track instanceof RemoteVideoTrack) {
           console.log("🎥 Nouveau remote track :", participant.identity, track);
-setRemoteTracks((prev) => {
-  if (prev.some((t) => t.id === participant.identity)) return prev;
-  return [...prev, { id: participant.identity, track, nom: participant.identity }];
-});
-
+          setRemoteTracks((prev) => {
+            if (prev.some((t) => t.id === participant.identity)) return prev;
+            return [...prev, { id: participant.identity, track, nom: participant.identity }];
+          });
         }
         if (track.kind === "audio") {
           const audio = document.createElement("audio");
@@ -102,11 +103,17 @@ setRemoteTracks((prev) => {
         }
       });
 
-      newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-        setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+      newRoom.on("participantConnected", (p) => {
+        console.log("✅ Participant connecté :", p.identity);
+      });
+
+      newRoom.on("participantDisconnected", (p) => {
+        console.log("❌ Participant déconnecté :", p.identity);
+        setRemoteTracks((prev) => prev.filter((t) => t.id !== p.identity));
       });
 
       await newRoom.connect(livekitUrl, token, { tracks });
+      console.log("🔗 Room connectée :", newRoom.name);
 
       setRoom(newRoom);
       setInCall(true);
@@ -123,7 +130,7 @@ setRemoteTracks((prev) => {
         setTimeout(() => clearInterval(tryAttach), 3000);
       }
 
-      const channel = ably.channels.get(conversation-${conversationId});
+      const channel = ably.channels.get(`conversation-${conversationId}`);
       channel.publish("start-call", {
         auteurId: utilisateur.id,
         video,
@@ -135,7 +142,7 @@ setRemoteTracks((prev) => {
     }
   };
 
-  const hangupCall = () => {
+  const hangupCall = async () => {
     try {
       cleanupLocalTracks(room);
       localTracksRef.current.forEach((track) => {
@@ -148,9 +155,9 @@ setRemoteTracks((prev) => {
       });
       localTracksRef.current = [];
 
-      if (room) room.disconnect();
+      if (room) await room.disconnect();
 
-      const channel = ably.channels.get(conversation-${conversationId});
+      const channel = ably.channels.get(`conversation-${conversationId}`);
       channel.publish("end-call", {
         auteurId: utilisateur.id,
       });
@@ -166,6 +173,12 @@ setRemoteTracks((prev) => {
         localVideo.removeAttribute("src");
         localVideo.load();
       }
+
+      document.querySelectorAll("audio").forEach((a) => {
+        a.pause();
+        a.srcObject = null;
+        a.remove();
+      });
     } catch (error) {
       console.error("❌ Erreur pendant le raccrochage :", error);
     }
@@ -186,7 +199,7 @@ setRemoteTracks((prev) => {
       date: new Date().toISOString(),
     };
 
-    const channel = ably.channels.get(conversation-${conversationId});
+    const channel = ably.channels.get(`conversation-${conversationId}`);
     channel.publish("message", nouveauMessage);
 
     setMessages((prev) => [...prev, { ...nouveauMessage, id: Date.now() }]);
@@ -196,10 +209,11 @@ setRemoteTracks((prev) => {
 
   useEffect(() => {
     if (!conversationId) return;
-console.log("📥 Conversation ID reçu :", conversationId);
+    console.log("📥 Conversation ID reçu :", conversationId);
+
     const fetchMessages = async () => {
       try {
-        const res = await fetch(/api/messages?conversationId=${conversationId});
+        const res = await fetch(`/api/messages?conversationId=${conversationId}`);
         const data = await res.json();
         setMessages(data.messages || []);
         setParticipantsAutres(data.participants || []);
@@ -210,7 +224,7 @@ console.log("📥 Conversation ID reçu :", conversationId);
 
     fetchMessages();
 
-    const channel = ably.channels.get(conversation-${conversationId});
+    const channel = ably.channels.get(`conversation-${conversationId}`);
 
     const handleStartCall = (msg) => {
       if (msg.data.auteurId !== utilisateur.id && !inCall) {
@@ -228,7 +242,7 @@ console.log("📥 Conversation ID reçu :", conversationId);
 
     const handleTyping = (msg) => {
       if (msg.data.auteurId !== utilisateur.id) {
-        setIsTyping(${msg.data.pseudo});
+        setIsTyping(`${msg.data.pseudo}`);
         setTimeout(() => setIsTyping(null), 2000);
       }
     };
@@ -250,12 +264,11 @@ console.log("📥 Conversation ID reçu :", conversationId);
 
   useEffect(() => {
     remoteTracks.forEach(({ id, track }) => {
-      const el = document.getElementById(remote-video-${id});
-     if (el && track) {
-  console.log("📷 Attaching remote track", track, "to element", el);
-  track.attach(el);
-}
-
+      const el = document.getElementById(`remote-video-${id}`);
+      if (el && track && typeof track.attach === "function") {
+        console.log("📷 Attaching remote track", track, "to element", el);
+        track.attach(el);
+      }
     });
   }, [remoteTracks]);
 
@@ -277,7 +290,7 @@ console.log("📥 Conversation ID reçu :", conversationId);
           </div>
           {remoteTracks.map(({ id, nom }) => (
             <div className="video-box" key={id}>
-              <video id={remote-video-${id}} autoPlay playsInline />
+              <video id={`remote-video-${id}`} autoPlay playsInline />
               <div className="video-label">{nom || "Participant"}</div>
             </div>
           ))}
@@ -330,4 +343,4 @@ console.log("📥 Conversation ID reçu :", conversationId);
       <audio ref={ringtoneRef} src="/ringtone.mp3" loop />
     </div>
   );
-} 
+}
