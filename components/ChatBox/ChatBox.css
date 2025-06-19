@@ -308,3 +308,51 @@
   font-size: 0.75rem;
   border-radius: 4px;
 }
+.appel-recu-popup {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 2px solid #e60073;
+  border-radius: 10px;
+  padding: 20px;
+  z-index: 9999;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.appel-popup-contenu {
+  text-align: center;
+}
+
+.appel-popup-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.appel-popup-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.appel-popup-actions button:first-child {
+  background-color: #4caf50;
+  color: white;
+}
+
+.appel-popup-actions button:last-child {
+  background-color: #f44336;
+  color: white;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
