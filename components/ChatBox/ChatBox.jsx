@@ -190,22 +190,39 @@ export default function ChatBox({ conversationId, utilisateur }) {
     notifyTyping();
   };
 
-  const envoyerMessage = async () => {
-    if (!texte.trim()) return;
-    const nouveauMessage = {
-      auteurId: utilisateur.id,
-      contenu: texte,
-      conversationId,
-      date: new Date().toISOString(),
-    };
+const envoyerMessage = async () => {
+  if (!texte.trim()) return;
+
+  try {
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId,
+        contenu: texte,
+        type: "TEXTE", // ⚠️ Assure-toi que c'est bien l'enum attendu par Prisma
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      console.error("❌ Message non enregistré :", data.message);
+      return;
+    }
+
+    const nouveauMessage = data.message;
 
     const channel = ably.channels.get(`conversation-${conversationId}`);
     channel.publish("message", nouveauMessage);
 
-    setMessages((prev) => [...prev, { ...nouveauMessage, id: Date.now() }]);
+    setMessages((prev) => [...prev, nouveauMessage]);
     setTexte("");
     textareaRef.current.style.height = "auto";
-  };
+  } catch (err) {
+    console.error("❌ Erreur lors de l’envoi du message :", err);
+  }
+};
+
 
   useEffect(() => {
     if (!conversationId) return;
@@ -216,7 +233,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
         const res = await fetch(`/api/messages?conversationId=${conversationId}`);
         const data = await res.json();
         setMessages(data.messages || []);
-        setParticipantsAutres(data.participants || []);
+        setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
       } catch (err) {
         console.error("❌ Erreur chargement messages :", err);
       }
