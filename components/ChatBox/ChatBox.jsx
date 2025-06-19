@@ -64,9 +64,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
       conversationId,
     });
   };
-
 const startCall = async (video = false) => {
   try {
+    console.log("🟢 Lancement startCall pour :", utilisateur.id);
+
     await navigator.mediaDevices.getUserMedia({ audio: true, video });
     console.log("🎯 Appel room =", conversationId, " | utilisateur.id =", utilisateur.id);
 
@@ -140,14 +141,25 @@ const startCall = async (video = false) => {
       console.log("🔌 Déconnecté de la room");
     });
 
-    // 🔗 Connexion à LiveKit
-    await newRoom.connect(livekitUrl, token, { tracks });
-    console.log("✅ Connecté à la room LiveKit !");
-    console.log("🧾 Mon utilisateur ID :", utilisateur.id);
+    try {
+      await newRoom.connect(livekitUrl, token, { tracks });
+      console.log("🔗 Connexion réussie pour :", utilisateur.id);
+    } catch (err) {
+      console.error("❌ Échec de connexion pour :", utilisateur.id, err);
+      return;
+    }
 
     setRoom(newRoom);
     setInCall(true);
     inCallRef.current = true;
+
+    console.log("✅ Connecté à la room LiveKit !");
+    console.log("🧾 Mon utilisateur ID :", utilisateur.id);
+
+    // 📊 Affiche les participants après délai
+    setTimeout(() => {
+      console.log("👥 Participants dans la room :", Array.from(newRoom.participants.values()).map(p => p.identity));
+    }, 2000);
 
     // 📹 Affichage de la caméra locale
     const localVideoTrack = tracks.find((t) => t.kind === "video");
@@ -175,6 +187,8 @@ const startCall = async (video = false) => {
     alert("❌ Erreur pendant l’appel : " + err.message);
   }
 };
+
+
 
 
   const hangupCall = () => {
@@ -383,10 +397,17 @@ useEffect(() => {
             <p><strong>{appelRecu.auteurPseudo}</strong> vous appelle pour un {appelRecu.video ? "appel vidéo" : "appel audio"}.</p>
             <div className="appel-popup-actions">
               <button onClick={() => {
-                ringtoneRef.current?.pause();
-                setAppelRecu(null);
-                setTimeout(() => startCall(appelRecu.video), 50);
-              }}>✅ Accepter</button>
+  ringtoneRef.current?.pause();
+  setAppelRecu(null);
+  // ⚠️ Forcer startCall même si déjà en appel localement
+  setTimeout(() => {
+    inCallRef.current = false;
+    startCall(appelRecu.video);
+  }, 50);
+}}>
+  ✅ Accepter
+</button>
+
               <button onClick={() => {
                 ringtoneRef.current?.pause();
                 setAppelRecu(null);
