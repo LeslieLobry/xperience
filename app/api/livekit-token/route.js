@@ -6,14 +6,16 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 export async function POST(req) {
   try {
-    const { identity, room = "default" } = await req.json();
+    const { identity, room } = await req.json();
 
-    if (!identity) {
-      return NextResponse.json({ error: "Missing user" }, { status: 400 });
-    }
+if (!identity || !room) {
+  return NextResponse.json({ error: "Missing user or room" }, { status: 400 });
+}
 console.log("✅ API_KEY:", API_KEY);
 console.log("✅ API_SECRET:", API_SECRET);
 console.log("✅ identity reçu:", identity);
+console.log("🎟️ Token demandé pour : identity =", identity, "| room =", room);
+
     const token = new AccessToken(API_KEY, API_SECRET, {
       identity,
       ttl: "10m",
