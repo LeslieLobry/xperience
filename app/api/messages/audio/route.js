@@ -13,8 +13,9 @@ const s3 = new S3Client({
   },
 });
 
-// 🔁 utilitaire pour formater la durée (en secondes) vers mm:ss
+// 🔁 utilitaire pour formater la durée en mm:ss
 function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds)) return "0:00";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s < 10 ? "0" + s : s}`;
@@ -24,14 +25,17 @@ export async function POST(req) {
   try {
     const user = await getUserFromToken();
     if (!user || !user.id) {
+      console.warn("🚫 Utilisateur non authentifié");
       return NextResponse.json({ success: false, message: "Utilisateur non authentifié" }, { status: 401 });
     }
 
     const formData = await req.formData();
     const file = formData.get("audio");
     const conversationId = formData.get("conversationId");
+    const dureeClient = formData.get("duree"); // ✅ on récupère la durée envoyée
 
     if (!file || !conversationId) {
+      console.warn("❌ Données manquantes :", { file, conversationId });
       return NextResponse.json({ success: false, message: "Fichier ou conversation manquant" }, { status: 400 });
     }
 
@@ -39,17 +43,33 @@ export async function POST(req) {
     const extension = file.name?.split(".").pop() || "webm";
     const fileName = `audios/${randomUUID()}.${extension}`;
 
-    // 🧠 Obtenir la durée avec music-metadata
-    let duree = "";
-    try {
-      const metadata = await parseBuffer(buffer, file.type);
-      if (metadata.format.duration) {
-        duree = formatDuration(metadata.format.duration);
+    console.log("📦 Fichier reçu :", {
+      name: file.name,
+      type: file.type,
+      size: buffer.length + " octets",
+    });
+
+    // 🧠 Durée : priorité à celle du client
+    let duree = typeof dureeClient === "string" && dureeClient.includes(":") ? dureeClient : "";
+
+    if (!duree) {
+      try {
+        console.log("🧪 Tentative d'extraction metadata...");
+        const metadata = await parseBuffer(buffer, file.type);
+        console.log("🎯 Metadata reçue :", metadata);
+
+        if (metadata.format.duration) {
+          duree = formatDuration(metadata.format.duration);
+          console.log("⏱️ Durée détectée via serveur :", duree);
+        } else {
+          console.warn("❌ Pas de durée dans metadata");
+        }
+      } catch (err) {
+        console.warn("⚠️ Erreur lors de parseBuffer :", err.message);
       }
-    } catch (err) {
-      console.warn("⏱️ Impossible de lire la durée de l’audio :", err.message);
     }
 
+    // ⬆️ Upload vers S3
     await s3.send(new PutObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET,
       Key: fileName,
@@ -59,6 +79,7 @@ export async function POST(req) {
 
     const audioUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
 
+    // 💾 Enregistrement en base
     const message = await prisma.message.create({
       data: {
         auteurId: user.id,
@@ -68,6 +89,8 @@ export async function POST(req) {
         duree,
       },
     });
+
+    console.log("📩 Message enregistré :", message);
 
     return NextResponse.json({ success: true, message });
   } catch (error) {

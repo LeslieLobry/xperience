@@ -1,4 +1,4 @@
-import MessageAudio from "./MessageAudio";
+import MessageAudio from "../MessageAudio/MessageAudio";
 
 export default function MessageBubble({ msg, utilisateur, previousMsg, lastReads }) {
   const isOwn = msg.auteurId === utilisateur.id;

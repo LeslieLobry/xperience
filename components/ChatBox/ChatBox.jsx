@@ -73,32 +73,49 @@ export default function ChatBox({ conversationId, utilisateur }) {
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("audio", blob);
-        formData.append("conversationId", conversationId);
+mediaRecorder.onstop = async () => {
+  const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
 
-        try {
-          const res = await fetch("/api/messages/audio", {
-            method: "POST",
-            body: formData,
-          });
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-          const data = await res.json();
-          if (!data.success) {
-            console.error("❌ Audio non enregistré :", data.message);
-            return;
-          }
+  let duree = "0:00";
+  try {
+    const decoded = await audioContext.decodeAudioData(arrayBuffer);
+    const totalSeconds = decoded.duration;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    duree = `${minutes}:${seconds < 10 ? "0" + seconds : seconds}`;
+  } catch (err) {
+    console.warn("⚠️ Impossible de décoder la durée :", err);
+  }
 
-          const nouveauMessage = data.message;
-          const channel = ably.channels.get(`conversation-${conversationId}`);
-          channel.publish("message", nouveauMessage);
-          setMessages((prev) => [...prev, nouveauMessage]);
-        } catch (err) {
-          console.error("❌ Erreur envoi audio :", err);
-        }
-      };
+  const formData = new FormData();
+  formData.append("audio", blob, "enregistrement.webm");
+  formData.append("conversationId", conversationId);
+  formData.append("duree", duree); // ✅ FIABLE
+
+  try {
+    const res = await fetch("/api/messages/audio", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      console.error("❌ Audio non enregistré :", data.message);
+      return;
+    }
+
+    const nouveauMessage = data.message;
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("message", nouveauMessage);
+    setMessages((prev) => [...prev, nouveauMessage]);
+  } catch (err) {
+    console.error("❌ Erreur envoi audio :", err);
+  }
+};
+
 
       mediaRecorder.start();
       setRecording(true);

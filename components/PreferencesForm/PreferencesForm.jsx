@@ -8,7 +8,7 @@ const recherchesOptions = [
 ];
 
 const enviesOptions = [
-  "2+2", "BDSM", "Cam", "Candualisme", "Chat", "Côte-à-côtisme", "Curieux", "Duo",
+  "2+2", "BDSM", "Cam", "Candaulisme", "Chat", "Côte-à-côtisme", "Curieux", "Duo",
   "Echangisme", "Exhibition", "Extreme", "Feeling", "Fétichisme", "Gang bang", "Hard",
   "Mélangisme", "Papouilles", "Photos", "Pluralité", "Scénario", "Soft", "Trio", "Vidéos", "Voyeurisme"
 ];
