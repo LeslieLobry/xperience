@@ -22,7 +22,7 @@ export default function MessageBubble({ msg, utilisateur, previousMsg, lastReads
       statutTexte = "✔ Envoyé";
     }
   }
-
+ 
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
       {showAuthorInfo && (

@@ -17,7 +17,7 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
       />
       <span className="participant-name">{p.pseudo}</span>
     </div>
-  ))
+  )) 
 )}
       </div>
       <div className="chat-actions">

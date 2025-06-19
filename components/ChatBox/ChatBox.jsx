@@ -209,7 +209,7 @@ const envoyerMessage = async () => {
       console.error("❌ Message non enregistré :", data.message);
       return;
     }
-
+  
     const nouveauMessage = data.message;
 
     const channel = ably.channels.get(`conversation-${conversationId}`);
