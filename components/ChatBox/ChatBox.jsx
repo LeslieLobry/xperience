@@ -1,12 +1,10 @@
 "use client";
 
-
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
 import {
   Room,
   createLocalTracks,
-  RemoteVideoTrack,
 } from "livekit-client";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
@@ -66,198 +64,152 @@ export default function ChatBox({ conversationId, utilisateur }) {
     });
   };
 
+  async function startCall(isVideoEnabled) {
+    try {
+      const roomName = String(conversationId);
+      const identity = String(utilisateur?.id);
+      const response = await fetch("/api/token", {
+        method: "POST",
+        body: JSON.stringify({ identity, room: roomName }),
+      });
+      const data = await response.json();
+      const token = data.token;
+      const tracks = await createLocalTracks({ audio: true, video: isVideoEnabled });
+      const newRoom = new Room();
+      setRoom(newRoom);
 
-async function startCall(isVideoEnabled) {
-  try {
-    console.log("🟢 startCall lancé - ID utilisateur:", utilisateur?.id, "| vidéo activée:", isVideoEnabled);
+      newRoom.on("participantConnected", (participant) => {
+        console.log("👤 participantConnected :", participant.identity);
+      });
 
-    const roomName = String(conversationId);
-    const identity = String(utilisateur?.id);
+      newRoom.on("participantDisconnected", (participant) => {
+        console.log("🚪 participantDisconnected :", participant.identity);
+      });
 
-    const response = await fetch("/api/token", {
-      method: "POST",
-      body: JSON.stringify({ identity, room: roomName }),
-    });
+      newRoom.on("trackSubscribed", (track, publication, participant) => {
+        console.log("🎧 trackSubscribed:", participant.identity, track.kind);
+        setRemoteTracks(prev => {
+          const already = prev.find(rt => rt.id === participant.identity && rt.track.kind === track.kind);
+          if (!already) {
+            return [...prev, { id: participant.identity, track }];
+          }
+          return prev;
+        });
+      });
 
-    const data = await response.json();
-    const token = data.token;
+      await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token, { autoSubscribe: true });
+      newRoom.localParticipant.publishTracks(tracks);
+      setInCall(true);
+      inCallRef.current = true;
 
-    console.log("🔑 Token reçu:", token, "| 🔗 URL:", process.env.NEXT_PUBLIC_LIVEKIT_URL);
-
-    const tracks = await createLocalTracks({
-      audio: true,
-      video: isVideoEnabled,
-    });
-
-    console.log("📹 Pistes locales :", tracks.map(t => t.kind));
-
-    const newRoom = new Room();
-    setRoom(newRoom);
-
-    newRoom.on("participantConnected", (participant) => {
-      console.log("👤 participantConnected :", participant.identity);
-    });
-
-    newRoom.on("participantDisconnected", (participant) => {
-      console.log("🚪 participantDisconnected :", participant.identity);
-    });
-
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      console.log("🎧 trackSubscribed - participant:", participant.identity, "| track kind:", track.kind);
-      if (track.kind === "video" || track.kind === "audio") {
-        setRemoteTracks(prev => [...prev, track]);
-      }
-    });
-
-    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token, {
-      autoSubscribe: true,
-    });
-
-    newRoom.localParticipant.publishTracks(tracks);
-
-    console.log("🎉 Appel actif | utilisateur:", identity);
-    console.log("📡 DEBUG APPEL - État en temps réel :");
-    console.log("🔹 room.name:", newRoom.name);
-    console.log("🔹 participants:", [...newRoom.participants.values()].map(p => p.identity));
-    console.log("🔹 localTracksRef:", tracks.map(t => t.kind));
-
-    setInCall(true);
-    inCallRef.current = true;
-
-    setTimeout(() => {
-      console.log("⏱️ DEBUG post-connexion - Participants actuels:");
-      console.log([...newRoom.participants.values()]);
-    }, 3000);
-
-  } catch (err) {
-    console.error("❌ Erreur startCall :", err);
+    } catch (err) {
+      console.error("❌ Erreur startCall :", err);
+    }
   }
-}
+
   const hangupCall = () => {
     if (!inCallRef.current) return;
-
     inCallRef.current = false;
     setInCall(false);
-
     try {
       cleanupLocalTracks(room);
-      localTracksRef.current.forEach((track) => {
-        try {
-          track.stop();
-          track.mediaStreamTrack?.stop();
-        } catch (e) {
-          console.warn("Erreur arrêt localTrack direct :", e);
-        }
-      });
-      localTracksRef.current = [];
-
       room?.disconnect();
       ably.channels.get(`conversation-${conversationId}`).publish("end-call", {
         auteurId: utilisateur.id,
       });
-
       setRoom(null);
       setRemoteTracks([]);
-
-      const localVideo = document.getElementById("local-video");
-      if (localVideo) {
-        localVideo.pause();
-        localVideo.srcObject = null;
-        localVideo.removeAttribute("src");
-        localVideo.load();
-      }
     } catch (error) {
-      console.error("❌ Erreur pendant le raccrochage :", error);
+      console.error("❌ Erreur raccrochage :", error);
     }
   };
 
-  const envoyerMessage = async () => {
-    if (!texte.trim()) return;
+const envoyerMessage = async () => {
+  if (!texte.trim()) return;
 
-    const nouveauMessage = {
-      auteurId: utilisateur.id,
-      contenu: texte,
-      conversationId,
-      date: new Date().toISOString(),
-    };
+  const nouveauMessage = {
+    contenu: texte,
+    conversationId,
+    type: "texte", // ou "text", selon ton modèle
+  };
 
-    ably.channels.get(`conversation-${conversationId}`).publish("message", nouveauMessage);
+  try {
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nouveauMessage),
+    });
 
-    setMessages((prev) => [...prev, { ...nouveauMessage, id: Date.now() }]);
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      console.error("❌ Erreur lors de l’envoi du message :", data.message);
+      return;
+    }
+
+    ably.channels.get(`conversation-${conversationId}`).publish("message", data.message);
+    setMessages((prev) => [...prev, data.message]);
     setTexte("");
     textareaRef.current.style.height = "auto";
-  };
+  } catch (err) {
+    console.error("❌ Erreur réseau lors de l’envoi du message :", err);
+  }
+};
+
 
   useEffect(() => {
     if (!conversationId) return;
-
     const fetchMessages = async () => {
-      try {
-        const res = await fetch(`/api/messages?conversationId=${conversationId}`);
-        const data = await res.json();
-        setMessages(data.messages || []);
-setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
-      } catch (err) {
-        console.error("❌ Erreur chargement messages :", err);
-      }
+      const res = await fetch(`/api/messages?conversationId=${conversationId}`);
+      const data = await res.json();
+      setMessages(data.messages || []);
+      setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
     };
-
     fetchMessages();
 
     const channel = ably.channels.get(`conversation-${conversationId}`);
-
     const handleStartCall = (msg) => {
       if (msg.data.auteurId !== utilisateur.id && !inCallRef.current) {
         setAppelRecu(msg.data);
         ringtoneRef.current?.play();
       }
     };
-
     const handleEndCall = (msg) => {
       if (msg.data.auteurId !== utilisateur.id && inCallRef.current) {
         hangupCall();
       }
     };
-
     const handleTyping = (msg) => {
       if (msg.data.auteurId !== utilisateur.id) {
         setIsTyping(`${msg.data.pseudo}`);
         setTimeout(() => setIsTyping(null), 2000);
       }
     };
+    const handleMessage = (msg) => {
+      if (msg.data.conversationId !== conversationId) return;
+      setMessages((prev) => [...prev, { ...msg.data, id: Date.now() }]);
+    };
 
     channel.subscribe("start-call", handleStartCall);
     channel.subscribe("end-call", handleEndCall);
     channel.subscribe("typing", handleTyping);
+    channel.subscribe("message", handleMessage);
 
     return () => {
       channel.unsubscribe("start-call", handleStartCall);
       channel.unsubscribe("end-call", handleEndCall);
       channel.unsubscribe("typing", handleTyping);
+      channel.unsubscribe("message", handleMessage);
+       ably.channels.release(`conversation-${conversationId}`)
     };
   }, [conversationId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
     remoteTracks.forEach(({ id, track }) => {
       const el = document.getElementById(`remote-video-${id}`);
-      if (el && track) {
-        track.attach(el);
-      }
+      if (el && track) track.attach(el);
     });
   }, [remoteTracks]);
-useEffect(() => {
-  console.log("📡 DEBUG APPEL - État en temps réel :");
-  console.log("🔹 inCallRef:", inCallRef.current);
-  console.log("🔹 inCall:", inCall);
-  console.log("🔹 remoteTracks:", remoteTracks.map(r => r.id));
-  console.log("🔹 room:", room?.name, "| participants:", room?.participants?.size);
-  console.log("🔹 localTracksRef:", localTracksRef.current.map(t => t.kind));
-}, [inCall, remoteTracks, room]);
-
   return (
     <div className="chatbox-container">
       <ChatHeader
