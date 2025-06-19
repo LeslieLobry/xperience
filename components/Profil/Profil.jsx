@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
-import GaleriePriveePhotos from "../GaleriePriveePhotos/GaleriePriveePhotos";
 import StatutToggle from "../StatutToggle/StatutToggle";
 import DescriptionCard from "../DescriptionCard/DescriptionCard";
 import PreferencesSummary from "../PreferencesSummary/PreferencesSummary";

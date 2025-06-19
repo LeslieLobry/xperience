@@ -80,7 +80,7 @@ export default function RechercheSidebar({ onSearch }) {
         {/* ENVIES */}
         <Section title="Envies" open={openSections.envies} toggle={() => toggleSection("envies")}>
           {renderCheckboxGroup("Mes envies", "envies", [
-            "2+2", "BDSM", "Cam", "Candualisme", "Chat", "Côte-à-côtisme", "Curieux",
+            "2+2", "BDSM", "Cam", "Candaulisme", "Chat", "Côte-à-côtisme", "Curieux",
             "Duo", "Echangisme", "Exhibition", "Extreme", "Feeling", "Fétichisme",
             "Gang bang", "Hard", "Mélangisme", "Papouilles", "Photos", "Pluralité",
             "Scénario", "Soft", "Trio", "Vidéos", "Voyeurisme"

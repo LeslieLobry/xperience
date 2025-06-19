@@ -7,7 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import logo from "../../public/images/logo.png";
 import { LogIn, Settings } from "lucide-react";
 import "../Nav/Navbar.css";
-
+import StatutToggle from "../StatutToggle/StatutToggle";
 const navLinks = [
   { label: "Accueil", href: "/accueil-page" },
   { label: "Événements", href: "/evenements" },
@@ -110,6 +110,8 @@ const handleLogout = async () => {
           <Image src={logo} alt="logo xpérience" width={120} height={120} className="navbar-logo" priority />
         </Link>
         {user && <h3 className="navbar-pseudo">Bienvenue, {user.pseudo}</h3>}
+          <StatutToggle initialStatut={user.statut} editable={true} />
+
       </div>
 
       <div className={`burger ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)}>
