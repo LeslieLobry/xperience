@@ -68,6 +68,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const startCall = async (video = false) => {
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true, video });
+console.log("🎯 Appel room =", conversationId, " | utilisateur.id =", utilisateur.id);
 
       const res = await fetch("/api/livekit-token", {
         method: "POST",
@@ -109,6 +110,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
      await newRoom.connect(livekitUrl, token, { tracks });
     console.log("✅ Connecté à la room LiveKit !");
+    console.log("🧾 Mon utilisateur ID :", utilisateur.id);
+
       setRoom(newRoom);
       newRoom.on('Connected', () => {
   console.log("✅ [LiveKit] Connexion réussie à la room.");
