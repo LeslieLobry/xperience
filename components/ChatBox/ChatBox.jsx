@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
 import {
   Room,
+  connect,
   createLocalTracks,
   RemoteVideoTrack,
 } from "livekit-client";
@@ -91,7 +92,8 @@ const startCall = async (video = false) => {
     console.log("🎬 Tracks locaux créés :", tracks.map(t => t.kind));
     localTracksRef.current = tracks;
 
-    const newRoom = new Room();
+    const newRoom = await connect(livekitUrl, token, { tracks });
+
 
     // 🔄 Liste des événements à écouter
     newRoom.on("participantConnected", (participant) => {
@@ -142,9 +144,6 @@ const startCall = async (video = false) => {
     });
 
     try {
-      await newRoom.connect(livekitUrl, token, { tracks });
-      await newRoom.localParticipant.publishTracks(tracks);
-
       console.log("🔗 Connexion réussie pour :", utilisateur.id);
     } catch (err) {
       console.error("❌ Échec de connexion pour :", utilisateur.id, err);
