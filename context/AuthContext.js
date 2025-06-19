@@ -12,8 +12,7 @@ const fetchUser = useCallback(async () => {
   try {
     const res = await fetch('/api/me', { credentials: 'include' });
     const data = await res.json();
-    console.log("🔁 fetchUser() - data:", data);
-    if (data.success && data.user) {
+        if (data.success && data.user) {
       setUser(data.user);
       return data.user;
     } else {

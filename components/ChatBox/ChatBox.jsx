@@ -9,6 +9,7 @@ import {
 } from "livekit-client";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
+import MessageAudio from "./MessageAudio";
 import "./ChatBox.css";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -53,6 +54,65 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const ringtoneRef = useRef(null);
+
+  // 🎙️ Enregistrement audio
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("audio", blob);
+        formData.append("conversationId", conversationId);
+
+        try {
+          const res = await fetch("/api/messages/audio", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+          if (!data.success) {
+            console.error("❌ Audio non enregistré :", data.message);
+            return;
+          }
+
+          const nouveauMessage = data.message;
+          const channel = ably.channels.get(`conversation-${conversationId}`);
+          channel.publish("message", nouveauMessage);
+          setMessages((prev) => [...prev, nouveauMessage]);
+        } catch (err) {
+          console.error("❌ Erreur envoi audio :", err);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+    } catch (err) {
+      console.error("Erreur accès micro :", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  };
 
   const adjustTextareaHeight = () => {
     const el = textareaRef.current;
@@ -190,39 +250,37 @@ export default function ChatBox({ conversationId, utilisateur }) {
     notifyTyping();
   };
 
-const envoyerMessage = async () => {
-  if (!texte.trim()) return;
+  const envoyerMessage = async () => {
+    if (!texte.trim()) return;
 
-  try {
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversationId,
-        contenu: texte,
-        type: "TEXTE", // ⚠️ Assure-toi que c'est bien l'enum attendu par Prisma
-      }),
-    });
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          contenu: texte,
+          type: "TEXTE",
+        }),
+      });
 
-    const data = await res.json();
-    if (!data.success) {
-      console.error("❌ Message non enregistré :", data.message);
-      return;
+      const data = await res.json();
+      if (!data.success) {
+        console.error("❌ Message non enregistré :", data.message);
+        return;
+      }
+
+      const nouveauMessage = data.message;
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("message", nouveauMessage);
+
+      setMessages((prev) => [...prev, nouveauMessage]);
+      setTexte("");
+      textareaRef.current.style.height = "auto";
+    } catch (err) {
+      console.error("❌ Erreur lors de l’envoi du message :", err);
     }
-  
-    const nouveauMessage = data.message;
-
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("message", nouveauMessage);
-
-    setMessages((prev) => [...prev, nouveauMessage]);
-    setTexte("");
-    textareaRef.current.style.height = "auto";
-  } catch (err) {
-    console.error("❌ Erreur lors de l’envoi du message :", err);
-  }
-};
-
+  };
 
   useEffect(() => {
     if (!conversationId) return;
@@ -340,6 +398,15 @@ const envoyerMessage = async () => {
           rows={1}
           style={{ overflow: "hidden", resize: "none" }}
         />
+        {/* 🎙️ Bouton audio */}
+        <button
+          type="button"
+          className={`audio-btn ${recording ? "recording" : ""}`}
+          onClick={recording ? stopRecording : startRecording}
+        >
+          {recording ? "🟥 Stop" : "🎙️"}
+        </button>
+
         <button type="button" className="emoji-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
         <button type="submit" className="message-btn">Envoyer</button>
       </form>
