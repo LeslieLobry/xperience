@@ -5,18 +5,21 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
   return (
     <div className="chat-header">
       <div className="chat-participants">
-        {participants.map((p) => (
-          <div key={p.id} className="participant-info">
-            <img
-              src={p.photoUrl || "/default-avatar.png"}
-              alt={p.pseudo}
-              className="participant-avatar"
-            />
-            <span className="participant-name">{p.pseudo}</span>
-          </div>
-        ))}
+       {participants.length === 0 ? (
+  <p className="aucun-participant">Aucun participant trouvé</p>
+) : (
+  participants.map((p) => (
+    <div key={p.id} className="participant-info">
+      <img
+        src={p.photoUrl || "/default-avatar.png"}
+        alt={p.pseudo}
+        className="participant-avatar"
+      />
+      <span className="participant-name">{p.pseudo}</span>
+    </div>
+  ))
+)}
       </div>
-
       <div className="chat-actions">
         {/* Affiche les boutons appel seulement si on n'est pas en appel */}
         {!inCall && (

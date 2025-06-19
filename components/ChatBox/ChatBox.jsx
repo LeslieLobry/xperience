@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
 import {
@@ -246,7 +247,7 @@ const startCall = async (video = false) => {
         const res = await fetch(`/api/messages?conversationId=${conversationId}`);
         const data = await res.json();
         setMessages(data.messages || []);
-        setParticipantsAutres(data.participants || []);
+setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
       } catch (err) {
         console.error("❌ Erreur chargement messages :", err);
       }

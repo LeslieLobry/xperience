@@ -191,6 +191,17 @@ export async function GET(req) {
         { status: 403 }
       );
     }
+const destinataire =
+  autresParticipants.length === 1
+    ? await prisma.utilisateur.findUnique({
+        where: { id: autresParticipants[0] },
+        select: {
+          id: true,
+          pseudo: true,
+          photoUrl: true,
+        },
+      })
+    : null;
 
     const messages = await prisma.message.findMany({
       where: { conversationId },
@@ -198,7 +209,11 @@ export async function GET(req) {
       orderBy: { createdAt: "asc" },
     });
 
-    return NextResponse.json({ success: true, messages }, { status: 200 });
+    return NextResponse.json(
+  { success: true, messages, destinataire },
+  { status: 200 }
+);
+
 
   } catch (error) {
     console.error("Erreur dans GET /api/messages :", error);
