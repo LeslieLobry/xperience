@@ -112,7 +112,6 @@ return (
     {user  && (
     <>
       <h3 className="navbar-pseudo">Bienvenue, {user.pseudo}</h3>
-      <StatutToggle initialStatut={user.statut}/>
     </>
     )}
 

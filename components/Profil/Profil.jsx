@@ -22,6 +22,27 @@ const router = useRouter();
 const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
 const [canSee, setCanSee] = useState(null); // null = en chargement
+const [statut, setStatut] = useState(user.statut);
+const [statutAuto, setStatutAuto] = useState(user.statutAuto);
+useEffect(() => {
+  if (!isOwnProfile) return;
+
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch("/api/utilisateur/statut");
+      const data = await res.json();
+      if (data?.utilisateur) {
+        setStatut(data.utilisateur.statut);
+        setStatutAuto(data.utilisateur.statutAuto);
+      }
+    } catch (err) {
+      console.error("Erreur rafraîchissement statut :", err);
+    }
+  }, 10000); // toutes les 10 secondes
+
+  return () => clearInterval(interval);
+}, [isOwnProfile]);
+
 
 // Vérifie si l'accès est autorisé
 useEffect(() => {
@@ -146,7 +167,16 @@ return (
     )}
   </div>
   <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
-  <StatutToggle initialStatut={user.statut} editable={isOwnProfile} />
+  <StatutToggle
+  statut={statut}
+  statutAuto={statutAuto}
+  editable={isOwnProfile}
+  onUpdate={({ statut, statutAuto }) => {
+    if (statut) setStatut(statut);
+    if (typeof statutAuto === "boolean") setStatutAuto(statutAuto);
+  }}
+/>
+
   <div className="profil-badge">{user.type} {user.orientation}</div>
   {isOwnProfile && (
   <div className="profil-completion-box">

@@ -50,6 +50,7 @@ model Utilisateur {
   yeux                 String?
   cheveux              String?
   reactions MessageReaction[]
+  
 
   // ✅ Champs supplémentaires pour les couples
 
@@ -62,8 +63,8 @@ model Utilisateur {
   yeux2                String?
   cheveux2             String?
   description2         String?
-
   statut               String          @default("en_ligne")
+  statutAuto Boolean @default(true) 
   consentCGU           Boolean         @default(false)
   consentCGUDate       DateTime?
   verificationDeadline DateTime?
