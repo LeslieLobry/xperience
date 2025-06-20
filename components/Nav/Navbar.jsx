@@ -109,10 +109,10 @@ return (
     <Link href="/accueil-page">
     <Image src={logo} alt="logo xpérience" width={120} height={120} className="navbar-logo" priority />
     </Link>
-    {user && user.statut !== undefined && (
+    {user  && (
     <>
       <h3 className="navbar-pseudo">Bienvenue, {user.pseudo}</h3>
-      <StatutToggle initialStatut={user.statut} editable={true} />
+      <StatutToggle initialStatut={user.statut}/>
     </>
     )}
 
