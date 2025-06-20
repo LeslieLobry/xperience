@@ -44,7 +44,6 @@ export default function PagePartenaires() {
   return (
     <div className="page-partenaires">
       <h1 className="titre-page">Nos partenaires</h1>
-      <div className="grid-partenaire">
       <div className="cartes-partenaires">
         {partenaires.map((p) => (
           <div className="carte-partenaire" key={p.nom}>
@@ -56,7 +55,7 @@ export default function PagePartenaires() {
           </div>
         ))}
       </div>
-      </div>
+
     </div>
   );
 }

@@ -27,7 +27,7 @@ img {
 
 html,
 body {
-  max-width: 100vw;
+  width: 100%;
   overflow-x: hidden;
   background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
   background-repeat: no-repeat;
