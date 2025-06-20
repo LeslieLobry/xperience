@@ -88,6 +88,8 @@ model Utilisateur {
   photos               Photo[]
   recherches           Recherche[]
   evenements           Evenement[]     @relation("Participation")
+  visitesFaites     VisiteProfil[] @relation("Visiteur")
+  visitesRecues     VisiteProfil[] @relation("Visite")
 
   @@map("Utilisateur")
 }
@@ -314,6 +316,20 @@ model Newsletter {
   createdAt DateTime @default(now())
     @@map("Newsletter")
 }
+model VisiteProfil {
+  id         Int         @id @default(autoincrement())
+  visiteurId Int
+  visiteId   Int
+  date       DateTime    @default(now())
+
+  visiteur   Utilisateur @relation("Visiteur", fields: [visiteurId], references: [id])
+  visite     Utilisateur @relation("Visite", fields: [visiteId], references: [id])
+
+  @@unique([visiteurId, visiteId, date])
+  @@map("VisiteProfil")
+}
+
+
 
 enum Role {
   USER

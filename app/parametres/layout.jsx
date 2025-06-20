@@ -14,6 +14,7 @@ const menuItems = [
   // { id: "confidentialite", label: "Confidentialité", icon: <EyeOff size={18} /> },
   { id: "blocages", label: "Blocages", icon: <Ban size={18} /> },
   { id: "galerie", label: "Galerie", icon: <Mail size={18} /> },
+  { id: "visites", label: "Visites", icon: <Wallet size={18} /> },
   // { id: "abonnement", label: "Abonnement", icon: <Wallet size={18} /> },
   // { id: "parrainage", label: "Parrainage", icon: <Users size={18} /> },
   // { id: "commandes", label: "Vos commandes", icon: <Euro size={18} /> },

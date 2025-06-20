@@ -68,19 +68,31 @@ return Math.round((completed / fields.length) * 100);
 const [demandesAcces, setDemandesAcces] = useState([]);
 
 useEffect(() => {
-const fetchDemandes = async () => {
-if (!isOwnProfile) return;
-try {
-const res = await fetch(`/api/utilisateur/${user.id}/demandes-acces`);
-const data = await res.json();
-setDemandesAcces(data || []);
-} catch (err) {
-console.error("Erreur chargement des demandes :", err);
-}
-};
+  const fetchDemandes = async () => {
+    if (!isOwnProfile) return;
 
-fetchDemandes();
+    try {
+      const res = await fetch(`/api/utilisateur/${user.id}/demandes-acces`);
+      const data = await res.json();
+      setDemandesAcces(data || []);
+    } catch (err) {
+      console.error("Erreur chargement des demandes :", err);
+    }
+  };
+
+  fetchDemandes();
 }, [isOwnProfile, user.id]);
+useEffect(() => {
+  if (connectedUser && connectedUser.id !== user.id) {
+    console.log("📡 Envoi de la visite vers :", user.id);
+    fetch("/api/visites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visiteId: parseInt(user.id) }), 
+    });
+  }
+}, [connectedUser?.id, user.id]);
+
 
 const handleStartConversation = async () => {
 try {

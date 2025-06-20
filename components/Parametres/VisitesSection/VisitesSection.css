@@ -1,0 +1,94 @@
+.visites-container {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  max-width: 700px;
+  margin: auto;
+  align-items: center;
+}
+
+.visites-tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.visite-titre{
+  color: #e0c084;
+  font-size: 64px;
+  font-weight: normal !important;
+}
+.visites-tabs button {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: white;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.visites-tabs button.active {
+  color: #e0c084;
+  border-color: #8c6a5d;
+}
+
+.liste-visites {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.visite-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.visite-item:last-child {
+  border-bottom: none;
+}
+
+.visite-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 1rem;
+  width: 56px;
+  height: 56px;
+}
+
+.visite-content {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: white;
+}
+
+.visite-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.visite-nom {
+
+  font-size: 32px;
+  color: #e0c084;
+}
+
+.visite-date {
+  font-size: 0.85rem;
+  color: #bbbbbb;
+  margin-top: 0.2rem;
+}
+
+.loading,
+.aucune {
+  text-align: center;
+  margin-top: 2rem;
+  font-style: italic;
+  color: #dddddd;
+}
