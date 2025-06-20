@@ -79,18 +79,27 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
-    const message = await prisma.message.create({
-      data: {
-        conversationId,
-        auteurId,
-        contenu,
-        imageUrl,
-        videoUrl,
-        type,
-        lu: false,
+const message = await prisma.message.create({
+  data: {
+    conversationId,
+    auteurId,
+    contenu,
+    imageUrl,
+    videoUrl,
+    type,
+    lu: false,
+  },
+  include: {
+    auteur: true,
+    reactions: {
+      select: {
+        emoji: true,
+        utilisateurId: true,
       },
-      include: { auteur: true },
-    });
+    },
+  },
+});
+
 
     await prisma.conversation.update({
       where: { id: conversationId },
@@ -203,11 +212,21 @@ const destinataire =
       })
     : null;
 
-    const messages = await prisma.message.findMany({
-      where: { conversationId },
-      include: { auteur: true },
-      orderBy: { createdAt: "asc" },
-    });
+   const messages = await prisma.message.findMany({
+  where: { conversationId },
+  include: {
+    auteur: true,
+    reactions: {
+      include: {
+    utilisateur: {
+      select: { pseudo: true }
+    }
+  }
+    },
+  },
+  orderBy: { createdAt: "asc" },
+});
+
 
     return NextResponse.json(
   { success: true, messages, destinataire },

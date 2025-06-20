@@ -20,8 +20,8 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
   )) 
 )}
       </div>
-      <div className="chat-actions">
-        {/* Affiche les boutons appel seulement si on n'est pas en appel */}
+      {/* <div className="chat-actions">
+       
         {!inCall && (
           <>
             <button onClick={onCallAudio} title="Appel audio"><Phone /></button>
@@ -29,11 +29,11 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
           </>
         )}
 
-        {/* Affiche bouton fermer (raccrocher) uniquement si on est en appel */}
+       
         {inCall && (
           <button onClick={onClose} title="Raccrocher"><X /></button>
         )}
-      </div>
+      </div> */}
     </div>
   );
 }

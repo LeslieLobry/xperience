@@ -40,12 +40,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [inCall, setInCall] = useState(false);
   const [remoteTracks, setRemoteTracks] = useState([]);
   const [isTyping, setIsTyping] = useState(null);
+  const [typingPseudo, setTypingPseudo] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const localTracksRef = useRef([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // 🎙️ Enregistrement audio
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -108,6 +108,28 @@ export default function ChatBox({ conversationId, utilisateur }) {
       mediaRecorderRef.current.stop();
       setRecording(false);
     }
+  };
+
+  const handleReaction = async (messageId, emoji) => {
+    await fetch(`/api/messages/${messageId}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              reactions: [{ utilisateurId: utilisateur.id, emoji }],
+            }
+          : m
+      )
+    );
+
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("reaction", { messageId, emoji, utilisateurId: utilisateur.id });
   };
 
   const startCall = async (video = false) => {
@@ -204,10 +226,18 @@ export default function ChatBox({ conversationId, utilisateur }) {
     channel.subscribe("end-call", (msg) => {
       if (msg.data.auteurId !== utilisateur.id) hangupCall();
     });
+    channel.subscribe("typing", (msg) => {
+      if (msg.data.auteurId !== utilisateur.id) {
+        setTypingPseudo(msg.data.pseudo);
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 3000);
+      }
+    });
 
     return () => {
       channel.unsubscribe("start-call");
       channel.unsubscribe("end-call");
+      channel.unsubscribe("typing");
     };
   }, [conversationId, inCall]);
 
@@ -248,8 +278,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
       )}
 
       <div className="chat-messages">
+        {isTyping && (
+          <div className="typing-indicator">
+            {typingPseudo || "Quelqu’un"} est en train d’écrire...
+          </div>
+        )}
+
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} utilisateur={utilisateur} />
+          <MessageBubble
+            key={msg.id}
+            msg={msg}
+            utilisateur={utilisateur}
+            onReact={handleReaction}
+          />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -266,7 +307,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
           className="input-text"
           value={texte}
           placeholder="Écris un message..."
-          onChange={(e) => setTexte(e.target.value)}
+          onChange={(e) => {
+            setTexte(e.target.value);
+            const channel = ably.channels.get(`conversation-${conversationId}`);
+            channel.publish("typing", { auteurId: utilisateur.id, pseudo: utilisateur.pseudo });
+          }}
           rows={1}
           style={{ resize: "none" }}
         />
