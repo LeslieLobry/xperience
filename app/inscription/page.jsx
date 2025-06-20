@@ -5,6 +5,8 @@ import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
 import Select from "react-select";
 import { useRouter } from "next/navigation";
+import { getCoordsFromVille } from "../../lib/getCoordsFromVille"; // adapte le chemin si besoin
+
 
 export default function RegisterForm() {
   const [step, setStep] = useState(1);
@@ -112,17 +114,24 @@ export default function RegisterForm() {
       setLoading(true);
       const formData = new FormData();
 
-      Object.entries(form).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          value.forEach((v) => formData.append(`${key}[]`, v));
-        } else if (typeof value === "boolean") {
-          formData.append(key, value ? "true" : "false");
-        } else if (key === "age") {
-          formData.append(key, parseInt(value, 10));
-        } else {
-          formData.append(key, value);
-        }
-      });
+      const coords = await getCoordsFromVille(form.localisation);
+
+Object.entries({
+  ...form,
+  latitude: coords.latitude,
+  longitude: coords.longitude,
+}).forEach(([key, value]) => {
+  if (Array.isArray(value)) {
+    value.forEach((v) => formData.append(`${key}[]`, v));
+  } else if (typeof value === "boolean") {
+    formData.append(key, value ? "true" : "false");
+  } else if (key === "age") {
+    formData.append(key, parseInt(value, 10));
+  } else {
+    formData.append(key, value);
+  }
+});
+
 
       if (photo) formData.append("photo", photo);
       formData.append("captchaToken", captchaToken);

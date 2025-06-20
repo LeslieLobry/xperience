@@ -55,6 +55,9 @@ export async function POST(req) {
         const orientation = String(fields.orientation || "");
         const age = parseInt(fields.age || "0", 10);
         const localisation = String(fields.localisation || "");
+        const latitude = parseFloat(fields.latitude || "");
+        const longitude = parseFloat(fields.longitude || "");
+
         const consent = fields.consent === "true";
         const captchaToken = String(fields.captchaToken || "");
 
@@ -133,6 +136,8 @@ export async function POST(req) {
             orientation,
             age,
             localisation,
+            latitude,
+            longitude,
             consent,
             consentCGU: consent,
             consentCGUDate: new Date(),
