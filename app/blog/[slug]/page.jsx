@@ -29,7 +29,7 @@ if (!user) return redirect("/connexion");
   return (
     <div className="article-container">
       <ArticleWrapper articleId={article.id} />
-      <div className="article-title">{article.titre}</div>
+      <h2 className="article-title">{article.titre}</h2>
       <p className="article-meta">
         {new Date(article.createdAt).toLocaleDateString("fr-FR")} –{" "}
         {article.vues} vues

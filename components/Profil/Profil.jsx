@@ -195,16 +195,17 @@ return (
   <div className="grid">
     <div className="profil-infos-wrapper">
       <div className="info-block">
+        <h3>Membre 1</h3>
         <p><span className="info-label">Âge :</span> <span className="info-value">{user.age}</span></p>
         <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette}</span></p>
-        <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span>
-        </p>
         <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines}</span></p>
         <p><span className="info-label">Taille :</span> <span className="info-value">{user.taille} cm</span></p>
+        <p><span className="info-label">Localisation :</span> <span className="info-value">{user.localisation}</span>
+        </p>
       </div>
       {user.type === "couple" && (
   <div className="info-block">
-    <h4>Membre 2</h4>
+    <h3>Membre 2</h3>
     <p><span className="info-label">Âge :</span> <span className="info-value">{user.age2 || "Non défini"}</span></p>
     <p><span className="info-label">Silhouette :</span> <span className="info-value">{user.silhouette2 || "Non défini"}</span></p>
     <p><span className="info-label">Origines :</span> <span className="info-value">{user.origines2 || "Non défini"}</span></p>

@@ -9,7 +9,8 @@
     "start": "next start",
     "socket-server": "node server.js",
     "create-users": "node scripts/create-users.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "analyze": "cross-env ANALYZE=true next build"
   },
   "dependencies": {
     "@ably/chat": "^0.8.0",
@@ -56,7 +57,9 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^15.3.4",
     "@types/node": "22.15.17",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "15.2.3",
     "prisma": "^6.6.0"

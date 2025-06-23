@@ -39,109 +39,100 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
 
       <div className="pref-details">
         <p className="pref-nom">Ville :</p>
-        <p className="pref-rep">{profil.localisation || "Non défini"}</p>
+        <p className="pref-rep">{profil.localisation || "..."}</p>
       </div>
 
       <div className="pref-details">
         <p className="pref-nom">Expérience :</p>
-        <p className="pref-rep">{profil.experience || "Non défini"}</p>
+        <p className="pref-rep">{profil.experience || "..."}</p>
       </div>
 
       <div className="pref-details">
         <p className="pref-nom">Type de recherche :</p>
-        <p className="pref-rep">{profil.rechercheType || "Non défini"}</p>
+        <p className="pref-rep">{profil.rechercheType || "..."}</p>
       </div>
 
       <div className="pref-details">
         <p className="pref-nom">Type :</p>
-        <p className="pref-rep">{profil.type || "Non défini"}</p>
+        <p className="pref-rep">{profil.type || "..."}</p>
       </div>
-
-      <h3>Informations personnelles</h3>
+    <div className="membre-colum">
+      <div className="membre-1">
+      <h3>Membre 1 </h3>
 
       <div className="pref-details">
         <p className="pref-nom">Âge :</p>
         <p className="pref-rep">
-          {profil.age ? `${profil.age} ans` : "Non défini"}
+          {profil.age ? `${profil.age} ans` : "..."}
         </p>
       </div>
 
       <div className="pref-details">
         <p className="pref-nom">Fume :</p>
-        <p className="pref-rep">{profil.fumeur || "Non défini"}</p>
+        <p className="pref-rep">{profil.fumeur || "..."}</p>
       </div>
-
-      <h3>Description physique</h3>
-
       <div className="pref-details">
         <p className="pref-nom">Silhouette :</p>
-        <p className="pref-rep">{profil.silhouette || "Non défini"}</p>
+        <p className="pref-rep">{profil.silhouette || "..."}</p>
       </div>
-
       <div className="pref-details">
         <p className="pref-nom">Taille :</p>
-        <p className="pref-rep">{profil.taille || "Non défini"}</p>
+        <p className="pref-rep">{profil.taille || "..."}</p>
       </div>
-
       <div className="pref-details">
         <p className="pref-nom">Origines :</p>
-        <p className="pref-rep">{profil.origines || "Non défini"}</p>
+        <p className="pref-rep">{profil.origines || "..."}</p>
       </div>
-
       <div className="pref-details">
         <p className="pref-nom">Yeux :</p>
-        <p className="pref-rep">{profil.yeux || "Non défini"}</p>
+        <p className="pref-rep">{profil.yeux || "..."}</p>
       </div>
-
       <div className="pref-details">
         <p className="pref-nom">Cheveux :</p>
-        <p className="pref-rep">{profil.cheveux || "Non défini"}</p>
+        <p className="pref-rep">{profil.cheveux || "..."}</p>
       </div>
-
+</div>
       {profil.type === "couple" && (
         <>
-          <h3>Informations du/de la partenaire</h3>
+        <div className="membre-2">
+          <h3>Membre 2</h3>
 
           <div className="pref-details">
             <p className="pref-nom">Âge :</p>
             <p className="pref-rep">
-              {profil.age2 ? `${profil.age2} ans` : "Non défini"}
+              {profil.age2 ? `${profil.age2} ans` : "..."}
             </p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Fume :</p>
-            <p className="pref-rep">{profil.fumeur2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.fumeur2 || "..."}</p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Silhouette :</p>
-            <p className="pref-rep">{profil.silhouette2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.silhouette2 || "..."}</p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Taille :</p>
-            <p className="pref-rep">{profil.taille2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.taille2 || "..."}</p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Origines :</p>
-            <p className="pref-rep">{profil.origines2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.origines2 || "..."}</p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Yeux :</p>
-            <p className="pref-rep">{profil.yeux2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.yeux2 || "..."}</p>
           </div>
 
           <div className="pref-details">
             <p className="pref-nom">Cheveux :</p>
-            <p className="pref-rep">{profil.cheveux2 || "Non défini"}</p>
+            <p className="pref-rep">{profil.cheveux2 || "..."}</p>
           </div>
-
-          <div className="pref-details">
-            <p className="pref-nom">Description :</p>
-            <p className="pref-rep">{profil.description2 || "Non définie"}</p>
           </div>
         </>
       )}
@@ -155,6 +146,7 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
           </Modal>
         </>
       )}
+      </div>
     </div>
   );
 }

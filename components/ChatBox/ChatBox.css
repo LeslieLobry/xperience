@@ -191,12 +191,6 @@
 }
 
 /* ----- Zone de texte ----- */
-.chat-input {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  border-top: 1px solid #e0c08433;
-}
 
 .input-text {
   flex: 1;
@@ -555,4 +549,47 @@
 .emoji-action-wrapper.left {
   flex-direction: row-reverse; /* bouton à droite, barre à gauche */
   justify-content: flex-end;
+}
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-radius: 16px;
+  padding: 6px 10px;
+  flex: 1;
+  position: relative;
+}
+
+.audio-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.audio-btn.recording {
+  color: red;
+}
+
+.emoji-btn,
+.message-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+@media screen and (max-width: 768px){
+.chat-input{
+  flex-direction: column;
+}
+
 }

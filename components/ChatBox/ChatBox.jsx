@@ -295,42 +295,66 @@ export default function ChatBox({ conversationId, utilisateur }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <form
-        className="chat-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          envoyerMessage();
-        }}
-      >
-        <textarea
-          ref={textareaRef}
-          className="input-text"
-          value={texte}
-          placeholder="Écris un message..."
-          onChange={(e) => {
-            setTexte(e.target.value);
-            const channel = ably.channels.get(`conversation-${conversationId}`);
-            channel.publish("typing", { auteurId: utilisateur.id, pseudo: utilisateur.pseudo });
-          }}
-          rows={1}
-          style={{ resize: "none" }}
-        />
-        <button
-          type="button"
-          onClick={recording ? stopRecording : startRecording}
-          className={`audio-btn ${recording ? "recording" : ""}`}
-        >
-          {recording ? "🟥" : "🎙️"}
-        </button>
-        <button
-          type="button"
-          className="emoji-btn"
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-        >
-          😊
-        </button>
-        <button type="submit" className="message-btn">Envoyer</button>
-      </form>
+<form
+  className="chat-input"
+  onSubmit={(e) => {
+    e.preventDefault();
+    envoyerMessage();
+  }}
+>
+  <div className="input-wrapper">
+    <textarea
+      ref={textareaRef}
+      className="input-text"
+      value={texte}
+      placeholder="Écris un message..."
+      onChange={(e) => {
+        setTexte(e.target.value);
+
+        // 🔁 Agrandit automatiquement le textarea
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.style.height = "auto";
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+
+        // ⌨️ Signale que l'utilisateur est en train d'écrire
+        const channel = ably.channels.get(`conversation-${conversationId}`);
+        channel.publish("typing", {
+          auteurId: utilisateur.id,
+          pseudo: utilisateur.pseudo,
+        });
+      }}
+      rows={1}
+      style={{ resize: "none" }}
+    />
+
+    {/* 🎙️ Micro */}
+    <button
+      type="button"
+      onClick={recording ? stopRecording : startRecording}
+      className={`audio-btn ${recording ? "recording" : ""}`}
+    >
+      {recording ? "🟥" : "🎙️"}
+    </button>
+
+    {/* 😊 Emoji */}
+    <button
+      type="button"
+      className="emoji-btn"
+      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+    >
+      😊
+    </button>
+  </div>
+
+  {/* 📩 Envoyer */}
+  <button type="submit" className="message-btn">
+    Envoyer
+  </button>
+</form>
+
+
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">

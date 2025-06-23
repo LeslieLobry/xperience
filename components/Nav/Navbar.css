@@ -78,6 +78,7 @@
     max-height: none;     
     border: none; 
     box-shadow: none;
+    background-image: none !important;
  
 }
   .navLinks {
@@ -91,7 +92,7 @@
     border-left: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     z-index: 998;
-    overflow: visible; /* ✅ Pour éviter que le menu soit masqué */
+    overflow: visible; 
     gap: 0;
   }
 
@@ -105,7 +106,7 @@
 }
 
 .nav-avatar-wrapper {
-  position: relative; /* ✅ pour positionner le dropdown */
+  position: relative; 
   cursor: pointer;
 }
 

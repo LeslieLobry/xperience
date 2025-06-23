@@ -26,8 +26,9 @@
     z-index: -1;
 }
   .article-title {
-    font-size: 4em;
+    font-size: 2em;
     color: #e0c084;
+    text-align: center;
   }
   
   .article-meta {

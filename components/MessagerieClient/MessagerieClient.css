@@ -33,14 +33,16 @@
 @media screen and (max-width: 768px) {
   .messagerie-page {
     flex-direction: column;
+    width: 100%;
+    
   }
 
   .messagerie-page .liste-conversations {
     width: 100%;
     min-width: unset;
-    max-height: 300px;
     border-right: none;
     border-bottom: 1px solid #ddd;
+    max-width: 100%;
   }
 
   .messagerie-page .chat-section {
