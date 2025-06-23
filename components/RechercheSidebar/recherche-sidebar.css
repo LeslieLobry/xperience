@@ -28,6 +28,7 @@
   border: 1px solid #ccc;
   color: #e0c084;
   font-size: 24px;
+  background-color: transparent;
 }
 
 .filters-group {
@@ -59,11 +60,6 @@
   /* font-weight: bold; */
   font-weight: normal;
   font-size: 26px;
-}
-
-.section-content {
-  padding-left: 0.5rem;
-  /* margin-bottom: 1rem; */
 }
 
 .recherche-sidebar {

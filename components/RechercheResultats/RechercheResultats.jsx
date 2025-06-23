@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import "./RechercheResultats.css"; // pour ajouter ton propre style
+import "./RechercheResultats.css";
 
 export default function RechercheResultats() {
   const searchParams = useSearchParams();
@@ -38,16 +38,27 @@ export default function RechercheResultats() {
         {utilisateurs.map((u) => (
           <div
             key={u.id}
-            className="card"
+            className="profil-card"
             onClick={() => router.push(`/profil/${u.id}`)}
           >
-            {u.photoUrl && (
-              <img src={u.photoUrl} alt={u.pseudo} className="card-photo" />
-            )}
-            <div className="card-content">
-              <h3>{u.pseudo} ({u.age} ans)</h3>
-              <p className="card-localisation">{u.localisation}</p>
-              <p className="card-description">{u.description}</p>
+            <div className="profil-photo-wrapper">
+              <img
+                src={
+                  u.photoUrl?.startsWith("http")
+                    ? u.photoUrl
+                    : u.photoUrl
+                    ? `/uploads/${u.photoUrl.replace(/^\/?uploads\//, "")}`
+                    : "/default.jpg"
+                }
+                alt={u.pseudo}
+                className="profil-photo"
+              />
+            </div>
+            <div className="profil-info">
+              <h2 className="profil-card-title">{u.pseudo}</h2>
+              <p className="profil-card-details">
+                {u.age} ans - {u.localisation}
+              </p>
             </div>
           </div>
         ))}

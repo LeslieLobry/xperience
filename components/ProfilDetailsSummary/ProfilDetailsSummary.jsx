@@ -136,7 +136,7 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
           </div>
         </>
       )}
-
+ </div>
       {editable && (
         <>
           <Button onClick={() => setIsModalOpen(true)} title="Modifier" color="#8c6a5d" />
@@ -146,7 +146,7 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
           </Modal>
         </>
       )}
-      </div>
+     
     </div>
   );
 }
