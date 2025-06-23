@@ -1,17 +1,20 @@
 export const dynamic = "force-dynamic"; // 🔁 important sur Vercel
 
-import { prisma } from "../../lib/prisma";
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
-import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
-import Link from "next/link";
-import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
-import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
-import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
+
+import ProfilsDisplayServer from "../../components/ProfilsDisplayServer/ProfilsDisplayServer";
+import DerniersArticlesServer from "../../components/DerniersArticlesServer/DerniersArticlesServer";
+import DerniersEvenementsServer from "../../components/DerniersEvenementsServer/DerniersEvenementsServer";
+
+import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
-import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDiplay";
+import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
+
+import { Suspense } from "react";
 import "./accueil.css";
+
 export default async function AccueilPage() {
   const user = await getUserFromToken();
 
@@ -28,73 +31,47 @@ export default async function AccueilPage() {
     return redirect("/verif-identite-obligatoire");
   }
 
+  // Précalcule les exclus uniquement pour ProfilsDisplayServer
   let exclus = [];
   try {
     exclus = await getIdsUtilisateursExclus(user.id);
   } catch (err) {
-    console.error("Erreur récupération des profils :", err.message, err.stack);
+    console.error("Erreur récupération des profils exclus :", err.message);
   }
-
-  const whereCommun = {
-    NOT: {
-      id: { in: [...exclus, user.id] },
-    },
-  };
-
-  let tousLesProfils = [];
-  try {
-    tousLesProfils = await prisma.utilisateur.findMany({
-      where: whereCommun,
-      select: {
-        id: true,
-        pseudo: true,
-        photoUrl: true,
-        age: true,
-        localisation: true,
-        statut: true,
-      },
-      take: 30,
-    });
-  } catch (err) {
-    console.error("❌ Erreur récupération des profils :", err);
-  }
-
-  const renderProfilCard = (user) => (
-    <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
-      <div className="profil-card">
-        <img
-          src={
-            user.photoUrl?.startsWith("http")
-              ? user.photoUrl
-              : user.photoUrl
-              ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
-              : "/default.jpg"
-          }
-          alt={user.pseudo}
-          className="profil-photo"
-        />
-        <h2 className="profil-card-title">{user.pseudo}</h2>
-        <p className="profil-card-details">
-          {user.age} ans - {user.localisation}
-        </p>
-      </div>
-    </Link>
-  );
 
   return (
     <div className="accueil-page">
       {!user.verificationIdentite && user.verificationDeadline && (
         <RappelVerification deadline={user.verificationDeadline} />
       )}
+
       <LoaderAnnonce />
+
       <div className="grid-accueil">
-        <ProfilsDisplay profils={tousLesProfils} />
-        <div className="grid-articles">
-          <DerniersArticles />
+        {/* Colonne 1 */}
+        <div className="recherche-sidebar">
+          <RechercheWrapper />
         </div>
-        <RechercheWrapper />
+
+        {/* Colonne 2 */}
+        <div className="profil-list1">
+          <Suspense fallback={<p>Chargement des profils...</p>}>
+            <ProfilsDisplayServer userId={user.id} exclus={exclus} />
+          </Suspense>
+        </div>
+
+        {/* Colonne 3 */}
+        <div className="grid-articles">
+          <Suspense fallback={<p>Chargement des articles...</p>}>
+            <DerniersArticlesServer />
+          </Suspense>
+        </div>
+
+        {/* Colonne 3, ligne 2 */}
         <div className="grid-event">
-          <DerniersEvenements />
+          <Suspense fallback={<p>Chargement des événements...</p>}>
+            <DerniersEvenementsServer />
+          </Suspense>
         </div>
       </div>
     </div>
