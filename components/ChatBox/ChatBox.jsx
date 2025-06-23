@@ -1,4 +1,3 @@
-// Nouveau fichier : ChatBox.jsx (version allégée)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -7,122 +6,139 @@ import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "../ChatInput/ChatInput";
 import VideoCallView from "../VideoCallView/VideoCallView";
-import Picker from "@emoji-mart/react";
+import dynamic from "next/dynamic";
 import data from "@emoji-mart/data";
 import "./ChatBox.css";
+import { useMessages } from "../../hook/useMessages";
+import { useTyping } from "../../hook/useTyping";
+import MessagesList from "../MessagesList";
 
+const Picker = dynamic(() => import("@emoji-mart/react"), { ssr: false });
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
 export default function ChatBox({ conversationId, utilisateur }) {
-  const [messages, setMessages] = useState([]);
   const [texte, setTexte] = useState("");
-  const [participantsAutres, setParticipantsAutres] = useState([]);
-  const [isTyping, setIsTyping] = useState(null);
-  const [typingPseudo, setTypingPseudo] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inCall, setInCall] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [recording, setRecording] = useState(false);
+  const [lastReads, setLastReads] = useState([]);
+  const mediaRecorderRef = useRef(null);
+  const audioChunks = useRef([]);
 
-  const handleReaction = async (messageId, emoji) => {
-    await fetch(`/api/messages/${messageId}/react`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji }),
-    });
+  const {
+    messages,
+    setMessages,
+    participantsAutres,
+    envoyerMessage,
+    handleReaction,
+  } = useMessages(conversationId, utilisateur, setTexte);
 
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, reactions: [{ utilisateurId: utilisateur.id, emoji }] }
-          : m
-      )
-    );
+  const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("reaction", { messageId, emoji, utilisateurId: utilisateur.id });
-  };
+  // Exemple fetch lastReads (à adapter selon ton API)
+  useEffect(() => {
+    async function fetchLastReads() {
+      if (!conversationId) return;
+      try {
+        const res = await fetch(`/api/last-reads?conversationId=${conversationId}`);
+        const data = await res.json();
+        if (data.success) {
+          setLastReads(data.lastReads);
+        }
+      } catch (err) {
+        console.error("Erreur fetch lastReads:", err);
+      }
+    }
+    fetchLastReads();
+  }, [conversationId]);
 
-  const envoyerMessage = async () => {
-    if (!texte.trim()) return;
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, contenu: texte, type: "TEXTE" }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      const channel = ably.channels.get(`conversation-${conversationId}`);
-      channel.publish("message", data.message);
-      setMessages((prev) => [...prev, data.message]);
-      setTexte("");
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunks.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
+
+        const duree = await new Promise((resolve) => {
+          const audio = new Audio();
+          audio.src = URL.createObjectURL(audioBlob);
+          audio.onloadedmetadata = () => {
+            const d = audio.duration;
+            const minutes = Math.floor(d / 60);
+            const secondes = Math.floor(d % 60);
+            resolve(`${minutes}:${secondes < 10 ? "0" : ""}${secondes}`);
+          };
+        });
+
+        const formData = new FormData();
+        formData.append("audio", audioBlob);
+        formData.append("conversationId", conversationId);
+        formData.append("type", "AUDIO");
+        formData.append("duree", duree);
+
+        const res = await fetch("/api/messages/audio", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          setMessages((prev) => [...prev, data.message]);
+        } else {
+          console.warn("❌ Échec de l’envoi audio :", data);
+        }
+      };
+
+      mediaRecorderRef.current.start();
+      setRecording(true);
+    } catch (err) {
+      console.error("Erreur lors du démarrage de l’enregistrement :", err);
     }
   };
 
-  useEffect(() => {
-    if (!conversationId) return;
-    const fetchMessages = async () => {
-      const res = await fetch(`/api/messages?conversationId=${conversationId}`);
-      const data = await res.json();
-      setMessages(data.messages || []);
-      setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
-    };
-    fetchMessages();
-
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.subscribe("typing", (msg) => {
-      if (msg.data.auteurId !== utilisateur.id) {
-        setTypingPseudo(msg.data.pseudo);
-        setIsTyping(true);
-        setTimeout(() => setIsTyping(false), 3000);
-      }
-    });
-
-    return () => channel.unsubscribe("typing");
-  }, [conversationId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
 
   return (
     <div className="chatbox-container">
       <ChatHeader participants={participantsAutres} inCall={inCall} setInCall={setInCall} />
+      <VideoCallView {...{ conversationId, utilisateur, inCall, setInCall }} />
 
-      <VideoCallView
-        conversationId={conversationId}
+      <MessagesList
+        messages={messages}
         utilisateur={utilisateur}
-        inCall={inCall}
-        setInCall={setInCall}
+        onReact={handleReaction}
+        typingPseudo={isTyping ? typingPseudo : null}
+        lastReads={lastReads}  
       />
 
-      <div className="chat-messages">
-        {isTyping && (
-          <div className="typing-indicator">
-            {typingPseudo || "Quelqu’un"} est en train d’écrire...
-          </div>
-        )}
-
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            msg={msg}
-            utilisateur={utilisateur}
-            onReact={handleReaction}
-          />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
       <ChatInput
-        utilisateur={utilisateur}
-        conversationId={conversationId}
-        onMessageSent={(message) => setMessages((prev) => [...prev, message])}
-        onTyping={() => {
-          const channel = ably.channels.get(`conversation-${conversationId}`);
-          channel.publish("typing", {
-            auteurId: utilisateur.id,
-            pseudo: utilisateur.pseudo,
-          });
+        {...{
+          utilisateur,
+          conversationId,
+          texte,
+          setTexte,
+          showEmojiPicker,
+          setShowEmojiPicker,
+          onMessageSent: (msg) => setMessages((prev) => [...prev, msg]),
+          onTyping: envoyerTyping,
+          startRecording,
+          stopRecording,
+          recording,
         }}
       />
 

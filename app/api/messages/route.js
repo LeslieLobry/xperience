@@ -87,6 +87,7 @@ const message = await prisma.message.create({
     imageUrl,
     videoUrl,
     type,
+    duree: true,
     lu: false,
   },
   include: {

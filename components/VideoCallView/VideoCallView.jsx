@@ -8,12 +8,15 @@ export default function VideoCallView({
   startCall,
   hangupCall,
 }) {
-  useEffect(() => {
-    remoteTracks.forEach(({ id, track }) => {
-      const el = document.getElementById(`remote-video-${id}`);
-      if (el && track) track.attach(el);
-    });
-  }, [remoteTracks]);
+ useEffect(() => {
+  if (!remoteTracks || !Array.isArray(remoteTracks)) return;
+
+  remoteTracks.forEach(({ id, track }) => {
+    const el = document.getElementById(`remote-video-${id}`);
+    if (el && track) track.attach(el);
+  });
+}, [remoteTracks]);
+
 
   return inCall ? (
     <div className="video-call-container">

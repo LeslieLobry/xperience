@@ -7,13 +7,14 @@ import data from "@emoji-mart/data";
 export default function ChatInput({
   utilisateur,
   conversationId,
+  texte,             
+  setTexte,
   onMessageSent,
   onTyping,
   startRecording,
   stopRecording,
   recording,
 }) {
-  const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef(null);
 

@@ -10,6 +10,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     const fetchMessages = async () => {
       const res = await fetch(`/api/messages?conversationId=${conversationId}`);
       const data = await res.json();
+      console.log("📥 Messages chargés :", data.messages);
       setMessages(data.messages || []);
       setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
     };
