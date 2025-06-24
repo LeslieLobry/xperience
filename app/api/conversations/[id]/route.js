@@ -62,27 +62,6 @@ export async function GET(req) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
-import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import jwt from "jsonwebtoken";
-import { prisma } from "../../../../lib/prisma";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-function getUserFromToken() {
-  const headerList = headers();
-  const cookieHeader = headerList.get("cookie") || "";
-  const tokenMatch = cookieHeader.match(/token=([^;]+)/);
-  const token = tokenMatch?.[1];
-
-  if (!token || !JWT_SECRET) return null;
-
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 export async function DELETE(req, { params }) {
   const decoded = getUserFromToken();

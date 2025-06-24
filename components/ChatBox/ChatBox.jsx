@@ -12,6 +12,7 @@ import "./ChatBox.css";
 import { useMessages } from "../../hook/useMessages";
 import { useTyping } from "../../hook/useTyping";
 import MessagesList from "../MessagesList";
+import Spinner from "../Spinner/Spinner";
 
 const Picker = dynamic(() => import("@emoji-mart/react"), { ssr: false });
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
@@ -119,18 +120,20 @@ const handleDelete = async (messageId) => {
     <ChatHeader participants={participantsAutres} inCall={inCall} setInCall={setInCall} />
     <VideoCallView {...{ conversationId, utilisateur, inCall, setInCall }} />
 
-    <MessagesList
-  messages={messages}
-  utilisateur={utilisateur}
-  onReact={handleReaction}
-  typingPseudo={isTyping ? typingPseudo : null}
-  lastReads={lastReads}
-  hasMore={hasMore}
-  onLoadMore={loadMoreMessages}
-  onDelete={handleDelete}
-/>
-
-
+   {!messages.length ? (
+  <Spinner />
+) : (
+  <MessagesList
+    messages={messages}
+    utilisateur={utilisateur}
+    onReact={handleReaction}
+    typingPseudo={isTyping ? typingPseudo : null}
+    lastReads={lastReads}
+    hasMore={hasMore}
+    onLoadMore={loadMoreMessages}
+    onDelete={handleDelete}
+  />
+)}
   <ChatInput
   {...{
     utilisateur,
