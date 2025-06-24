@@ -84,11 +84,9 @@
 
 .profil-card-title {
   color: #e0c084;
-  font-size: clamp(1rem, 4vw, 2.2rem);
   text-align: center;
   word-break: break-word;
   margin: 0.5rem 0;
-  font-family: "Allura", cursive;
 }
 
 .profil-card-details {
