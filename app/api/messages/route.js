@@ -169,8 +169,7 @@ const message = await prisma.message.create({
 }
 
 export async function GET(req) {
-  console.log("⇒ GET /api/messages déclenché");
-
+ 
   try {
     const { searchParams } = new URL(req.url);
     const conversationId = parseInt(searchParams.get("conversationId"), 10);
@@ -213,22 +212,29 @@ const destinataire =
       })
     : null;
 
-   const messages = await prisma.message.findMany({
-  where: { conversationId },
+const beforeId = searchParams.get("beforeId");
+const limit = parseInt(searchParams.get("limit") || "30", 10);
+
+const messages = await prisma.message.findMany({
+  where: {
+    conversationId,
+    ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
+  },
+  orderBy: { id: "desc" },
+  take: limit,
   include: {
     auteur: true,
     reactions: {
       include: {
-    utilisateur: {
-      select: { pseudo: true }
-    }
-  }
+        utilisateur: {
+          select: { pseudo: true },
+        },
+      },
     },
   },
-  orderBy: { createdAt: "asc" },
 });
 
-
+messages.reverse(); // pour afficher dans l’ordre chronologique
     return NextResponse.json(
   { success: true, messages, destinataire },
   { status: 200 }

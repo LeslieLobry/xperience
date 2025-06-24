@@ -31,3 +31,20 @@ export async function POST(req, { params }) {
 
   return NextResponse.json({ success: true, reactions });
 }
+export async function DELETE(req, { params }) {
+  const user = await getUserFromToken();
+  if (!user) {
+    return new Response("Non autorisé", { status: 401 });
+  }
+
+  const { id } = params;
+  const message = await prisma.message.findUnique({ where: { id: parseInt(id) } });
+
+  if (!message || message.auteurId !== user.id) {
+    return new Response("Interdit", { status: 403 });
+  }
+
+  await prisma.message.delete({ where: { id: parseInt(id) } });
+
+  return new Response("Message supprimé", { status: 200 });
+}

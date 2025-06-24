@@ -13,7 +13,7 @@ export default function MessageAudio({ url, duration }) {
         <Play />
       </button>
       <audio ref={audioRef} src={url} />
-      <span className="duration">{duration}</span>
+      {/* <span className="duration">{duration}</span> */}
     </div>
   );
 }

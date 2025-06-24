@@ -65,8 +65,14 @@ export default function ListeConversations({ userId, onSelectConversation }) {
           onSelectConversation(null);
         }
       } else {
-        const error = await res.json();
-        console.error("❌ Erreur suppression conversation :", error);
+        const text = await res.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { message: text || "Erreur inconnue" };
+        }
+        console.error("❌ Erreur suppression conversation :", error.message || error);
       }
     } catch (err) {
       console.error("❌ Erreur serveur :", err);
@@ -119,8 +125,10 @@ export default function ListeConversations({ userId, onSelectConversation }) {
             key={conv.id}
             className={`conversation-item ${selectedId === conv.id ? "active" : ""}`}
           >
-            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
-              
+            <div
+              className="conversation-clickable"
+              onClick={() => handleSelect(conv.id)}
+            >
               <div className="conv-info">
                 <div className="conv-pseudo">{pseudo}</div>
               </div>

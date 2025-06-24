@@ -7,6 +7,7 @@ export default function MessageBubble({
   previousMsg,
   lastReads,
   onReact,
+  onDelete,
   emojiPack = "sexy",
 }) {
   const emojiPacks = {
@@ -133,6 +134,16 @@ export default function MessageBubble({
         <span className="message-time">{heure}</span>
         {isOwn && <span className="message-status">{statutTexte}</span>}
       </div>
+      {isOwn && (
+  <button
+    className="delete-message-button"
+    onClick={() => onDelete?.(msg.id)}
+    title="Supprimer ce message"
+  >
+    🗑️
+  </button>
+)}
+
 
       {groupedReactions.length > 0 && (
         <div className="message-reactions">

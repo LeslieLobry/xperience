@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
-import { isBlockedBetween } from "../../../../lib/utilsFiltrage";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-async function getUserFromToken() {
+function getUserFromToken() {
   const headerList = headers();
   const cookieHeader = headerList.get("cookie") || "";
   const tokenMatch = cookieHeader.match(/token=([^;]+)/);
@@ -20,122 +19,106 @@ async function getUserFromToken() {
     return null;
   }
 }
-export async function GET(req, { params }) {
-  const decoded = await getUserFromToken();
+
+export async function GET(req) {
+  const decoded = getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(params.id, 10);
 
-  if (!conversationId || isNaN(conversationId)) {
-    return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
-  }
-
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: {
-      participants: {
-        include: {
-          utilisateur: {
-            select: {
-              id: true,
-              pseudo: true,
-              photoUrl: true,
+  try {
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: {
+          some: {
+            utilisateurId: userId,
+            supprimé: false,
+          },
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            utilisateur: {
+              select: {
+                id: true,
+                pseudo: true,
+                photoUrl: true,
+              },
             },
           },
         },
       },
-    },
-  });
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
 
-  if (!conversation) {
-    return NextResponse.json({ error: "Conversation introuvable" }, { status: 404 });
+    return NextResponse.json({ success: true, conversations });
+  } catch (err) {
+    console.error("Erreur fetch conversations:", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
+}
+import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import jwt from "jsonwebtoken";
+import { prisma } from "../../../../lib/prisma";
 
-  const estParticipant = conversation.participants.some(p => p.utilisateurId === userId);
-  if (!estParticipant) {
-    return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
+const JWT_SECRET = process.env.JWT_SECRET;
+
+function getUserFromToken() {
+  const headerList = headers();
+  const cookieHeader = headerList.get("cookie") || "";
+  const tokenMatch = cookieHeader.match(/token=([^;]+)/);
+  const token = tokenMatch?.[1];
+
+  if (!token || !JWT_SECRET) return null;
+
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
   }
-
-  const idsParticipants = conversation.participants.map(p => p.utilisateur.id);
-  const estBloque = await Promise.any(
-    idsParticipants.filter(id => id !== userId).map(id => isBlockedBetween(userId, id))
-  ).catch(() => false);
-
-  if (estBloque) {
-    return NextResponse.json({ error: "Un participant est bloqué" }, { status: 403 });
-  }
-
-  // ✅ Inclure lastReadAt dans la réponse
-  return NextResponse.json({
-    participants: conversation.participants.map((p) => ({
-      id: p.utilisateur.id,
-      pseudo: p.utilisateur.pseudo,
-      photoUrl: p.utilisateur.photoUrl,
-      lastReadAt: p.lastReadAt, // <-- C'EST ICI
-    })),
-  });
 }
 
 export async function DELETE(req, { params }) {
-  const decoded = await getUserFromToken();
+  const decoded = getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const userId = decoded.id;
-  const conversationId = parseInt(params.id, 10);
+  const conversationId = params?.id;
 
-  if (!conversationId || isNaN(conversationId)) {
-    return NextResponse.json({ error: "ID conversation invalide" }, { status: 400 });
+  console.log("🧪 Suppression conversationId =", conversationId);
+
+  if (!conversationId) {
+    return NextResponse.json({ error: "ID de conversation manquant" }, { status: 400 });
   }
 
   try {
-    const participants = await prisma.participant.findMany({
-      where: { conversationId },
-      include: { utilisateur: true },
-    });
-
-    const estParticipant = participants.some(p => p.utilisateur.id === userId);
-    if (!estParticipant) {
-      return NextResponse.json({ error: "Accès interdit à cette conversation" }, { status: 403 });
-    }
-
-    await prisma.participant.updateMany({
+    const participant = await prisma.participant.findFirst({
       where: {
         conversationId,
         utilisateurId: userId,
       },
-      data: {
-        supprimé: true,
-      },
     });
 
-    const updatedParticipants = await prisma.participant.findMany({
-      where: { conversationId },
-    });
-
-    const tousOntSupprimé = updatedParticipants.every((p) => p.supprimé);
-
-    if (tousOntSupprimé) {
-      await prisma.message.deleteMany({ where: { conversationId } });
-      await prisma.participant.deleteMany({ where: { conversationId } });
-      await prisma.conversation.delete({ where: { id: conversationId } });
-
-      return NextResponse.json({
-        success: true,
-        message: "Conversation supprimée définitivement",
-      });
+    if (!participant) {
+      return NextResponse.json({ error: "Conversation non trouvée ou accès refusé" }, { status: 403 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Conversation masquée pour l'utilisateur",
+    await prisma.participant.update({
+      where: { id: participant.id },
+      data: { supprimé: true },
     });
+
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Erreur suppression conversation:", err);
+    console.error("❌ Erreur suppression conversation :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
