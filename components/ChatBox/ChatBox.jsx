@@ -131,16 +131,23 @@ const handleDelete = async (messageId) => {
 />
 
 
-    <ChatInput {...{ utilisateur, conversationId, texte, setTexte, showEmojiPicker, setShowEmojiPicker, onMessageSent: async (contenu, type = "TEXTE") => {
-  await envoyerMessage(contenu, type); 
-
-
-      onTyping: envoyerTyping,
-      startRecording,
-      stopRecording,
-      recording,
-      }}
-      />
+  <ChatInput
+  {...{
+    utilisateur,
+    conversationId,
+    texte,
+    setTexte,
+    showEmojiPicker,
+    setShowEmojiPicker,
+    onMessageSent: async (contenu, type = "TEXTE") => {
+      await envoyerMessage(contenu, type);
+    },
+    onTyping: envoyerTyping,
+    startRecording,
+    stopRecording,
+    recording,
+  }}
+/>
 
       {showEmojiPicker && (
       <div className="emoji-picker-container">
