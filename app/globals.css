@@ -37,7 +37,8 @@ body {
 body {
   color: var(--foreground);
   color: var(--foreground);
-  font-family: var(--font-raleway);
+ font-family: 'Inter', sans-serif;
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -57,7 +58,6 @@ h1, h2, h3,
 .navbar a,
 .logo-text,
 .navbar-pseudo strong {
-  font-family: var(--font-allura);
   font-weight:normal;
   color: var(--gold);
 }
