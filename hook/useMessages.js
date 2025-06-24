@@ -47,21 +47,29 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
   // Envoi d’un message texte
-  const envoyerMessage = async (texte) => {
-    if (!texte.trim()) return;
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, contenu: texte, type: "TEXTE" }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      const channel = ably.channels.get(`conversation-${conversationId}`);
-      channel.publish("message", data.message);
-      setMessages((prev) => [...prev, data.message]);
-      setTexte("");
-    }
-  };
+const envoyerMessage = async (texte) => {
+  if (!texte.trim()) return null;
+
+  const res = await fetch("/api/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, contenu: texte, type: "TEXTE" }),
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("message", data.message);
+    setMessages((prev) => [...prev, data.message]);
+    setTexte("");
+
+    return data.message; // ✅ AJOUTÉ
+  }
+
+  return null; // ✅ Bonne pratique
+};
+
 
   // Réaction à un message
   const handleReaction = async (messageId, emoji) => {

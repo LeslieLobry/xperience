@@ -7,7 +7,7 @@ import data from "@emoji-mart/data";
 export default function ChatInput({
   utilisateur,
   conversationId,
-  texte,             
+  texte,
   setTexte,
   onMessageSent,
   onTyping,
@@ -30,29 +30,16 @@ export default function ChatInput({
     }
   };
 
-  const envoyerMessage = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!texte.trim()) return;
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, contenu: texte, type: "TEXTE" }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      onMessageSent(data.message);
-      setTexte("");
-    }
+    await onMessageSent(texte);
+    setTexte("");
   };
 
   return (
     <>
-      <form
-        className="chat-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          envoyerMessage();
-        }}
-      >
+      <form className="chat-input" onSubmit={handleSubmit}>
         <div className="input-wrapper">
           <textarea
             ref={textareaRef}
