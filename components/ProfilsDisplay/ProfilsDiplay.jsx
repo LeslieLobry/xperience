@@ -88,59 +88,63 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   </div>
 </div>
 
-
-      {loading ? (
-        <p>Chargement des profils proches...</p>
-      ) : (
-        <div className="grid-profil">
-          {profilsFiltres.length === 0 ? (
-            <p>Aucun profil trouvé pour ce filtre.</p>
-          ) : (
-            profilsFiltres.map((user) => (
-              <Link
-                href={`/profil/${user.id}`}
-                key={user.id}
-                className="profil-card-link"
+{loading ? (
+  <p>Chargement des profils proches...</p>
+) : (
+  <div className="grid-profil">
+    {profilsFiltres.length === 0 ? (
+      <p>Aucun profil trouvé pour ce filtre.</p>
+    ) : (
+      profilsFiltres.map((user) => (
+        <Link
+          href={`/profil/${user.id}`}
+          key={user.id}
+          className="profil-card-link"
+        >
+          <div className="profil-card">
+            <span
+              className={`statut-badge ${
+                user.statut === 'en_ligne' ? 'en-ligne' : 'hors-ligne'
+              }`}
+              title={user.statut === 'en_ligne' ? 'En ligne' : 'Hors ligne'}
+            />
+            <img
+              src={
+                user.photoUrl?.startsWith('http')
+                  ? user.photoUrl
+                  : user.photoUrl
+                  ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '')}`
+                  : '/default.jpg'
+              }
+              alt={user.pseudo}
+              className="profil-photo"
+            />
+            <h2 className="profil-card-title">
+              {user.pseudo.charAt(0).toUpperCase() +
+                user.pseudo.slice(1).toLowerCase()}
+            </h2>
+            <p className="profil-card-details">
+              {user.age} ans - {user.localisation}
+            </p>
+            <p
+              className="profil-card-details-type"
+            >
+              {user.type}
+            </p>
+            {user.distance && (
+              <p
+                className="profil-card-details"
+                style={{ fontSize: '0.85em', color: '#999' }}
               >
-                <div className="profil-card">
-                  <span
-                    className={`statut-badge ${
-                      user.statut === 'en_ligne' ? 'en-ligne' : 'hors-ligne'
-                    }`}
-                    title={
-                      user.statut === 'en_ligne' ? 'En ligne' : 'Hors ligne'
-                    }
-                  />
-                  <img
-                    src={
-                      user.photoUrl?.startsWith('http')
-                        ? user.photoUrl
-                        : user.photoUrl
-                        ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '')}`
-                        : '/default.jpg'
-                    }
-                    alt={user.pseudo}
-                    className="profil-photo"
-                  />
-                  <h2 className="profil-card-title">
-                    {user.pseudo.charAt(0).toUpperCase() +
-                      user.pseudo.slice(1).toLowerCase()}
-                  </h2>
-                  <p className="profil-card-details">
-                    {user.age} ans - {user.localisation}
-                  </p>
-                  {user.distance && (
-  <p className="profil-card-details" style={{ fontSize: "0.85em", color: "#999" }}>
-    {user.distance.toFixed(1)} km de vous
-  </p>
+                {user.distance.toFixed(1)} km de vous
+              </p>
+            )}
+          </div>
+        </Link>
+      ))
+    )}
+  </div>
 )}
-
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-      )}
 
       {afficherPlus && (
         <Link href="/profils" className="afficher-plus">

@@ -2,6 +2,7 @@
 import { prisma } from "../../lib/prisma";
 import ProfilsDisplay from "../ProfilsDisplay/ProfilsDiplay";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
+import { type } from "os";
 
 export default async function ProfilsDisplayServer({ userId }) {
   let profils = [];
@@ -22,6 +23,7 @@ export default async function ProfilsDisplayServer({ userId }) {
         age: true,
         localisation: true,
         statut: true,
+        type:true,
       },
       take: 30,
     });

@@ -13,7 +13,7 @@
 
 .navbar-pseudo {
   color: #a2b9c1;
-  font-size: 32px;
+  font-size: 24px;
   font-style: italic;
 }
 
@@ -32,7 +32,7 @@
   text-decoration: none;
   color: var(--primary-color);
   transition: color 0.3s ease;
-  font-size: 36px;
+  font-size: 24px;
 }
 
 .navLinks li a:hover {

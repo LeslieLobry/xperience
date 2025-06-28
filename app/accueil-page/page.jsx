@@ -31,7 +31,6 @@ export default async function AccueilPage() {
     return redirect("/verif-identite-obligatoire");
   }
 
-  // Précalcule les exclus uniquement pour ProfilsDisplayServer
   let exclus = [];
   try {
     exclus = await getIdsUtilisateursExclus(user.id);

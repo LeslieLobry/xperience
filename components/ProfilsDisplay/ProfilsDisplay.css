@@ -124,7 +124,9 @@
   font-size: 16px;
   color: #ffffff;
 }
-
+.profil-card-details-type{
+  color:#e0c084;
+}
 .statut-badge {
   position: absolute;
   top: 10px;
