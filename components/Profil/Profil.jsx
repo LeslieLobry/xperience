@@ -28,6 +28,24 @@ export default function Profil({ user, connectedUser }) {
   const [canSee, setCanSee] = useState(null);
   const [statut, setStatut] = useState(user.statut);
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
+  const [aDejaCommente, setADejaCommente] = useState(false);
+
+useEffect(() => {
+  if (!connectedUser?.id || !user?.id || isOwnProfile) return;
+
+  const verifierAvis = async () => {
+    try {
+      const res = await fetch(`/api/avis/utilisateur/${user.id}`);
+      const data = await res.json();
+      const deja = data.avis?.some(a => a.auteur?.id === connectedUser.id);
+      setADejaCommente(deja);
+    } catch (err) {
+      console.error("Erreur lors de la vérification d'avis :", err);
+    }
+  };
+
+  verifierAvis();
+}, [connectedUser?.id, user?.id, isOwnProfile]);
 
   useEffect(() => {
     if (!isOwnProfile) return;
@@ -62,9 +80,6 @@ export default function Profil({ user, connectedUser }) {
 
   const completion = calculateProfileCompletion(user);
 
-  const aDejaCommente = user.avisRecus?.some(
-    (avis) => avis.auteur?.id === connectedUser.id
-  );
 
 function calculateProfileCompletion(user) {
   const fields = [
@@ -194,8 +209,7 @@ function calculateProfileCompletion(user) {
 
         <PreferencesSummary editable={isOwnProfile} user={user} />
         <ProfilDetailsSummary editable={isOwnProfile} user={user} />
-        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-
+        <AvisList  cibleId={user.id}  connectedUserId={connectedUser.id}/>
         {!isOwnProfile && !aDejaCommente && <AvisForm cibleId={user.id} />}
         {!isOwnProfile && aDejaCommente && (
           <p className="avis-deja-message">✅ Vous avez déjà laissé un avis sur ce profil.</p>

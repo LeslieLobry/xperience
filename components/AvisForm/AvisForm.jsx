@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from "react";
-import "./AvisForm.css"
-export default function AvisForm({ cibleId }) {
+import "./AvisForm.css";
+
+export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
   const [commentaire, setCommentaire] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -21,6 +22,7 @@ export default function AvisForm({ cibleId }) {
       if (res.ok) {
         setSuccess(true);
         setCommentaire("");
+        if (onCommentaireEnvoye) onCommentaireEnvoye(); // ✅ appel ici
         setTimeout(() => setSuccess(false), 3000);
       } else {
         const data = await res.json();

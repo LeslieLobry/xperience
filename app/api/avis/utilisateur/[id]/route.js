@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 const prisma = new PrismaClient();
 
 export async function GET(req, context) {
+  console.log("📍 ID reçu dans API avis :", context.params.id);
   const id = context.params.id; // ✅ Pas de déstructuration
 
   if (!id) {

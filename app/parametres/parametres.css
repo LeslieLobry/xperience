@@ -36,7 +36,6 @@
 
 .parametres-sidebar h3 {
   margin-bottom: 1rem;
-  font-size: 1.8rem;
   font-weight: normal;
   color: #e0c084;
 }
@@ -59,7 +58,6 @@
   gap: 10px;
   text-decoration: none;
   color: white;
-  font-size: 0.95rem;
   padding: 8px 10px;
   border-radius: 6px;
   transition: background-color 0.2s ease;
@@ -90,7 +88,6 @@
 }
 .parametres-title {
   color: #e0c084;
-  font-size: 2.2rem;
   margin-bottom: 1rem;
   text-transform: uppercase;
 }
