@@ -32,8 +32,7 @@ const [room, setRoom] = useState(null);
 const [remoteTracks, setRemoteTracks] = useState([]);
 const [appelEntrant, setAppelEntrant] = useState(null);
 const sonnerieRef = useRef(null);
-
-
+const appelTimeoutRef = useRef(null);
 const {
 messages,
 setMessages,
@@ -43,9 +42,7 @@ handleReaction,
 loadMoreMessages,
 } = useMessages(conversationId, utilisateur, setTexte);
 
-
 const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
-
 useEffect(() => {
 async function fetchLastReads() {
 if (!conversationId) return;
@@ -189,27 +186,47 @@ const startCall = async (video = true) => {
   if (!utilisateur?.id) return;
 
   const channel = ably.channels.get(`notification-${utilisateur.id}`);
-
-  const handleIncomingCall = (msg) => {
+const handleIncomingCall = (msg) => {
   const { from, room, type } = msg.data;
 
   if (inCall) {
-  ably.channels.get(`notification-${from.id}`).publish("call:busy", {
-  from: utilisateur,
-  room: conversationId,
-  });
-  return;
+    ably.channels.get(`notification-${from.id}`).publish("call:busy", {
+      from: utilisateur,
+      room: conversationId,
+    });
+    return;
   }
 
   setAppelEntrant({ from, room, type });
 
   if (sonnerieRef.current) {
-  sonnerieRef.current.currentTime = 0;
-  sonnerieRef.current.play().catch((e) =>
-  console.warn("🔇 Erreur lecture sonnerie", e)
-  );
+    sonnerieRef.current.currentTime = 0;
+    sonnerieRef.current.play().catch((e) =>
+      console.warn("🔇 Erreur lecture sonnerie", e)
+    );
   }
-  };
+appelTimeoutRef.current = setTimeout(async () => {
+  console.log("⏰ Appel expiré (aucune réponse)");
+  setAppelEntrant(null);
+  if (sonnerieRef.current) {
+    sonnerieRef.current.pause();
+    sonnerieRef.current.currentTime = 0;
+  }
+
+  ably.channels.get(`notification-${from.id}`).publish("call:refused", {
+    from: utilisateur,
+    room: conversationId,
+  });
+
+  try {
+    await envoyerMessage("📵 Appel manqué", "TEXTE");
+  } catch (err) {
+    console.warn("❌ Erreur envoi message 'appel manqué' :", err);
+  }
+}, 20000);
+
+};
+
 
   channel.subscribe("call:incoming", handleIncomingCall);
 
@@ -234,10 +251,21 @@ const startCall = async (video = true) => {
 
   channel.subscribe("call:refused", handleRefused);
   channel.subscribe("call:busy", handleBusy);
+const handleCallEnded = (msg) => {
+  console.log("📴 Appel terminé par l'appelant", msg.data);
+  setAppelEntrant(null);
+  if (sonnerieRef.current) {
+    sonnerieRef.current.pause();
+    sonnerieRef.current.currentTime = 0;
+  }
+};
+
+channel.subscribe("call:ended", handleCallEnded);
 
   return () => {
   channel.unsubscribe("call:refused", handleRefused);
   channel.unsubscribe("call:busy", handleBusy);
+  channel.unsubscribe("call:ended", handleCallEnded);
   };
   }, [utilisateur]);
 
@@ -278,25 +306,42 @@ const startCall = async (video = true) => {
           />
       </div>
       )}
-      <NotificationAppelEntrant appel={appelEntrant} onAccepter={(type)=> {
-        setAppelEntrant(null);
-        if (sonnerieRef.current) sonnerieRef.current.pause(); // ✅ AJOUT stop sonnerie
-        startCall(type === "video");
-        }}
-        onRefuser={() => {
-        setAppelEntrant(null);
-        if (sonnerieRef.current) sonnerieRef.current.pause(); // ✅ AJOUT stop sonnerie
-        participantsAutres.forEach((p) => {
-        ably.channels.get(`notification-${p.id}`).publish("call:refused", {
-        from: utilisateur,
-        room: conversationId,
-        });
-        });
-        }}
-        />
+      <NotificationAppelEntrant appel={appelEntrant} onAccepter={(type) => {
+  if (appelTimeoutRef.current) {
+    clearTimeout(appelTimeoutRef.current);
+    appelTimeoutRef.current = null;
+  }
+  setAppelEntrant(null);
+  if (sonnerieRef.current) {
+    sonnerieRef.current.pause();
+    sonnerieRef.current.currentTime = 0;
+  }
+  startCall(type === "video");
+}}
 
-        <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" /> {/* ✅ AJOUT sonnerie */}
 
+onRefuser={() => {
+  if (appelTimeoutRef.current) {
+    clearTimeout(appelTimeoutRef.current);
+    appelTimeoutRef.current = null;
+  }
+
+  setAppelEntrant(null);
+
+  if (sonnerieRef.current) {
+    sonnerieRef.current.pause();
+    sonnerieRef.current.currentTime = 0;
+  }
+
+  participantsAutres.forEach((p) => {
+    ably.channels.get(`notification-${p.id}`).publish("call:refused", {
+      from: utilisateur,
+      room: conversationId,
+    });
+  });
+}}
+  />
+  <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" /> {/* ✅ AJOUT sonnerie */}
   </div>
   );
   }
