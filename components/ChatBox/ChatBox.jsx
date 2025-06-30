@@ -173,14 +173,30 @@ const startCall = async (video = true) => {
     });
   });
 };
-  const hangupCall = () => {
+const hangupCall = () => {
   if (room) {
-  room.disconnect();
-  setRoom(null);
-  setRemoteTracks([]);
-  setInCall(false);
+    const localTracks = room.localParticipant?.tracks;
+    localTracks?.forEach((publication) => {
+      const track = publication.track;
+      if (track) {
+        track.stop(); // stoppe usage cam/micro
+        room.localParticipant.unpublishTrack(track); // dépublie proprement
+      }
+    });
+
+    room.disconnect();
+    setRoom(null);
+    setRemoteTracks([]);
+    setInCall(false);
+
+    // Nettoyage éventuel de la vidéo locale si tu la stockes dans window
+    if (window.localVideoTrack) {
+      window.localVideoTrack.stop();
+      delete window.localVideoTrack;
+    }
   }
-  };
+};
+
 
   useEffect(() => {
   if (!utilisateur?.id) return;
