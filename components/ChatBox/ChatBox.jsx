@@ -179,32 +179,25 @@ const hangupCall = () => {
     localTracks?.forEach((publication) => {
       const track = publication.track;
       if (track) {
-        track.stop(); // stoppe usage cam/micro
-        room.localParticipant.unpublishTrack(track); // dépublie proprement
+        track.stop();
+        room.localParticipant.unpublishTrack(track);
       }
     });
-
     room.disconnect();
     setRoom(null);
     setRemoteTracks([]);
     setInCall(false);
-
-    // Nettoyage éventuel de la vidéo locale si tu la stockes dans window
     if (window.localVideoTrack) {
       window.localVideoTrack.stop();
       delete window.localVideoTrack;
     }
   }
 };
-
-
   useEffect(() => {
   if (!utilisateur?.id) return;
-
   const channel = ably.channels.get(`notification-${utilisateur.id}`);
 const handleIncomingCall = (msg) => {
   const { from, room, type } = msg.data;
-
   if (inCall) {
     ably.channels.get(`notification-${from.id}`).publish("call:busy", {
       from: utilisateur,
@@ -212,9 +205,7 @@ const handleIncomingCall = (msg) => {
     });
     return;
   }
-
   setAppelEntrant({ from, room, type });
-
   if (sonnerieRef.current) {
     sonnerieRef.current.currentTime = 0;
     sonnerieRef.current.play().catch((e) =>
