@@ -1,35 +1,53 @@
 "use client";
+import { useEffect, useRef } from "react";
+import "./VideoCallView.css";
 
-import { useEffect } from "react";
+export default function VideoCallView({ inCall, remoteTracks }) {
+  const localVideoRef = useRef(null);
 
-export default function VideoCallView({
-  inCall,
-  remoteTracks,
-  startCall,
-  hangupCall,
-}) {
- useEffect(() => {
-  if (!remoteTracks || !Array.isArray(remoteTracks)) return;
+  useEffect(() => {
+    const videoEl = localVideoRef.current;
+    const localTrack = window.localVideoTrack;
+    if (videoEl && localTrack) {
+      localTrack.attach(videoEl);
+    }
+  }, [inCall]);
 
-  remoteTracks.forEach(({ id, track }) => {
-    const el = document.getElementById(`remote-video-${id}`);
-    if (el && track) track.attach(el);
-  });
-}, [remoteTracks]);
+  useEffect(() => {
+    if (!remoteTracks || !Array.isArray(remoteTracks)) return;
+    remoteTracks.forEach(({ id, track }) => {
+      const el = document.getElementById(`remote-video-${id}`);
+      if (el && track) track.attach(el);
+    });
+  }, [remoteTracks]);
 
+  if (!inCall) return null;
 
-  return inCall ? (
+  return (
     <div className="video-call-container">
-      <div className="video-box local">
-        <video id="local-video" autoPlay muted playsInline />
-        <div className="video-label">Moi</div>
-      </div>
       {remoteTracks.map(({ id, nom }) => (
-        <div className="video-box" key={id}>
-          <video id={`remote-video-${id}`} autoPlay playsInline />
-          <div className="video-label">{nom || "Participant"}</div>
+        <div className="remote-video-wrapper" key={id}>
+          <video
+            id={`remote-video-${id}`}
+            autoPlay
+            playsInline
+            className="remote-video"
+          />
+          <div className="video-label remote">{nom || "Participant"}</div>
         </div>
       ))}
+
+      <div className="local-video-fixed">
+        <video
+          id="local-video"
+          ref={localVideoRef}
+          autoPlay
+          muted
+          playsInline
+          className="local-video"
+        />
+        <div className="video-label local">Moi</div>
+      </div>
     </div>
-  ) : null;
+  );
 }

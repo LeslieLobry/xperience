@@ -13,6 +13,8 @@ import { useMessages } from "../../hook/useMessages";
 import { useTyping } from "../../hook/useTyping";
 import MessagesList from "../MessagesList";
 import Spinner from "../Spinner/Spinner";
+import { createLocalTracks, Room } from "livekit-client";
+import NotificationAppelEntrant from "../NotificationAppelEntrant/NotificationAppelEntrant";
 
 const Picker = dynamic(() => import("@emoji-mart/react"), { ssr: false });
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
@@ -26,15 +28,19 @@ const [lastReads, setLastReads] = useState([]);
 const mediaRecorderRef = useRef(null);
 const audioChunks = useRef([]);
 const [hasMore, setHasMore] = useState(false);
+const [room, setRoom] = useState(null);
+const [remoteTracks, setRemoteTracks] = useState([]);
+const [appelEntrant, setAppelEntrant] = useState(null);
+const sonnerieRef = useRef(null);
 
 
 const {
-  messages,
-  setMessages,
-  participantsAutres,
-  envoyerMessage,
-  handleReaction,
-  loadMoreMessages, 
+messages,
+setMessages,
+participantsAutres,
+envoyerMessage,
+handleReaction,
+loadMoreMessages,
 } = useMessages(conversationId, utilisateur, setTexte);
 
 
@@ -102,55 +108,165 @@ resolve(`${minutes}:${secondes < 10 ? "0" : "" }${secondes}`); }; }); const form
   mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
   }
   };
-const handleDelete = async (messageId) => {
+  const handleDelete = async (messageId) => {
   try {
-    const res = await fetch(`/api/messages/${messageId}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error("Erreur lors de la suppression");
+  const res = await fetch(`/api/messages/${messageId}`, {
+  method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Erreur lors de la suppression");
 
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  setMessages((prev) => prev.filter((m) => m.id !== messageId));
   } catch (err) {
-    console.error("Erreur suppression message :", err);
+  console.error("Erreur suppression message :", err);
   }
+  };
+const startCall = async (video = true) => {
+  const res = await fetch("/api/livekit/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      identity: `user_${utilisateur.id}`,
+      room: conversationId,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.token) {
+    console.error("❌ Erreur token LiveKit :", data);
+    return;
+  }
+
+  const token = data.token;
+
+  const newRoom = new Room();
+  setRoom(newRoom);
+
+  newRoom.on("trackSubscribed", (track, publication, participant) => {
+    console.log("🎥 trackSubscribed from", participant.identity);
+    setRemoteTracks((prev) => [
+      ...prev.filter((t) => t.id !== participant.identity),
+      { id: participant.identity, nom: participant.identity, track },
+    ]);
+  });
+
+  newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+    console.log("📴 trackUnsubscribed", participant.identity);
+    setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+  });
+
+  const localTracks = await createLocalTracks({ audio: true, video });
+  console.log("🎥 localTracks:", localTracks);
+
+  const localVideoTrack = localTracks.find((t) => t.kind === "video");
+  if (localVideoTrack) {
+    console.log("✅ window.localVideoTrack defined");
+    window.localVideoTrack = localVideoTrack;
+  }
+
+  await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
+  localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+
+  setInCall(true);
+
+  participantsAutres.forEach((p) => {
+    ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
+      from: utilisateur,
+      room: conversationId,
+      type: video ? "video" : "audio",
+    });
+  });
 };
+  const hangupCall = () => {
+  if (room) {
+  room.disconnect();
+  setRoom(null);
+  setRemoteTracks([]);
+  setInCall(false);
+  }
+  };
+
+  useEffect(() => {
+  if (!utilisateur?.id) return;
+
+  const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+  const handleIncomingCall = (msg) => {
+  const { from, room, type } = msg.data;
+
+  if (inCall) {
+  ably.channels.get(`notification-${from.id}`).publish("call:busy", {
+  from: utilisateur,
+  room: conversationId,
+  });
+  return;
+  }
+
+  setAppelEntrant({ from, room, type });
+
+  if (sonnerieRef.current) {
+  sonnerieRef.current.currentTime = 0;
+  sonnerieRef.current.play().catch((e) =>
+  console.warn("🔇 Erreur lecture sonnerie", e)
+  );
+  }
+  };
+
+  channel.subscribe("call:incoming", handleIncomingCall);
+
+  return () => {
+  channel.unsubscribe("call:incoming", handleIncomingCall);
+  };
+  }, [utilisateur, inCall]);
+
+  // ✅ AJOUT écoute refus ou occupation
+  useEffect(() => {
+  if (!utilisateur?.id) return;
+
+  const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+  const handleRefused = (msg) => {
+  alert(`${msg.data.from?.pseudo || "L'utilisateur"} a refusé l'appel.`);
+  };
+
+  const handleBusy = (msg) => {
+  alert(`${msg.data.from?.pseudo || "L'utilisateur"} est déjà en appel.`);
+  };
+
+  channel.subscribe("call:refused", handleRefused);
+  channel.subscribe("call:busy", handleBusy);
+
+  return () => {
+  channel.unsubscribe("call:refused", handleRefused);
+  channel.unsubscribe("call:busy", handleBusy);
+  };
+  }, [utilisateur]);
+
 
   return (
   <div className="chatbox-container">
-    <ChatHeader participants={participantsAutres} inCall={inCall} setInCall={setInCall} />
-    <VideoCallView {...{ conversationId, utilisateur, inCall, setInCall }} />
+    <ChatHeader participants={participantsAutres} inCall={inCall} onCallAudio={startCall} onCallVideo={startCall}
+      onClose={hangupCall} />
 
-   {!messages.length ? (
-  <Spinner />
-) : (
-  <MessagesList
-    messages={messages}
-    utilisateur={utilisateur}
-    onReact={handleReaction}
-    typingPseudo={isTyping ? typingPseudo : null}
-    lastReads={lastReads}
-    hasMore={hasMore}
-    onLoadMore={loadMoreMessages}
-    onDelete={handleDelete}
-  />
-)}
-  <ChatInput
-  {...{
-    utilisateur,
-    conversationId,
-    texte,
-    setTexte,
-    showEmojiPicker,
-    setShowEmojiPicker,
-    onMessageSent: async (contenu, type = "TEXTE") => {
+    <VideoCallView inCall={inCall} remoteTracks={remoteTracks} startCall={startCall} hangupCall={hangupCall} />
+
+
+    {!messages.length ? (
+    <Spinner />
+    ) : (
+    <MessagesList messages={messages} utilisateur={utilisateur} onReact={handleReaction} typingPseudo={isTyping ?
+      typingPseudo : null} lastReads={lastReads} hasMore={hasMore} onLoadMore={loadMoreMessages}
+      onDelete={handleDelete} />
+    )}
+    <ChatInput {...{ utilisateur, conversationId, texte, setTexte, showEmojiPicker, setShowEmojiPicker, onMessageSent:
+      async (contenu, type="TEXTE" )=> {
       await envoyerMessage(contenu, type);
-    },
-    onTyping: envoyerTyping,
-    startRecording,
-    stopRecording,
-    recording,
-  }}
-/>
+      },
+      onTyping: envoyerTyping,
+      startRecording,
+      stopRecording,
+      recording,
+      }}
+      />
 
       {showEmojiPicker && (
       <div className="emoji-picker-container">
@@ -162,6 +278,25 @@ const handleDelete = async (messageId) => {
           />
       </div>
       )}
+      <NotificationAppelEntrant appel={appelEntrant} onAccepter={(type)=> {
+        setAppelEntrant(null);
+        if (sonnerieRef.current) sonnerieRef.current.pause(); // ✅ AJOUT stop sonnerie
+        startCall(type === "video");
+        }}
+        onRefuser={() => {
+        setAppelEntrant(null);
+        if (sonnerieRef.current) sonnerieRef.current.pause(); // ✅ AJOUT stop sonnerie
+        participantsAutres.forEach((p) => {
+        ably.channels.get(`notification-${p.id}`).publish("call:refused", {
+        from: utilisateur,
+        room: conversationId,
+        });
+        });
+        }}
+        />
+
+        <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" /> {/* ✅ AJOUT sonnerie */}
+
   </div>
   );
   }

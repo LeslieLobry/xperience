@@ -66,22 +66,23 @@ export default function Profil({ user, connectedUser }) {
     (avis) => avis.auteur?.id === connectedUser.id
   );
 
-  function calculateProfileCompletion(user) {
-    const fields = [
-      "pseudo", "email", "sexe", "orientation", "age",
-      "localisation", "description", "photoUrl", "coverUrl",
-      "taille", "silhouette", "origines"
-    ];
-    let completed = 0;
-    for (let field of fields) {
-      if (Array.isArray(user[field])) {
-        if (user[field].length > 0) completed++;
-      } else if (user[field] && user[field] !== '') {
-        completed++;
-      }
+function calculateProfileCompletion(user) {
+  const fields = [
+    "pseudo", "email", "orientation", "age",
+    "localisation", "description", "photoUrl",
+    "taille", "silhouette", "origines"
+  ];
+  let completed = 0;
+  for (let field of fields) {
+    if (Array.isArray(user[field])) {
+      if (user[field].length > 0) completed++;
+    } else if (user[field] && user[field] !== '') {
+      completed++;
     }
-    return Math.round((completed / fields.length) * 100);
   }
+  return Math.round((completed / fields.length) * 100);
+}
+
 
   const [demandesAcces, setDemandesAcces] = useState([]);
 

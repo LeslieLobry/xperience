@@ -22,19 +22,18 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
         )}
       </div>
 
-      {/* Décommente si tu veux remettre les boutons d’appel :
       <div className="chat-actions">
         {!inCall && (
           <>
-            <button onClick={onCallAudio} title="Appel audio"><Phone /></button>
-            <button onClick={onCallVideo} title="Appel vidéo"><Video /></button>
+           <button onClick={() => onCallAudio()} title="Appel audio"><Phone /></button>
+           <button onClick={() => onCallVideo()} title="Appel vidéo"><Video /></button>
           </>
         )}
         {inCall && (
           <button onClick={onClose} title="Raccrocher"><X /></button>
         )}
       </div>
-      */}
+     
     </div>
   );
 }
