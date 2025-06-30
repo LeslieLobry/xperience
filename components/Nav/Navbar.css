@@ -82,6 +82,8 @@
  
 }
   .navLinks {
+    display: flex;
+    align-items: flex-start;
     position: absolute;
     top: 100%;
     right: 0;

@@ -362,3 +362,12 @@ enum DemandeStatut {
   ACCEPTEE
   REFUSEE
 }
+model Partenaire {
+  id        String   @id @default(dbgenerated()) @db.Uuid
+  nom       String
+  type      String
+  lien      String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("Partenaire")
+}

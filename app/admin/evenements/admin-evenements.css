@@ -1,0 +1,54 @@
+.admin-evenements-container {
+  padding: 2rem;
+  color: #f5ece0;
+}
+
+.admin-evenements-container h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e0c084;
+  padding-bottom: 0.5rem;
+}
+
+.admin-evenements-error {
+  color: #ff6b6b;
+  margin-bottom: 1rem;
+}
+
+.admin-evenements-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  color: #f5ece0;
+}
+
+.admin-evenements-table th,
+.admin-evenements-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(224, 192, 132, 0.3);
+}
+
+.admin-evenements-table th {
+  background-color: rgba(224, 192, 132, 0.1);
+  color: #e0c084;
+}
+
+.admin-evenements-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.admin-evenements-table button {
+  padding: 6px 12px;
+  background: #e0c084;
+  color: #1e1e1e;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.admin-evenements-table .supprimer-btn {
+  background: #6f1d1b;
+  color: #f5ece0;
+  margin-left: 0.5rem;
+}

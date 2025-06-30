@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import "./admin-newsletter.css"; // 👉 crée ce fichier ou adapte le chemin si tu préfères un style global
+import "./admin-newsletter.css"; 
 
 export default function AdminNewsletterPage() {
   const [titre, setTitre] = useState("");
