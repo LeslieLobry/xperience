@@ -1,55 +1,53 @@
-'use client';
+// AvisCard.jsx
+"use client";
 
 import { useState } from "react";
 import Image from "next/image";
 import Button from "../Button/Button";
+import "./AvisCard.css";          // ✅ feuille CSS classique, plus de modules
 
 export default function AvisCard({ avis, connectedUserId, onRefresh }) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing]   = useState(false);
   const [commentaire, setCommentaire] = useState(avis.commentaire);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]       = useState(false);
 
   const isAuteur = connectedUserId === avis.auteurId;
 
   const handleDelete = async () => {
     if (!confirm("Supprimer cet avis ?")) return;
-
     setLoading(true);
     const res = await fetch(`/api/avis/${avis.id}`, { method: "DELETE" });
-
-    if (res.ok && onRefresh) {
-      onRefresh(); // Pour rafraîchir la liste des avis
-    }
+    if (res.ok && onRefresh) onRefresh();
+    setLoading(false);
   };
 
   const handleEdit = async () => {
     if (!commentaire.trim()) return;
-
     setLoading(true);
     const res = await fetch(`/api/avis/${avis.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ commentaire }),
     });
-
     if (res.ok) {
       setIsEditing(false);
       if (onRefresh) onRefresh();
     }
+    setLoading(false);
   };
 
   return (
-    <div className="avis-card">
-      <div className="avis-header">
+    <article className="avis-card">
+      <header className="avis-header">
         <Image
           src={avis.auteur.photoUrl || "/default.jpg"}
-          alt="avatar"
-          width={40}
-          height={40}
+          alt={`Avatar de ${avis.auteur.pseudo}`}
+          width={44}
+          height={44}
           className="avis-avatar"
         />
-        <strong>{avis.auteur.pseudo}</strong>
-      </div>
+        <strong className="avis-author">{avis.auteur.pseudo}</strong>
+      </header>
 
       {isEditing ? (
         <div className="avis-edit">
@@ -57,32 +55,31 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
             value={commentaire}
             onChange={(e) => setCommentaire(e.target.value)}
             disabled={loading}
+            className="avis-textarea"
           />
-          <button onClick={handleEdit} disabled={loading}>Enregistrer</button>
-          <button onClick={() => setIsEditing(false)} disabled={loading}>Annuler</button>
+          <div className="avis-edit-actions">
+            <Button title="Enregistrer" onClick={handleEdit} disabled={loading} />
+            <Button
+              title="Annuler"
+              onClick={() => {
+                setCommentaire(avis.commentaire);
+                setIsEditing(false);
+              }}
+              variant="ghost"
+              disabled={loading}
+            />
+          </div>
         </div>
       ) : (
         <p className="avis-commentaire">{avis.commentaire}</p>
       )}
 
       {isAuteur && !isEditing && (
-        <div className="avis-actions">
-          <Button
-  title="Modifier"
-  onClick={() => setIsEditing(true)}
-  color="#e0c084" 
-  style={{ marginRight: "1em" }}
-/>
-
-<Button
-  title="Supprimer"
-  onClick={handleDelete}
-  color="#8c6a5d"
-  style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
-  disabled={loading}
-/>
-        </div>
+        <footer className="avis-footer">
+          <Button title="Modifier"   onClick={() => setIsEditing(true)}color="#e0c084" />
+          <Button title="Supprimer"  onClick={handleDelete} color="#8c6a5d" disabled={loading} />
+        </footer>
       )}
-    </div>
+    </article>
   );
 }

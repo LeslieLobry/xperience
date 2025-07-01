@@ -1,35 +1,50 @@
 .avis-card {
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  background: rgba(31, 29, 27, 0.6);
+  border: 1px solid #e0c084;
+  border-radius: 12px;
   padding: 1rem;
   margin-bottom: 1rem;
+  color: #e0c084;
+  padding: 1rem;
 }
 
 .avis-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: .65rem;
+  margin-bottom: .6rem;
 }
 
 .avis-avatar {
-  width: 40px;
-  height: 40px;
   border-radius: 50%;
   object-fit: cover;
+  border: 2px solid #e0c084;
+}
+
+.avis-author {
+  color: #d6a98c;
 }
 
 .avis-commentaire {
-  margin-top: 0.5rem;
+  line-height: 1.4;
+  margin-bottom: .9rem;
 }
 
-.avis-actions {
-  margin-top: 0.5rem;
-  display: flex;
-  gap: 0.5rem;
-}
-
-.avis-edit textarea {
+.avis-textarea {
   width: 100%;
-  min-height: 60px;
-  margin-top: 0.5rem;
+  min-height: 90px;
+  padding: .6rem;
+  border-radius: 8px;
+  border: 1px solid #8c6a5d;
+  background: rgba(0, 0, 0, 0.25);
+  color: #f0e4d2;
+  resize: vertical;
+}
+
+.avis-edit-actions,
+.avis-footer {
+  display: flex;
+  gap: .6rem;
+  margin-top: .6rem;
 }

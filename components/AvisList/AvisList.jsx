@@ -2,22 +2,41 @@
 
 import AvisCard from "../AvisCard/AvisCard";
 import { useState, useEffect } from "react";
-import "./AvisList.css"
+import "./AvisList.css";
 
 export default function AvisList({ cibleId, connectedUserId }) {
   const [avisRecus, setAvisRecus] = useState([]);
+  const [error, setError] = useState(null);
 
   const fetchAvis = async () => {
-    const res = await fetch(`/api/avis/utilisateur/${cibleId}`);
-    const data = await res.json();
-    if (res.ok && data.avis) {
-      setAvisRecus(data.avis);
+    setError(null);
+    try {
+      const res = await fetch(`/api/avis/utilisateur/${cibleId}`);
+      if (!res.ok) {
+        throw new Error(`Erreur HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.avis) {
+        setAvisRecus(data.avis);
+      } else {
+        setAvisRecus([]);
+      }
+    } catch (err) {
+      console.error("Erreur lors du fetch des avis :", err);
+      setError("Impossible de récupérer les avis.");
+      setAvisRecus([]);
     }
   };
 
   useEffect(() => {
-    fetchAvis();
+    if (cibleId) {
+      fetchAvis();
+    }
   }, [cibleId]);
+
+  if (error) {
+    return <p className="avis-text-p erreur">{error}</p>;
+  }
 
   if (!avisRecus || avisRecus.length === 0) {
     return <p className="avis-text-p">Aucun avis reçu pour l'instant.</p>;

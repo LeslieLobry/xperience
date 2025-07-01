@@ -10,6 +10,7 @@ export default function ProfilProtege({ userId, children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+      window.scrollTo(0, 0);
     let isMounted = true;
 
     const checkUser = async () => {
@@ -35,13 +36,11 @@ export default function ProfilProtege({ userId, children }) {
     return () => {
       isMounted = false;
     };
-  }, [userId, router, fetchUser]); // ✅ Ajout de fetchUser maintenant qu’il est mémoïsé
+  }, [userId, router, fetchUser]); 
 
   if (loading) {
     return (
-      <div style={{ padding: "2rem", textAlign: "center" }}>
-        Chargement du profil sécurisé...
-      </div>
+      null
     );
   }
 

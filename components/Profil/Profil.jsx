@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
@@ -12,74 +12,14 @@ import AProposCard from "../AProposCard/AProposCard";
 import Image from "next/image";
 import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
+import Spinner from "../Spinner/Spinner";
 
-// Imports dynamiques pour alléger le bundle initial
-const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), { ssr: false });
-const AvisList = dynamic(() => import("../AvisList/AvisList"), { ssr: false });
+const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), { ssr: false, loading: Spinner });
+const AvisList = dynamic(() => import("../AvisList/AvisList"), { ssr: false, loading: Spinner });
 const MenuProfilActions = dynamic(() => import("../MenuProfilActions/MenuProfilActions"), { ssr: false });
-const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), { ssr: false });
+const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), { ssr: false, loading: Spinner });
 const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
 const DemandesAccesGalerie = dynamic(() => import("../DemandesAccesGalerie/DemandesAccesGalerie"), { ssr: false });
-
-export default function Profil({ user, connectedUser }) {
-  const router = useRouter();
-  const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
-  const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
-  const [canSee, setCanSee] = useState(null);
-  const [statut, setStatut] = useState(user.statut);
-  const [statutAuto, setStatutAuto] = useState(user.statutAuto);
-  const [aDejaCommente, setADejaCommente] = useState(false);
-
-useEffect(() => {
-  if (!connectedUser?.id || !user?.id || isOwnProfile) return;
-
-  const verifierAvis = async () => {
-    try {
-      const res = await fetch(`/api/avis/utilisateur/${user.id}`);
-      const data = await res.json();
-      const deja = data.avis?.some(a => a.auteur?.id === connectedUser.id);
-      setADejaCommente(deja);
-    } catch (err) {
-      console.error("Erreur lors de la vérification d'avis :", err);
-    }
-  };
-
-  verifierAvis();
-}, [connectedUser?.id, user?.id, isOwnProfile]);
-
-  useEffect(() => {
-    if (!isOwnProfile) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/utilisateur/statut");
-        const data = await res.json();
-        if (data?.utilisateur) {
-          setStatut(data.utilisateur.statut);
-          setStatutAuto(data.utilisateur.statutAuto);
-        }
-      } catch (err) {
-        console.error("Erreur rafraîchissement statut :", err);
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [isOwnProfile]);
-
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (isOwnProfile) return setCanSee(true);
-      try {
-        const res = await fetch(`/api/blocage/visibilite/${user.id}`);
-        const data = await res.json();
-        setCanSee(data.canSee);
-      } catch {
-        setCanSee(false);
-      }
-    };
-    checkAccess();
-  }, [user.id, isOwnProfile]);
-
-  const completion = calculateProfileCompletion(user);
-
 
 function calculateProfileCompletion(user) {
   const fields = [
@@ -98,16 +38,15 @@ function calculateProfileCompletion(user) {
   return Math.round((completed / fields.length) * 100);
 }
 
+export default function Profil({ user, connectedUser }) {
+  const router = useRouter();
+  const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  const [demandesAcces, setDemandesAcces] = useState([]);
+  const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
+  const [statut, setStatut] = useState(user.statut);
+  const [statutAuto, setStatutAuto] = useState(user.statutAuto);
 
-  useEffect(() => {
-    if (!isOwnProfile) return;
-    fetch(`/api/utilisateur/${user.id}/demandes-acces`)
-      .then((res) => res.json())
-      .then(setDemandesAcces)
-      .catch((err) => console.error("Erreur chargement des demandes :", err));
-  }, [isOwnProfile, user.id]);
+  const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
@@ -139,14 +78,22 @@ function calculateProfileCompletion(user) {
     }
   };
 
-  if (canSee === null) return <p>Chargement du profil...</p>;
-  if (canSee === false) return <p>🚫 Ce profil n’est pas accessible.</p>;
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    const interval = setInterval(async () => {
+      const res = await fetch("/api/utilisateur/statut");
+      const data = await res.json();
+      setStatut(data.utilisateur.statut);
+      setStatutAuto(data.utilisateur.statutAuto);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isOwnProfile]);
 
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
         <div className="profil-avatar-horizontal">
-          <PhotoUploader currentUrl={photoUrl} isOwnProfile={isOwnProfile} onUpload={setPhotoUrl} />
+          <PhotoUploader priority currentUrl={photoUrl} isOwnProfile={isOwnProfile} onUpload={setPhotoUrl} />
         </div>
 
         {!isOwnProfile && (
@@ -166,54 +113,24 @@ function calculateProfileCompletion(user) {
 
       <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
 
-      <StatutToggle
-        statut={statut}
-        statutAuto={statutAuto}
-        editable={isOwnProfile}
-        onUpdate={({ statut, statutAuto }) => {
-          if (statut) setStatut(statut);
-          if (typeof statutAuto === "boolean") setStatutAuto(statutAuto);
-        }}
-      />
+      <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
 
       <div className="profil-badge">{user.type} {user.orientation}</div>
-      {isOwnProfile && <ProfilCompletionBox user={user} />}
+      {isOwnProfile && <ProfilCompletionBox user={user} completion={completion} />}
+
       <div className="grid">
-        <div className="profil-infos-wrapper">
-          <div className="info-block">
-            <h3>Membre 1</h3>
-            <p><span className="info-label">Âge :</span> {user.age}</p>
-            <p><span className="info-label">Silhouette :</span> {user.silhouette}</p>
-            <p><span className="info-label">Origines :</span> {user.origines}</p>
-            <p><span className="info-label">Taille :</span> {user.taille} cm</p>
-            <p><span className="info-label">Localisation :</span> {user.localisation}</p>
-          </div>
-
-          {user.type === "couple" && (
-            <div className="info-block">
-              <h3>Membre 2</h3>
-              <p><span className="info-label">Âge :</span> {user.age2 || "Non défini"}</p>
-              <p><span className="info-label">Silhouette :</span> {user.silhouette2 || "Non défini"}</p>
-              <p><span className="info-label">Origines :</span> {user.origines2 || "Non défini"}</p>
-              <p><span className="info-label">Taille :</span> {user.taille2 ? `${user.taille2} cm` : "Non défini"}</p>
-            </div>
-          )}
-        </div>
-
         <DescriptionCard editable={isOwnProfile} description={user.description} />
-        <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriesPrivees?.[0]} editable={isOwnProfile} utilisateurId={user.id} visiteurId={connectedUser.id} />
 
-        {isOwnProfile && (
-          <DemandesAccesGalerie isOwnProfile={isOwnProfile} connectedUserId={connectedUser.id} />
-        )}
+        <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriePrivee} editable={isOwnProfile} utilisateurId={user.id} visiteurId={connectedUser.id} />
+
+        {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
 
         <PreferencesSummary editable={isOwnProfile} user={user} />
         <ProfilDetailsSummary editable={isOwnProfile} user={user} />
-        <AvisList  cibleId={user.id}  connectedUserId={connectedUser.id}/>
-        {!isOwnProfile && !aDejaCommente && <AvisForm cibleId={user.id} />}
-        {!isOwnProfile && aDejaCommente && (
-          <p className="avis-deja-message">✅ Vous avez déjà laissé un avis sur ce profil.</p>
-        )}
+
+        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
+
+        {!isOwnProfile && <AvisForm cibleId={user.id} />}
 
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
