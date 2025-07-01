@@ -1,8 +1,7 @@
-export const dynamic = "force-dynamic"; // 🔁 important sur Vercel
+export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
-import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 import ProfilsDisplayServer from "../../components/ProfilsDisplayServer/ProfilsDisplayServer";
 import DerniersArticlesServer from "../../components/DerniersArticlesServer/DerniersArticlesServer";
@@ -14,6 +13,8 @@ import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper
 
 import { Suspense } from "react";
 import "./accueil.css";
+
+import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -31,12 +32,8 @@ export default async function AccueilPage() {
     return redirect("/verif-identite-obligatoire");
   }
 
-  let exclus = [];
-  try {
-    exclus = await getIdsUtilisateursExclus(user.id);
-  } catch (err) {
-    console.error("Erreur récupération des profils exclus :", err.message);
-  }
+  // Lance la récupération des exclus en parallèle sans attendre
+  const exclusPromise = getIdsUtilisateursExclus(user.id);
 
   return (
     <div className="accueil-page">
@@ -47,26 +44,22 @@ export default async function AccueilPage() {
       <LoaderAnnonce />
 
       <div className="grid-accueil">
-        {/* Colonne 1 */}
         <div className="recherche-sidebar">
           <RechercheWrapper />
         </div>
 
-        {/* Colonne 2 */}
         <div className="profil-list1">
           <Suspense fallback={<p>Chargement des profils...</p>}>
-            <ProfilsDisplayServer userId={user.id} exclus={exclus} />
+            <ProfilsDisplayServer userId={user.id} exclusPromise={exclusPromise} />
           </Suspense>
         </div>
 
-        {/* Colonne 3 */}
         <div className="grid-articles">
           <Suspense fallback={<p>Chargement des articles...</p>}>
             <DerniersArticlesServer />
           </Suspense>
         </div>
 
-        {/* Colonne 3, ligne 2 */}
         <div className="grid-event">
           <Suspense fallback={<p>Chargement des événements...</p>}>
             <DerniersEvenementsServer />

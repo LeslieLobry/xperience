@@ -44,8 +44,8 @@ export default function ClientWrapper({ children }) {
       }
     };
 
-    const handleBeforeUnload = () => {
-      console.log("🚪 beforeunload → sendBeacon");
+    const handlePageHide = () => {
+      console.log("🚪 pagehide → sendBeacon");
       updateStatut("hors_ligne", true);
     };
 
@@ -54,24 +54,21 @@ export default function ClientWrapper({ children }) {
 
     // ➤ Listeners
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("unload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("unload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
     };
-  },
-  []);
-  useEffect(() => {
-  const disableContextMenu = (e) => e.preventDefault();
-  document.addEventListener("contextmenu", disableContextMenu);
-  return () => {
-    document.removeEventListener("contextmenu", disableContextMenu);
-  };
-}, []);
+  }, []);
 
+  useEffect(() => {
+    const disableContextMenu = (e) => e.preventDefault();
+    document.addEventListener("contextmenu", disableContextMenu);
+    return () => {
+      document.removeEventListener("contextmenu", disableContextMenu);
+    };
+  }, []);
 
   return <>{children}</>;
 }

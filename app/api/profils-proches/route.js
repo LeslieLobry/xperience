@@ -10,24 +10,23 @@ export async function POST(req) {
       return NextResponse.json([], { status: 200 });
     }
 
-    const utilisateurs = await prisma.utilisateur.findMany({
-      where: {
-        NOT: {
-          latitude: null,
-          longitude: null,
-        },
-      },
-      select: {
-        id: true,
-        pseudo: true,
-        photoUrl: true,
-        age: true,
-        localisation: true,
-        statut: true,
-        latitude: true,
-        longitude: true,
-      },
-    });
+const utilisateurs = await prisma.utilisateur.findMany({
+  where: {
+    latitude: { not: null },
+    longitude: { not: null },
+  },
+  select: {
+    id: true,
+    pseudo: true,
+    photoUrl: true,
+    age: true,
+    localisation: true,
+    statut: true,
+    latitude: true,
+    longitude: true,
+  },
+});
+
 
     const proches = utilisateurs
       .map((u) => {

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
-import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDiplay";
+import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDisplay";
 
 const secret = process.env.JWT_SECRET;
 

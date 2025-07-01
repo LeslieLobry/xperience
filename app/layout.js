@@ -4,7 +4,6 @@ import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
 import Footer from "../components/Footer/Footer";
-import ChatBubble from "../components/ChatBubble/ChatBubble";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 

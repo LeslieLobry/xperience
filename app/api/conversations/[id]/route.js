@@ -40,7 +40,8 @@ export async function GET(req) {
       },
       include: {
         participants: {
-          include: {
+          where: { supprimé: false },
+          select: {
             utilisateur: {
               select: {
                 id: true,
@@ -51,9 +52,8 @@ export async function GET(req) {
           },
         },
       },
-      orderBy: {
-        updatedAt: "desc",
-      },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
     });
 
     return NextResponse.json({ success: true, conversations });
@@ -62,6 +62,7 @@ export async function GET(req) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
+
 
 export async function DELETE(req, { params }) {
   const decoded = getUserFromToken();

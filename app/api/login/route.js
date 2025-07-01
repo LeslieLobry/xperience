@@ -8,11 +8,26 @@ const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
 export async function POST(req) {
-  console.log("🔐 SECRET =", process.env.JWT_SECRET)
+  const start = Date.now();
+  console.log("⏱️ Login démarré");
+
   try {
     const { email, password } = await req.json();
+    console.log("⏱️ Après req.json()", Date.now() - start);
 
-    const user = await prisma.utilisateur.findUnique({ where: { email } });
+   const user = await prisma.utilisateur.findUnique({
+  where: { email },
+  select: {
+    id: true,
+    email: true,
+    pseudo: true,
+    password: true,
+    role: true,
+    photoUrl: true,
+  },
+});
+
+    console.log("⏱️ Après findUnique", Date.now() - start);
 
     if (!user) {
       return NextResponse.json({ success: false, message: "Utilisateur introuvable" }, { status: 401 });
@@ -23,31 +38,40 @@ export async function POST(req) {
     }
 
     const valid = await bcrypt.compare(password, user.password);
+    console.log("⏱️ Après bcrypt.compare", Date.now() - start);
+
     if (!valid) {
       return NextResponse.json({ success: false, message: "Mot de passe incorrect" }, { status: 401 });
     }
 
-    await prisma.utilisateur.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
+    setTimeout(() => {
+  prisma.utilisateur.update({
+    where: { id: user.id },
+    data: { lastLogin: new Date() },
+    select: { id: true },
+  }).catch(console.error);
+}, 0);
+
+    console.log("⏱️ Après update lastLogin", Date.now() - start);
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role },
+      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role, photoUrl: user.photoUrl,},
       secret,
       { expiresIn: "7d" }
     );
+    console.log("⏱️ Après jwt.sign", Date.now() - start);
 
     const response = NextResponse.json({ success: true });
 
-    // ✅ Envoie cookie sécurisé
     response.cookies.set("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // ✅ true en prod
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 joursdomain: ",
+      maxAge: 60 * 60 * 24 * 7,
     });
+
+    console.log("⏱️ Fin totale login", Date.now() - start);
 
     return response;
   } catch (error) {
