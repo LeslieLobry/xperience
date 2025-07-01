@@ -44,13 +44,20 @@ export default function ConnexionPage() {
       const data = await res.json();
 
       if (data.success) {
-        setSuccess("Connexion réussie !");
-        // Mets à jour le contexte utilisateur avec les données reçues si possible
-        // Par exemple : setUser(data.user);
-        // Sinon, tu peux faire fetchUser() mais ça ralentit un peu
+  // Précharge les données accueil
+ const initRes = await fetch("/api/init", {
+  credentials: "include",
+});
+  const initData = await initRes.json();
 
-        router.replace("/accueil-page"); // redirige vite sans garder l’historique
-      } else {
+  if (initData.success) {
+    setUser(initData.utilisateur); // met à jour le contexte
+    // Tu peux stocker initData.conversations, notifications, etc. aussi si besoin
+  }
+
+  setSuccess("Connexion réussie !");
+  router.replace("/accueil-page");
+} else {
         setError(data.message);
       }
     } catch (err) {

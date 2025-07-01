@@ -1,21 +1,17 @@
 import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 
 // POST /api/conversations
 export async function POST(req) {
   try {
-    const cookieStore = await cookies();
-    const currentUser = await getUserFromToken(cookieStore);
-
+    const currentUser = await getUserFromToken();
     if (!currentUser) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { participantIds } = body;
+    const { participantIds } = await req.json();
 
     if (!Array.isArray(participantIds) || participantIds.length < 2) {
       return NextResponse.json({ error: "Participants invalides" }, { status: 400 });
@@ -25,7 +21,6 @@ export async function POST(req) {
       return NextResponse.json({ error: "Tu dois faire partie des participants." }, { status: 403 });
     }
 
-    // Vérifie les utilisateurs exclus
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = participantIds.filter((id) => id !== currentUser.id);
 
@@ -36,7 +31,6 @@ export async function POST(req) {
       );
     }
 
-    // Vérifie si une conversation avec exactement les mêmes participants existe déjà
     const conversationsPotentielles = await prisma.conversation.findMany({
       where: {
         participants: {
@@ -48,17 +42,16 @@ export async function POST(req) {
       },
     });
 
+    const inputIdsSorted = [...participantIds].sort();
     const existingConversation = conversationsPotentielles.find((conv) => {
-      const ids = conv.participants.map((p) => p.utilisateurId).sort();
-      const inputIds = [...participantIds].sort();
-      return JSON.stringify(ids) === JSON.stringify(inputIds);
+      const idsSorted = conv.participants.map((p) => p.utilisateurId).sort();
+      return JSON.stringify(idsSorted) === JSON.stringify(inputIdsSorted);
     });
 
     if (existingConversation) {
       return NextResponse.json({ conversation: existingConversation, existed: true });
     }
 
-    // Crée une nouvelle conversation
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
@@ -66,7 +59,13 @@ export async function POST(req) {
         },
       },
       include: {
-        participants: { include: { utilisateur: true } },
+        participants: {
+          include: {
+            utilisateur: {
+              select: { id: true, pseudo: true, photoUrl: true },
+            },
+          },
+        },
       },
     });
 
@@ -77,17 +76,15 @@ export async function POST(req) {
   }
 }
 
-// GET /api/conversations?userId=xxx
-export async function GET(req) {
+// GET /api/conversations
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const userIdParam = searchParams.get("userId");
-    const userId = userIdParam ? parseInt(userIdParam, 10) : null;
-
-    if (!userId || isNaN(userId)) {
-      return NextResponse.json({ error: "Paramètre userId requis ou invalide" }, { status: 400 });
+    const currentUser = await getUserFromToken();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
+    const userId = currentUser.id;
     const exclus = await getIdsUtilisateursExclus(userId);
 
     const conversations = await prisma.conversation.findMany({
@@ -97,10 +94,24 @@ export async function GET(req) {
         },
       },
       include: {
-        participants: { include: { utilisateur: true } },
+        participants: {
+          include: {
+            utilisateur: {
+              select: { id: true, pseudo: true, photoUrl: true },
+            },
+          },
+        },
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
+          select: {
+            id: true,
+            contenu: true,
+            type: true,
+            createdAt: true,
+            auteurId: true,
+            lu: true,
+          },
         },
       },
       orderBy: { updatedAt: "desc" },

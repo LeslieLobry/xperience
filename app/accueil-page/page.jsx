@@ -2,19 +2,18 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
+import { prisma } from "../../lib/prisma";
+import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 import ProfilsDisplayServer from "../../components/ProfilsDisplayServer/ProfilsDisplayServer";
-import DerniersArticlesServer from "../../components/DerniersArticlesServer/DerniersArticlesServer";
-import DerniersEvenementsServer from "../../components/DerniersEvenementsServer/DerniersEvenementsServer";
-
+import DerniersArticles from "../../components/DerniersArticles/DerniersArticles";
+import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
 
 import { Suspense } from "react";
 import "./accueil.css";
-
-import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -32,8 +31,36 @@ export default async function AccueilPage() {
     return redirect("/verif-identite-obligatoire");
   }
 
-  // Lance la récupération des exclus en parallèle sans attendre
+  // Préchargement côté serveur
   const exclusPromise = getIdsUtilisateursExclus(user.id);
+
+  const [articles, evenements] = await Promise.all([
+    prisma.article.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      select: {
+        id: true,
+        titre: true,
+        slug: true,
+        createdAt: true,
+        images: {
+          take: 1,
+          select: { url: true },
+        },
+      },
+    }),
+    prisma.evenement.findMany({
+      orderBy: [{ date: "desc" }],
+      take: 3,
+      select: {
+        id: true,
+        titre: true,
+        imageUrl: true,
+        date: true,
+        lieu: true,
+      },
+    }),
+  ]);
 
   return (
     <div className="accueil-page">
@@ -55,15 +82,11 @@ export default async function AccueilPage() {
         </div>
 
         <div className="grid-articles">
-          <Suspense fallback={<p>Chargement des articles...</p>}>
-            <DerniersArticlesServer />
-          </Suspense>
+          <DerniersArticles articles={articles} />
         </div>
 
         <div className="grid-event">
-          <Suspense fallback={<p>Chargement des événements...</p>}>
-            <DerniersEvenementsServer />
-          </Suspense>
+          <DerniersEvenements evenements={evenements} />
         </div>
       </div>
     </div>

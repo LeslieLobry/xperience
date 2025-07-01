@@ -6,38 +6,53 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [evenements, setEvenements] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ Memoïser fetchUser avec useCallback pour stabilité
-const fetchUser = useCallback(async () => {
-  try {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    const data = await res.json();
-        if (data.success && data.user) {
-      setUser(data.user);
-      return data.user;
-    } else {
+  // Memoïser fetchUser (pas fetchInit)
+  const fetchUser = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/init', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.utilisateur);
+        setConversations(data.conversations);
+        setNotifications(data.notifications);
+        setArticles(data.articles);
+        setEvenements(data.evenements);
+        return data.utilisateur;  // optionnel, utile pour await
+      } else {
+        setUser(null);
+        return null;
+      }
+    } catch (err) {
+      console.error("❌ fetchUser error :", err);
       setUser(null);
       return null;
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("❌ fetchUser() error :", err);
-    setUser(null);
-    return null;
-  }
-}, []);
+  }, []);
 
   const logout = async () => {
-  try {
-    await fetch('/api/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    setUser(null);
-  } catch (err) {
-    console.error("❌ Erreur logout :", err);
-  }
-};
-
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      setUser(null);
+      setConversations([]);
+      setNotifications([]);
+      setArticles([]);
+      setEvenements([]);
+    } catch (err) {
+      console.error("❌ Erreur logout :", err);
+    }
+  };
 
   const updateUser = (updatedFields) => {
     setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
@@ -45,10 +60,23 @@ const fetchUser = useCallback(async () => {
 
   useEffect(() => {
     fetchUser();
-  }, [fetchUser]); 
+  }, [fetchUser]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, fetchUser, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        setUser,
+        conversations,
+        notifications,
+        articles,
+        evenements,
+        loading,
+        logout,
+        fetchUser,  // <-- corrige ici, exporte fetchUser
+        updateUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

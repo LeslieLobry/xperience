@@ -1,12 +1,11 @@
 import { prisma } from "../../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 import { getUserFromToken } from "../../../lib/auth";
-import { cookies } from "next/headers";
 import { resend } from "../../../lib/resend";
 import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
- 
+
 // Config S3
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -17,11 +16,12 @@ const s3 = new S3Client({
 });
 const BUCKET = process.env.AWS_S3_BUCKET_NAME;
 
+// POST /api/messages
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
 
   try {
-    const contentType = req.headers.get("content-type");
+    const contentType = req.headers.get("content-type") || "";
     let body = {};
     let file = null;
 
@@ -41,7 +41,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Type non supporté" }, { status: 400 });
     }
 
-    // Upload image sur S3 si fichier fourni
+    // Upload S3 si fichier fourni
     if (file && file.size > 0) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const ext = file.name.split(".").pop();
@@ -57,14 +57,10 @@ export async function POST(req) {
     }
 
     const { conversationId, contenu, imageUrl, videoUrl, type } = body;
-
-    const user = await getUserFromToken(cookies());
-    if (!user) {
-      return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
-    }
+    const user = await getUserFromToken();
+    if (!user) return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
 
     const auteurId = user.id;
-
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
@@ -79,28 +75,29 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
-const message = await prisma.message.create({
-  data: {
-    conversationId,
-    auteurId,
-    contenu,
-    imageUrl,
-    videoUrl,
-    type,
-    duree: null,
-    lu: false,
-  },
-  include: {
-    auteur: true,
-    reactions: {
-      select: {
-        emoji: true,
-        utilisateurId: true,
+    const message = await prisma.message.create({
+      data: {
+        conversationId,
+        auteurId,
+        contenu,
+        imageUrl,
+        videoUrl,
+        type,
+        duree: null,
+        lu: false,
       },
-    },
-  },
-});
-
+      include: {
+        auteur: {
+          select: { id: true, pseudo: true },
+        },
+        reactions: {
+          select: {
+            emoji: true,
+            utilisateurId: true,
+          },
+        },
+      },
+    });
 
     await prisma.conversation.update({
       where: { id: conversationId },
@@ -120,7 +117,7 @@ const message = await prisma.message.create({
       )
     );
 
-    // Envoi d'e-mail si destinataire hors ligne
+    // Envoi email si destinataire hors ligne
     (async () => {
       try {
         const participantsWithUser = await prisma.participant.findMany({
@@ -130,6 +127,7 @@ const message = await prisma.message.create({
         const destinataire = participantsWithUser
           .map(p => p.utilisateur)
           .find(u => u.id !== auteurId);
+
         if (!destinataire || destinataire.statut === "en_ligne" || !destinataire.email) return;
 
         const extrait = (contenu || "")
@@ -154,13 +152,7 @@ const message = await prisma.message.create({
       }
     })();
 
-    return NextResponse.json({
-      success: true,
-      message: {
-        ...message,
-        conversationId: message.conversationId,
-      },
-    }, { status: 200 });
+    return NextResponse.json({ success: true, message }, { status: 200 });
 
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
@@ -168,84 +160,69 @@ const message = await prisma.message.create({
   }
 }
 
+// GET /api/messages
 export async function GET(req) {
- 
   try {
     const { searchParams } = new URL(req.url);
-    const conversationId = parseInt(searchParams.get("conversationId"), 10);
+    const conversationId = parseInt(searchParams.get("conversationId") || "", 10);
+    const beforeId = searchParams.get("beforeId");
+    const limit = parseInt(searchParams.get("limit") || "30", 10);
 
-    const cookieStore = cookies();
-    const user = await getUserFromToken(cookieStore);
+    const user = await getUserFromToken();
     if (!user) {
       return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
 
     const auteurId = user.id;
 
-    // Vérifie blocage
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
 
     const autresParticipants = participants
-      .map((p) => p.utilisateurId)
-      .filter((id) => id !== auteurId);
+      .map(p => p.utilisateurId)
+      .filter(id => id !== auteurId);
 
     const exclus = await getIdsUtilisateursExclus(auteurId);
-    const estBloque = autresParticipants.some((id) => exclus.includes(id));
-    if (estBloque) {
-      return NextResponse.json(
-        { success: false, message: "Accès refusé à cette conversation." },
-        { status: 403 }
-      );
+    if (autresParticipants.some(id => exclus.includes(id))) {
+      return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
-const destinataire =
-  autresParticipants.length === 1
-    ? await prisma.utilisateur.findUnique({
-        where: { id: autresParticipants[0] },
-        select: {
-          id: true,
-          pseudo: true,
-          photoUrl: true,
-        },
-      })
-    : null;
 
-const beforeId = searchParams.get("beforeId");
-const limit = parseInt(searchParams.get("limit") || "30", 10);
+    const destinataire = autresParticipants.length === 1
+      ? await prisma.utilisateur.findUnique({
+          where: { id: autresParticipants[0] },
+          select: { id: true, pseudo: true, photoUrl: true },
+        })
+      : null;
 
-const messages = await prisma.message.findMany({
-  where: {
-    conversationId,
-    ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
-  },
-  orderBy: { id: "desc" },
-  take: limit,
-  include: {
-    auteur: true,
-    reactions: {
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
+      },
+      orderBy: { id: "desc" },
+      take: limit,
       include: {
-        utilisateur: {
-          select: { pseudo: true },
+        auteur: {
+          select: { id: true, pseudo: true, photoUrl: true },
+        },
+        reactions: {
+          include: {
+            utilisateur: {
+              select: { pseudo: true },
+            },
+          },
         },
       },
-    },
-  },
-});
+    });
 
-messages.reverse(); // pour afficher dans l’ordre chronologique
-    return NextResponse.json(
-  { success: true, messages, destinataire },
-  { status: 200 }
-);
+    messages.reverse(); // Chronologique (du plus ancien au plus récent)
 
+    return NextResponse.json({ success: true, messages, destinataire }, { status: 200 });
 
   } catch (error) {
     console.error("Erreur dans GET /api/messages :", error);
-    return NextResponse.json(
-      { success: false, message: "Impossible de récupérer les messages." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
   }
 }

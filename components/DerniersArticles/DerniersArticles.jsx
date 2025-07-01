@@ -1,27 +1,10 @@
-"use server";
-
-import { prisma } from "../../lib/prisma";
+// components/DerniersArticles/DerniersArticles.jsx
 import Link from "next/link";
 import Image from "next/image";
-import "../DerniersArticles/DerniersArticles.css";
+import "./DerniersArticles.css";
 
-export default async function DerniersArticlesServer() {
-  const articles = await prisma.article.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 4,
-    select: {
-      id: true,
-      titre: true,
-      slug: true,
-      createdAt: true,
-      images: {
-        take: 1,
-        select: { url: true },
-      },
-    },
-  });
-
-  if (!articles.length) return <p className="articles-empty">Aucun article trouvé.</p>;
+export default function DerniersArticles({ articles }) {
+  if (!articles?.length) return <p className="articles-empty">Aucun article trouvé.</p>;
 
   return (
     <section className="dernier-articles-section">

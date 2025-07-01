@@ -1,22 +1,10 @@
-import { prisma } from "../../lib/prisma";
+// components/DerniersEvenements/DerniersEvenements.jsx
 import Link from "next/link";
 import Image from "next/image";
-import "../DerniersEvenements/DerniersEvenements.css";
+import "./DerniersEvenements.css";
 
-export default async function DerniersEvenementsServer() {
-  const evenements = await prisma.evenement.findMany({
-    orderBy: [{ date: "desc" }],
-    take: 3,
-    select: {
-      id: true,
-      titre: true,
-      imageUrl: true,
-      date: true,
-      lieu: true,
-    },
-  });
-
-  if (!evenements.length) {
+export default function DerniersEvenements({ evenements }) {
+  if (!evenements?.length) {
     return (
       <section className="evenements-section">
         <h2 className="events-title">Derniers événements</h2>

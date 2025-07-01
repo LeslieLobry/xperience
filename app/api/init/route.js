@@ -25,87 +25,82 @@ export async function GET() {
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
+
   const userId = decoded.id;
 
   try {
-    // Récupération utilisateur (sélectif)
-    const utilisateur = await prisma.utilisateur.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        pseudo: true,
-        email: true,
-        photoUrl: true,
-        role: true,
-        age: true,
-        localisation: true,
-      },
-    });
+    const [
+      utilisateur,
+      conversations,
+      notifications,
+      articles,
+      evenements
+    ] = await Promise.all([
+      prisma.utilisateur.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          pseudo: true,
+          email: true,
+          photoUrl: true,
+          role: true,
+          age: true,
+          localisation: true,
+        },
+      }),
 
-    // Conversations récentes (limit 10)
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        participants: {
-          some: {
-            utilisateurId: userId,
-            supprimé: false,
+      prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: { utilisateurId: userId, supprimé: false },
           },
         },
-      },
-      include: {
-        participants: {
-          include: {
-            utilisateur: {
-              select: { id: true, pseudo: true, photoUrl: true },
+        include: {
+          participants: {
+            where: { supprimé: false },
+            take: 2, // max 2 participants
+            select: {
+              utilisateurId: true,
+              utilisateur: {
+                select: { id: true, pseudo: true, photoUrl: true },
+              },
             },
           },
         },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 10,
-    });
+        orderBy: { updatedAt: "desc" },
+        take: 10,
+      }),
 
-    // Notifications non lues (limit 10)
-    const notifications = await prisma.notification.findMany({
-      where: { utilisateurId: userId, lu: false },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        message: true,
-        lien: true,
-        createdAt: true,
-      },
-    });
+      prisma.notification.findMany({
+        where: { utilisateurId: userId, lu: false },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, message: true, lien: true, createdAt: true },
+      }),
 
-    // Derniers articles (limit 5)
-    const articles = await prisma.article.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        titre: true,
-        slug: true,
-        createdAt: true,
-        images: {
-          take: 1,
-          select: { url: true },
+      prisma.article.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: {
+          images: {
+            take: 1,
+            select: { url: true },
+          },
         },
-      },
-    });
+      }),
 
-    // Derniers événements (limit 5)
-    const evenements = await prisma.evenement.findMany({
-      orderBy: { date: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        titre: true,
-        imageUrl: true,
-        date: true,
-        lieu: true,
-      },
-    });
+      prisma.evenement.findMany({
+        orderBy: { date: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          titre: true,
+          imageUrl: true,
+          date: true,
+          lieu: true,
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -116,7 +111,7 @@ export async function GET() {
       evenements,
     });
   } catch (err) {
-    console.error("Erreur /api/init :", err);
+    console.error("❌ Erreur /api/init :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

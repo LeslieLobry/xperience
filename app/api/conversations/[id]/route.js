@@ -1,39 +1,20 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import jwt from "jsonwebtoken";
+import { getUserFromToken } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-function getUserFromToken() {
-  const headerList = headers();
-  const cookieHeader = headerList.get("cookie") || "";
-  const tokenMatch = cookieHeader.match(/token=([^;]+)/);
-  const token = tokenMatch?.[1];
-
-  if (!token || !JWT_SECRET) return null;
-
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
-
+// GET /api/conversations/[id] — inutile si déjà dans /api/conversations
 export async function GET(req) {
-  const decoded = getUserFromToken();
-  if (!decoded) {
+  const user = await getUserFromToken();
+  if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
-
-  const userId = decoded.id;
 
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
-            utilisateurId: userId,
+            utilisateurId: user.id,
             supprimé: false,
           },
         },
@@ -63,27 +44,23 @@ export async function GET(req) {
   }
 }
 
-
+// DELETE /api/conversations/[id]
 export async function DELETE(req, { params }) {
-  const decoded = getUserFromToken();
-  if (!decoded) {
+  const user = await getUserFromToken();
+  if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const userId = decoded.id;
-  const conversationId = params?.id;
-
-  console.log("🧪 Suppression conversationId =", conversationId);
-
-  if (!conversationId) {
-    return NextResponse.json({ error: "ID de conversation manquant" }, { status: 400 });
+  const conversationId = parseInt(params?.id);
+  if (!conversationId || isNaN(conversationId)) {
+    return NextResponse.json({ error: "ID de conversation invalide" }, { status: 400 });
   }
 
   try {
     const participant = await prisma.participant.findFirst({
       where: {
         conversationId,
-        utilisateurId: userId,
+        utilisateurId: user.id,
       },
     });
 

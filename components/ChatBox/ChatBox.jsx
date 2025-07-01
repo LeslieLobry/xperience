@@ -2,29 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
-import ChatHeader from "./ChatHeader";
-import MessageBubble from "./MessageBubble";
-import ChatInput from "../ChatInput/ChatInput";
 import dynamic from "next/dynamic";
-import "./ChatBox.css";
+import ChatInput from "../ChatInput/ChatInput";
+import Spinner from "../Spinner/Spinner";
+
 import { useMessages } from "../../hook/useMessages";
 import { useTyping } from "../../hook/useTyping";
-import MessagesList from "../MessagesList";
-import Spinner from "../Spinner/Spinner";
-import NotificationAppelEntrant from "../NotificationAppelEntrant/NotificationAppelEntrant";
+import "./ChatBox.css";
 
-const VideoCallView = dynamic(() => import("../VideoCallView/VideoCallView"), {
-  ssr: false,
-  loading: () => <p>Chargement appel...</p>,
-});
-
-const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), {
-  ssr: false,
-  loading: () => <p>Chargement emojis...</p>,
-});
+const ChatHeader = dynamic(() => import("./ChatHeader"), { ssr: false });
+const MessagesList = dynamic(() => import("../MessagesList"), { ssr: false, loading: () => <Spinner /> });
+const NotificationAppelEntrant = dynamic(() => import("../NotificationAppelEntrant/NotificationAppelEntrant"), { ssr: false });
+const VideoCallView = dynamic(() => import("../VideoCallView/VideoCallView"), { ssr: false });
+const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), { ssr: false });
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
-
 let Room, createLocalTracks;
 
 export default function ChatBox({ conversationId, utilisateur }) {
@@ -32,15 +24,13 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inCall, setInCall] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [lastReads, setLastReads] = useState([]);
-  const mediaRecorderRef = useRef(null);
-  const audioChunks = useRef([]);
-  const [hasMore, setHasMore] = useState(false);
   const [room, setRoom] = useState(null);
   const [remoteTracks, setRemoteTracks] = useState([]);
   const [appelEntrant, setAppelEntrant] = useState(null);
   const sonnerieRef = useRef(null);
   const appelTimeoutRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunks = useRef([]);
 
   const {
     messages,
@@ -49,25 +39,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
     envoyerMessage,
     handleReaction,
     loadMoreMessages,
+    hasMore,
   } = useMessages(conversationId, utilisateur, setTexte);
 
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
-
-  useEffect(() => {
-    async function fetchLastReads() {
-      if (!conversationId) return;
-      try {
-        const res = await fetch(`/api/last-reads?conversationId=${conversationId}`);
-        const data = await res.json();
-        if (data.success) {
-          setLastReads(data.lastReads);
-        }
-      } catch (err) {
-        console.error("Erreur fetch lastReads:", err);
-      }
-    }
-    fetchLastReads();
-  }, [conversationId]);
 
   const startCall = async (video = true) => {
     if (!Room || !createLocalTracks) {
@@ -92,7 +67,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
     }
 
     const token = data.token;
-
     const newRoom = new Room();
     setRoom(newRoom);
 
@@ -103,19 +77,16 @@ export default function ChatBox({ conversationId, utilisateur }) {
       ]);
     });
 
-    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+    newRoom.on("trackUnsubscribed", (_, __, participant) => {
       setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
     });
 
     const localTracks = await createLocalTracks({ audio: true, video });
     const localVideoTrack = localTracks.find((t) => t.kind === "video");
-    if (localVideoTrack) {
-      window.localVideoTrack = localVideoTrack;
-    }
+    if (localVideoTrack) window.localVideoTrack = localVideoTrack;
 
     await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
     localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-
     setInCall(true);
 
     participantsAutres.forEach((p) => {
@@ -129,14 +100,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   const hangupCall = () => {
     if (room) {
-      const localTracks = room.localParticipant?.tracks;
-      localTracks?.forEach((publication) => {
-        const track = publication.track;
-        if (track) {
-          track.stop();
-          room.localParticipant.unpublishTrack(track);
-        }
-      });
+      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
       room.disconnect();
       setRoom(null);
       setRemoteTracks([]);
@@ -155,9 +119,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
       audioChunks.current = [];
 
       mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunks.current.push(event.data);
       };
 
       mediaRecorderRef.current.onstop = async () => {
@@ -180,23 +142,15 @@ export default function ChatBox({ conversationId, utilisateur }) {
         formData.append("type", "AUDIO");
         formData.append("duree", duree);
 
-        const res = await fetch("/api/messages/audio", {
-          method: "POST",
-          body: formData,
-        });
-
+        const res = await fetch("/api/messages/audio", { method: "POST", body: formData });
         const data = await res.json();
-        if (data.success) {
-          setMessages((prev) => [...prev, data.message]);
-        } else {
-          console.warn("❌ Échec de l’envoi audio :", data);
-        }
+        if (data.success) setMessages((prev) => [...prev, data.message]);
       };
 
       mediaRecorderRef.current.start();
       setRecording(true);
     } catch (err) {
-      console.error("Erreur lors du démarrage de l’enregistrement :", err);
+      console.error("Erreur enregistrement :", err);
     }
   };
 
@@ -211,14 +165,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const handleDelete = async (messageId) => {
     try {
       const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Erreur lors de la suppression");
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== messageId));
     } catch (err) {
       console.error("Erreur suppression message :", err);
     }
   };
-
-  // ably listeners ici comme dans ton code (inchangés)
 
   return (
     <div className="chatbox-container">
@@ -245,7 +196,6 @@ export default function ChatBox({ conversationId, utilisateur }) {
           utilisateur={utilisateur}
           onReact={handleReaction}
           typingPseudo={isTyping ? typingPseudo : null}
-          lastReads={lastReads}
           hasMore={hasMore}
           onLoadMore={loadMoreMessages}
           onDelete={handleDelete}
@@ -260,9 +210,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
           setTexte,
           showEmojiPicker,
           setShowEmojiPicker,
-          onMessageSent: async (contenu, type = "TEXTE") => {
-            await envoyerMessage(contenu, type);
-          },
+          onMessageSent: async (contenu, type = "TEXTE") => envoyerMessage(contenu, type),
           onTyping: envoyerTyping,
           startRecording,
           stopRecording,
@@ -282,21 +230,17 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <NotificationAppelEntrant
         appel={appelEntrant}
         onAccepter={(type) => {
-          if (appelTimeoutRef.current) clearTimeout(appelTimeoutRef.current);
+          clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
-          if (sonnerieRef.current) {
-            sonnerieRef.current.pause();
-            sonnerieRef.current.currentTime = 0;
-          }
+          sonnerieRef.current?.pause();
+          sonnerieRef.current.currentTime = 0;
           startCall(type === "video");
         }}
         onRefuser={() => {
-          if (appelTimeoutRef.current) clearTimeout(appelTimeoutRef.current);
+          clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
-          if (sonnerieRef.current) {
-            sonnerieRef.current.pause();
-            sonnerieRef.current.currentTime = 0;
-          }
+          sonnerieRef.current?.pause();
+          sonnerieRef.current.currentTime = 0;
           participantsAutres.forEach((p) => {
             ably.channels.get(`notification-${p.id}`).publish("call:refused", {
               from: utilisateur,

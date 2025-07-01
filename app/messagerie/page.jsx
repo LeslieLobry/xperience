@@ -5,13 +5,12 @@ import { redirect } from "next/navigation";
 import "../../app/messagerie/messagerie.css";
 
 export default async function MessageriePage() {
-  const cookieStore = cookies();
-  const user = await getUserFromToken(cookieStore);
-
+  const user = await getUserFromToken(); 
   if (!user) {
-    return redirect("/connexion");
+    redirect("/connexion");
   }
 
   return <MessagerieClient user={user} />;
 }
+
  
