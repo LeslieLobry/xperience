@@ -2,9 +2,20 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "../../../lib/prisma";
 import jwt from "jsonwebtoken";
-import path from "path";
-import fs from "fs/promises";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { randomUUID } from "crypto";
+
+// Config AWS S3
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+const BUCKET = process.env.AWS_S3_BUCKET;
+const REGION = process.env.AWS_REGION;
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -21,7 +32,7 @@ async function getUserFromCookie() {
   }
 }
 
-// 📥 POST — Créer un événement
+// 📥 POST — Créer un événement (PRODUCTION S3)
 export async function POST(req) {
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
@@ -30,13 +41,13 @@ export async function POST(req) {
 
   const formData = await req.formData();
 
+  // Champs texte
   const titre = formData.get("titre");
   const description = formData.get("description");
   const date = formData.get("date");
   const lieu = formData.get("lieu");
   const type = formData.get("type");
   const acces = formData.get("acces");
-  const image = formData.get("image");
   const latitude = parseFloat(formData.get("latitude")) || null;
   const longitude = parseFloat(formData.get("longitude")) || null;
   const tarifCouple = parseFloat(formData.get("tarifCouple")) || null;
@@ -44,14 +55,16 @@ export async function POST(req) {
   const tarifHomme = parseFloat(formData.get("tarifHomme")) || null;
   const heureDebut = formData.get("heureDebut") || null;
   const heureFin = formData.get("heureFin") || null;
-  const lien = formData.get("lien") || null; // ← ajout du champ lien
+  const lien = formData.get("lien") || null;
 
+  // Champs obligatoires
   if (!titre || !description || !date || !lieu || !type || !acces) {
     return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
   }
 
+  // Image upload sur S3 (ou null)
   let imageUrl = null;
-
+  const image = formData.get("image");
   if (image && image.name) {
     if (!image.type.startsWith("image/")) {
       return NextResponse.json({ error: "Format d’image invalide" }, { status: 400 });
@@ -59,16 +72,26 @@ export async function POST(req) {
 
     try {
       const buffer = Buffer.from(await image.arrayBuffer());
-      const filename = `${Date.now()}_${image.name.replace(/\s/g, "_")}`;
-      const uploadsDir = path.join(process.cwd(), "public/uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
+      // Compression webp
+      const webpBuffer = await sharp(buffer)
+        .resize(800)
+        .webp({ quality: 80 })
+        .toBuffer();
 
-      const imagePath = path.join(uploadsDir, filename);
-      await sharp(buffer).resize({ width: 800 }).toFile(imagePath);
+      const fileName = `evenements/${randomUUID()}.webp`;
 
-      imageUrl = `/uploads/${filename}`;
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: fileName,
+          Body: webpBuffer,
+          ContentType: "image/webp",
+        })
+      );
+
+      imageUrl = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
     } catch (err) {
-      console.error("Erreur traitement image :", err);
+      console.error("Erreur upload S3 :", err);
       return NextResponse.json({ error: "Erreur lors du traitement de l’image" }, { status: 500 });
     }
   }
@@ -90,7 +113,7 @@ export async function POST(req) {
         imageUrl,
         latitude,
         longitude,
-        lien, // ← on inclut le lien ici
+        lien,
         createur: { connect: { id: user.id } },
       },
     });
@@ -102,7 +125,7 @@ export async function POST(req) {
   }
 }
 
-// 📤 GET — Liste des événements (pagination)
+// 📤 GET — Liste des événements (identique à avant)
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
 
