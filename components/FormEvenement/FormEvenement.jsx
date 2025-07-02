@@ -1,8 +1,10 @@
 "use client";
 
+
 import { useState, useEffect } from "react";
 import Button from "../Button/Button";
 import "./FormEvenement.css";
+
 
 export default function FormEvenement({
   initialValues = {},
@@ -27,14 +29,18 @@ export default function FormEvenement({
     ...initialValues,
   });
 
+
   // Ajout latitude/longitude au state
   const [latitude, setLatitude] = useState(initialValues.latitude || "");
   const [longitude, setLongitude] = useState(initialValues.longitude || "");
+  const [pays, setPays] = useState(initialValues.pays || "France");
+
 
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(initialValues.imageUrl || "");
   const [lieuInput, setLieuInput] = useState(initialValues.lieu || "");
   const [citySuggestions, setCitySuggestions] = useState([]);
+
 
   // Mise à jour des valeurs si initialValues change (édition)
   useEffect(() => {
@@ -43,36 +49,63 @@ export default function FormEvenement({
     setLieuInput(initialValues.lieu || "");
     setLatitude(initialValues.latitude || "");
     setLongitude(initialValues.longitude || "");
+    setPays(initialValues.pays || "France");
   }, [initialValues]);
+
 
   // Autocomplétion villes avec géoloc
   useEffect(() => {
-    if (!lieuInput) return setCitySuggestions([]);
+    if (!lieuInput || lieuInput.length < 2) return setCitySuggestions([]);
+
+
     const delayDebounce = setTimeout(() => {
-      fetch(
-        `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
-          lieuInput
-        )}&fields=nom,centre&boost=population&limit=5`
-      )
-        .then((res) => res.json())
-        .then((data) =>
-          setCitySuggestions(
-            data.map((v) => ({
-              nom: v.nom,
-              lat: v.centre?.coordinates?.[1] || "",
-              lon: v.centre?.coordinates?.[0] || "",
-            }))
-          )
+      if (pays === "France") {
+        fetch(
+          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
+            lieuInput
+          )}&fields=nom,centre&boost=population&limit=5`
         )
-        .catch(() => setCitySuggestions([]));
+          .then((res) => res.json())
+          .then((data) =>
+            setCitySuggestions(
+              data.map((v) => ({
+                nom: v.nom,
+                lat: v.centre?.coordinates?.[1] || "",
+                lon: v.centre?.coordinates?.[0] || "",
+              }))
+            )
+          )
+          .catch(() => setCitySuggestions([]));
+      } else if (pays === "Belgium") {
+        fetch(
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(
+            lieuInput
+          )}&country=Belgium&format=json&limit=5`
+        )
+          .then((res) => res.json())
+          .then((data) =>
+            setCitySuggestions(
+              data.map((v) => ({
+                nom: v.display_name,
+                lat: v.lat,
+                lon: v.lon,
+              }))
+            )
+          )
+          .catch(() => setCitySuggestions([]));
+      }
     }, 300);
+
+
     return () => clearTimeout(delayDebounce);
-  }, [lieuInput]);
+  }, [lieuInput, pays]);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -82,14 +115,20 @@ export default function FormEvenement({
     }
   };
 
-  // Quand on sélectionne une ville : on remplit aussi lat/lon
+
+  // Quand on sélectionne une ville : on remplit aussi lat/lon
   const handleCitySelect = (city) => {
-    setForm((prev) => ({ ...prev, lieu: city.nom }));
-    setLieuInput(city.nom);
+    setForm((prev) => ({
+      ...prev,
+      lieu: pays === "France" ? city.nom : city.nom.split(",")[0],
+      pays: pays,
+    }));
+    setLieuInput(pays === "France" ? city.nom : city.nom.split(",")[0]);
     setLatitude(city.lat);
     setLongitude(city.lon);
     setCitySuggestions([]);
   };
+
 
   const generateHeureOptions = () => {
     const options = [];
@@ -104,27 +143,42 @@ export default function FormEvenement({
     return options;
   };
 
+
   // Envoie la latitude/longitude au parent lors de la soumission
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({
       ...form,
+      pays,
       imageFile,
       latitude,
       longitude,
     });
   };
 
+
   return (
     <div className="creer-contenant">
       <h2 className="creer-title">{titre}</h2>
-
       <form
         onSubmit={handleSubmit}
         encType="multipart/form-data"
         className="event-form"
       >
         {error && <p className="error-message">{error}</p>}
+
+
+        {/* Sélecteur de pays */}
+        <select
+          name="pays"
+          value={pays}
+          onChange={e => setPays(e.target.value)}
+          style={{ marginBottom: 8 }}
+        >
+          <option value="France">France</option>
+          <option value="Belgium">Belgique</option>
+        </select>
+
 
         <input
           name="titre"
@@ -133,6 +187,7 @@ export default function FormEvenement({
           onChange={handleChange}
           required
         />
+
 
         <textarea
           name="description"
@@ -143,6 +198,7 @@ export default function FormEvenement({
           required
         />
 
+
         <input
           name="date"
           type="date"
@@ -151,6 +207,7 @@ export default function FormEvenement({
           required
           className="filtre-date"
         />
+
 
         <select
           name="heureDebut"
@@ -166,6 +223,7 @@ export default function FormEvenement({
           ))}
         </select>
 
+
         <select
           name="heureFin"
           onChange={handleChange}
@@ -179,6 +237,7 @@ export default function FormEvenement({
             </option>
           ))}
         </select>
+
 
         <div className="autocomplete-wrapper">
           <input
@@ -199,18 +258,22 @@ export default function FormEvenement({
                   key={city.nom + "-" + i}
                   onClick={() => handleCitySelect(city)}
                 >
-                  {city.nom}
+                  {pays === "France"
+                    ? city.nom
+                    : city.nom.split(",")[0]}
                 </li>
               ))}
             </ul>
           )}
         </div>
 
-        {/* Champs cachés pour latitude/longitude pour debug */}
-        {/* 
+
+        {/* Champs cachés pour latitude/longitude pour debug */}
+        {/*
         <input type="text" value={latitude} readOnly />
-        <input type="text" value={longitude} readOnly /> 
+        <input type="text" value={longitude} readOnly />
         */}
+
 
         <input
           name="lien"
@@ -218,6 +281,7 @@ export default function FormEvenement({
           value={form.lien}
           onChange={handleChange}
         />
+
 
         <input
           name="tarifCouple"
@@ -241,6 +305,7 @@ export default function FormEvenement({
           onChange={handleChange}
         />
 
+
         <input
           type="file"
           accept="image/*"
@@ -249,6 +314,7 @@ export default function FormEvenement({
         {previewUrl && (
           <img src={previewUrl} alt="Aperçu" className="image-preview" />
         )}
+
 
         <select
           name="acces"
@@ -259,6 +325,7 @@ export default function FormEvenement({
           <option value="femmes_couples">Femmes et couples</option>
           <option value="hommes">Hommes seuls acceptés</option>
         </select>
+
 
         <Button
           title={isSubmitting ? "Envoi en cours..." : "Valider"}
@@ -272,3 +339,6 @@ export default function FormEvenement({
     </div>
   );
 }
+
+
+
