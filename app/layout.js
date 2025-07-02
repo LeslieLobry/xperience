@@ -6,7 +6,7 @@ import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
-
+import { Analytics } from "@vercel/analytics/next"
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -45,6 +45,7 @@ export default function RootLayout({ children }) {
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
+         <Analytics /> 
       </body>
     </html>
   );

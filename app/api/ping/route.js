@@ -1,6 +1,8 @@
-export async function POST(req) {
-  const raw = await req.text();
-  console.log("📩 PING reçu :", raw);
+// app/api/ping/route.js
+import { prisma } from "../../../lib/prisma";
 
-  return new Response("ok");
+export async function GET() {
+  // Effectue une toute petite requête (très rapide)
+  await prisma.utilisateur.findFirst({ select: { id: true } });
+  return new Response("pong");
 }

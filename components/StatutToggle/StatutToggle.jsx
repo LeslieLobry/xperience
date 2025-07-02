@@ -7,28 +7,34 @@ export default function StatutToggle({ statut, statutAuto, editable = false, onU
   const [etat, setEtat] = useState(statut);        // "en_ligne" ou "hors_ligne"
   const [auto, setAuto] = useState(statutAuto);    // true ou false
 
-  const toggleStatut = async () => {
-    if (!editable) return;
-
-    const nouveauStatut = etat === "en_ligne" ? "hors_ligne" : "en_ligne";
-
+const toggleStatut = async () => {
+  if (!editable) return;
+  const nouveauStatut = etat === "en_ligne" ? "hors_ligne" : "en_ligne";
+  try {
     const res = await fetch("/api/utilisateur/statut", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         statut: nouveauStatut,
-        statutAuto: false, // ➤ désactive l'automatisme
+        statutAuto: false,
       }),
     });
-
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setEtat(nouveauStatut);
       setAuto(false);
       if (onUpdate) onUpdate({ statut: nouveauStatut, statutAuto: false });
+    } else {
+      alert(data?.error || "Erreur inattendue lors du changement de statut");
     }
-  };
+  } catch (err) {
+    alert("Impossible de changer le statut. (erreur réseau)");
+    console.error(err);
+  }
+};
 
-  const resetAuto = async () => {
+const resetAuto = async () => {
+  try {
     const res = await fetch("/api/utilisateur/statut", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,14 +43,19 @@ export default function StatutToggle({ statut, statutAuto, editable = false, onU
         statutAuto: true,
       }),
     });
-
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setEtat("en_ligne");
       setAuto(true);
       if (onUpdate) onUpdate({ statut: "en_ligne", statutAuto: true });
+    } else {
+      alert(data?.error || "Erreur inattendue lors du retour en auto.");
     }
-  };
-
+  } catch (err) {
+    alert("Impossible d'activer l'auto-statut. (erreur réseau)");
+    console.error(err);
+  }
+};
   return (
     <div className="statut-switch-container">
       <span className="statut-label">

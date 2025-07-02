@@ -161,41 +161,32 @@ export async function POST(req) {
 }
 
 // GET /api/messages
+// GET /api/messages
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const conversationId = parseInt(searchParams.get("conversationId") || "", 10);
     const beforeId = searchParams.get("beforeId");
-    const limit = parseInt(searchParams.get("limit") || "30", 10);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 50);
 
     const user = await getUserFromToken();
     if (!user) {
       return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
-
     const auteurId = user.id;
 
+    // Vérification d’accès
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
-
-    const autresParticipants = participants
-      .map(p => p.utilisateurId)
-      .filter(id => id !== auteurId);
-
+    const autresParticipants = participants.map(p => p.utilisateurId).filter(id => id !== auteurId);
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some(id => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
 
-    const destinataire = autresParticipants.length === 1
-      ? await prisma.utilisateur.findUnique({
-          where: { id: autresParticipants[0] },
-          select: { id: true, pseudo: true, photoUrl: true },
-        })
-      : null;
-
+    // Fetch messages optimisé
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
@@ -203,21 +194,37 @@ export async function GET(req) {
       },
       orderBy: { id: "desc" },
       take: limit,
-      include: {
-        auteur: {
-          select: { id: true, pseudo: true, photoUrl: true },
-        },
+      select: {
+        id: true,
+        contenu: true,
+        imageUrl: true,
+        videoUrl: true,
+        audioUrl: true,
+        duree: true,
+        type: true,
+        createdAt: true,
+        auteurId: true,
+        lu: true,
+        auteur: { select: { id: true, pseudo: true, photoUrl: true } },
         reactions: {
-          include: {
-            utilisateur: {
-              select: { pseudo: true },
-            },
-          },
-        },
+          select: {
+            emoji: true,
+            utilisateurId: true,
+            utilisateur: { select: { pseudo: true } },
+          }
+        }
       },
     });
 
-    messages.reverse(); // Chronologique (du plus ancien au plus récent)
+    messages.reverse(); // Chronologique
+
+    // Destinataire (si besoin)
+    const destinataire = autresParticipants.length === 1
+      ? await prisma.utilisateur.findUnique({
+          where: { id: autresParticipants[0] },
+          select: { id: true, pseudo: true, photoUrl: true }
+        })
+      : null;
 
     return NextResponse.json({ success: true, messages, destinataire }, { status: 200 });
 

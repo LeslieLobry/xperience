@@ -11,9 +11,6 @@ if (!secret) throw new Error("JWT_SECRET non défini");
 export default async function BlogPage() {
   // 🔐 Vérifier l'utilisateur connecté
  const user = await getUserFromToken();
-if (!user) redirect("/connexion");
-
-
   const isAdmin = user?.role === "ADMIN";
 
   // 📄 Récupérer les articles
