@@ -86,12 +86,14 @@ export default function EvenementsPage() {
                 <Link key={event.id} href={`/evenements/${event.id}`} className="event-link">
                   <div className="event-card">
                     <Image
-                      src={event.imageUrl?.startsWith("/") ? event.imageUrl : "/placeholder.jpg"}
+                     src={event.imageUrl && event.imageUrl.length > 8 ? event.imageUrl : "/placeholder.jpg"}
                       alt={event.titre}
                       width={300}
                       height={180}
                       className="event-image"
+                      style={{ objectFit: "cover", borderRadius: 8 }}
                     />
+
                     <div className="event-info">
                       <h3 className="event-info-title">{event.titre}</h3>
                       <p>{new Date(event.date).toISOString().split("T")[0]}</p>
