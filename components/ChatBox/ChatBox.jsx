@@ -11,7 +11,7 @@ import { useTyping } from "../../hook/useTyping";
 import "./ChatBox.css";
 
 const ChatHeader = dynamic(() => import("./ChatHeader"), { ssr: false });
-const MessagesList = dynamic(() => import("../MessagesList"), { ssr: false, loading: () => <Spinner /> });
+import MessagesList from "../MessagesList";
 const NotificationAppelEntrant = dynamic(() => import("../NotificationAppelEntrant/NotificationAppelEntrant"), { ssr: false });
 const VideoCallView = dynamic(() => import("../VideoCallView/VideoCallView"), { ssr: false });
 const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), { ssr: false });
@@ -31,6 +31,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const appelTimeoutRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunks = useRef([]);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+
 
   const {
     messages,
@@ -41,7 +43,9 @@ export default function ChatBox({ conversationId, utilisateur }) {
     loadMoreMessages,
     hasMore,
   } = useMessages(conversationId, utilisateur, setTexte);
-
+  useEffect(() => {
+  if (messages.length) setLoadingInitial(false);
+  }, [messages.length]);
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
   const startCall = async (video = true) => {
@@ -188,7 +192,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
         hangupCall={hangupCall}
       />
 
-      {!messages.length ? (
+      {loadingInitial ? (
         <Spinner />
       ) : (
         <MessagesList
