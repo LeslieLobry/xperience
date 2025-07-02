@@ -5,9 +5,6 @@ import "./blog.css";
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
 
-
-
-
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 

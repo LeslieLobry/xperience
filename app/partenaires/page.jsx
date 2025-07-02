@@ -36,12 +36,6 @@ export default function PagePartenaires() {
   return (
     <div className="page-partenaires">
       <h1 className="titre-page">Nos partenaires</h1>
-
-      {loading ? (
-        <p>Chargement en cours...</p>
-      ) : partenaires.length === 0 ? (
-        <p>Aucun partenaire pour le moment.</p>
-      ) : (
         <div className="cartes-partenaires">
           {partenaires.map((p) => (
             <div className="carte-partenaire" key={p.id}>
@@ -58,7 +52,6 @@ export default function PagePartenaires() {
             </div>
           ))}
         </div>
-      )}
     </div>
   );
 }
