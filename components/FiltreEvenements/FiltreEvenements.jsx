@@ -17,7 +17,6 @@ export default function FiltreEvenements({ onFilterChange }) {
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
 
-  // Met à jour le slider visuellement
   useEffect(() => {
     const rangeEl = document.querySelector(".filtre-range");
     if (rangeEl) {

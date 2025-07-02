@@ -314,8 +314,6 @@ export default function FormEvenement({
         {previewUrl && (
           <img src={previewUrl} alt="Aperçu" className="image-preview" />
         )}
-
-
         <select
           name="acces"
           onChange={handleChange}
@@ -325,8 +323,6 @@ export default function FormEvenement({
           <option value="femmes_couples">Femmes et couples</option>
           <option value="hommes">Hommes seuls acceptés</option>
         </select>
-
-
         <Button
           title={isSubmitting ? "Envoi en cours..." : "Valider"}
           type="submit"
