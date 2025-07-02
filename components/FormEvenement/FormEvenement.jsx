@@ -332,7 +332,7 @@ export default function FormEvenement({
           style={{ marginTop: "1rem" }}
         />
       </form>
-    </div>
+    </div> 
   );
 }
 
