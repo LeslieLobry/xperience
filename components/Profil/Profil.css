@@ -212,3 +212,10 @@ list-style: none;
 .membre-colum{
   display: flex;
 }
+.profil-photo-modal-bg {
+  animation: fadeInPhotoModal 0.18s;
+}
+@keyframes fadeInPhotoModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

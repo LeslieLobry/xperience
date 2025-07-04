@@ -21,13 +21,40 @@ const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), { ssr: f
 const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
 const DemandesAccesGalerie = dynamic(() => import("../DemandesAccesGalerie/DemandesAccesGalerie"), { ssr: false });
 
+// ===== Modal pour afficher la photo en grand =====
+function SimpleModal({ open, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div
+      className="profil-photo-modal-bg"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.85)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        className="profil-photo-modal-img-wrapper"
+        style={{ maxWidth: "90vw", maxHeight: "90vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function calculateProfileCompletion(user) {
   const fields = [
     "pseudo", "email", "orientation", "age",
     "localisation", "description", "photoUrl",
     "taille", "silhouette", "origines"
   ];
-  // Champs pour membre 2 si couple
   if (user.type?.toLowerCase() === "couple") {
     fields.push("age2", "taille2", "silhouette2", "origines2");
   }
@@ -42,7 +69,6 @@ function calculateProfileCompletion(user) {
   return Math.round((completed / fields.length) * 100);
 }
 
-
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
@@ -50,6 +76,7 @@ export default function Profil({ user, connectedUser }) {
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
   const [statut, setStatut] = useState(user.statut);
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
@@ -97,50 +124,70 @@ export default function Profil({ user, connectedUser }) {
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
-         <div className="profil-header-row">
-        <div className="profil-avatar-horizontal">
-          <PhotoUploader priority currentUrl={photoUrl} isOwnProfile={isOwnProfile} onUpload={setPhotoUrl} />
+        <div className="profil-header-row">
+          <div className="profil-avatar-horizontal">
+            {/* Clique = ouvre la lightbox */}
+            <div style={{ cursor: "zoom-in" }} onClick={() => setModalOpen(true)}>
+              <PhotoUploader
+                priority
+                currentUrl={photoUrl}
+                isOwnProfile={isOwnProfile}
+                onUpload={setPhotoUrl}
+              />
+            </div>
+            {/* Affichage modal photo grand */}
+            <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
+              <img
+                src={
+                  photoUrl?.startsWith("http")
+                    ? photoUrl
+                    : photoUrl
+                    ? `/uploads/${photoUrl.replace(/^\/?uploads\//, "")}`
+                    : "/default.jpg"
+                }
+                alt="Photo de profil"
+                style={{
+                  maxWidth: "90vw",
+                  maxHeight: "90vh",
+                  borderRadius: "12px",
+                  boxShadow: "0 8px 32px 0 #0008"
+                }}
+              />
+            </SimpleModal>
+          </div>
+          <div className="profil-name-like">
+            <h1 className="profil-name">
+              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+            </h1>
+            {!isOwnProfile && (
+              <>
+                <button className="btn-envoyer-message" onClick={handleStartConversation}>
+                  <div className="tooltip-container">
+                    <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
+                    <span className="tooltip">Envoyer un message</span>
+                  </div>
+                </button>
+                <BoutonLike cibleId={user.id} />
+                <MenuProfilActions cibleId={user.id} />
+              </>
+            )}
+          </div>
+          <div>
+            <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
+            <div className="profil-badge">{user.type} {user.orientation}</div>
+          </div>
         </div>
-        <div className="profil-name-like">
-      <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
-        {!isOwnProfile && (
-          <>
-            <button className="btn-envoyer-message" onClick={handleStartConversation}>
-              <div className="tooltip-container">
-                <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
-                <span className="tooltip">Envoyer un message</span>
-              </div>
-            </button>
-
-            <BoutonLike cibleId={user.id} />
-            <MenuProfilActions cibleId={user.id} />
-          </>
-        )}
-        </div>
-        <div>
-      <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
-
-      <div className="profil-badge">{user.type} {user.orientation}</div>
-        </div>
-    
-      </div> 
       </div>
       {isOwnProfile && <ProfilCompletionBox user={user} completion={completion} />}
 
       <div className="grid">
         <DescriptionCard editable={isOwnProfile} description={user.description} />
-
         <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriePrivee} editable={isOwnProfile} utilisateurId={user.id} visiteurId={connectedUser.id} />
-
         {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
-
         <PreferencesSummary editable={isOwnProfile} user={user} />
         <ProfilDetailsSummary editable={isOwnProfile} user={user} />
-
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
-
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
     </div>
