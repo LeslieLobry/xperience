@@ -1,7 +1,18 @@
 "use client";
 import React, { useState } from "react";
 import "./recherche-sidebar.css";
+import { usePathname } from "next/navigation";
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+  React.useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [breakpoint]);
+  return isMobile;
+}
 export default function RechercheSidebar({ onSearch }) {
   const [form, setForm] = useState({
     pseudo: "", type: [], orientation: [], rechercheType: [],
@@ -42,6 +53,18 @@ export default function RechercheSidebar({ onSearch }) {
     e.preventDefault();
     onSearch?.(form);
   };
+const isMobile = useIsMobile(768);
+const pathname = usePathname()
+
+if (isMobile && pathname !== "/recherche") {
+    return (
+      <aside className="recherche-sidebar recherche-sidebar--mobile">
+        <a href="/recherche" className="go-recherche-link">
+          🔎 Lancer une recherche avancée
+        </a>
+      </aside>
+    );
+  }
 
   return (
     <aside className="recherche-sidebar">

@@ -205,7 +205,9 @@ list-style: none;
     flex-direction: column;
     gap: 32px;
   }
-  
+  .profil-header-row{
+    flex-direction: column;
+  }
 }
 .membre-colum{
   display: flex;

@@ -71,9 +71,8 @@ export default async function AccueilPage() {
       <LoaderAnnonce />
 
       <div className="grid-accueil">
-        <div className="recherche-sidebar">
-          <RechercheWrapper />
-        </div>
+        <RechercheWrapper />
+      
 
         <div className="profil-list1">
           <Suspense fallback={<p>Chargement des profils...</p>}>

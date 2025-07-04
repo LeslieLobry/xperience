@@ -82,3 +82,27 @@
 .section-group.open {
   margin-bottom: 1rem;
 }
+.recherche-sidebar--mobile {
+  /* Tu peux customiser l'affichage mobile ici */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 120px;
+}
+
+.go-recherche-link {
+  display: inline-block;
+  font-size: 1.1rem;
+  padding: 12px 20px;
+  border-radius: 20px;
+  background: #e0c084;
+  color:#e2e2fa;
+  font-weight: normal;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(70,70,90,0.10);
+  transition: background 0.2s;
+}
+
+.go-recherche-link:hover {
+  background: #e2e2fa;
+}
