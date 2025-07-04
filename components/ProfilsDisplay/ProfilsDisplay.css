@@ -66,6 +66,10 @@
 .switch input:checked + .slider {
   background-color: #8c6a5d;
 }
+.profil-range {
+  accent-color: #e0c084;
+  transition: opacity 0.2s;
+}
 
 .switch input:checked + .slider:before {
   transform: translateX(22px);
@@ -212,4 +216,16 @@
   display: flex;
   width: 100%;
   justify-content: space-around;
+}
+input[type="range"].profil-range {
+  display: inline-block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  width: 120px !important;
+  accent-color: #e0c084;
+  margin: 0 10px !important;
+  background: transparent !important;
+  position: static !important;
+  z-index: 99 !important;
 }
