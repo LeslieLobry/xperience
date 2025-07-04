@@ -33,6 +33,22 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const audioChunks = useRef([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
+  // 👇 Etat pour les prénoms du couple
+  const [prenomsCouple, setPrenomsCouple] = useState(null);
+
+  // Fetch des prénoms du couple pour cette conversation
+  useEffect(() => {
+    if (utilisateur.type !== "couple" || !conversationId) {
+      setPrenomsCouple(null);
+      return;
+    }
+    fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.prenoms) setPrenomsCouple(data.prenoms);
+        else setPrenomsCouple(null);
+      });
+  }, [conversationId, utilisateur.type]);
 
   const {
     messages,
@@ -43,9 +59,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
     loadMoreMessages,
     hasMore,
   } = useMessages(conversationId, utilisateur, setTexte);
+
   useEffect(() => {
-  if (messages.length) setLoadingInitial(false);
+    if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
+  
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
   const startCall = async (video = true) => {
@@ -203,6 +221,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
           hasMore={hasMore}
           onLoadMore={loadMoreMessages}
           onDelete={handleDelete}
+          prenomsCouple={prenomsCouple}  // 👈 Passe à MessagesList
         />
       )}
 
@@ -214,7 +233,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
           setTexte,
           showEmojiPicker,
           setShowEmojiPicker,
-          onMessageSent: async (contenu, type = "TEXTE") => envoyerMessage(contenu, type),
+          onMessageSent: async (contenu, type = "TEXTE", membreParlant) =>
+            envoyerMessage(contenu, type, membreParlant),
           onTyping: envoyerTyping,
           startRecording,
           stopRecording,

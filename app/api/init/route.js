@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
+import { type } from "os";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -23,6 +24,8 @@ function getUserFromToken() {
 export async function GET() {
   const decoded = getUserFromToken();
   if (!decoded) {
+    console.log("UTILISATEUR CHARGÉ:", utilisateur);
+
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
@@ -41,6 +44,7 @@ export async function GET() {
         select: {
           id: true,
           pseudo: true,
+          type:true, 
           email: true,
           photoUrl: true,
           role: true,

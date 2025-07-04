@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
         evenements,
         loading,
         logout,
-        fetchUser,  // <-- corrige ici, exporte fetchUser
+        fetchUser,  
         updateUser,
       }}
     >

@@ -24,6 +24,7 @@ export async function POST(req) {
     password: true,
     role: true,
     photoUrl: true,
+    type: true,
   },
 });
 
@@ -55,7 +56,7 @@ export async function POST(req) {
     console.log("⏱️ Après update lastLogin", Date.now() - start);
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role, photoUrl: user.photoUrl,},
+      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role, photoUrl: user.photoUrl, type:user.type},
       secret,
       { expiresIn: "7d" }
     );

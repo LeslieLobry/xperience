@@ -92,6 +92,7 @@ model Utilisateur {
   evenements           Evenement[]     @relation("Participation")
   visitesFaites     VisiteProfil[] @relation("Visiteur")
   visitesRecues     VisiteProfil[] @relation("Visite")
+  prenomsCouple PrenomCoupleConversation[] 
 
   @@map("Utilisateur")
 }
@@ -206,6 +207,7 @@ model Conversation {
   createdAt    DateTime      @default(now())
   messages     Message[]
   participants Participant[]
+   prenomsCouple PrenomCoupleConversation[] 
     @@map("Conversation")
 }
 
@@ -237,6 +239,7 @@ model Message {
   auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   reactions MessageReaction[] 
+  envoyeur       String?
   @@index([conversationId, id])
   @@map("Message")
 }
@@ -372,3 +375,17 @@ model Partenaire {
 
   @@map("Partenaire")
 }
+model PrenomCoupleConversation {
+  id             Int    @id @default(autoincrement())
+  conversationId Int    @map("conversationid")
+  utilisateurId  Int    @map("utilisateurid")
+  prenom1        String
+  prenom2        String
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
+
+  @@unique([conversationId, utilisateurId])
+  @@map("PrenomCoupleConversation")  // 👈 important !
+}
+

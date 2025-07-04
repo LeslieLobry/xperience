@@ -9,6 +9,7 @@ export default function MessageBubble({
   onReact,
   onDelete,
   emojiPack = "sexy",
+  prenomsCouple = null, // <- NOUVEAU !
 }) {
   const emojiPacks = {
     sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
@@ -50,7 +51,6 @@ export default function MessageBubble({
   const pickerRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Gestion fermeture picker au clic en dehors
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -109,41 +109,53 @@ export default function MessageBubble({
     }, {}) || {}
   );
 
-  return (
-    <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-      {showAuthorInfo && (
-        <div className="author-info">
-          <img
-            src={msg.auteur?.photoUrl || "/default-avatar.png"}
-            alt={msg.auteur?.pseudo}
-            className="author-avatar"
-          />
-          <span className="author-name">{msg.auteur?.pseudo}</span>
-        </div>
-      )}
+  let auteurAffiche = msg.auteur?.pseudo || "Utilisateur";
+if (msg.envoyeur && prenomsCouple) {
+  if (msg.envoyeur === "MEMBRE_1") auteurAffiche = prenomsCouple.prenom1 || "Membre 1";
+  else if (msg.envoyeur === "MEMBRE_2") auteurAffiche = prenomsCouple.prenom2 || "Membre 2";
+  else if (msg.envoyeur === "COUPLE" || msg.envoyeur === "couple") auteurAffiche = "Le couple";
+}
 
-      {msg.type === "IMAGE" && msg.imageUrl ? (
-        <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
-      ) : msg.type === "AUDIO" && msg.audioUrl ? (
-        <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
-      ) : (
+return (
+  <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
+    {showAuthorInfo && (
+      <div className="author-info">
+        <img
+          src={msg.auteur?.photoUrl || "/default-avatar.png"}
+          alt={auteurAffiche}
+          className="author-avatar"
+        />
+        <span className="author-name">{auteurAffiche}</span>
+      </div>
+    )}
+{msg.envoyeur && prenomsCouple && (
+          <div className="author-inline-name">
+            <p>{auteurAffiche} : </p>
+          </div>
+        )}
+    {msg.type === "IMAGE" && msg.imageUrl ? (
+      <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
+    ) : msg.type === "AUDIO" && msg.audioUrl ? (
+      <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
+    ) : (
+      <>
         <p className="message-text">{msg.contenu}</p>
-      )}
+      </>
+    )}
 
       <div className="message-meta">
         <span className="message-time">{heure}</span>
         {isOwn && <span className="message-status">{statutTexte}</span>}
       </div>
       {isOwn && (
-  <button
-    className="delete-message-button"
-    onClick={() => onDelete?.(msg.id)}
-    title="Supprimer ce message"
-  >
-    🗑️
-  </button>
-)}
-
+        <button
+          className="delete-message-button"
+          onClick={() => onDelete?.(msg.id)}
+          title="Supprimer ce message"
+        >
+          🗑️
+        </button>
+      )}
 
       {groupedReactions.length > 0 && (
         <div className="message-reactions">
@@ -217,4 +229,4 @@ export default function MessageBubble({
       </div>
     </div>
   );
-}
+} 

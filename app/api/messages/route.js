@@ -56,7 +56,7 @@ export async function POST(req) {
       body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
     }
 
-    const { conversationId, contenu, imageUrl, videoUrl, type } = body;
+    const { conversationId, contenu, imageUrl, videoUrl, type, envoyeur } = body;
     const user = await getUserFromToken();
     if (!user) return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
 
@@ -85,6 +85,7 @@ export async function POST(req) {
         type,
         duree: null,
         lu: false,
+        envoyeur: envoyeur || null,
       },
       include: {
         auteur: {
@@ -160,8 +161,6 @@ export async function POST(req) {
   }
 }
 
-// GET /api/messages
-// GET /api/messages
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -206,6 +205,7 @@ export async function GET(req) {
         auteurId: true,
         lu: true,
         auteur: { select: { id: true, pseudo: true, photoUrl: true } },
+         envoyeur: true,
         reactions: {
           select: {
             emoji: true,

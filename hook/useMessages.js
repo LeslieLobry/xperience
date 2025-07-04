@@ -46,30 +46,37 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     setIsLoadingMore(false);
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
-  // Envoi d’un message texte
-const envoyerMessage = async (texte) => {
-  if (!texte.trim()) return null;
+  // PATCH : Prend un 3e param "envoyeur" optionnel
+  const envoyerMessage = async (texte, type = "TEXTE", envoyeur) => {
+    if (!texte.trim()) return null;
 
-  const res = await fetch("/api/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, contenu: texte, type: "TEXTE" }),
-  });
+    // Construit dynamiquement selon qu'il y a un envoyeur
+    const payload = {
+      conversationId,
+      contenu: texte,
+      type,
+    };
+    if (envoyeur) payload.envoyeur = envoyeur;
 
-  const data = await res.json();
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-  if (data.success) {
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("message", data.message);
-    setMessages((prev) => [...prev, data.message]);
-    setTexte("");
+    const data = await res.json();
 
-    return data.message; // ✅ AJOUTÉ
-  }
+    if (data.success) {
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("message", data.message);
+      setMessages((prev) => [...prev, data.message]);
+      setTexte("");
 
-  return null; // ✅ Bonne pratique
-};
+      return data.message;
+    }
 
+    return null;
+  };
 
   // Réaction à un message
   const handleReaction = async (messageId, emoji) => {
