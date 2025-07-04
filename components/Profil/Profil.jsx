@@ -27,16 +27,21 @@ function calculateProfileCompletion(user) {
     "localisation", "description", "photoUrl",
     "taille", "silhouette", "origines"
   ];
+  // Champs pour membre 2 si couple
+  if (user.type?.toLowerCase() === "couple") {
+    fields.push("age2", "taille2", "silhouette2", "origines2");
+  }
   let completed = 0;
   for (let field of fields) {
     if (Array.isArray(user[field])) {
       if (user[field].length > 0) completed++;
-    } else if (user[field] && user[field] !== '') {
+    } else if (user[field] && user[field] !== "") {
       completed++;
     }
   }
   return Math.round((completed / fields.length) * 100);
 }
+
 
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();

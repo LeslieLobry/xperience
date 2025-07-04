@@ -1,20 +1,27 @@
 "use client";
 
 export default function ProfilCompletionBox({ user }) {
+  // Ici, tu retires Sexe et Photo de couverture de la liste !
   const profileFields = {
     "Pseudo": user.pseudo,
     "Email": user.email,
-    "Sexe": user.sexe,
     "Orientation": user.orientation,
     "Âge": user.age,
     "Localisation": user.localisation,
     "Description": user.description,
     "Photo de profil": user.photoUrl,
-    "Photo de couverture": user.coverUrl,
     "Taille": user.taille,
     "Silhouette": user.silhouette,
     "Origines": user.origines,
   };
+
+  // Si profil "couple", ajoute les champs du membre 2 (si tu veux)
+  if (user.type?.toLowerCase() === "couple") {
+    profileFields["Âge du/de la partenaire"] = user.age2;
+    profileFields["Taille du/de la partenaire"] = user.taille2;
+    profileFields["Silhouette du/de la partenaire"] = user.silhouette2;
+    profileFields["Origines du/de la partenaire"] = user.origines2;
+  }
 
   const totalFields = Object.keys(profileFields).length;
 
@@ -27,7 +34,6 @@ export default function ProfilCompletionBox({ user }) {
   return (
     <div className="profil-completion-box">
       <h2>Devenez irrésistible, complétez votre profil !</h2>
-
       {completion < 100 ? (
         <>
           <p>Vous avez encore des informations à renseigner :</p>
