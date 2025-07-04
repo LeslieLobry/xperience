@@ -43,17 +43,19 @@ export async function POST(req) {
   };
 
   // Ajout des champs du second membre seulement si couple
-  if (body.type === "Couple") {
-    champsCommun.age2 = isNaN(Number(body.age2)) ? null : Number(body.age2);
-    champsCommun.dateNaissance2 = body.dateNaissance2 ? new Date(body.dateNaissance2) : null;
-    champsCommun.fumeur2 = body.fumeur2;
-    champsCommun.silhouette2 = body.silhouette2;
-    champsCommun.taille2 = isNaN(Number(body.taille2)) ? null : Number(body.taille2);
-    champsCommun.origines2 = body.origines2;
-    champsCommun.yeux2 = body.yeux2;
-    champsCommun.cheveux2 = body.cheveux2;
-    champsCommun.description2 = body.description2;
-  }
+  if (body.type?.trim().toLowerCase() === "couple") {
+  // Ajoute les champs membre 2
+  champsCommun.age2 = isNaN(Number(body.age2)) ? null : Number(body.age2);
+  champsCommun.dateNaissance2 = body.dateNaissance2 ? new Date(body.dateNaissance2) : null;
+  champsCommun.fumeur2 = body.fumeur2;
+  champsCommun.silhouette2 = body.silhouette2;
+  champsCommun.taille2 = isNaN(Number(body.taille2)) ? null : Number(body.taille2);
+  champsCommun.origines2 = body.origines2;
+  champsCommun.yeux2 = body.yeux2;
+  champsCommun.cheveux2 = body.cheveux2;
+  champsCommun.description2 = body.description2;
+}
+console.log("TYPE reçu :", body.type, "Tous les champs :", body);
 
   // Nettoyage des champs
   const data = {};
@@ -68,16 +70,15 @@ export async function POST(req) {
       data[key] = value;
     }
   }
+try {
+  const updatedUser = await prisma.utilisateur.update({
+    where: { id: decoded.id },
+    data,
+  });
 
-  try {
-    await prisma.utilisateur.update({
-      where: { id: decoded.id },
-      data,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("❌ Erreur update-profil :", err);
-    return NextResponse.json({ success: false, message: 'Erreur serveur.' }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, user: updatedUser });
+} catch (err) {
+  console.error("❌ Erreur update-profil :", err);
+  return NextResponse.json({ success: false, message: 'Erreur serveur.' }, { status: 500 });
+}
 }
