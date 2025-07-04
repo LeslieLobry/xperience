@@ -56,7 +56,7 @@ export async function POST(req) {
       body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
     }
 
-    const { conversationId, contenu, imageUrl, videoUrl, type, envoyeur } = body;
+    const { conversationId, contenu, imageUrl, videoUrl, type, envoyeur, prenom1, prenom2 } = body;
     const user = await getUserFromToken();
     if (!user) return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
 
@@ -75,6 +75,15 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
+    // -------- Ajout du prénom membre couple --------
+    let prenomEnvoyeur = null;
+    if (envoyeur && user.type === "couple") {
+  if (envoyeur === "MEMBRE_1") prenomEnvoyeur = prenom1 || "Membre 1";
+  else if (envoyeur === "MEMBRE_2") prenomEnvoyeur = prenom2 || "Membre 2";
+  else if (envoyeur === "COUPLE" || envoyeur === "couple") prenomEnvoyeur = "Le couple";
+}
+    // ----------------------------------------------
+
     const message = await prisma.message.create({
       data: {
         conversationId,
@@ -86,15 +95,17 @@ export async function POST(req) {
         duree: null,
         lu: false,
         envoyeur: envoyeur || null,
+        prenomEnvoyeur: prenomEnvoyeur || null, // <- stocke bien le prénom !
       },
       include: {
         auteur: {
-          select: { id: true, pseudo: true },
+          select: { id: true, pseudo: true, photoUrl: true },
         },
         reactions: {
           select: {
             emoji: true,
             utilisateurId: true,
+            utilisateur: { select: { pseudo: true } }
           },
         },
       },
@@ -205,7 +216,8 @@ export async function GET(req) {
         auteurId: true,
         lu: true,
         auteur: { select: { id: true, pseudo: true, photoUrl: true } },
-         envoyeur: true,
+        envoyeur: true,
+        prenomEnvoyeur: true,
         reactions: {
           select: {
             emoji: true,

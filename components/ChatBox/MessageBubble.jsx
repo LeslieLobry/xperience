@@ -44,7 +44,6 @@ export default function MessageBubble({
     "😮‍💨": "Soupir de plaisir",
     "👄": "Envie de t’embrasser",
   };
-
   const [selectedPack, setSelectedPack] = useState(emojiPack);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -73,21 +72,23 @@ export default function MessageBubble({
   }, [showPicker]);
 
   const isOwn = msg.auteurId === utilisateur.id;
+
+  // Affiche le bloc auteur si changement d’auteur ou de membre (envoyeur ou prénom)
   const showAuthorInfo =
-    !isOwn && (!previousMsg || previousMsg.auteurId !== msg.auteurId);
+    !isOwn &&
+    (
+      !previousMsg ||
+      previousMsg.auteurId !== msg.auteurId ||
+      previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur // Ajoute le prénom comme critère de séparation
+    );
 
   const heure = msg.createdAt
-    ? new Date(msg.createdAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
 
   let statutTexte = "";
   if (isOwn && lastReads) {
-    const autresLecteurs = lastReads.filter(
-      (r) => r.utilisateurId !== utilisateur.id
-    );
+    const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
     const lus = autresLecteurs.filter(
       (r) => r.lastReadAt && new Date(r.lastReadAt) > new Date(msg.createdAt)
     );
@@ -109,39 +110,31 @@ export default function MessageBubble({
     }, {}) || {}
   );
 
-  let auteurAffiche = msg.auteur?.pseudo || "Utilisateur";
-if (msg.envoyeur && prenomsCouple) {
-  if (msg.envoyeur === "MEMBRE_1") auteurAffiche = prenomsCouple.prenom1 || "Membre 1";
-  else if (msg.envoyeur === "MEMBRE_2") auteurAffiche = prenomsCouple.prenom2 || "Membre 2";
-  else if (msg.envoyeur === "COUPLE" || msg.envoyeur === "couple") auteurAffiche = "Le couple";
-}
-
-return (
-  <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-    {showAuthorInfo && (
-      <div className="author-info">
-        <img
-          src={msg.auteur?.photoUrl || "/default-avatar.png"}
-          alt={auteurAffiche}
-          className="author-avatar"
-        />
-        <span className="author-name">{auteurAffiche}</span>
-      </div>
-    )}
-{msg.envoyeur && prenomsCouple && (
-          <div className="author-inline-name">
-            <p>{auteurAffiche} : </p>
+  return (
+    <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
+      {showAuthorInfo && (
+        <div className="author-info">
+          <img
+            src={msg.auteur?.photoUrl || "/default-avatar.png"}
+            alt={msg.auteur?.pseudo || "Utilisateur"}
+            className="author-avatar"
+          />
+          <div>
+            <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+            {msg.prenomEnvoyeur && (
+              <div className="author-inline-name">{msg.prenomEnvoyeur}</div>
+            )}
           </div>
-        )}
-    {msg.type === "IMAGE" && msg.imageUrl ? (
-      <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
-    ) : msg.type === "AUDIO" && msg.audioUrl ? (
-      <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
-    ) : (
-      <>
+        </div>
+      )}
+
+      {msg.type === "IMAGE" && msg.imageUrl ? (
+        <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
+      ) : msg.type === "AUDIO" && msg.audioUrl ? (
+        <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
+      ) : (
         <p className="message-text">{msg.contenu}</p>
-      </>
-    )}
+      )}
 
       <div className="message-meta">
         <span className="message-time">{heure}</span>
@@ -208,7 +201,6 @@ return (
                 ))}
               </select>
             </div>
-
             <div className="reaction-bar">
               {emojiPacks[selectedPack].map((emo) => (
                 <button
@@ -229,4 +221,4 @@ return (
       </div>
     </div>
   );
-} 
+}

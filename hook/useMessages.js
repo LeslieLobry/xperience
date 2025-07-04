@@ -46,8 +46,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     setIsLoadingMore(false);
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
-  // PATCH : Prend un 3e param "envoyeur" optionnel
-  const envoyerMessage = async (texte, type = "TEXTE", envoyeur) => {
+  const envoyerMessage = async (texte, type = "TEXTE", envoyeur, prenom1, prenom2) => {
     if (!texte.trim()) return null;
 
     // Construit dynamiquement selon qu'il y a un envoyeur
@@ -57,7 +56,8 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       type,
     };
     if (envoyeur) payload.envoyeur = envoyeur;
-
+    if (prenom1) payload.prenom1 = prenom1;
+    if (prenom2) payload.prenom2 = prenom2;
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

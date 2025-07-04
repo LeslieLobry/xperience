@@ -35,6 +35,8 @@ export async function GET() {
         cheveux: user.cheveux,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
+        verificationDeadline: user.verificationDeadline,
+        verificationIdentite: user.verificationIdentite,
       },
     });
   } catch (err) {

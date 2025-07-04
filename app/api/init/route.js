@@ -50,6 +50,8 @@ export async function GET() {
           role: true,
           age: true,
           localisation: true,
+          verificationDeadline: true,
+          verificationIdentite: true,
         },
       }),
 
