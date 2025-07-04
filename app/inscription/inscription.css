@@ -66,9 +66,15 @@ select {
     padding: 0.5rem;
     box-sizing: border-box;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid #e0c084;
     background-color: transparent;
-    color: white;
+    color: #e0c084;
+}
+input::placeholder{
+color: #e0c084;
+}
+.form-input::placeholder{
+  color: #e0c084;
 }
 
 .form-buttons {

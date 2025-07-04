@@ -23,20 +23,17 @@ input[type="email"] {
   padding: 0.8rem 1rem;
   border: 1px solid #e0c084;
   border-radius: 8px;
-  font-size: 1rem;
-  background-color: #12172a;
   color: #fff;
 }
 
 input[type="email"]::placeholder {
-  color: #aaa;
+  color: #e0c084;
 }
 
 button[type="submit"] {
   padding: 0.7rem 1.4rem;
   background-color: #e0c084;
-  color: #0d0f2a;
-  font-weight: bold;
+
   border: none;
   border-radius: 8px;
   cursor: pointer;

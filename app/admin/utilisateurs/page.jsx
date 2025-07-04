@@ -66,9 +66,8 @@ export default function AdminUtilisateurs() {
               <td>{u.id}</td>
               <td>{u.pseudo}</td>
               <td>
-  <a href={`mailto:${u.email}`}>{u.email}</a>
-</td>
-
+               <a href={`mailto:${u.email}`}>{u.email}</a>
+              </td>
               <td>{u.role || "utilisateur"}</td>
             </tr>
           ))}

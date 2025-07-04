@@ -36,11 +36,12 @@
 .form-connexion input {
     padding: 25px;
     border-radius: 25px;
-    color: var(--primary);
+    color: #F6D391;
     font-weight: 900;  
     opacity: 1; 
     background-color: transparent;
     border: 2px #F6D391 solid;
+    font-size: 25px;
 }
 .form-connexion ::placeholder{
     color: #F6D391;
@@ -68,4 +69,29 @@
   font-size: 1.5rem;
   cursor: pointer;
   color: #ccc;
+}
+.input-email {
+  color: #63177d !important;            /* Texte violet foncé */
+  border: 2px solid #F6D391 !important; /* Bordure violette */
+  font-weight: 900;
+  font-size: 25px;
+  padding: 25px;
+  border-radius: 25px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.input-email::placeholder {
+  color: #e0c084 !important;   
+  opacity: 1;
+}
+input{
+    font-weight: normal !important;
+}
+.btn-connection{
+    color: white;
+    font-weight: normal;
+    background-color: #e0c084;
+}
+.button-blanc {
+  color: #fff !important;
+  font-weight: 400 !important;
 }

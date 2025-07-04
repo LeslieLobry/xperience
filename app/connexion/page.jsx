@@ -76,16 +76,17 @@ export default function ConnexionPage() {
       {success && <p style={{ color: "green" }}>{success}</p>}
 
       <form onSubmit={handleSubmit} className="form-connexion">
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-          className="form-input"
-          required
-          disabled={loading}
-        />
+      <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      value={form.email}
+      onChange={handleChange}
+      className="input-email"
+      required
+      disabled={loading}
+    />
+
         <div className="input-wrapper">
           <input
             type={showPassword ? "text" : "password"}
@@ -112,6 +113,7 @@ export default function ConnexionPage() {
           title={loading ? "Connexion en cours..." : "Se connecter"}
           color="var(--primary-color)"
           disabled={loading}
+          className="button-blanc"
         />
       </form>
 

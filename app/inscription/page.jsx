@@ -246,7 +246,7 @@ Object.entries({
   return (
     <div className="register-contenant">
       <div className="register-background">
-        <h2 className="form-title">Inscription</h2>
+        <h1 className="form-title">Inscription</h1>
         <p className="form-step">Étape {step} / 3</p>
         <form onSubmit={handleSubmit} className="form-container">
           {error && <p className="form-error">{error}</p>}
