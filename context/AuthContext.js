@@ -37,6 +37,17 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, []);
+const refreshUser = useCallback(async () => {
+  try {
+    const res = await fetch('/api/me', { credentials: 'include' });
+    const data = await res.json();
+    if (data.success && data.utilisateur) {
+      setUser(data.utilisateur);
+    }
+  } catch (err) {
+    console.error('Erreur refreshUser:', err);
+  }
+}, []);
 
   const logout = async () => {
     try {
@@ -75,6 +86,7 @@ export function AuthProvider({ children }) {
         logout,
         fetchUser,  
         updateUser,
+        refreshUser
       }}
     >
       {children}
