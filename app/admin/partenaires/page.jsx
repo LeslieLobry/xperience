@@ -7,7 +7,7 @@ import "./partenaires.css";
 export default function AdminPartenaires() {
   const [user, setUser] = useState(null);
   const [partenaires, setPartenaires] = useState([]);
-  const [form, setForm] = useState({ nom: "", type: "", lien: "" });
+  const [form, setForm] = useState({ nom: "", type: "", lien: "", photo: null, photoUrl: "" });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -47,29 +47,38 @@ export default function AdminPartenaires() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const method = form.id ? "PUT" : "POST";
+  e.preventDefault();
+  const method = form.id ? "PUT" : "POST";
 
-    const res = await fetch("/api/admin/partenaires", {
-      method,
-      body: JSON.stringify(form),
-      headers: { "Content-Type": "application/json" },
-    });
+  const formData = new FormData();
+  if (form.id) formData.append("id", form.id);
+  formData.append("nom", form.nom);
+  formData.append("type", form.type);
+  formData.append("lien", form.lien);
+  if (form.photo) formData.append("photo", form.photo);
 
-    if (res.ok) {
-      setForm({ nom: "", type: "", lien: "" });
-      fetchPartenaires();
-    }
-  };
+  const res = await fetch("/api/admin/partenaires", {
+    method,
+    body: formData,
+  });
 
-  const handleEdit = (p) => {
-    setForm({
-      id: p.id,
-      nom: p.nom,
-      type: p.type,
-      lien: p.lien,
-    });
-  };
+  if (res.ok) {
+    setForm({ nom: "", type: "", lien: "", photo: null, photoUrl: "" });
+    fetchPartenaires();
+  }
+};
+
+const handleEdit = (p) => {
+  setForm({
+    id: p.id,
+    nom: p.nom,
+    type: p.type,
+    lien: p.lien,
+    photo: null,
+    photoUrl: p.photoUrl || "",
+  });
+};
+
 
   const handleDelete = async (id) => {
     if (!confirm("Supprimer ce partenaire ?")) return;
@@ -113,24 +122,45 @@ export default function AdminPartenaires() {
           onChange={(e) => setForm({ ...form, lien: e.target.value })}
           required
         />
+        <input
+        type="file"
+         accept="image/*"
+         onChange={(e) => setForm({ ...form, photo: e.target.files[0] })}
+        />
+
         <button type="submit">{form.id ? "Mettre à jour" : "Ajouter"}</button>
         {form.id && (
-          <button type="button" onClick={() => setForm({ nom: "", type: "", lien: "" })}>
+          <button type="button" onClick={() => setForm({ nom: "", type: "", lien: "",photo: null, photoUrl: "" })}>
             Annuler
           </button>
         )}
       </form>
 
-      <ul className="liste-partenaires">
-        {partenaires.map((p) => (
-          <li key={p.id}>
-            <strong>{p.nom}</strong> — {p.type} —{" "}
-            <a href={p.lien} target="_blank" rel="noreferrer">site</a>{" "}
-            <button onClick={() => handleEdit(p)}>✏️</button>
-            <button onClick={() => handleDelete(p.id)}>❌</button>
-          </li>
-        ))}
-      </ul>
+     <ul className="liste-partenaires">
+  {partenaires.map((p) => (
+    <li key={p.id}>
+      {p.photoUrl && (
+        <img
+          src={p.photoUrl}
+          alt={p.nom}
+          style={{
+            width: 40,
+            height: 40,
+            objectFit: "cover",
+            borderRadius: 8,
+            marginRight: 8,
+            verticalAlign: "middle"
+          }}
+        />
+      )}
+      <strong>{p.nom}</strong> — {p.type} —{" "}
+      <a href={p.lien} target="_blank" rel="noreferrer">site</a>{" "}
+      <button onClick={() => handleEdit(p)}>✏️</button>
+      <button onClick={() => handleDelete(p.id)}>❌</button>
+    </li>
+  ))}
+</ul>
+
     </div>
   );
 }
