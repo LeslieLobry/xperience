@@ -30,7 +30,7 @@ export default function PreferencesSummary({ editable = false, user }) {
 
   return (
     <div className="preference-contenant">
-      <h2>Préférences</h2>
+      <h3>Préférences</h3>
       <div className="ref">
         <div>
           <h3>Je recherche</h3>

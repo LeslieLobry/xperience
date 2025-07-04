@@ -1,26 +1,7 @@
-/* .avis-list {
-  margin-top: 2rem;
-  padding: 1rem;
-  border-radius: 8px;
+ .avis-list {
+  border :1px solid var(--gold);
+   background-color: rgba(255, 255, 255, 0.05);
+  padding: 5px;
+  border-radius: 16px;
 }
 
-.avis-card {
-  border-bottom: 1px solid #ccc;
-  padding: 1rem 0;
-}
-
-.avis-auteur {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.avis-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-
-.avis-text-p{
-  color: #e0c084;
-} */

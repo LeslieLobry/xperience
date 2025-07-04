@@ -7,18 +7,18 @@
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
   color: #e0c084;
   font-family: 'Segoe UI', sans-serif;
+  display: flex; 
+  flex-direction: column;
+  gap: 16px;
 }
 
 .profil-form h2 {
   text-align: center;
-  margin-bottom: 2rem;
   color: #f5e8c7;
 }
 
 .profil-form label {
   display: block;
-  margin-top: 1.5rem;
-  margin-bottom: 0.4rem;
   font-weight: 600;
   color: #f2d28c;
 }
@@ -54,7 +54,6 @@
   width: 100%;
   border: 1px solid #ccc;
   border-radius: 4px;
-  margin-top: 0.3rem;
   max-height: 150px;
   overflow-y: auto;
 }
@@ -76,7 +75,6 @@
 
 .form-actions button {
   flex: 1;
-  margin: 0 0.5rem;
   padding: 0.75rem;
   font-weight: bold;
   background-color: #e0c084;
@@ -92,7 +90,6 @@
 }
 
 .profil-form p {
-  margin-top: 1rem;
   text-align: center;
   color: #b4ffb4;
   font-weight: bold;

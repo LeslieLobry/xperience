@@ -4,6 +4,11 @@
     align-items: flex-start;
     gap: 16px;
     width: 100%;
+    border :1px solid var(--gold);
+    height: 100%;
+    border-radius: 16px;
+    padding: 5px;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 /* Pour le message de confirmation */
 .description-message {

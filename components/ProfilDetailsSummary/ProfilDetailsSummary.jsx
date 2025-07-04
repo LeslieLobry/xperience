@@ -35,7 +35,7 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
 
   return (
     <div className="preference-sum-contenant">
-      <h2>Profil</h2>
+      <h3>Profil</h3>
 
       <div className="pref-details">
         <p className="pref-nom">Ville :</p>

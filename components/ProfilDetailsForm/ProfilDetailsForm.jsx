@@ -163,6 +163,7 @@ export default function ProfilDetailsForm({ onClose, editable = true }) {
         <option value="Relation secrète">Relation secrète</option>
         <option value="Relation à long terme">Relation à long terme</option>
       </select>
+      <h3>Membre 1</h3>
       <input
         type="number"
         name="age"

@@ -92,10 +92,12 @@ export default function Profil({ user, connectedUser }) {
   return (
     <div className="profil-page">
       <div className="profil-header-horizontal">
+         <div className="profil-header-row">
         <div className="profil-avatar-horizontal">
           <PhotoUploader priority currentUrl={photoUrl} isOwnProfile={isOwnProfile} onUpload={setPhotoUrl} />
         </div>
-
+        <div className="profil-name-like">
+      <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
         {!isOwnProfile && (
           <>
             <button className="btn-envoyer-message" onClick={handleStartConversation}>
@@ -109,13 +111,15 @@ export default function Profil({ user, connectedUser }) {
             <MenuProfilActions cibleId={user.id} />
           </>
         )}
-      </div>
-
-      <h1 className="profil-name">{user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}</h1>
-
+        </div>
+        <div>
       <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
 
       <div className="profil-badge">{user.type} {user.orientation}</div>
+        </div>
+    
+      </div> 
+      </div>
       {isOwnProfile && <ProfilCompletionBox user={user} completion={completion} />}
 
       <div className="grid">
