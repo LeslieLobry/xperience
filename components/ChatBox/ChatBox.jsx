@@ -320,6 +320,11 @@ export default function ChatBox({ conversationId, utilisateur }) {
         startCall={startCall}
         hangupCall={hangupCall}
       />
+{isTyping && typingPseudo && (
+  <div className="typing-notif" style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}>
+    {typingPseudo} est en train d&apos;écrire...
+  </div>
+)}
 
       {loadingInitial ? (
         <Spinner />

@@ -45,7 +45,8 @@ export async function GET(req) {
 }
 
 // DELETE /api/conversations/[id]
-export async function DELETE(req, { params }) {
+export async function DELETE(req, context) {
+  const { params } = await context;
   const user = await getUserFromToken();
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

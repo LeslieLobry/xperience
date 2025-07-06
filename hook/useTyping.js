@@ -8,20 +8,22 @@ export function useTyping(conversationId, utilisateur) {
   const [typingPseudo, setTypingPseudo] = useState(null);
 
   useEffect(() => {
+    if (!conversationId || !utilisateur?.id) return;
     const channel = ably.channels.get(`conversation-${conversationId}`);
     const handler = (msg) => {
       if (msg.data.auteurId !== utilisateur.id) {
         setTypingPseudo(msg.data.pseudo);
         setIsTyping(true);
-        setTimeout(() => setIsTyping(false), 3000);
+        setTimeout(() => setIsTyping(false), 2000); // 2 sec pour UX plus réactive
       }
     };
     channel.subscribe("typing", handler);
 
     return () => channel.unsubscribe("typing", handler);
-  }, [conversationId]);
+  }, [conversationId, utilisateur?.id]);
 
   const envoyerTyping = () => {
+    if (!conversationId || !utilisateur?.id) return;
     const channel = ably.channels.get(`conversation-${conversationId}`);
     channel.publish("typing", {
       auteurId: utilisateur.id,

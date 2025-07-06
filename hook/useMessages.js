@@ -8,9 +8,10 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   const [participantsAutres, setParticipantsAutres] = useState([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [lastReads, setLastReads] = useState([]);
   const MESSAGES_LIMIT = 30;
 
-  // Chargement initial
+  // Chargement initial des messages
   useEffect(() => {
     if (!conversationId) return;
     const fetchMessages = async () => {
@@ -27,6 +28,17 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     fetchMessages();
   }, [conversationId]);
 
+  // Chargement initial des statuts de lecture
+  useEffect(() => {
+    if (!conversationId) return;
+    const fetchLastReads = async () => {
+      const res = await fetch(`/api/messages/last-reads?conversationId=${conversationId}`);
+      const data = await res.json();
+      if (data.success) setLastReads(data.lastReads || []);
+    };
+    fetchLastReads();
+  }, [conversationId]);
+
   // Abonnement temps réel Ably pour cette conversation
   useEffect(() => {
     if (!conversationId) return;
@@ -37,6 +49,23 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === msg.data.id);
         if (exists) return prev;
+
+        // Si le message n'est pas de moi, je signale "reçu" et "lu"
+        if (msg.data.auteurId !== utilisateur.id) {
+          // ACK (reçu)
+          fetch("/api/messages/acknowledge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId: msg.data.id }),
+          });
+          // LU (lu)
+          fetch("/api/messages/mark-as-read", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId: msg.data.id }),
+          });
+        }
+
         return [...prev, msg.data];
       });
     };
@@ -56,14 +85,29 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       );
     };
 
+    // Statut de lecture reçu en live (optionnel)
+    const onRead = (msg) => {
+      setLastReads((prev) => {
+        const idx = prev.findIndex(r => r.utilisateurId === msg.data.utilisateurId);
+        if (idx > -1) {
+          const copy = [...prev];
+          copy[idx] = msg.data;
+          return copy;
+        }
+        return [...prev, msg.data];
+      });
+    };
+
     channel.subscribe("message", onMessage);
     channel.subscribe("reaction", onReaction);
+    channel.subscribe("read", onRead);
 
     return () => {
       channel.unsubscribe("message", onMessage);
       channel.unsubscribe("reaction", onReaction);
+      channel.unsubscribe("read", onRead);
     };
-  }, [conversationId]);
+  }, [conversationId, utilisateur.id]);
 
   // Chargement des anciens messages (lazy loading)
   const loadMoreMessages = useCallback(async () => {
@@ -145,5 +189,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     handleReaction,
     hasMore,
     loadMoreMessages,
+    lastReads,  
+    setLastReads,
   };
 }

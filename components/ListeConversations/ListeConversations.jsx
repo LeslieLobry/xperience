@@ -12,20 +12,18 @@ export default function ListeConversations({ userId, onSelectConversation }) {
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  const fetchConversations = async () => {
-    try {
-      const res = await fetch(`/api/conversations?userId=${userId}`);
-      const data = await res.json();
+const fetchConversations = async () => {
+  try {
+    const res = await fetch("/api/conversations");
+    const data = await res.json();
 
-      const visibles = (data.conversations || []).filter((conv) =>
-        conv.participants.some((p) => p.utilisateurId === userId)
-      );
+    // Pas besoin de filtrer : la route API ne retourne QUE les conversations actives du user connecté !
+    setConversations(data.conversations || []);
+  } catch (err) {
+    console.error("❌ Erreur chargement conversations :", err);
+  }
+};
 
-      setConversations(visibles);
-    } catch (err) {
-      console.error("❌ Erreur chargement conversations :", err);
-    }
-  };
 
   useEffect(() => {
     if (!userId) return;

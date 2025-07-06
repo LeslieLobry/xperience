@@ -12,7 +12,7 @@ export default function MessagesList({
   hasMore,
   onLoadMore,
   onDelete,
-  prenomsCouple = null, // 👈 ajout ici !
+  prenomsCouple = null, 
 }) {
   const containerRef = useRef();
 

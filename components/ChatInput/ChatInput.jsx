@@ -25,7 +25,6 @@ export default function ChatInput({
 
   // → Fetch prénoms si utilisateur couple
   useEffect(() => {
-    console.log("utilisateur reçu dans ChatInput :", utilisateur);
     if (utilisateur.type !== "couple") return;
     setLoadingPrenoms(true);
     fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
@@ -63,11 +62,11 @@ export default function ChatInput({
     setLoadingPrenoms(false);
   };
 
-  // → Gère la saisie dans le chat
+  // → Gère la saisie dans le chat + typing
   const handleTyping = (e) => {
     const value = e.target.value;
     setTexte(value);
-    onTyping?.();
+    if (onTyping) onTyping(); // <- Appelle bien la notif typing à chaque frappe
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
@@ -87,9 +86,11 @@ export default function ChatInput({
       await onMessageSent(texte, "TEXTE");
     }
     setTexte("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
   };
 
-  // Affichage
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK ? (
