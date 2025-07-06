@@ -2,8 +2,12 @@ import { prisma } from "../../../../lib/prisma";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { Realtime } from "ably";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const ABLY_API_KEY = process.env.ABLY_API_KEY; // Assure-toi de l'avoir
+
+const ably = new Realtime(ABLY_API_KEY);
 
 async function getUserFromToken() {
   const cookieStore = cookies();
@@ -25,7 +29,6 @@ export async function POST(req) {
     const { messageId } = await req.json();
     if (!messageId) return NextResponse.json({ error: "ID manquant" }, { status: 400 });
 
-    // On récupère la conversation de ce message
     const message = await prisma.message.findUnique({
       where: { id: messageId },
       select: { conversationId: true }
@@ -33,14 +36,22 @@ export async function POST(req) {
 
     if (!message) return NextResponse.json({ error: "Message non trouvé" }, { status: 404 });
 
-    // Marque tous les messages de la conversation comme lus pour ce user (hors ses propres messages)
-    await prisma.message.updateMany({
+    // Met à jour lastReadAt dans participant (indispensable pour statut "vu")
+    await prisma.participant.updateMany({
       where: {
         conversationId: message.conversationId,
-        lu: false,
-        auteurId: { not: user.id }
+        utilisateurId: user.id,
       },
-      data: { lu: true },
+      data: {
+        lastReadAt: new Date(),
+      },
+    });
+
+    // Publie l'événement "read" sur Ably pour informer les autres clients
+    const channel = ably.channels.get(`conversation-${message.conversationId}`);
+    await channel.publish("read", {
+      utilisateurId: user.id,
+      lastReadAt: new Date().toISOString(),
     });
 
     return NextResponse.json({ success: true });

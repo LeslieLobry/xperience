@@ -9,10 +9,9 @@ export async function POST(req) {
   }
 
   try {
-    // Ici, tu peux simplement mettre à jour le champ 'recu' (si tu l’as dans ton schéma)
     await prisma.message.update({
       where: { id: messageId },
-      data: { recu: true },
+      data: { lu: true },
     });
     return NextResponse.json({ success: true });
   } catch (err) {
