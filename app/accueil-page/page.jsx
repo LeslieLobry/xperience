@@ -49,17 +49,18 @@ export default async function AccueilPage() {
         },
       },
     }),
-    prisma.evenement.findMany({
-      orderBy: [{ date: "desc" }],
-      take: 3,
-      select: {
-        id: true,
-        titre: true,
-        imageUrl: true,
-        date: true,
-        lieu: true,
-      },
-    }),
+ prisma.evenement.findMany({
+  orderBy: [{ dateDebut: "desc" }], // <-- mets ici le vrai nom de ton champ date !
+  take: 3,
+  select: {
+    id: true,
+    titre: true,
+    imageUrl: true,
+    dateDebut: true, // <-- pareil ici !
+    lieu: true,
+  },
+}),
+
   ]);
 
   return (
@@ -84,9 +85,9 @@ export default async function AccueilPage() {
           <DerniersArticles articles={articles} />
         </div>
 
-        {/* <div className="grid-event">
+        <div className="grid-event">
           <DerniersEvenements evenements={evenements} />
-        </div> */}
+        </div>
       </div>
     </div>
   );

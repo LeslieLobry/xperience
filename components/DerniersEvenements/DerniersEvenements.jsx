@@ -4,7 +4,28 @@ import Image from "next/image";
 import "./DerniersEvenements.css";
 
 export default function DerniersEvenements({ evenements }) {
-  if (!evenements?.length) {
+  // Date du jour sans les heures
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  // Ne garde que les événements à venir (au moins une date future)
+  const evenementsAVenir = (evenements || [])
+    .map((event) => {
+      // On ne garde que les dates futures pour l'affichage
+      const datesAVenir = (event.dates || []).filter(
+        (d) => new Date(d).setHours(0, 0, 0, 0) >= now.getTime()
+      );
+      datesAVenir.sort((a, b) => new Date(a) - new Date(b));
+      return {
+        ...event,
+        datesAVenir,
+        prochaineDate: datesAVenir[0] || null,
+      };
+    })
+    .filter((event) => event.datesAVenir.length > 0)
+    .sort((a, b) => new Date(a.prochaineDate) - new Date(b.prochaineDate));
+
+  if (!evenementsAVenir.length) {
     return (
       <section className="evenements-section">
         <h2 className="events-title">Derniers événements</h2>
@@ -27,7 +48,7 @@ export default function DerniersEvenements({ evenements }) {
     <section className="evenements-section">
       <h2 className="events-title">Derniers événements</h2>
       <div className="evenements-liste">
-        {evenements.map((event) => (
+        {evenementsAVenir.map((event) => (
           <Link
             key={event.id}
             href={`/evenements/${event.id}`}
@@ -47,15 +68,13 @@ export default function DerniersEvenements({ evenements }) {
             </div>
             <div className="evenement-infos">
               <h3>{event.titre}</h3>
-              {/* Affichage multi-dates : 1 ou plusieurs */}
+              {/* Affichage multi-dates à venir */}
               <small>
-                {Array.isArray(event.dates)
-                  ? event.dates
-                      .map((d) =>
-                        new Date(d).toLocaleDateString("fr-FR")
-                      )
-                      .join(", ")
-                  : "?"}
+                {event.datesAVenir
+                  .map((d) =>
+                    new Date(d).toLocaleDateString("fr-FR")
+                  )
+                  .join(", ")}
               </small>
               <div>{event.lieu}</div>
             </div>
