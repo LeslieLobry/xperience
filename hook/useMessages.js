@@ -11,7 +11,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   const [lastReads, setLastReads] = useState([]);
   const MESSAGES_LIMIT = 30;
 
-  // Chargement initial des messages
+  // Chargement initial des messages ET des statuts de lecture
   useEffect(() => {
     if (!conversationId) return;
     const fetchMessages = async () => {
@@ -23,20 +23,10 @@ export function useMessages(conversationId, utilisateur, setTexte) {
         setMessages(data.messages || []);
         setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
         setHasMore((data.messages || []).length === MESSAGES_LIMIT);
+        setLastReads(data.lastReads || []);  // ← ici !
       }
     };
     fetchMessages();
-  }, [conversationId]);
-
-  // Chargement initial des statuts de lecture
-  useEffect(() => {
-    if (!conversationId) return;
-    const fetchLastReads = async () => {
-      const res = await fetch(`/api/messages/last-reads?conversationId=${conversationId}`);
-      const data = await res.json();
-      if (data.success) setLastReads(data.lastReads || []);
-    };
-    fetchLastReads();
   }, [conversationId]);
 
   // Abonnement temps réel Ably pour cette conversation

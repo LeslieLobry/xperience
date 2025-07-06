@@ -35,6 +35,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const audioChunks = useRef([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
+
   // 👇 Etat pour les prénoms du couple
   const [prenomsCouple, setPrenomsCouple] = useState(null);
 
@@ -153,6 +154,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   const {
     messages,
+    lastReads,
     setMessages,
     participantsAutres,
     envoyerMessage,
@@ -333,6 +335,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
           messages={messages}
           utilisateur={utilisateur}
           onReact={handleReaction}
+          lastReads={lastReads}
           typingPseudo={isTyping ? typingPseudo : null}
           hasMore={hasMore}
           onLoadMore={loadMoreMessages}

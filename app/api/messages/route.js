@@ -188,7 +188,7 @@ export async function GET(req) {
     // Vérification d’accès
     const participants = await prisma.participant.findMany({
       where: { conversationId },
-      select: { utilisateurId: true },
+      select: { utilisateurId: true, lastReadAt: true }, // ⬅️ Ajoute lastReadAt ici !
     });
     const autresParticipants = participants.map(p => p.utilisateurId).filter(id => id !== auteurId);
     const exclus = await getIdsUtilisateursExclus(auteurId);
@@ -238,7 +238,18 @@ export async function GET(req) {
         })
       : null;
 
-    return NextResponse.json({ success: true, messages, destinataire }, { status: 200 });
+    // ⬇️ **Ajoute ce bloc pour retourner lastReads**
+    const lastReads = await prisma.participant.findMany({
+      where: { conversationId },
+      select: { utilisateurId: true, lastReadAt: true },
+    });
+
+    return NextResponse.json({
+      success: true,
+      messages,
+      destinataire,
+      lastReads, // ⬅️ Ajoute au retour
+    }, { status: 200 });
 
   } catch (error) {
     console.error("Erreur dans GET /api/messages :", error);
