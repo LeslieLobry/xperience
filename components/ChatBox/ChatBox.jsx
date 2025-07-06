@@ -27,6 +27,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [room, setRoom] = useState(null);
   const [remoteTracks, setRemoteTracks] = useState([]);
   const [appelEntrant, setAppelEntrant] = useState(null);
+  const [appelRefuse, setAppelRefuse] = useState(false);
+  const [appelOccupe, setAppelOccupe] = useState(false);
   const sonnerieRef = useRef(null);
   const appelTimeoutRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -65,6 +67,76 @@ export default function ChatBox({ conversationId, utilisateur }) {
     // eslint-disable-next-line
   }, [utilisateur?.id]);
 
+  // Listen "call:accepted" pour stopper notif/sonnerie côté appelant
+  useEffect(() => {
+    if (!utilisateur?.id) return;
+    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+    const handleCallAccepted = ({ data }) => {
+      setAppelEntrant(null);
+      setInCall(true);
+      if (sonnerieRef.current) {
+        sonnerieRef.current.pause();
+        sonnerieRef.current.currentTime = 0;
+      }
+      // Si tu veux connecter côté appelant (optionnel, à ajuster selon ton flow)
+      if (!inCall) {
+        startCall(data.type === "video");
+      }
+    };
+
+    channel.subscribe("call:accepted", handleCallAccepted);
+
+    return () => {
+      channel.unsubscribe("call:accepted", handleCallAccepted);
+    };
+    // eslint-disable-next-line
+  }, [utilisateur?.id, inCall]);
+
+  // Listen "call:refused" pour notif refus (appelant)
+  useEffect(() => {
+    if (!utilisateur?.id) return;
+    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+    const handleCallRefused = ({ data }) => {
+      setAppelEntrant(null);
+      setAppelRefuse(true);
+      if (sonnerieRef.current) {
+        sonnerieRef.current.pause();
+        sonnerieRef.current.currentTime = 0;
+      }
+      setTimeout(() => setAppelRefuse(false), 4000);
+    };
+
+    channel.subscribe("call:refused", handleCallRefused);
+
+    return () => {
+      channel.unsubscribe("call:refused", handleCallRefused);
+    };
+  }, [utilisateur?.id]);
+
+  // Listen "call:busy" pour notif occupé (appelant)
+  useEffect(() => {
+    if (!utilisateur?.id) return;
+    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+    const handleCallBusy = ({ data }) => {
+      setAppelEntrant(null);
+      setAppelOccupe(true);
+      if (sonnerieRef.current) {
+        sonnerieRef.current.pause();
+        sonnerieRef.current.currentTime = 0;
+      }
+      setTimeout(() => setAppelOccupe(false), 4000);
+    };
+
+    channel.subscribe("call:busy", handleCallBusy);
+
+    return () => {
+      channel.unsubscribe("call:busy", handleCallBusy);
+    };
+  }, [utilisateur?.id]);
+
   // Fetch des prénoms du couple pour cette conversation
   useEffect(() => {
     if (utilisateur.type !== "couple" || !conversationId) {
@@ -96,6 +168,16 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
   const startCall = async (video = true) => {
+    // Gestion occupé : si déjà en call, prévient l'autre et ne fait rien
+    if (inCall) {
+      participantsAutres.forEach((p) => {
+        ably.channels.get(`notification-${p.id}`).publish("call:busy", {
+          from: utilisateur,
+          room: conversationId,
+        });
+      });
+      return;
+    }
     if (!Room || !createLocalTracks) {
       const livekit = await import("livekit-client");
       Room = livekit.Room;
@@ -287,6 +369,14 @@ export default function ChatBox({ conversationId, utilisateur }) {
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
           sonnerieRef.current.currentTime = 0;
+          // Ajoute l'envoi du signal call:accepted
+          if (appelEntrant?.from?.id) {
+            ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
+              from: utilisateur,
+              room: conversationId,
+              type,
+            });
+          }
           startCall(type === "video");
         }}
         onRefuser={() => {
@@ -294,16 +384,36 @@ export default function ChatBox({ conversationId, utilisateur }) {
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
           sonnerieRef.current.currentTime = 0;
-          participantsAutres.forEach((p) => {
-            ably.channels.get(`notification-${p.id}`).publish("call:refused", {
+          // Ajoute l'envoi du signal call:refused
+          if (appelEntrant?.from?.id) {
+            ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:refused", {
               from: utilisateur,
               room: conversationId,
             });
-          });
+          } else {
+            participantsAutres.forEach((p) => {
+              ably.channels.get(`notification-${p.id}`).publish("call:refused", {
+                from: utilisateur,
+                room: conversationId,
+              });
+            });
+          }
         }}
       />
 
       <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" />
+
+      {/* Notifs refus et occupé */}
+      {appelRefuse && (
+        <div className="call-refused-notif">
+          Appel refusé 📵
+        </div>
+      )}
+      {appelOccupe && (
+        <div className="call-busy-notif">
+          Utilisateur occupé sur un autre appel 🚫
+        </div>
+      )}
     </div>
   );
 }
