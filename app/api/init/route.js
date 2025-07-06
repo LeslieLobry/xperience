@@ -24,8 +24,6 @@ function getUserFromToken() {
 export async function GET() {
   const decoded = getUserFromToken();
   if (!decoded) {
-    console.log("UTILISATEUR CHARGÉ:", utilisateur);
-
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
@@ -37,14 +35,14 @@ export async function GET() {
       conversations,
       notifications,
       articles,
-      evenements
+      evenementsRaw
     ] = await Promise.all([
       prisma.utilisateur.findUnique({
         where: { id: userId },
         select: {
           id: true,
           pseudo: true,
-          type:true, 
+          type: true,
           email: true,
           photoUrl: true,
           role: true,
@@ -64,7 +62,7 @@ export async function GET() {
         include: {
           participants: {
             where: { supprimé: false },
-            take: 2, // max 2 participants
+            take: 2,
             select: {
               utilisateurId: true,
               utilisateur: {
@@ -96,17 +94,30 @@ export async function GET() {
       }),
 
       prisma.evenement.findMany({
-        orderBy: { date: "desc" },
-        take: 5,
         select: {
           id: true,
           titre: true,
           imageUrl: true,
-          date: true,
+          dates: true,
           lieu: true,
         },
+        take: 20, // limite brute, vrai filtre ci-dessous
       }),
     ]);
+
+    // 👉 Filtrer et trier les événements à venir (dates >= aujourd'hui)
+    const now = new Date();
+    const evenements = (evenementsRaw || [])
+      .filter(evt =>
+        Array.isArray(evt.dates) &&
+        evt.dates.some(d => new Date(d) >= now)
+      )
+      .sort((a, b) => {
+        const nextA = (a.dates || []).find(d => new Date(d) >= now) || a.dates[0];
+        const nextB = (b.dates || []).find(d => new Date(d) >= now) || b.dates[0];
+        return new Date(nextA) - new Date(nextB);
+      })
+      .slice(0, 5);
 
     return NextResponse.json({
       success: true,
