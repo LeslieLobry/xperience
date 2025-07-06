@@ -34,7 +34,7 @@ export default async function AccueilPage() {
   // Préchargement côté serveur
   const exclusPromise = getIdsUtilisateursExclus(user.id);
 
-  const [articles, evenements] = await Promise.all([
+  const [articles, evenementsRaw] = await Promise.all([
     prisma.article.findMany({
       orderBy: { createdAt: "desc" },
       take: 4,
@@ -49,19 +49,31 @@ export default async function AccueilPage() {
         },
       },
     }),
- prisma.evenement.findMany({
-  orderBy: [{ dateDebut: "desc" }], // <-- mets ici le vrai nom de ton champ date !
-  take: 3,
-  select: {
-    id: true,
-    titre: true,
-    imageUrl: true,
-    dateDebut: true, // <-- pareil ici !
-    lieu: true,
-  },
-}),
 
+    prisma.evenement.findMany({
+      select: {
+        id: true,
+        titre: true,
+        imageUrl: true,
+        dates: true,  // tableau !
+        lieu: true,
+      },
+    }),
   ]);
+
+  // On filtre et trie les événements : seulement ceux à venir, triés par la date la plus proche
+  const now = new Date();
+  const evenements = evenementsRaw
+    .filter(evt =>
+      Array.isArray(evt.dates) && evt.dates.some(d => new Date(d) >= now)
+    )
+    .sort((a, b) => {
+      // On prend la première date future la plus proche
+      const nextDateA = (a.dates || []).find(d => new Date(d) >= now) || a.dates[0];
+      const nextDateB = (b.dates || []).find(d => new Date(d) >= now) || b.dates[0];
+      return new Date(nextDateA) - new Date(nextDateB);
+    })
+    .slice(0, 3);
 
   return (
     <div className="accueil-page">
@@ -73,7 +85,6 @@ export default async function AccueilPage() {
 
       <div className="grid-accueil">
         <RechercheWrapper />
-      
 
         <div className="profil-list1">
           <Suspense fallback={<p>Chargement des profils...</p>}>
