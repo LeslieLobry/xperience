@@ -36,6 +36,35 @@ export default function ChatBox({ conversationId, utilisateur }) {
   // 👇 Etat pour les prénoms du couple
   const [prenomsCouple, setPrenomsCouple] = useState(null);
 
+  // Listen notifications d'appel entrant (Ably)
+  useEffect(() => {
+    if (!utilisateur?.id) return;
+    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+
+    const handleIncomingCall = ({ data }) => {
+      setAppelEntrant(data);
+      if (sonnerieRef.current) {
+        sonnerieRef.current.currentTime = 0;
+        sonnerieRef.current.play();
+      }
+      appelTimeoutRef.current = setTimeout(() => {
+        setAppelEntrant(null);
+        if (sonnerieRef.current) {
+          sonnerieRef.current.pause();
+          sonnerieRef.current.currentTime = 0;
+        }
+      }, 30000);
+    };
+
+    channel.subscribe("call:incoming", handleIncomingCall);
+
+    return () => {
+      channel.unsubscribe("call:incoming", handleIncomingCall);
+      clearTimeout(appelTimeoutRef.current);
+    };
+    // eslint-disable-next-line
+  }, [utilisateur?.id]);
+
   // Fetch des prénoms du couple pour cette conversation
   useEffect(() => {
     if (utilisateur.type !== "couple" || !conversationId) {
@@ -221,7 +250,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
           hasMore={hasMore}
           onLoadMore={loadMoreMessages}
           onDelete={handleDelete}
-          prenomsCouple={prenomsCouple}  // 👈 Passe à MessagesList
+          prenomsCouple={prenomsCouple}
         />
       )}
 

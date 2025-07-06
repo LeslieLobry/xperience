@@ -27,7 +27,45 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     fetchMessages();
   }, [conversationId]);
 
-  // Chargement des anciens messages
+  // Abonnement temps réel Ably pour cette conversation
+  useEffect(() => {
+    if (!conversationId) return;
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+
+    // Nouveau message reçu
+    const onMessage = (msg) => {
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === msg.data.id);
+        if (exists) return prev;
+        return [...prev, msg.data];
+      });
+    };
+
+    // Réaction reçue
+    const onReaction = (msg) => {
+      const { messageId, emoji, utilisateurId } = msg.data;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                reactions: [{ utilisateurId, emoji }],
+              }
+            : m
+        )
+      );
+    };
+
+    channel.subscribe("message", onMessage);
+    channel.subscribe("reaction", onReaction);
+
+    return () => {
+      channel.unsubscribe("message", onMessage);
+      channel.unsubscribe("reaction", onReaction);
+    };
+  }, [conversationId]);
+
+  // Chargement des anciens messages (lazy loading)
   const loadMoreMessages = useCallback(async () => {
     if (!conversationId || isLoadingMore || !hasMore || messages.length === 0) return;
     setIsLoadingMore(true);
@@ -46,10 +84,10 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     setIsLoadingMore(false);
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
+  // Envoi d'un message
   const envoyerMessage = async (texte, type = "TEXTE", envoyeur, prenom1, prenom2) => {
     if (!texte.trim()) return null;
 
-    // Construit dynamiquement selon qu'il y a un envoyeur
     const payload = {
       conversationId,
       contenu: texte,
@@ -58,6 +96,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     if (envoyeur) payload.envoyeur = envoyeur;
     if (prenom1) payload.prenom1 = prenom1;
     if (prenom2) payload.prenom2 = prenom2;
+
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,11 +106,11 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     const data = await res.json();
 
     if (data.success) {
+      // Publie sur Ably pour tous les utilisateurs de la conv
       const channel = ably.channels.get(`conversation-${conversationId}`);
       channel.publish("message", data.message);
       setMessages((prev) => [...prev, data.message]);
       setTexte("");
-
       return data.message;
     }
 
