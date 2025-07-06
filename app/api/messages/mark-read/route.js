@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { Realtime } from "ably";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const ABLY_API_KEY = process.env.ABLY_API_KEY; // Assure-toi de l'avoir
+const ABLY_API_KEY = process.env.NEXT_PUBLIC_ABLY_API_KEY; 
 
 const ably = new Realtime(ABLY_API_KEY);
 
