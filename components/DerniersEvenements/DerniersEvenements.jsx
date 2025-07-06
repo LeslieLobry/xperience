@@ -47,7 +47,16 @@ export default function DerniersEvenements({ evenements }) {
             </div>
             <div className="evenement-infos">
               <h3>{event.titre}</h3>
-              <small>{new Date(event.date).toLocaleDateString()}</small>
+              {/* Affichage multi-dates : 1 ou plusieurs */}
+              <small>
+                {Array.isArray(event.dates)
+                  ? event.dates
+                      .map((d) =>
+                        new Date(d).toLocaleDateString("fr-FR")
+                      )
+                      .join(", ")
+                  : "?"}
+              </small>
               <div>{event.lieu}</div>
             </div>
           </Link>

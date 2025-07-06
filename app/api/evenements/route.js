@@ -44,7 +44,6 @@ export async function POST(req) {
   // Champs texte
   const titre = formData.get("titre");
   const description = formData.get("description");
-  const date = formData.get("date");
   const lieu = formData.get("lieu");
   const type = formData.get("type");
   const acces = formData.get("acces");
@@ -57,8 +56,13 @@ export async function POST(req) {
   const heureFin = formData.get("heureFin") || null;
   const lien = formData.get("lien") || null;
 
-  // Champs obligatoires
-  if (!titre || !description || !date || !lieu || !type || !acces) {
+  // 🔥 Prise en charge 1 ou plusieurs dates
+  let dates = formData.getAll("dates[]");
+  if (!dates.length) dates = formData.getAll("dates");
+  if (!dates.length && formData.get("date")) dates = [formData.get("date")];
+  dates = dates.filter((d) => !!d); // filtre les vides
+
+  if (!titre || !description || !lieu || !type || !acces || !dates.length) {
     return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
   }
 
@@ -96,36 +100,34 @@ export async function POST(req) {
     }
   }
 
-  try {
-    await prisma.evenement.create({
-      data: {
-        titre,
-        description,
-        date: new Date(date),
-        lieu,
-        type,
-        acces,
-        heureDebut,
-        heureFin,
-        tarifCouple,
-        tarifFemme,
-        tarifHomme,
-        imageUrl,
-        latitude,
-        longitude,
-        lien,
-        createur: { connect: { id: user.id } },
-      },
-    });
+ try {
+  await prisma.evenement.create({
+    data: {
+      titre,
+      description,
+      dates: dates.map(d => new Date(d)), // <-- tableau de dates
+      lieu,
+      type,
+      acces,
+      heureDebut,
+      heureFin,
+      tarifCouple,
+      tarifFemme,
+      tarifHomme,
+      imageUrl,
+      latitude,
+      longitude,
+      lien,
+      createur: { connect: { id: user.id } },
+    },
+  });
 
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("❌ Erreur création événement :", err);
-    return NextResponse.json({ error: "Erreur serveur", details: err.message }, { status: 500 });
-  }
+  return NextResponse.json({ success: true });
+} catch (err) {
+  console.error("❌ Erreur création événement :", err);
+  return NextResponse.json({ error: "Erreur serveur", details: err.message }, { status: 500 });
 }
-
-// 📤 GET — Liste des événements (identique à avant)
+}
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
 
@@ -145,13 +147,8 @@ export async function GET(req) {
   try {
     let evenements = await prisma.evenement.findMany({
       where: {
-        date: {
-          gte: dateDebut ? new Date(dateDebut) : undefined,
-          lte: dateFin ? new Date(dateFin) : undefined,
-        },
         acces: acces.length ? { in: acces } : undefined,
       },
-      orderBy: { date: "asc" },
       include: {
         participants: {
           select: { id: true },
@@ -159,14 +156,25 @@ export async function GET(req) {
       },
     });
 
-    // 🌍 Filtrage géographique
+    // 👉 Filtrage sur dates (array)
+    if (dateDebut || dateFin) {
+      evenements = evenements.filter((evt) =>
+        evt.dates.some((d) => {
+          const dt = new Date(d);
+          const okDebut = dateDebut ? dt >= new Date(dateDebut) : true;
+          const okFin = dateFin ? dt <= new Date(dateFin) : true;
+          return okDebut && okFin;
+        })
+      );
+    }
+
+    // 🌍 Filtrage géographique (inchangé)
     if (!isNaN(latitude) && !isNaN(longitude)) {
       const toRad = (deg) => (deg * Math.PI) / 180;
-      const R = 6371; // Rayon Terre en km
+      const R = 6371; // km
 
       evenements = evenements.filter((e) => {
         if (e.latitude == null || e.longitude == null) return false;
-
         const dLat = toRad(e.latitude - latitude);
         const dLon = toRad(e.longitude - longitude);
         const a =
@@ -176,10 +184,15 @@ export async function GET(req) {
             Math.sin(dLon / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distance = R * c;
-
         return distance <= rayon;
       });
     }
+
+    // 👉 Tri par date la plus proche (première du tableau)
+    evenements.sort(
+      (a, b) =>
+        new Date(a.dates[0] || 0) - new Date(b.dates[0] || 0)
+    );
 
     const total = evenements.length;
     const paginated = evenements.slice(skip, skip + perPage);

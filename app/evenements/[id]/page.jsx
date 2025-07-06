@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
-import Button from "../../../components/Button/Button";
+import Button from "../../../components/Button/Button"; // ajoute l'import si besoin
 import "./id.css";
 
 export default function PageEvenement() {
@@ -92,6 +92,14 @@ export default function PageEvenement() {
     }
   };
 
+  // ⚡️ Gestion multi-dates
+  const datesAffichees = Array.isArray(evenement.dates)
+  ? evenement.dates.map((d) =>
+      new Date(d).toLocaleDateString("fr-FR")
+    )
+  : [];
+
+
   return (
     <div className="evenement-container">
       <Button
@@ -105,38 +113,46 @@ export default function PageEvenement() {
       <h1>{evenement.titre}</h1>
 
       {evenement.imageUrl && (
-        <img src={evenement.imageUrl} alt="Affiche de l'événement" />
+        <img
+          src={evenement.imageUrl}
+          alt="Affiche de l'événement"
+          className="evenement-image"
+        />
       )}
 
-      <p>
-        <strong>Date :</strong>{" "}
-        {evenement.date ? new Date(evenement.date).toISOString().split("T")[0] : "?"}
-      </p>
-      <p>
-        <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}
-      </p>
-      <p>
-        <strong>Lieu :</strong> {evenement.lieu}
-      </p>
-      <p>
-        <strong>Type :</strong> {evenement.type}
-      </p>
-      <p>
-        <strong>Accès :</strong> {evenement.acces}
-      </p>
-
-      {evenement.lien && (
+      <div className="evenement-details">
         <p>
-          <strong>Lien :</strong>{" "}
-          <a
-            href={evenement.lien.startsWith("http") ? evenement.lien : `https://${evenement.lien}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {evenement.lien}
-          </a>
+          <strong>Date{datesAffichees.length > 1 ? "s" : ""} :</strong>{" "}
+          {datesAffichees.length
+            ? datesAffichees.join(", ")
+            : "?"}
         </p>
-      )}
+        <p>
+          <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}
+        </p>
+        <p>
+          <strong>Lieu :</strong> {evenement.lieu}
+        </p>
+        <p>
+          <strong>Type :</strong> {evenement.type}
+        </p>
+        <p>
+          <strong>Accès :</strong> {evenement.acces}
+        </p>
+
+        {evenement.lien && (
+          <p>
+            <strong>Lien :</strong>{" "}
+            <a
+              href={evenement.lien.startsWith("http") ? evenement.lien : `https://${evenement.lien}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {evenement.lien}
+            </a>
+          </p>
+        )}
+      </div>
 
       <h2>Description</h2>
       <p>{evenement.description}</p>
@@ -167,7 +183,6 @@ export default function PageEvenement() {
         />
       )}
 
-      {/* Boutons admin visibles seulement pour l’admin */}
       {isAdmin && (
         <div className="admin-actions" style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
           <Button

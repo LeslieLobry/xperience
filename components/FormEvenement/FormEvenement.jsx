@@ -1,22 +1,18 @@
 "use client";
 
-
 import { useState, useEffect } from "react";
 import Button from "../Button/Button";
 import "./FormEvenement.css";
 
-
 export default function FormEvenement({
   initialValues = {},
-  onSubmit,
-  isSubmitting = false,
-  error = "",
+  onSuccess, // Appelée après succès (optionnel)
   titre = "Créer un événement",
 }) {
+  const [dates, setDates] = useState(initialValues.dates || [""]);
   const [form, setForm] = useState({
     titre: "",
     description: "",
-    date: "",
     heureDebut: "",
     heureFin: "",
     lieu: "",
@@ -29,20 +25,18 @@ export default function FormEvenement({
     ...initialValues,
   });
 
-
-  // Ajout latitude/longitude au state
   const [latitude, setLatitude] = useState(initialValues.latitude || "");
   const [longitude, setLongitude] = useState(initialValues.longitude || "");
   const [pays, setPays] = useState(initialValues.pays || "France");
-
 
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(initialValues.imageUrl || "");
   const [lieuInput, setLieuInput] = useState(initialValues.lieu || "");
   const [citySuggestions, setCitySuggestions] = useState([]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  // Mise à jour des valeurs si initialValues change (édition)
   useEffect(() => {
     setForm((prev) => ({ ...prev, ...initialValues }));
     setPreviewUrl(initialValues.imageUrl || "");
@@ -50,14 +44,12 @@ export default function FormEvenement({
     setLatitude(initialValues.latitude || "");
     setLongitude(initialValues.longitude || "");
     setPays(initialValues.pays || "France");
+    setDates(initialValues.dates || [""]);
   }, [initialValues]);
-
 
   // Autocomplétion villes avec géoloc
   useEffect(() => {
     if (!lieuInput || lieuInput.length < 2) return setCitySuggestions([]);
-
-
     const delayDebounce = setTimeout(() => {
       if (pays === "France") {
         fetch(
@@ -95,17 +87,13 @@ export default function FormEvenement({
           .catch(() => setCitySuggestions([]));
       }
     }, 300);
-
-
     return () => clearTimeout(delayDebounce);
   }, [lieuInput, pays]);
-
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
-
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -115,8 +103,6 @@ export default function FormEvenement({
     }
   };
 
-
-  // Quand on sélectionne une ville : on remplit aussi lat/lon
   const handleCitySelect = (city) => {
     setForm((prev) => ({
       ...prev,
@@ -128,7 +114,6 @@ export default function FormEvenement({
     setLongitude(city.lon);
     setCitySuggestions([]);
   };
-
 
   const generateHeureOptions = () => {
     const options = [];
@@ -143,19 +128,56 @@ export default function FormEvenement({
     return options;
   };
 
-
-  // Envoie la latitude/longitude au parent lors de la soumission
-  const handleSubmit = (e) => {
+  // Soumission avec FormData POST
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({
-      ...form,
-      pays,
-      imageFile,
-      latitude,
-      longitude,
-    });
-  };
+    setError("");
+    setIsSubmitting(true);
 
+    try {
+      const formData = new FormData();
+      formData.append("titre", form.titre);
+      formData.append("description", form.description);
+      formData.append("lieu", form.lieu);
+      formData.append("type", form.type);
+      formData.append("acces", form.acces);
+      formData.append("heureDebut", form.heureDebut);
+      formData.append("heureFin", form.heureFin);
+      formData.append("latitude", latitude);
+      formData.append("longitude", longitude);
+      formData.append("pays", pays);
+      formData.append("lien", form.lien || "");
+      formData.append("tarifCouple", form.tarifCouple || "");
+      formData.append("tarifFemme", form.tarifFemme || "");
+      formData.append("tarifHomme", form.tarifHomme || "");
+      // Dates
+      const nonEmptyDates = dates.filter(Boolean);
+      if (nonEmptyDates.length === 1) {
+        formData.append("date", nonEmptyDates[0]);
+      } else {
+        nonEmptyDates.forEach((d) => formData.append("dates[]", d));
+      }
+      // Image
+      if (imageFile) formData.append("image", imageFile);
+
+      const res = await fetch("/api/evenements", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erreur serveur");
+      }
+
+      setIsSubmitting(false);
+      setError("");
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      setError(err.message);
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="creer-contenant">
@@ -166,7 +188,6 @@ export default function FormEvenement({
         className="event-form"
       >
         {error && <p className="error-message">{error}</p>}
-
 
         {/* Sélecteur de pays */}
         <select
@@ -179,7 +200,6 @@ export default function FormEvenement({
           <option value="Belgium">Belgique</option>
         </select>
 
-
         <input
           name="titre"
           placeholder="Titre"
@@ -187,7 +207,6 @@ export default function FormEvenement({
           onChange={handleChange}
           required
         />
-
 
         <textarea
           name="description"
@@ -198,16 +217,58 @@ export default function FormEvenement({
           required
         />
 
-
-        <input
-          name="date"
-          type="date"
-          value={form.date}
-          onChange={handleChange}
-          required
-          className="filtre-date"
-        />
-
+        {/* MULTI-DATES */}
+        <label>Dates de l'événement</label>
+        {dates.map((date, idx) => (
+          <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              name={`date-${idx}`}
+              type="date"
+              value={date}
+              onChange={e => {
+                const newDates = [...dates];
+                newDates[idx] = e.target.value;
+                setDates(newDates);
+              }}
+              required
+              className="filtre-date"
+              style={{ marginBottom: 4 }}
+            />
+            {dates.length > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDates(dates.filter((_, i) => i !== idx));
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontWeight: "bold",
+                  color: "#c54",
+                  cursor: "pointer",
+                  fontSize: "1.2em"
+                }}
+                title="Supprimer cette date"
+              >✕</button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setDates([...dates, ""])}
+          style={{
+            background: "#e0c084",
+            border: "none",
+            padding: "0.2em 0.8em",
+            borderRadius: 4,
+            marginBottom: 10,
+            cursor: "pointer",
+            fontWeight: 500
+          }}
+        >
+          + Ajouter une date
+        </button>
+        {/* FIN MULTI-DATES */}
 
         <select
           name="heureDebut"
@@ -223,7 +284,6 @@ export default function FormEvenement({
           ))}
         </select>
 
-
         <select
           name="heureFin"
           onChange={handleChange}
@@ -237,7 +297,6 @@ export default function FormEvenement({
             </option>
           ))}
         </select>
-
 
         <div className="autocomplete-wrapper">
           <input
@@ -267,21 +326,12 @@ export default function FormEvenement({
           )}
         </div>
 
-
-        {/* Champs cachés pour latitude/longitude pour debug */}
-        {/*
-        <input type="text" value={latitude} readOnly />
-        <input type="text" value={longitude} readOnly />
-        */}
-
-
         <input
           name="lien"
           placeholder="Lien vers l'événement"
           value={form.lien}
           onChange={handleChange}
         />
-
 
         <input
           name="tarifCouple"
@@ -305,7 +355,6 @@ export default function FormEvenement({
           onChange={handleChange}
         />
 
-
         <input
           type="file"
           accept="image/*"
@@ -314,6 +363,7 @@ export default function FormEvenement({
         {previewUrl && (
           <img src={previewUrl} alt="Aperçu" className="image-preview" />
         )}
+
         <select
           name="acces"
           onChange={handleChange}
@@ -332,9 +382,6 @@ export default function FormEvenement({
           style={{ marginTop: "1rem" }}
         />
       </form>
-    </div> 
+    </div>
   );
 }
-
-
-
