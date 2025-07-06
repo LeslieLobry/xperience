@@ -31,7 +31,7 @@ export default function DerniersArticles({ articles }) {
               </div>
               <h3 className="dernier-article-titre">{article.titre}</h3>
               <small className="dernier-article-date">
-                {new Date(article.createdAt).toLocaleDateString()}
+                {new Date(article.createdAt).toLocaleDateString("fr-FR")}
               </small>
             </div>
           </Link>

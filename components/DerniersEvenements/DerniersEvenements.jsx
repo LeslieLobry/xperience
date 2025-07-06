@@ -68,12 +68,15 @@ export default function DerniersEvenements({ evenements }) {
             </div>
             <div className="evenement-infos">
               <h3>{event.titre}</h3>
-              {/* Affichage multi-dates à venir */}
               <small>
                 {event.datesAVenir
                   .map((d) =>
-                    new Date(d).toLocaleDateString("fr-FR")
-                  )
+                    new Date(d).toLocaleDateString("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric"
+})
+                 )
                   .join(", ")}
               </small>
               <div>{event.lieu}</div>
