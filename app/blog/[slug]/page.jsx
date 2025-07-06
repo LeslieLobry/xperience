@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
 import ArticleWrapper from "./ArticleWrapper";
+import Image from "next/image";
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
@@ -31,8 +32,8 @@ if (!user) return redirect("/connexion");
       <ArticleWrapper articleId={article.id} />
       <h2 className="article-title">{article.titre}</h2>
       <p className="article-meta">
-        {new Date(article.createdAt).toLocaleDateString("fr-FR")} –{" "}
-        {article.vues} vues
+        {new Date(article.createdAt).toLocaleDateString("fr-FR")} {" "}
+        {/* {article.vues} vues */}
       </p>
 
       {article.description && (
@@ -42,13 +43,16 @@ if (!user) return redirect("/connexion");
       {article.images?.length > 0 && (
         <div className="article-images">
           {article.images.map((image, index) => (
-            <img
-              key={index}
-              src={image.url}
-              alt={`Illustration ${index + 1}`}
-              className="article-image"
-              style={{ maxWidth: "100%", margin: "10px 0" }}
-            />
+            <Image
+    key={index}
+    src={image.url}
+    alt={`Illustration ${index + 1}`}
+    className="article-image"
+    style={{ maxWidth: "100%", margin: "10px 0" }}
+    width={350}     
+    height={350}    
+    sizes="100vw"   
+  />
           ))}
         </div>
       )}
