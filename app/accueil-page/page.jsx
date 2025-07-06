@@ -84,9 +84,9 @@ export default async function AccueilPage() {
           <DerniersArticles articles={articles} />
         </div>
 
-        <div className="grid-event">
+        {/* <div className="grid-event">
           <DerniersEvenements evenements={evenements} />
-        </div>
+        </div> */}
       </div>
     </div>
   );
