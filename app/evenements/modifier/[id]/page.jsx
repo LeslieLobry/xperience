@@ -30,7 +30,10 @@ export default function ModifierEvenementPage() {
         const event = await res.json();
         setEvenement({
           ...event,
-          date: event.date ? event.date.split("T")[0] : "",
+          // On transforme le tableau de dates pour le <input type="date" /> (format YYYY-MM-DD)
+          dates: Array.isArray(event.dates)
+            ? event.dates.map((d) => d.split("T")[0])
+            : [],
         });
       } else {
         setError("Événement introuvable.");
@@ -46,10 +49,17 @@ export default function ModifierEvenementPage() {
 
     const fd = new FormData();
     Object.entries(formData).forEach(([k, v]) => {
-      if (k === "imageFile" && v) fd.append("image", v);
-      else if (k !== "imageFile") fd.append(k, v);
+      if (k === "imageFile" && v) {
+        fd.append("image", v);
+      } else if (k === "dates" && Array.isArray(v)) {
+        // Plusieurs dates : envoie chaque date individuellement
+        v.forEach((dateStr) => fd.append("dates[]", dateStr));
+      } else if (k !== "imageFile") {
+        fd.append(k, v);
+      }
     });
 
+    // Appelle bien la route d'update (PUT sur /api/evenements/[id])
     const res = await fetch(`/api/evenements/${params.id}`, {
       method: "PUT",
       body: fd,

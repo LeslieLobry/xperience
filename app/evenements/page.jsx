@@ -46,21 +46,16 @@ if (filtres.latitude) params.append("latitude", filtres.latitude);
 if (filtres.longitude) params.append("longitude", filtres.longitude);
 // Ajoute d'autres filtres ici si besoin (motCle, etc.)
 }
-
 try {
-const res = await fetch(`/api/evenements?${params.toString()}`);
-const data = await res.json();
-const now = new Date();
-const evenementsAVenir = (data.events || []).filter(event =>
-  Array.isArray(event.dates) &&
-  event.dates.some(d => new Date(d).setHours(0,0,0,0) >= now.setHours(0,0,0,0))
-);
-setEvenements(evenementsAVenir);
-setTotalPages(Math.ceil((evenementsAVenir.length || 0) / (data.perPage || 10)));
+  const res = await fetch(`/api/evenements?${params.toString()}`);
+  const data = await res.json();
+
+  setEvenements(data.events || []);
+  setTotalPages(Math.ceil((data.total || 0) / (data.perPage || 10)));
 } catch (err) {
-console.error("Erreur de chargement des événements :", err);
-setEvenements([]);
-setTotalPages(1);
+  console.error("Erreur de chargement des événements :", err);
+  setEvenements([]);
+  setTotalPages(1);
 }
 };
 fetchEvents();

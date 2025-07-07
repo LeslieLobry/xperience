@@ -3,7 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { randomUUID } from "crypto"; // ✅ Ajout ici
+import { randomUUID } from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const s3 = new S3Client({
@@ -48,8 +48,9 @@ export async function GET(_req, contextPromise) {
   }
 }
 
-// ✏️ PUT : modifier un événement (image S3 supportée)
+// ✏️ PUT : modifier un événement (image S3 supportée, dates[] supporté)
 export async function PUT(req, contextPromise) {
+  console.log("APPEL PUT /api/evenements/[id] (UPDATE)");
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
   const user = await getUserFromCookie();
@@ -64,14 +65,15 @@ export async function PUT(req, contextPromise) {
     data[key] = formData.get(key);
   }
 
-  // Formatage de la date
-  if (data.date) {
-    try {
-      data.date = new Date(data.date).toISOString();
-    } catch {
-      return NextResponse.json({ error: "Date invalide" }, { status: 400 });
-    }
+  // ✅ Gère les dates (tableau)
+  let dates = formData.getAll("dates[]");
+  if (!dates.length) dates = formData.getAll("dates");
+  if (!dates.length && formData.get("date")) dates = [formData.get("date")];
+  dates = dates.filter((d) => !!d);
+  if (dates.length) {
+    data.dates = dates.map((d) => new Date(d));
   }
+  delete data.date;
 
   const fieldsToFloat = ["tarifCouple", "tarifFemme", "tarifHomme", "latitude", "longitude"];
   fieldsToFloat.forEach((field) => {
@@ -84,7 +86,8 @@ export async function PUT(req, contextPromise) {
     }
   });
 
-  ["lien", "imageUrl"].forEach((field) => {
+  // Ne remplace pas l'imageUrl si non changée
+  ["lien"].forEach((field) => {
     if (data[field] === "null" || data[field] === "") data[field] = null;
   });
 
@@ -95,6 +98,7 @@ export async function PUT(req, contextPromise) {
   delete data.createurId;
   delete data.image;
 
+  // Gestion image
   const image = formData.get("image");
   if (image && typeof image.name === "string" && image.size > 0) {
     try {
@@ -116,6 +120,9 @@ export async function PUT(req, contextPromise) {
       console.error("Erreur S3 PUT événement :", err);
       return NextResponse.json({ error: "Erreur lors de l’upload image" }, { status: 500 });
     }
+  } else {
+    // 🟢 Si PAS de nouvelle image, NE TOUCHE PAS à imageUrl
+    if ("imageUrl" in data) delete data.imageUrl;
   }
 
   try {
@@ -130,19 +137,17 @@ export async function PUT(req, contextPromise) {
   }
 }
 
-// PATCH : update partiel
+// PATCH : update partiel (json)
 export async function PATCH(req, contextPromise) {
   const context = await contextPromise;
   const id = parseInt(context.params.id, 10);
   const data = await req.json();
 
-  if (data.date) {
-    try {
-      data.date = new Date(data.date).toISOString();
-    } catch {
-      return NextResponse.json({ error: "Date invalide" }, { status: 400 });
-    }
+  // ✅ Gère les dates (tableau)
+  if (data.dates && Array.isArray(data.dates)) {
+    data.dates = data.dates.map((d) => new Date(d));
   }
+  delete data.date;
 
   const fieldsToFloat = ["tarifCouple", "tarifFemme", "tarifHomme", "latitude", "longitude"];
   fieldsToFloat.forEach((field) => {
@@ -154,13 +159,18 @@ export async function PATCH(req, contextPromise) {
     }
   });
 
-  ["lien", "imageUrl"].forEach((field) => {
+  ["lien"].forEach((field) => {
     if (data[field] === "null" || data[field] === "") data[field] = null;
   });
 
-  ["id", "participants", "createur", "createurId"].forEach((field) => {
+  ["id", "participants", "createur", "createurId", "image"].forEach((field) => {
     delete data[field];
   });
+
+  // ⚡️ Si PAS d'imageUrl dans le PATCH, on ne l'efface pas
+  if ("imageUrl" in data && (data.imageUrl === null || data.imageUrl === "")) {
+    delete data.imageUrl;
+  }
 
   try {
     const evenement = await prisma.evenement.update({
@@ -205,8 +215,9 @@ export async function DELETE(req, contextPromise) {
   }
 }
 
-// POST : inscription
+// POST : inscription à l'événement
 export async function POST(_req, contextPromise) {
+  
   const user = await getUserFromCookie();
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

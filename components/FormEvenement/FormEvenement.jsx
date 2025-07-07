@@ -7,6 +7,7 @@ import "./FormEvenement.css";
 export default function FormEvenement({
   initialValues = {},
   onSuccess, // Appelée après succès (optionnel)
+  onSubmit,  // Optionnel, pour modification
   titre = "Créer un événement",
 }) {
   const [dates, setDates] = useState(initialValues.dates || [""]);
@@ -37,6 +38,7 @@ export default function FormEvenement({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Sync initial values si props changent (modif)
   useEffect(() => {
     setForm((prev) => ({ ...prev, ...initialValues }));
     setPreviewUrl(initialValues.imageUrl || "");
@@ -47,15 +49,13 @@ export default function FormEvenement({
     setDates(initialValues.dates || [""]);
   }, [initialValues]);
 
-  // Autocomplétion villes avec géoloc
+  // Autocomplétion villes
   useEffect(() => {
     if (!lieuInput || lieuInput.length < 2) return setCitySuggestions([]);
     const delayDebounce = setTimeout(() => {
       if (pays === "France") {
         fetch(
-          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
-            lieuInput
-          )}&fields=nom,centre&boost=population&limit=5`
+          `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(lieuInput)}&fields=nom,centre&boost=population&limit=5`
         )
           .then((res) => res.json())
           .then((data) =>
@@ -70,9 +70,7 @@ export default function FormEvenement({
           .catch(() => setCitySuggestions([]));
       } else if (pays === "Belgium") {
         fetch(
-          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(
-            lieuInput
-          )}&country=Belgium&format=json&limit=5`
+          `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(lieuInput)}&country=Belgium&format=json&limit=5`
         )
           .then((res) => res.json())
           .then((data) =>
@@ -107,7 +105,7 @@ export default function FormEvenement({
     setForm((prev) => ({
       ...prev,
       lieu: pays === "France" ? city.nom : city.nom.split(",")[0],
-      pays: pays,
+      pays,
     }));
     setLieuInput(pays === "France" ? city.nom : city.nom.split(",")[0]);
     setLatitude(city.lat);
@@ -119,16 +117,14 @@ export default function FormEvenement({
     const options = [];
     for (let h = 0; h < 24; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const heure = `${h.toString().padStart(2, "0")}:${m
-          .toString()
-          .padStart(2, "0")}`;
+        const heure = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
         options.push(heure);
       }
     }
     return options;
   };
 
-  // Soumission avec FormData POST
+  // ✅ SOUMISSION pour CREATION
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -147,9 +143,9 @@ export default function FormEvenement({
       formData.append("longitude", longitude);
       formData.append("pays", pays);
       formData.append("lien", form.lien || "");
-      formData.append("tarifCouple", form.tarifCouple || "");
-      formData.append("tarifFemme", form.tarifFemme || "");
-      formData.append("tarifHomme", form.tarifHomme || "");
+      formData.append("tarifCouple", form.tarifCouple ?? "");
+      formData.append("tarifFemme", form.tarifFemme ?? "");
+      formData.append("tarifHomme", form.tarifHomme ?? "");
       // Dates
       const nonEmptyDates = dates.filter(Boolean);
       if (nonEmptyDates.length === 1) {
@@ -183,35 +179,34 @@ export default function FormEvenement({
     <div className="creer-contenant">
       <h2 className="creer-title">{titre}</h2>
       <form
-        onSubmit={handleSubmit}
+        onSubmit={onSubmit ? (e) => {
+          e.preventDefault();
+          // Utilise la signature classique pour update : onSubmit(formData, dates, imageFile, latitude, longitude, pays)
+          onSubmit({
+            ...form,
+            dates,
+            imageFile,
+            latitude,
+            longitude,
+            pays,
+          });
+        } : handleSubmit}
         encType="multipart/form-data"
         className="event-form"
       >
         {error && <p className="error-message">{error}</p>}
 
-        {/* Sélecteur de pays */}
-        <select
-          name="pays"
-          value={pays}
-          onChange={e => setPays(e.target.value)}
-          style={{ marginBottom: 8 }}
-        >
+        <select name="pays" value={pays} onChange={e => setPays(e.target.value)} style={{ marginBottom: 8 }}>
           <option value="France">France</option>
           <option value="Belgium">Belgique</option>
         </select>
 
-        <input
-          name="titre"
-          placeholder="Titre"
-          value={form.titre}
-          onChange={handleChange}
-          required
-        />
+        <input name="titre" placeholder="Titre" value={form.titre ?? ""} onChange={handleChange} required />
 
         <textarea
           name="description"
           placeholder="Description"
-          value={form.description}
+          value={form.description ?? ""}
           onChange={handleChange}
           className="creer-description"
           required
@@ -224,7 +219,7 @@ export default function FormEvenement({
             <input
               name={`date-${idx}`}
               type="date"
-              value={date}
+              value={date ?? ""}
               onChange={e => {
                 const newDates = [...dates];
                 newDates[idx] = e.target.value;
@@ -273,7 +268,7 @@ export default function FormEvenement({
         <select
           name="heureDebut"
           onChange={handleChange}
-          value={form.heureDebut}
+          value={form.heureDebut ?? ""}
           required
         >
           <option value="">Heure de début</option>
@@ -287,7 +282,7 @@ export default function FormEvenement({
         <select
           name="heureFin"
           onChange={handleChange}
-          value={form.heureFin}
+          value={form.heureFin ?? ""}
           required
         >
           <option value="">Heure de fin</option>
@@ -302,7 +297,7 @@ export default function FormEvenement({
           <input
             name="lieu"
             placeholder="Ville"
-            value={lieuInput}
+            value={lieuInput ?? ""}
             onChange={(e) => {
               setLieuInput(e.target.value);
               setForm((prev) => ({ ...prev, lieu: e.target.value }));
@@ -329,7 +324,7 @@ export default function FormEvenement({
         <input
           name="lien"
           placeholder="Lien vers l'événement"
-          value={form.lien}
+          value={form.lien ?? ""}
           onChange={handleChange}
         />
 
@@ -337,21 +332,21 @@ export default function FormEvenement({
           name="tarifCouple"
           placeholder="Tarif couple (€)"
           type="number"
-          value={form.tarifCouple}
+          value={form.tarifCouple ?? ""}
           onChange={handleChange}
         />
         <input
           name="tarifFemme"
           placeholder="Tarif femme (€)"
           type="number"
-          value={form.tarifFemme}
+          value={form.tarifFemme ?? ""}
           onChange={handleChange}
         />
         <input
           name="tarifHomme"
           placeholder="Tarif homme (€)"
           type="number"
-          value={form.tarifHomme}
+          value={form.tarifHomme ?? ""}
           onChange={handleChange}
         />
 
@@ -367,7 +362,7 @@ export default function FormEvenement({
         <select
           name="acces"
           onChange={handleChange}
-          value={form.acces}
+          value={form.acces ?? ""}
           className="acces-select"
         >
           <option value="femmes_couples">Femmes et couples</option>

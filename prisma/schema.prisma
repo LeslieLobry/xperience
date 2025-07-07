@@ -50,6 +50,8 @@ model Utilisateur {
   yeux                 String?
   cheveux              String?
   reactions MessageReaction[]
+  profilComplet Boolean @default(false) @map("profil_complet")
+  reminderSent  Boolean @default(false) @map("reminder_sent")
   
 
   // ✅ Champs supplémentaires pour les couples
