@@ -2,8 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { headers } from 'next/headers';
-import { isProfilComplet } from '@/lib/isProfilComplet'; // 👈 Ajout
-
+import { isProfilComplet } from '../../../lib/isProfilComplet'; 
 const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
