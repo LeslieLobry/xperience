@@ -69,7 +69,7 @@ export default function MessagesList({
   let lastDate = null;
 
   return (
-    <div ref={containerRef} className="chat-messages" style={{ overflowY: "auto", flexGrow: 1 }}>
+    <div ref={containerRef} className="chat-messages">
       {typingPseudo && (
         <div className="typing-indicator">{typingPseudo} est en train d’écrire...</div>
       )}
@@ -93,7 +93,7 @@ export default function MessagesList({
         }
 
         return (
-          <div key={msg.id}>
+          <div key={msg.id} className="message-class">
             {showDate && (
               <div className="day-separator" style={{
                 textAlign: "center",

@@ -89,17 +89,24 @@
   align-self: flex-end;
   border-top-right-radius: 0;
   border-bottom-right-radius: 16px;
+  width: 50%;
 }
-
+.message-class{
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 .message-bubble.other {
   background: rgba(30, 20, 7, 0.72);
   color: #f7f6f4;
   align-self: flex-start;
   border-top-left-radius: 0;
   border-bottom-left-radius: 16px;
+  width: 50%;
 }
 .message-text {
   white-space: pre-line;
+  font-size: 22px;
 }
 
 /* === Auteur (avatar + nom) === */
@@ -108,6 +115,12 @@
   align-items: center;
   margin-bottom: 3px;
   gap: 6px;
+  border-bottom: 1px solid #e0c084;
+}
+.div-react{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .author-avatar {
   width: 26px;
@@ -116,6 +129,7 @@
   background: #fff5;
   object-fit: cover;
   box-shadow: 0 0 2px #ddd8;
+  margin-bottom: 6px;
 }
 .author-name {
   font-size: 0.97em;
@@ -151,20 +165,9 @@
 
 /* === Infos meta (heure, statut) === */
 .message-meta {
-  font-size: 1em;
-  margin-top: 7px;
-  color: white;
-  text-align: right;
-  opacity: 0.55;
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
 }
-.message-status {
-  margin-left: 8px;
-  font-weight: 400;
-}
-
 /* === Réactions / Emojis === */
 .message-reactions {
   display: flex;
@@ -176,6 +179,11 @@
   align-items: center;
   width: fit-content;
   box-shadow: 0 1px 4px #0002;
+}
+.message-time{
+      display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
 .reaction-item {
   background: #fff;

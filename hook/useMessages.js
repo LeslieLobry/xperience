@@ -23,7 +23,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
         setMessages(data.messages || []);
         setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
         setHasMore((data.messages || []).length === MESSAGES_LIMIT);
-        setLastReads(data.lastReads || []);  // ← ici !
+        setLastReads(data.lastReads || []);
       }
     };
     fetchMessages();
@@ -39,43 +39,36 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === msg.data.id);
         if (exists) return prev;
-
-        // Si le message n'est pas de moi, je signale "reçu" et "lu"
+        // ACK et LU
         if (msg.data.auteurId !== utilisateur.id) {
-          // ACK (reçu)
           fetch("/api/messages/acknowledge", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ messageId: msg.data.id }),
           });
-          // LU (lu)
           fetch("/api/messages/mark-as-read", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ messageId: msg.data.id }),
           });
         }
-
         return [...prev, msg.data];
       });
     };
 
-    // Réaction reçue
+    // Réaction reçue (maintenant, liste complète !)
     const onReaction = (msg) => {
-      const { messageId, emoji, utilisateurId } = msg.data;
+      const { messageId, reactions } = msg.data;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
-            ? {
-                ...m,
-                reactions: [{ utilisateurId, emoji }],
-              }
+            ? { ...m, reactions }
             : m
         )
       );
     };
 
-    // Statut de lecture reçu en live (optionnel)
+    // Statut de lecture reçu
     const onRead = (msg) => {
       setLastReads((prev) => {
         const idx = prev.findIndex(r => r.utilisateurId === msg.data.utilisateurId);
@@ -151,24 +144,27 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     return null;
   };
 
-  // Réaction à un message
+  // Réaction à un message (corrigé)
   const handleReaction = async (messageId, emoji) => {
-    await fetch(`/api/messages/${messageId}/react`, {
+    const res = await fetch(`/api/messages/${messageId}/react`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emoji }),
     });
 
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, reactions: [{ utilisateurId: utilisateur.id, emoji }] }
-          : m
-      )
-    );
+    const data = await res.json();
 
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("reaction", { messageId, emoji, utilisateurId: utilisateur.id });
+    if (data.success) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, reactions: data.reactions }
+            : m
+        )
+      );
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("reaction", { messageId, reactions: data.reactions });
+    }
   };
 
   return {
@@ -179,7 +175,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     handleReaction,
     hasMore,
     loadMoreMessages,
-    lastReads,  
+    lastReads,
     setLastReads,
   };
 }

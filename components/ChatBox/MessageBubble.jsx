@@ -73,12 +73,12 @@ export default function MessageBubble({
 
   const isOwn = msg.auteurId === utilisateur.id;
 
-const auteurIsCouple = msg.auteur?.type === "couple";
-const showAuthorInfo =
-  auteurIsCouple ||
-  !previousMsg ||
-  previousMsg.auteurId !== msg.auteurId ||
-  previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
+  const auteurIsCouple = msg.auteur?.type === "couple";
+  const showAuthorInfo =
+    auteurIsCouple ||
+    !previousMsg ||
+    previousMsg.auteurId !== msg.auteurId ||
+    previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
 
   const heure = msg.createdAt
     ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -99,36 +99,37 @@ const showAuthorInfo =
     }
   }
 
+  // --- CORRECTION : regroupement des réactions par emoji, calcule le nombre d'utilisateurs pour chaque emoji
   const groupedReactions = Object.entries(
-    msg.reactions?.reduce((acc, r) => {
-      const pseudo = r.utilisateur?.pseudo || "Quelqu’un";
+    (msg.reactions || []).reduce((acc, r) => {
       if (!acc[r.emoji]) acc[r.emoji] = new Set();
-      acc[r.emoji].add(pseudo);
+      acc[r.emoji].add(r.utilisateurId);
       return acc;
-    }, {}) || {}
+    }, {})
   );
+  // ---
+
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-{showAuthorInfo && (
-  <div className="author-info">
-    <img
-      src={msg.auteur?.photoUrl || "/default.jpg"}
-      alt={msg.auteur?.pseudo || "Utilisateur"}
-      className="author-avatar"
-    />
-    <div>
-      {msg.prenomEnvoyeur
-        ? <span className="author-name">{msg.prenomEnvoyeur}</span>
-        : <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
-      }
-      {/* 👇 AFFICHAGE prénoms du couple SI L'AUTEUR EST UN COUPLE */}
-      {auteurIsCouple && prenomsCouple && (
-        <span className="author-couple-names">({prenomsCouple})</span>
+      {showAuthorInfo && (
+        <div className="author-info">
+          <img
+            src={msg.auteur?.photoUrl || "/default.jpg"}
+            alt={msg.auteur?.pseudo || "Utilisateur"}
+            className="author-avatar"
+          />
+          <div>
+            {msg.prenomEnvoyeur
+              ? <span className="author-name">{msg.prenomEnvoyeur}</span>
+              : <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+            }
+            {/* 👇 AFFICHAGE prénoms du couple SI L'AUTEUR EST UN COUPLE */}
+            {auteurIsCouple && prenomsCouple && (
+              <span className="author-couple-names">({prenomsCouple})</span>
+            )}
+          </div>
+        </div>
       )}
-    </div>
-  </div>
-)}
-
 
       {msg.type === "IMAGE" && msg.imageUrl ? (
         <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
@@ -138,11 +139,7 @@ const showAuthorInfo =
         <p className="message-text">{msg.contenu}</p>
       )}
 
-      <div className="message-meta">
-        <span className="message-time">{heure}</span>
-        {isOwn && <span className="message-status">{statutTexte}</span>}
-      </div>
-      {isOwn && (
+       {isOwn && (
         <button
           className="delete-message-button"
           onClick={() => onDelete?.(msg.id)}
@@ -151,11 +148,21 @@ const showAuthorInfo =
           🗑️
         </button>
       )}
-
+<div className="div-react">
+      {/* Affichage des réactions */}
+      <div className={`emoji-action-wrapper ${isOwn ? "right" : "left"}`}>
+        <button
+          ref={buttonRef}
+          onClick={() => setShowPicker(!showPicker)}
+          className="emoji-fixed-btn"
+          type="button"
+        >
+          😊
+        </button>
       {groupedReactions.length > 0 && (
         <div className="message-reactions">
-          {groupedReactions.map(([emoji, pseudoSet]) => {
-            const pseudos = Array.from(pseudoSet);
+          {groupedReactions.map(([emoji, utilisateursSet]) => {
+            const nb = utilisateursSet.size;
             return (
               <span
                 key={emoji}
@@ -168,9 +175,13 @@ const showAuthorInfo =
                     ? "user-reaction"
                     : ""
                 }`}
-                title={`${emojiTooltips[emoji] || ""} : ${pseudos.join(", ")}`}
+                title={
+                  (emojiTooltips[emoji] || "") +
+                  " — " +
+                  (nb > 1 ? `${nb} personnes` : "1 personne")
+                }
               >
-                {emoji} {pseudos.length}
+                {emoji} {nb}
               </span>
             );
           })}
@@ -178,15 +189,6 @@ const showAuthorInfo =
       )}
 
       {/* Wrapper du bouton + barre d'émojis */}
-      <div className={`emoji-action-wrapper ${isOwn ? "right" : "left"}`}>
-        <button
-          ref={buttonRef}
-          onClick={() => setShowPicker(!showPicker)}
-          className="emoji-fixed-btn"
-          type="button"
-        >
-          😊
-        </button>
 
         {showPicker && (
           <div ref={pickerRef} className={`reaction-bar-container ${isOwn ? "open-left" : "open-right"}`}>
@@ -216,11 +218,19 @@ const showAuthorInfo =
                 >
                   {emo}
                 </button>
+                
               ))}
             </div>
+                
           </div>
+          
         )}
       </div>
+    <div className="message-meta">
+        <span className="message-time">{heure}</span>
+        {isOwn && <span className="message-status">{statutTexte}</span>}
+      </div>
+    </div>
     </div>
   );
 }
