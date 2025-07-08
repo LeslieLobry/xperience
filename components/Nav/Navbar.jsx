@@ -26,6 +26,26 @@ export default function Navbar() {
   const router = useRouter();
   const menuRef = useRef();
   const popupRef = useRef();
+const [unreadCount, setUnreadCount] = useState(0);
+
+const fetchUnreadMessages = async () => {
+  try {
+    const res = await fetch("/api/messages/nonlus", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setUnreadCount(data.length); // <- on compte le nombre de messages non lus
+    }
+  } catch (err) {
+    console.error("Erreur fetch unread messages", err);
+  }
+};
+
+useEffect(() => {
+  if (localUser) fetchUnreadMessages();
+}, [localUser]);
 
   // Synchroniser localUser avec le user du contexte
   useEffect(() => {
@@ -147,11 +167,19 @@ export default function Navbar() {
       </div>
 
       <ul ref={menuRef} className={`navLinks ${menuOpen ? "active" : ""}`}>
-        {navLinks.map((link) => (
-          <li key={link.href} onClick={() => setMenuOpen(false)}>
-            <Link href={link.href}>{link.label}</Link>
-          </li>
-        ))}
+{navLinks.map((link) => (
+  <li key={link.href} onClick={() => {
+    setMenuOpen(false);
+    if (link.href === "/messagerie") setUnreadCount(0);
+  }}>
+    <Link href={link.href} className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}>
+      {link.label}
+      {link.href === "/messagerie" && unreadCount > 0 && (
+        <span className="messagerie-badge">{unreadCount}</span>
+      )}
+    </Link>
+  </li>
+))}
         {localUser?.role === "ADMIN" && (
           <li onClick={() => setMenuOpen(false)}>
             <Link href="/admin">🛠 Admin</Link>
