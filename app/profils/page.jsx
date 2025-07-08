@@ -34,7 +34,8 @@ export default async function PageTousLesProfils() {
       photoUrl: true,
       age: true,
       localisation: true,
-      statut: true, // ✅ pour la pastille
+      statut: true, 
+      type: true,
     },
     orderBy: {
       createdAt: "desc",
