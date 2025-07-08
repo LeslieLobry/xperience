@@ -10,17 +10,14 @@ export async function POST(req) {
     if (!currentUser) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
-
     const { participantIds } = await req.json();
 
     if (!Array.isArray(participantIds) || participantIds.length < 2) {
       return NextResponse.json({ error: "Participants invalides" }, { status: 400 });
     }
-
     if (!participantIds.includes(currentUser.id)) {
       return NextResponse.json({ error: "Tu dois faire partie des participants." }, { status: 403 });
     }
-
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = participantIds.filter((id) => id !== currentUser.id);
 
@@ -76,7 +73,7 @@ export async function POST(req) {
   }
 }
 
-// GET /api/conversations
+// GET /api/conversations — avec unreadCount
 export async function GET() {
   try {
     const currentUser = await getUserFromToken();
@@ -103,7 +100,7 @@ export async function GET() {
         },
         messages: {
           orderBy: { createdAt: "desc" },
-          take: 1,
+          take: 1, 
           select: {
             id: true,
             contenu: true,
@@ -117,11 +114,34 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
     });
 
-    const filtrées = conversations.filter((conv) =>
-      conv.participants.every((p) => !exclus.includes(p.utilisateurId))
+    const formatted = await Promise.all(conversations
+      .filter((conv) => conv.participants.every((p) => !exclus.includes(p.utilisateurId)))
+      .map(async (conv) => {
+       
+        const myParticipant = conv.participants.find(p => p.utilisateurId === userId);
+
+        let unreadCount = 0;
+        if (myParticipant) {
+          unreadCount = await prisma.message.count({
+            where: {
+              conversationId: conv.id,
+              auteurId: { not: userId },
+              createdAt: {
+                gt: myParticipant.lastReadAt || new Date(0)
+              },
+            },
+          });
+        }
+
+        return {
+          ...conv,
+          unreadCount,
+          messages: conv.messages, 
+        };
+      })
     );
 
-    return NextResponse.json({ conversations: filtrées });
+    return NextResponse.json({ conversations: formatted });
   } catch (err) {
     console.error("❌ Erreur GET /api/conversations :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

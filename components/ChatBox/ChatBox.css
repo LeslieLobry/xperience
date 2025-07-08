@@ -98,10 +98,8 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 16px;
 }
-
-.message-bubble:hover {
-  filter: brightness(1.07);
-  box-shadow: 0 4px 16px rgba(224,193,132,0.14);
+.message-text {
+  white-space: pre-line;
 }
 
 /* === Auteur (avatar + nom) === */

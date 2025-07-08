@@ -126,7 +126,7 @@ model Evenement {
   latitude     Float?
   longitude    Float?
   lien         String?
-
+  pays        String? 
   createurId   Int
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   participants Utilisateur[] @relation("Participation")

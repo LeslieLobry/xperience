@@ -155,6 +155,13 @@ export async function GET(req) {
         },
       },
     });
+    const now = new Date();
+
+evenements = evenements.filter((evt) =>
+  Array.isArray(evt.dates) &&
+  evt.dates.some((d) => new Date(d) >= now)
+);
+
 
     // 👉 Filtrage sur dates (array)
     if (dateDebut || dateFin) {

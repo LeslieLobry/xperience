@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
+import "./ChatInput.css"
 
 export default function ChatInput({
   utilisateur,
@@ -128,7 +129,6 @@ export default function ChatInput({
                 className="select-membre"
                 value={membreParlant}
                 onChange={e => setMembreParlant(e.target.value)}
-                style={{ marginRight: 8 }}
               >
                 <option value="MEMBRE_1">{pr1}</option>
                 <option value="MEMBRE_2">{pr2}</option>

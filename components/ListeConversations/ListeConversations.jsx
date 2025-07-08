@@ -12,18 +12,15 @@ export default function ListeConversations({ userId, onSelectConversation }) {
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-const fetchConversations = async () => {
-  try {
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-
-    // Pas besoin de filtrer : la route API ne retourne QUE les conversations actives du user connecté !
-    setConversations(data.conversations || []);
-  } catch (err) {
-    console.error("❌ Erreur chargement conversations :", err);
-  }
-};
-
+  const fetchConversations = async () => {
+    try {
+      const res = await fetch("/api/conversations");
+      const data = await res.json();
+      setConversations(data.conversations || []);
+    } catch (err) {
+      console.error("❌ Erreur chargement conversations :", err);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -77,10 +74,32 @@ const fetchConversations = async () => {
     }
   };
 
-  const handleSelect = (id) => {
+  // HANDLE SELECT = mark-as-read (POST) + badge à 0
+  const handleSelect = async (id) => {
     setSelectedId(id);
     if (typeof onSelectConversation === "function") {
       onSelectConversation(id);
+    }
+
+    // Appelle la route pour marquer comme lu
+    try {
+      await fetch(`/api/conversations/${id}/mark-as-read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      // Optimiste : badge non-lu = 0 tout de suite
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === id ? { ...conv, unreadCount: 0 } : conv
+        )
+      );
+
+      // Si tu veux forcer le refresh ably sur plusieurs devices :
+      // ably.channels.get(`notification-${userId}`).publish("refresh-conversations", {});
+    } catch (err) {
+      console.error("Erreur lors de la mise à jour des non-lus :", err);
     }
   };
 
@@ -113,10 +132,7 @@ const fetchConversations = async () => {
             ? autres[0].pseudo
             : autres.map((u) => u.pseudo).join(", ");
 
-        const avatar =
-          autres.length === 1
-            ? autres[0].photoUrl || "/default-avatar.png"
-            : "/group-avatar.png";
+        const unreadCount = conv.unreadCount || 0;
 
         return (
           <div
@@ -129,6 +145,9 @@ const fetchConversations = async () => {
             >
               <div className="conv-info">
                 <div className="conv-pseudo">{pseudo}</div>
+                {unreadCount > 0 && (
+                  <span className="notif-badge">{unreadCount}</span>
+                )}
               </div>
             </div>
             <button

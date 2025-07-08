@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
-
+import "./MessageBubble.css"
 export default function MessageBubble({
   msg,
   utilisateur,

@@ -150,7 +150,7 @@ export default function Navbar() {
                       localUser.photoUrl.startsWith("/uploads")
                       ? localUser.photoUrl
                       : `/uploads/${localUser.photoUrl}`
-                    : "/images/default.jpg"
+                    : "/default.jpg"
                 }
                 alt="Photo de profil"
                 width={40}

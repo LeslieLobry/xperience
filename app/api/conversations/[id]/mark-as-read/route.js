@@ -4,42 +4,48 @@ import { NextResponse } from "next/server";
 
 // POST /api/conversations/{conversationId}/mark-as-read
 export async function POST(req, { params }) {
-  const conversationId = parseInt(params.id, 10);
-  const { userId } = await req.json();
+  try {
+    const conversationId = parseInt(params.id, 10);
+    const { userId } = await req.json();
 
-  if (!conversationId || !userId) {
-    return NextResponse.json(
-      { error: "conversationId et userId requis" },
-      { status: 400 }
-    );
+    if (!conversationId || !userId) {
+      return NextResponse.json(
+        { error: "conversationId et userId requis" },
+        { status: 400 }
+      );
+    }
+
+    // Met à jour lastReadAt pour ce participant
+    const result = await prisma.participant.updateMany({
+      where: {
+        conversationId: conversationId,
+        utilisateurId: userId,
+      },
+      data: {
+        lastReadAt: new Date(),
+      },
+    });
+
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: "Participant introuvable" },
+        { status: 404 }
+      );
+    }
+
+    // Marque tous les messages comme "lu" pour cet utilisateur (sauf les siens)
+    await prisma.message.updateMany({
+      where: {
+        conversationId,
+        auteurId: { not: userId },
+        lu: false,
+      },
+      data: { lu: true },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erreur mark-as-read:", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-
-  // Met à jour lastReadAt pour ce participant
-  const result = await prisma.participant.updateMany({
-    where: {
-      conversationId: conversationId,
-      utilisateurId: userId,
-    },
-    data: {
-      lastReadAt: new Date(),
-    },
-  });
-
-  if (result.count === 0) {
-    return NextResponse.json(
-      { error: "Participant introuvable" },
-      { status: 404 }
-    );
-  }
-// Marque tous les messages comme "lu" pour cet utilisateur (sauf les siens)
-await prisma.message.updateMany({
-  where: {
-    conversationId,
-    auteurId: { not: userId },
-    lu: false,
-  },
-  data: { lu: true },
-});
-
-  return NextResponse.json({ success: true });
 }

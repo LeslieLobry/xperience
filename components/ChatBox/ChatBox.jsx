@@ -38,6 +38,12 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   // 👇 Etat pour les prénoms du couple
   const [prenomsCouple, setPrenomsCouple] = useState(null);
+function formatDurationFront(seconds) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s < 10 ? "0" + s : s}`;
+}
 
   // Listen notifications d'appel entrant (Ably)
   useEffect(() => {
@@ -260,16 +266,56 @@ export default function ChatBox({ conversationId, utilisateur }) {
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
 
-        const duree = await new Promise((resolve) => {
-          const audio = new Audio();
-          audio.src = URL.createObjectURL(audioBlob);
-          audio.onloadedmetadata = () => {
-            const d = audio.duration;
-            const minutes = Math.floor(d / 60);
-            const secondes = Math.floor(d % 60);
-            resolve(`${minutes}:${secondes < 10 ? "0" : ""}${secondes}`);
-          };
-        });
+const duree = await new Promise((resolve) => {
+  const audio = document.createElement("audio");
+  audio.src = URL.createObjectURL(audioBlob);
+  audio.preload = "metadata";
+
+  let resolved = false;
+
+  audio.onloadedmetadata = () => {
+    if (audio.duration === Infinity) {
+      // ⚡ HACK pour forcer la vraie durée !
+      audio.currentTime = 1e101; // avance à "infini"
+      audio.ontimeupdate = () => {
+        audio.ontimeupdate = null; // ne pas boucler
+        let seconds = audio.duration;
+        if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+          resolve("0:00");
+        } else {
+          const m = Math.floor(seconds / 60);
+          const s = Math.floor(seconds % 60);
+          const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+          console.log("[AUDIO] HACKED duration:", seconds, dureeStr);
+          resolve(dureeStr);
+        }
+        URL.revokeObjectURL(audio.src);
+        resolved = true;
+      };
+    } else {
+      let seconds = audio.duration;
+      if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+        resolve("0:00");
+      } else {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+        console.log("[AUDIO] duration:", seconds, dureeStr);
+        resolve(dureeStr);
+      }
+      URL.revokeObjectURL(audio.src);
+      resolved = true;
+    }
+  };
+  // Sécurité : Timeout 3s si rien ne se passe
+  setTimeout(() => {
+    if (!resolved) {
+      resolve("0:00");
+      URL.revokeObjectURL(audio.src);
+    }
+  }, 3000);
+});
+
 
         const formData = new FormData();
         formData.append("audio", audioBlob);

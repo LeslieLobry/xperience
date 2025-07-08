@@ -44,7 +44,6 @@ export async function GET(req) {
   }
 }
 
-// DELETE /api/conversations/[id]
 export async function DELETE(req, context) {
   const { params } = await context;
   const user = await getUserFromToken();
@@ -58,6 +57,7 @@ export async function DELETE(req, context) {
   }
 
   try {
+    // 1. Soft delete pour ce participant
     const participant = await prisma.participant.findFirst({
       where: {
         conversationId,
@@ -73,6 +73,31 @@ export async function DELETE(req, context) {
       where: { id: participant.id },
       data: { supprimé: true },
     });
+
+    // 2. Vérifie si tous les participants ont supprimé la conv
+    const totalNonSuppr = await prisma.participant.count({
+      where: {
+        conversationId,
+        supprimé: false,
+      },
+    });
+
+    if (totalNonSuppr === 0) {
+      // 3. Supprime tous les messages liés (optionnel mais propre)
+      await prisma.message.deleteMany({
+        where: { conversationId }
+      });
+
+      // 4. Supprime tous les participants
+      await prisma.participant.deleteMany({
+        where: { conversationId }
+      });
+
+      // 5. Supprime la conversation
+      await prisma.conversation.delete({
+        where: { id: conversationId }
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

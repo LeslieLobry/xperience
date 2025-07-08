@@ -124,3 +124,15 @@
 .start-search-link:hover {
   text-decoration: underline;
 }
+.notif-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 2px 6px;
+  background: #e0c084;
+  color: #fff;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: bold;
+  margin-left: 8px;
+  vertical-align: middle;
+}

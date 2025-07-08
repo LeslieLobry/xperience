@@ -26,9 +26,8 @@ async function getUserFromCookie() {
 }
 
 // 📘 GET : récupérer un événement
-export async function GET(_req, contextPromise) {
-  const context = await contextPromise;
-  const id = parseInt(context.params.id, 10);
+export async function GET(_req, { params }) {
+  const id = parseInt(params.id, 10);
 
   try {
     const evenement = await prisma.evenement.findUnique({
@@ -49,21 +48,22 @@ export async function GET(_req, contextPromise) {
 }
 
 // ✏️ PUT : modifier un événement (image S3 supportée, dates[] supporté)
-export async function PUT(req, contextPromise) {
+export async function PUT(req, { params }) {
   console.log("APPEL PUT /api/evenements/[id] (UPDATE)");
-  const context = await contextPromise;
-  const id = parseInt(context.params.id, 10);
+  const id = parseInt(params.id, 10);
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
   const formData = await req.formData();
-  const data = {};
-
-  for (const key of formData.keys()) {
+ const data = {};
+for (const key of formData.keys()) {
+  if (!key.endsWith("[]") && key !== "dates") {
     data[key] = formData.get(key);
   }
+}
+
 
   // ✅ Gère les dates (tableau)
   let dates = formData.getAll("dates[]");
@@ -86,7 +86,6 @@ export async function PUT(req, contextPromise) {
     }
   });
 
-  // Ne remplace pas l'imageUrl si non changée
   ["lien"].forEach((field) => {
     if (data[field] === "null" || data[field] === "") data[field] = null;
   });
@@ -138,9 +137,8 @@ export async function PUT(req, contextPromise) {
 }
 
 // PATCH : update partiel (json)
-export async function PATCH(req, contextPromise) {
-  const context = await contextPromise;
-  const id = parseInt(context.params.id, 10);
+export async function PATCH(req, { params }) {
+  const id = parseInt(params.id, 10);
   const data = await req.json();
 
   // ✅ Gère les dates (tableau)
@@ -185,9 +183,8 @@ export async function PATCH(req, contextPromise) {
 }
 
 // DELETE : désinscription ou suppression
-export async function DELETE(req, contextPromise) {
-  const context = await contextPromise;
-  const id = parseInt(context.params.id, 10);
+export async function DELETE(req, { params }) {
+  const id = parseInt(params.id, 10);
   const user = await getUserFromCookie();
   const action = req.headers.get("x-action");
 
@@ -216,14 +213,12 @@ export async function DELETE(req, contextPromise) {
 }
 
 // POST : inscription à l'événement
-export async function POST(_req, contextPromise) {
-  
+export async function POST(_req, { params }) {
   const user = await getUserFromCookie();
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
-  const context = await contextPromise;
-  const id = parseInt(context.params.id, 10);
+  const id = parseInt(params.id, 10);
 
   try {
     const alreadyRegistered = await prisma.evenement.findFirst({
