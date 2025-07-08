@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
-import "./ChatInput.css"
+import "./ChatInput.css";
 
 export default function ChatInput({
   utilisateur,
@@ -22,6 +22,8 @@ export default function ChatInput({
   const [loadingPrenoms, setLoadingPrenoms] = useState(false);
   const [prenomsOK, setPrenomsOK] = useState(false); // Passera à true après POST ou si déjà existant
   const [membreParlant, setMembreParlant] = useState(""); // <- par défaut vide !
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const textareaRef = useRef(null);
 
   // → Fetch prénoms si utilisateur couple
@@ -35,7 +37,6 @@ export default function ChatInput({
           setPr1(data.prenoms.prenom1 || "");
           setPr2(data.prenoms.prenom2 || "");
           setPrenomsOK(true);
-          // 🟢 Initialise membreParlant automatiquement au 1er prénom ou "Le couple"
           setMembreParlant(data.prenoms.prenom1 || "Le couple");
         } else {
           setPrenomsOK(false);
@@ -61,7 +62,6 @@ export default function ChatInput({
     const data = await res.json();
     if (data.success) {
       setPrenomsOK(true);
-      // 🟢 Initialise aussi ici
       setMembreParlant(pr1);
     }
     setLoadingPrenoms(false);
@@ -79,14 +79,30 @@ export default function ChatInput({
     }
   };
 
-  // → Submit message
+  // → Submit message texte OU image
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!texte.trim()) return;
 
-    // Si couple, envoie info sur qui parle (et les prénoms pour le front)
+    // Cas : envoi d'image sélectionnée (même si pas de texte)
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+      formData.append("conversationId", conversationId);
+      formData.append("type", "IMAGE");
+      if (texte) formData.append("contenu", texte);
+      if (utilisateur.type === "couple") formData.append("envoyeur", membreParlant);
+
+      await onMessageSent(formData, "IMAGE");
+      setImageFile(null);
+      setImagePreview(null);
+      setTexte("");
+      return;
+    }
+
+    // Sinon : message texte classique
+    if (!texte.trim()) return;
     if (utilisateur.type === "couple") {
-     await onMessageSent(texte, "TEXTE", membreParlant);
+      await onMessageSent(texte, "TEXTE", membreParlant);
     } else {
       await onMessageSent(texte, "TEXTE");
     }
@@ -94,6 +110,23 @@ export default function ChatInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+  };
+
+  // → Envoi d’une photo (preview local + garde le fichier dans le state)
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+    setImageFile(file);
+    // Reset input pour pouvoir ré-uploader la même image plus tard si besoin
+    e.target.value = "";
+  };
+
+  // → Retirer le preview
+  const removePreview = () => {
+    setImagePreview(null);
+    setImageFile(null);
   };
 
   return (
@@ -125,7 +158,7 @@ export default function ChatInput({
           </div>
         </form>
       ) : (
-        // → Champ classique + select qui parle
+        // → Champ classique + select qui parle + photo
         <form className="chat-input" onSubmit={handleSubmit}>
           <div className="input-wrapper" style={{ alignItems: "center" }}>
             {utilisateur.type === "couple" && (
@@ -138,6 +171,55 @@ export default function ChatInput({
                 <option value={pr2}>{pr2}</option>
                 <option value="Le couple">Le couple</option>
               </select>
+            )}
+
+            {/* Ajoute le bouton photo */}
+            <input
+              type="file"
+              accept="image/*"
+              id="file-upload"
+              style={{ display: "none" }}
+              onChange={handleImageUpload}
+            />
+            <label htmlFor="file-upload" className="chat-input-photo-btn" title="Envoyer une photo" style={{ cursor: "pointer", fontSize: "1.4em", marginRight: 6 }}>
+              📷
+            </label>
+
+            {/* Aperçu de l'image si sélectionnée */}
+            {imagePreview && (
+              <div style={{ position: "relative", marginRight: 8 }}>
+                <img
+                  src={imagePreview}
+                  alt="Aperçu"
+                  style={{
+                    maxWidth: 50,
+                    maxHeight: 50,
+                    borderRadius: 8,
+                    objectFit: "cover",
+                    border: "1px solid #ccc",
+                  }}
+                />
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    background: "#fff",
+                    border: "1px solid #ccc",
+                    borderRadius: "50%",
+                    width: 22,
+                    height: 22,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    color: "#d00",
+                  }}
+                  onClick={removePreview}
+                  title="Supprimer"
+                >
+                  ×
+                </button>
+              </div>
             )}
 
             <textarea
@@ -168,7 +250,7 @@ export default function ChatInput({
           </div>
 
           <button type="submit" className="message-btn">
-            Envoyer
+            {imageFile ? "Envoyer l'image" : "Envoyer"}
           </button>
         </form>
       )}

@@ -389,22 +389,26 @@ const duree = await new Promise((resolve) => {
     {typingPseudo} est en train d&apos;écrire...
   </div>
 )}
-      <ChatInput
-        {...{
-          utilisateur,
-          conversationId,
-          texte,
-          setTexte,
-          showEmojiPicker,
-          setShowEmojiPicker,
-          onMessageSent: async (contenu, type = "TEXTE", membreParlant) =>
-            envoyerMessage(contenu, type, membreParlant),
-          onTyping: envoyerTyping,
-          startRecording,
-          stopRecording,
-          recording,
-        }}
-      />
+   <ChatInput
+  utilisateur={utilisateur}
+  conversationId={conversationId}
+  texte={texte}
+  setTexte={setTexte}
+  showEmojiPicker={showEmojiPicker}
+  setShowEmojiPicker={setShowEmojiPicker}
+  onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+    // Si c'est une image, le ChatInput a déjà fait le POST et l'affichage sera via Ably
+    if (!isImage) {
+      await envoyerMessage(contenu, type, membreParlant);
+    }
+    // Sinon ne rien faire, l'event Ably ajoutera le message quand il arrive
+  }}
+  onTyping={envoyerTyping}
+  startRecording={startRecording}
+  stopRecording={stopRecording}
+  recording={recording}
+/>
+
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">

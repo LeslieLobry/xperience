@@ -112,37 +112,47 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
   // Envoi d'un message
-  const envoyerMessage = async (texte, type = "TEXTE", envoyeur, prenom1, prenom2) => {
-    if (!texte.trim()) return null;
-
+const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) => {
+  let res, result;
+  // Si data est un FormData (cas image)
+  if (data instanceof FormData) {
+    res = await fetch("/api/messages", {
+      method: "POST",
+      body: data,
+    });
+  } else {
+    // Sinon, message texte classique
+    if (!data.trim()) return null;
     const payload = {
       conversationId,
-      contenu: texte,
+      contenu: data,
       type,
     };
     if (envoyeur) payload.envoyeur = envoyeur;
     if (prenom1) payload.prenom1 = prenom1;
     if (prenom2) payload.prenom2 = prenom2;
 
-    const res = await fetch("/api/messages", {
+    res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+  }
 
-    const data = await res.json();
+  result = await res.json();
 
-    if (data.success) {
-      // Publie sur Ably pour tous les utilisateurs de la conv
-      const channel = ably.channels.get(`conversation-${conversationId}`);
-      channel.publish("message", data.message);
-      setMessages((prev) => [...prev, data.message]);
-      setTexte("");
-      return data.message;
-    }
+  if (result.success) {
+    // Publie sur Ably pour tous les utilisateurs de la conv
+    const channel = ably.channels.get(`conversation-${conversationId}`);
+    channel.publish("message", result.message);
+    setMessages((prev) => [...prev, result.message]);
+    setTexte && setTexte("");
+    return result.message;
+  }
 
-    return null;
-  };
+  return null;
+};
+
 
   // Réaction à un message (corrigé)
   const handleReaction = async (messageId, emoji) => {

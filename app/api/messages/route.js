@@ -14,7 +14,7 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
-const BUCKET = process.env.AWS_S3_BUCKET_NAME;
+const BUCKET = process.env.AWS_S3_BUCKET;
 
 // POST /api/messages
 export async function POST(req) {
@@ -51,7 +51,6 @@ export async function POST(req) {
         Key: fileName,
         Body: buffer,
         ContentType: file.type,
-        ACL: "public-read",
       }));
       body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
     }
@@ -80,7 +79,6 @@ if (envoyeur && user.type === "couple") {
   prenomEnvoyeur = envoyeur; 
 }
 
-    // ----------------------------------------------
 
     const message = await prisma.message.create({
       data: {
