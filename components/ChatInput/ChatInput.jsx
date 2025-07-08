@@ -17,11 +17,11 @@ export default function ChatInput({
   recording,
 }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [pr1, setPr1] = useState("");    // Pour prénom 1
-  const [pr2, setPr2] = useState("");    // Pour prénom 2
+  const [pr1, setPr1] = useState(""); // Pour prénom 1
+  const [pr2, setPr2] = useState(""); // Pour prénom 2
   const [loadingPrenoms, setLoadingPrenoms] = useState(false);
   const [prenomsOK, setPrenomsOK] = useState(false); // Passera à true après POST ou si déjà existant
-  const [membreParlant, setMembreParlant] = useState("couple");
+  const [membreParlant, setMembreParlant] = useState(""); // <- par défaut vide !
   const textareaRef = useRef(null);
 
   // → Fetch prénoms si utilisateur couple
@@ -35,6 +35,8 @@ export default function ChatInput({
           setPr1(data.prenoms.prenom1 || "");
           setPr2(data.prenoms.prenom2 || "");
           setPrenomsOK(true);
+          // 🟢 Initialise membreParlant automatiquement au 1er prénom ou "Le couple"
+          setMembreParlant(data.prenoms.prenom1 || "Le couple");
         } else {
           setPrenomsOK(false);
         }
@@ -59,6 +61,8 @@ export default function ChatInput({
     const data = await res.json();
     if (data.success) {
       setPrenomsOK(true);
+      // 🟢 Initialise aussi ici
+      setMembreParlant(pr1);
     }
     setLoadingPrenoms(false);
   };
@@ -67,7 +71,7 @@ export default function ChatInput({
   const handleTyping = (e) => {
     const value = e.target.value;
     setTexte(value);
-    if (onTyping) onTyping(); // <- Appelle bien la notif typing à chaque frappe
+    if (onTyping) onTyping();
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
@@ -82,7 +86,7 @@ export default function ChatInput({
 
     // Si couple, envoie info sur qui parle (et les prénoms pour le front)
     if (utilisateur.type === "couple") {
-      await onMessageSent(texte, "TEXTE", membreParlant, pr1, pr2);
+     await onMessageSent(texte, "TEXTE", membreParlant);
     } else {
       await onMessageSent(texte, "TEXTE");
     }
@@ -130,9 +134,9 @@ export default function ChatInput({
                 value={membreParlant}
                 onChange={e => setMembreParlant(e.target.value)}
               >
-                <option value="MEMBRE_1">{pr1}</option>
-                <option value="MEMBRE_2">{pr2}</option>
-                <option value="couple">Le couple</option>
+                <option value={pr1}>{pr1}</option>
+                <option value={pr2}>{pr2}</option>
+                <option value="Le couple">Le couple</option>
               </select>
             )}
 

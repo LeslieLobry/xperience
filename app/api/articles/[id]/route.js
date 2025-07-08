@@ -30,7 +30,6 @@ export async function GET(req, { params }) {
   }
 }
 
-// ✅ PUT : mettre à jour l'article et ses images
 export async function PUT(req, { params }) {
   const { id } = params;
   const body = await req.json();
@@ -54,20 +53,19 @@ export async function PUT(req, { params }) {
       },
     });
 
-    // 🧹 Supprimer toutes les anciennes images
-    await prisma.imageArticle.deleteMany({
-      where: { articleId: id },
-    });
 
-    // ➕ Ajouter les nouvelles images
     if (Array.isArray(images)) {
-      const data = images.map((url) => ({
-        url,
+      await prisma.imageArticle.deleteMany({ where: { articleId: id } });
+      const data = images.map((img) => ({
+        url: typeof img === "string" ? img : img.url,
         articleId: id,
       }));
 
-      await prisma.imageArticle.createMany({ data });
+      if (data.length > 0) {
+        await prisma.imageArticle.createMany({ data });
+      }
     }
+    // Sinon : ne rien toucher, les images restent inchangées
 
     return NextResponse.json({ success: true, article: updatedArticle });
   } catch (error) {
@@ -80,9 +78,8 @@ export async function PUT(req, { params }) {
 }
 
 // ✅ DELETE : supprimer un article + ses images
-export async function DELETE(request, context) {
-  const params = await context.params;
-  const id = params.id;
+export async function DELETE(req, { params }) {
+  const { id } = params;
 
   try {
     await prisma.imageArticle.deleteMany({
@@ -102,5 +99,3 @@ export async function DELETE(request, context) {
     );
   }
 }
-
-

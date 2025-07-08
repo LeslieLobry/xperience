@@ -72,7 +72,15 @@ export default function AdminUtilisateurs() {
             </tr>
           ))}
         </tbody>
+        <tfoot>
+  <tr>
+    <td colSpan="4" style={{ textAlign: "right", fontWeight: "bold" }}>
+      Total utilisateurs : {utilisateurs.length}
+    </td>
+  </tr>
+</tfoot>
       </table>
-    </div>
+      
+</div>
   );
 }

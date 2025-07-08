@@ -32,17 +32,27 @@ export default function Navbar() {
     setLocalUser(user);
   }, [user]);
 
+  // Click en dehors pour fermer menus/popup
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (popupRef.current && !popupRef.current.contains(event.target)) {
+      // Fermeture popup profil/notif
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target)
+      ) {
         setDropdownOpen(false);
       }
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      // Fermeture menu burger mobile
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target)
+      ) {
         setMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = async () => {
@@ -51,9 +61,7 @@ export default function Navbar() {
         method: "POST",
         credentials: "include",
       });
-
       const data = await res.json();
-      console.log("🔁 Logout API response:", res.status, data);
       logout();
       router.push("/connexion");
     } catch (err) {
@@ -103,6 +111,12 @@ export default function Navbar() {
     }
   };
 
+  // Naviguer ET fermer le dropdown AVANT
+  const handleGoTo = (href) => {
+    setDropdownOpen(false);
+    router.push(href);
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-left">
@@ -116,7 +130,11 @@ export default function Navbar() {
             priority
           />
         </Link>
-        {localUser && <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>}
+        {localUser && (
+          <h3 className="navbar-pseudo">
+            Bienvenue, {localUser.pseudo}
+          </h3>
+        )}
       </div>
 
       <div
@@ -141,7 +159,7 @@ export default function Navbar() {
         )}
 
         {localUser ? (
-          <li className="nav-avatar-wrapper" ref={popupRef}>
+          <li className="nav-avatar-wrapper">
             <div className="nav-avatar-container" onClick={handleAvatarClick}>
               <Image
                 src={
@@ -163,29 +181,45 @@ export default function Navbar() {
             </div>
 
             {dropdownOpen && (
-              <div className="nav-combined-popup">
+              <div
+                className="nav-combined-popup"
+                ref={popupRef}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="notif-section">
                   <ul>
-                    {notifications.length === 0 && <li>Aucune notification</li>}
+                    {notifications.length === 0 && (
+                      <li>Aucune notification</li>
+                    )}
                     {notifications.map((notif) => (
                       <li key={notif.id}>
-                        <Link href={notif.lien || "#"} onClick={() => setDropdownOpen(false)}>
+                        <a
+                          href={notif.lien || "#"}
+                          onClick={() => setDropdownOpen(false)}
+                        >
                           {notif.message}
-                        </Link>
-                        <small>{new Date(notif.createdAt).toLocaleString()}</small>
+                        </a>
+                        <small>
+                          {new Date(notif.createdAt).toLocaleString()}
+                        </small>
                       </li>
                     ))}
                   </ul>
                 </div>
                 <hr />
                 <div className="profil-actions">
-                  <Link href={`/profil/${localUser.id}`} onClick={() => setDropdownOpen(false)}>
+                  <button
+                    onClick={() => handleGoTo(`/profil/${localUser.id}`)}
+                    className="btn-link"
+                  >
                     Mon profil
-                  </Link>
-                  <Link href="/parametres" onClick={() => setDropdownOpen(false)}>
-                    <Settings size={16} style={{ marginRight: "6px" }} />
-                    Paramètres
-                  </Link>
+                  </button>
+                  <button
+                    onClick={() => handleGoTo("/parametres")}
+                    className="btn-link"
+                  >
+                  Paramètres
+                  </button>
                   <button onClick={handleLogout} className="btn-dec">
                     Déconnexion
                   </button>

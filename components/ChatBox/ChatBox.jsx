@@ -369,9 +369,9 @@ const duree = await new Promise((resolve) => {
         hangupCall={hangupCall}
       />
 
-      {loadingInitial ? (
-        <Spinner />
-      ) : (
+      {/* {loadingInitial ? (
+        <Spinner /> */}
+      {/* ) : ( */}
         <MessagesList
           messages={messages}
           utilisateur={utilisateur}
@@ -383,7 +383,7 @@ const duree = await new Promise((resolve) => {
           onDelete={handleDelete}
           prenomsCouple={prenomsCouple}
         />
-      )}
+      {/* )} */}
 {isTyping && typingPseudo && (
   <div className="typing-notif" style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}>
     {typingPseudo} est en train d&apos;écrire...

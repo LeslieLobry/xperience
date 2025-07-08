@@ -84,8 +84,8 @@
 }
 
 .message-bubble.own {
-  background: linear-gradient(100deg, #e0c084 92%, #d3a762 100%);
-  color: #221c0e;
+ background: linear-gradient(  100deg,  rgba(198, 132, 10, 0.28) 92%,  rgba(221, 169, 87, 0.17) 100%);
+  color:white;
   align-self: flex-end;
   border-top-right-radius: 0;
   border-bottom-right-radius: 16px;
@@ -93,7 +93,7 @@
 
 .message-bubble.other {
   background: rgba(30, 20, 7, 0.72);
-  color: #f2c98b;
+  color: #f7f6f4;
   align-self: flex-start;
   border-top-left-radius: 0;
   border-bottom-left-radius: 16px;
@@ -120,7 +120,7 @@
 .author-name {
   font-size: 0.97em;
   font-weight: 600;
-  color: #e0c084;
+  color: white;
   letter-spacing: 0.03em;
 }
 
@@ -136,12 +136,12 @@
 }
 
 /* === Contenu du message === */
-.message-text {
+/* .message-text {
   margin: 0;
   line-height: 1.5;
   font-size: 1.06em;
   word-break: break-word;
-}
+} */
 .message-image {
   max-width: 100%;
   border-radius: 8px;
@@ -151,9 +151,9 @@
 
 /* === Infos meta (heure, statut) === */
 .message-meta {
-  font-size: 0.76em;
+  font-size: 1em;
   margin-top: 7px;
-  color: #a68c61;
+  color: white;
   text-align: right;
   opacity: 0.55;
   display: flex;
@@ -231,7 +231,7 @@
   transition: color 0.15s, opacity 0.15s;
 }
 .message-bubble.own .delete-message-button {
-  color: #7b653c;
+  color:white;
 }
 .delete-message-button:hover { color: #e66; opacity: 1; }
 

@@ -12,9 +12,48 @@ export default function MessagesList({
   hasMore,
   onLoadMore,
   onDelete,
-  prenomsCouple = null, 
+  prenomsCouple = null,
 }) {
   const containerRef = useRef();
+
+  // → Fonction utilitaire pour avoir les prénoms au bon format string
+  const getPrenomsCoupleString = (msg) => {
+    // Si le message a prénom1 et prénom2 (ex : stocké dans la DB)
+    if (msg.prenom1 && msg.prenom2) return `${msg.prenom1} & ${msg.prenom2}`;
+    // Si msg.prenomsCouple est un objet {prenom1, prenom2}
+    if (
+      msg.prenomsCouple &&
+      typeof msg.prenomsCouple === "object" &&
+      msg.prenomsCouple.prenom1 &&
+      msg.prenomsCouple.prenom2
+    ) {
+      return `${msg.prenomsCouple.prenom1} & ${msg.prenomsCouple.prenom2}`;
+    }
+    // Si msg.prenomsCouple est une string
+    if (
+      msg.prenomsCouple &&
+      typeof msg.prenomsCouple === "string"
+    ) {
+      return msg.prenomsCouple;
+    }
+    // Sinon utiliser la prop parent si elle existe (string ou objet)
+    if (
+      prenomsCouple &&
+      typeof prenomsCouple === "object" &&
+      prenomsCouple.prenom1 &&
+      prenomsCouple.prenom2
+    ) {
+      return `${prenomsCouple.prenom1} & ${prenomsCouple.prenom2}`;
+    }
+    if (
+      prenomsCouple &&
+      typeof prenomsCouple === "string"
+    ) {
+      return prenomsCouple;
+    }
+    // Rien à afficher
+    return "";
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -26,6 +65,7 @@ export default function MessagesList({
     container?.addEventListener("scroll", handleScroll);
     return () => container?.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
+
   let lastDate = null;
 
   return (
@@ -73,7 +113,7 @@ export default function MessagesList({
               lastReads={lastReads}
               previousMsg={messages[index - 1]}
               onDelete={onDelete}
-              prenomsCouple={prenomsCouple} // 👈 passe la prop ici
+              prenomsCouple={getPrenomsCoupleString(msg)}
             />
           </div>
         );

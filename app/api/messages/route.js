@@ -75,13 +75,11 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
-    // -------- Ajout du prénom membre couple --------
-    let prenomEnvoyeur = null;
-    if (envoyeur && user.type === "couple") {
-  if (envoyeur === "MEMBRE_1") prenomEnvoyeur = prenom1 || "Membre 1";
-  else if (envoyeur === "MEMBRE_2") prenomEnvoyeur = prenom2 || "Membre 2";
-  else if (envoyeur === "COUPLE" || envoyeur === "couple") prenomEnvoyeur = "Le couple";
+let prenomEnvoyeur = null;
+if (envoyeur && user.type === "couple") {
+  prenomEnvoyeur = envoyeur; 
 }
+
     // ----------------------------------------------
 
     const message = await prisma.message.create({
@@ -99,8 +97,9 @@ export async function POST(req) {
       },
       include: {
         auteur: {
-          select: { id: true, pseudo: true, photoUrl: true },
-        },
+  select: { id: true, pseudo: true, photoUrl: true, type: true },
+},
+
         reactions: {
           select: {
             emoji: true,
@@ -215,7 +214,7 @@ export async function GET(req) {
         createdAt: true,
         auteurId: true,
         lu: true,
-        auteur: { select: { id: true, pseudo: true, photoUrl: true } },
+        auteur: { select: { id: true, pseudo: true, photoUrl: true, type: true } },
         envoyeur: true,
         prenomEnvoyeur: true,
         reactions: {

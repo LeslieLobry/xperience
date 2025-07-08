@@ -73,14 +73,12 @@ export default function MessageBubble({
 
   const isOwn = msg.auteurId === utilisateur.id;
 
-  // Affiche le bloc auteur si changement d’auteur ou de membre (envoyeur ou prénom)
-  const showAuthorInfo =
-    !isOwn &&
-    (
-      !previousMsg ||
-      previousMsg.auteurId !== msg.auteurId ||
-      previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur // Ajoute le prénom comme critère de séparation
-    );
+const auteurIsCouple = msg.auteur?.type === "couple";
+const showAuthorInfo =
+  auteurIsCouple ||
+  !previousMsg ||
+  previousMsg.auteurId !== msg.auteurId ||
+  previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
 
   const heure = msg.createdAt
     ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -109,24 +107,28 @@ export default function MessageBubble({
       return acc;
     }, {}) || {}
   );
-
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-      {showAuthorInfo && (
-        <div className="author-info">
-          <img
-            src={msg.auteur?.photoUrl || "/default-avatar.png"}
-            alt={msg.auteur?.pseudo || "Utilisateur"}
-            className="author-avatar"
-          />
-          <div>
-            <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
-            {msg.prenomEnvoyeur && (
-              <div className="author-inline-name">{msg.prenomEnvoyeur}</div>
-            )}
-          </div>
-        </div>
+{showAuthorInfo && (
+  <div className="author-info">
+    <img
+      src={msg.auteur?.photoUrl || "/default.jpg"}
+      alt={msg.auteur?.pseudo || "Utilisateur"}
+      className="author-avatar"
+    />
+    <div>
+      {msg.prenomEnvoyeur
+        ? <span className="author-name">{msg.prenomEnvoyeur}</span>
+        : <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+      }
+      {/* 👇 AFFICHAGE prénoms du couple SI L'AUTEUR EST UN COUPLE */}
+      {auteurIsCouple && prenomsCouple && (
+        <span className="author-couple-names">({prenomsCouple})</span>
       )}
+    </div>
+  </div>
+)}
+
 
       {msg.type === "IMAGE" && msg.imageUrl ? (
         <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
