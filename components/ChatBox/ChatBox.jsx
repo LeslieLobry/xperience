@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
-import dynamic from "next/dynamic";
+import dynamic from "next/dynamic"; // corrigé ici
 import ChatInput from "../ChatInput/ChatInput";
 import Spinner from "../Spinner/Spinner";
 
@@ -35,15 +35,15 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const audioChunks = useRef([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-
   // 👇 Etat pour les prénoms du couple
   const [prenomsCouple, setPrenomsCouple] = useState(null);
-function formatDurationFront(seconds) {
-  if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s < 10 ? "0" + s : s}`;
-}
+
+  function formatDurationFront(seconds) {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? "0" + s : s}`;
+  }
 
   // Listen notifications d'appel entrant (Ably)
   useEffect(() => {
@@ -71,7 +71,6 @@ function formatDurationFront(seconds) {
       channel.unsubscribe("call:incoming", handleIncomingCall);
       clearTimeout(appelTimeoutRef.current);
     };
-    // eslint-disable-next-line
   }, [utilisateur?.id]);
 
   // Listen "call:accepted" pour stopper notif/sonnerie côté appelant
@@ -86,7 +85,6 @@ function formatDurationFront(seconds) {
         sonnerieRef.current.pause();
         sonnerieRef.current.currentTime = 0;
       }
-      // Si tu veux connecter côté appelant (optionnel, à ajuster selon ton flow)
       if (!inCall) {
         startCall(data.type === "video");
       }
@@ -97,7 +95,6 @@ function formatDurationFront(seconds) {
     return () => {
       channel.unsubscribe("call:accepted", handleCallAccepted);
     };
-    // eslint-disable-next-line
   }, [utilisateur?.id, inCall]);
 
   // Listen "call:refused" pour notif refus (appelant)
@@ -172,11 +169,10 @@ function formatDurationFront(seconds) {
   useEffect(() => {
     if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
-  
+
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
   const startCall = async (video = true) => {
-    // Gestion occupé : si déjà en call, prévient l'autre et ne fait rien
     if (inCall) {
       participantsAutres.forEach((p) => {
         ably.channels.get(`notification-${p.id}`).publish("call:busy", {
@@ -266,56 +262,54 @@ function formatDurationFront(seconds) {
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
 
-const duree = await new Promise((resolve) => {
-  const audio = document.createElement("audio");
-  audio.src = URL.createObjectURL(audioBlob);
-  audio.preload = "metadata";
+        const duree = await new Promise((resolve) => {
+          const audio = document.createElement("audio");
+          audio.src = URL.createObjectURL(audioBlob);
+          audio.preload = "metadata";
 
-  let resolved = false;
+          let resolved = false;
 
-  audio.onloadedmetadata = () => {
-    if (audio.duration === Infinity) {
-      // ⚡ HACK pour forcer la vraie durée !
-      audio.currentTime = 1e101; // avance à "infini"
-      audio.ontimeupdate = () => {
-        audio.ontimeupdate = null; // ne pas boucler
-        let seconds = audio.duration;
-        if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
-          resolve("0:00");
-        } else {
-          const m = Math.floor(seconds / 60);
-          const s = Math.floor(seconds % 60);
-          const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
-          console.log("[AUDIO] HACKED duration:", seconds, dureeStr);
-          resolve(dureeStr);
-        }
-        URL.revokeObjectURL(audio.src);
-        resolved = true;
-      };
-    } else {
-      let seconds = audio.duration;
-      if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
-        resolve("0:00");
-      } else {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
-        console.log("[AUDIO] duration:", seconds, dureeStr);
-        resolve(dureeStr);
-      }
-      URL.revokeObjectURL(audio.src);
-      resolved = true;
-    }
-  };
-  // Sécurité : Timeout 3s si rien ne se passe
-  setTimeout(() => {
-    if (!resolved) {
-      resolve("0:00");
-      URL.revokeObjectURL(audio.src);
-    }
-  }, 3000);
-});
+          audio.onloadedmetadata = () => {
+            if (audio.duration === Infinity) {
+              audio.currentTime = 1e101;
+              audio.ontimeupdate = () => {
+                audio.ontimeupdate = null;
+                let seconds = audio.duration;
+                if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+                  resolve("0:00");
+                } else {
+                  const m = Math.floor(seconds / 60);
+                  const s = Math.floor(seconds % 60);
+                  const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+                  console.log("[AUDIO] HACKED duration:", seconds, dureeStr);
+                  resolve(dureeStr);
+                }
+                URL.revokeObjectURL(audio.src);
+                resolved = true;
+              };
+            } else {
+              let seconds = audio.duration;
+              if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+                resolve("0:00");
+              } else {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+                console.log("[AUDIO] duration:", seconds, dureeStr);
+                resolve(dureeStr);
+              }
+              URL.revokeObjectURL(audio.src);
+              resolved = true;
+            }
+          };
 
+          setTimeout(() => {
+            if (!resolved) {
+              resolve("0:00");
+              URL.revokeObjectURL(audio.src);
+            }
+          }, 3000);
+        });
 
         const formData = new FormData();
         formData.append("audio", audioBlob);
@@ -369,53 +363,60 @@ const duree = await new Promise((resolve) => {
         hangupCall={hangupCall}
       />
 
-      {/* {loadingInitial ? (
-        <Spinner /> */}
-      {/* ) : ( */}
-        <MessagesList
-          messages={messages}
-          utilisateur={utilisateur}
-          onReact={handleReaction}
-          lastReads={lastReads}
-          typingPseudo={isTyping ? typingPseudo : null}
-          hasMore={hasMore}
-          onLoadMore={loadMoreMessages}
-          onDelete={handleDelete}
-          prenomsCouple={prenomsCouple}
-        />
-      {/* )} */}
-{isTyping && typingPseudo && (
-  <div className="typing-notif" style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}>
-    {typingPseudo} est en train d&apos;écrire...
-  </div>
-)}
-   <ChatInput
-  utilisateur={utilisateur}
-  conversationId={conversationId}
-  texte={texte}
-  setTexte={setTexte}
-  showEmojiPicker={showEmojiPicker}
-  setShowEmojiPicker={setShowEmojiPicker}
-  onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
-    // Si c'est une image, le ChatInput a déjà fait le POST et l'affichage sera via Ably
-    if (!isImage) {
-      await envoyerMessage(contenu, type, membreParlant);
-    }
-    // Sinon ne rien faire, l'event Ably ajoutera le message quand il arrive
-  }}
-  onTyping={envoyerTyping}
-  startRecording={startRecording}
-  stopRecording={stopRecording}
-  recording={recording}
-/>
+      <MessagesList
+        messages={messages}
+        utilisateur={utilisateur}
+        onReact={handleReaction}
+        lastReads={lastReads}
+        typingPseudo={isTyping ? typingPseudo : null}
+        hasMore={hasMore}
+        onLoadMore={loadMoreMessages}
+        onDelete={handleDelete}
+        prenomsCouple={prenomsCouple}
+      />
 
+      {isTyping && typingPseudo && (
+        <div className="typing-notif" style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}>
+          {typingPseudo} est en train d&apos;écrire...
+        </div>
+      )}
+
+      <ChatInput
+        utilisateur={utilisateur}
+        conversationId={conversationId}
+        texte={texte}
+        setTexte={setTexte}
+        showEmojiPicker={showEmojiPicker}
+        setShowEmojiPicker={setShowEmojiPicker}
+        onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+          if (isImage) {
+            // Contenu est un FormData pour image/audio, envoie POST ici
+            const res = await fetch("/api/messages", {
+              method: "POST",
+              body: contenu, // FormData envoyé depuis ChatInput
+            });
+            const data = await res.json();
+            if (data.success && data.message) {
+              setMessages((prev) => [...prev, data.message]); // Ajoute message manuellement
+            }
+          } else {
+            await envoyerMessage(contenu, type, membreParlant);
+          }
+        }}
+        onTyping={envoyerTyping}
+        startRecording={startRecording}
+        stopRecording={stopRecording}
+        recording={recording}
+      />
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">
-          <EmojiPicker onSelect={(emoji) => {
-            setTexte((prev) => prev + emoji.native);
-            setShowEmojiPicker(false);
-          }} />
+          <EmojiPicker
+            onSelect={(emoji) => {
+              setTexte((prev) => prev + emoji.native);
+              setShowEmojiPicker(false);
+            }}
+          />
         </div>
       )}
 
@@ -426,7 +427,6 @@ const duree = await new Promise((resolve) => {
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
           sonnerieRef.current.currentTime = 0;
-          // Ajoute l'envoi du signal call:accepted
           if (appelEntrant?.from?.id) {
             ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
               from: utilisateur,
@@ -441,7 +441,6 @@ const duree = await new Promise((resolve) => {
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
           sonnerieRef.current.currentTime = 0;
-          // Ajoute l'envoi du signal call:refused
           if (appelEntrant?.from?.id) {
             ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:refused", {
               from: utilisateur,
@@ -460,17 +459,8 @@ const duree = await new Promise((resolve) => {
 
       <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" />
 
-      {/* Notifs refus et occupé */}
-      {appelRefuse && (
-        <div className="call-refused-notif">
-          Appel refusé 📵
-        </div>
-      )}
-      {appelOccupe && (
-        <div className="call-busy-notif">
-          Utilisateur occupé sur un autre appel 🚫
-        </div>
-      )}
+      {appelRefuse && <div className="call-refused-notif">Appel refusé 📵</div>}
+      {appelOccupe && <div className="call-busy-notif">Utilisateur occupé sur un autre appel 🚫</div>}
     </div>
   );
 }

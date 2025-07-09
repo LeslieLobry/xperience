@@ -238,6 +238,7 @@ model Message {
   type           MessageType  @default(TEXTE)
   lu             Boolean      @default(false)
   createdAt      DateTime     @default(now())
+  openedAt     DateTime? @map("opened_at")
   auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   reactions MessageReaction[] 
@@ -362,6 +363,7 @@ enum MessageType {
   IMAGE
   VIDEO
   AUDIO
+  EPHEMERE
 }
 
 enum DemandeStatut {

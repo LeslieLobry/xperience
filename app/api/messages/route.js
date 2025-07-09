@@ -16,9 +16,12 @@ const s3 = new S3Client({
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
 
-// POST /api/messages
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
+  console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
+  let debugBody = "";
+  try { debugBody = await req.clone().text(); } catch {}
+  console.log("POST /api/messages RAW BODY:", debugBody);
 
   try {
     const contentType = req.headers.get("content-type") || "";
@@ -34,9 +37,19 @@ export async function POST(req) {
         contenu: formData.get("contenu"),
         type: formData.get("type"),
         imageUrl: null,
+        audioUrl: null,
         videoUrl: null,
+        envoyeur: formData.get("envoyeur") || null,
+        prenom1: formData.get("prenom1") || null,
+        prenom2: formData.get("prenom2") || null,
       };
-      file = formData.get("image");
+
+      // Sélectionne le fichier selon le type et présence dans formData
+      if ((body.type === "IMAGE" || body.type === "EPHEMERE") && formData.get("image")) {
+        file = formData.get("image");
+      } else if ((body.type === "AUDIO" || body.type === "EPHEMERE") && formData.get("audio")) {
+        file = formData.get("audio");
+      }
     } else {
       return NextResponse.json({ error: "Type non supporté" }, { status: 400 });
     }
@@ -45,40 +58,59 @@ export async function POST(req) {
     if (file && file.size > 0) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const ext = file.name.split(".").pop();
-      const fileName = `msg_${uuidv4()}.${ext}`;
-      await s3.send(new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: fileName,
-        Body: buffer,
-        ContentType: file.type,
-      }));
-      body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+      let fileName;
+
+      if (body.type === "EPHEMERE") {
+        fileName = `ephemere/snap_${uuidv4()}.${ext}`;
+      } else {
+        fileName = `msg_${uuidv4()}.${ext}`;
+      }
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: fileName,
+          Body: buffer,
+          ContentType: file.type,
+        })
+      );
+
+      // Détermine le bon champ URL selon MIME type même en mode EPHEMERE
+      if (file.type.startsWith("audio/")) {
+        body.audioUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+      } else {
+        body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+      }
+      console.log("URL construite :", body.imageUrl || body.audioUrl);
     }
 
-    const { conversationId, contenu, imageUrl, videoUrl, type, envoyeur, prenom1, prenom2 } = body;
+    const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } = body;
     const user = await getUserFromToken();
-    if (!user) return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
 
     const auteurId = user.id;
+
+    // Participants de la conversation
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
 
     const autresParticipants = participants
-      .map(p => p.utilisateurId)
-      .filter(id => id !== auteurId);
+      .map((p) => p.utilisateurId)
+      .filter((id) => id !== auteurId);
 
+    // Vérifie si certains participants sont bloqués
     const exclus = await getIdsUtilisateursExclus(auteurId);
-    if (autresParticipants.some(id => exclus.includes(id))) {
+    if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
-let prenomEnvoyeur = null;
-if (envoyeur && user.type === "couple") {
-  prenomEnvoyeur = envoyeur; 
-}
-
+    let prenomEnvoyeur = null;
+    if (envoyeur && user.type === "couple") {
+      prenomEnvoyeur = envoyeur;
+    }
 
     const message = await prisma.message.create({
       data: {
@@ -86,27 +118,30 @@ if (envoyeur && user.type === "couple") {
         auteurId,
         contenu,
         imageUrl,
+        audioUrl,
         videoUrl,
         type,
         duree: null,
         lu: false,
         envoyeur: envoyeur || null,
-        prenomEnvoyeur: prenomEnvoyeur || null, // <- stocke bien le prénom !
+        prenomEnvoyeur: prenomEnvoyeur || null,
+        openedAt: null,
       },
       include: {
         auteur: {
-  select: { id: true, pseudo: true, photoUrl: true, type: true },
-},
-
+          select: { id: true, pseudo: true, photoUrl: true, type: true },
+        },
         reactions: {
           select: {
             emoji: true,
             utilisateurId: true,
-            utilisateur: { select: { pseudo: true } }
+            utilisateur: { select: { pseudo: true } },
           },
         },
       },
     });
+
+    console.log("Message créé en base :", message);
 
     await prisma.conversation.update({
       where: { id: conversationId },
@@ -114,7 +149,7 @@ if (envoyeur && user.type === "couple") {
     });
 
     await Promise.all(
-      autresParticipants.map(destId =>
+      autresParticipants.map((destId) =>
         prisma.notification.create({
           data: {
             utilisateurId: destId,
@@ -134,8 +169,8 @@ if (envoyeur && user.type === "couple") {
           include: { utilisateur: true },
         });
         const destinataire = participantsWithUser
-          .map(p => p.utilisateur)
-          .find(u => u.id !== auteurId);
+          .map((p) => p.utilisateur)
+          .find((u) => u.id !== auteurId);
 
         if (!destinataire || destinataire.statut === "en_ligne" || !destinataire.email) return;
 
@@ -162,7 +197,6 @@ if (envoyeur && user.type === "couple") {
     })();
 
     return NextResponse.json({ success: true, message }, { status: 200 });
-
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
     return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
@@ -185,11 +219,11 @@ export async function GET(req) {
     // Vérification d’accès
     const participants = await prisma.participant.findMany({
       where: { conversationId },
-      select: { utilisateurId: true, lastReadAt: true }, // ⬅️ Ajoute lastReadAt ici !
+      select: { utilisateurId: true, lastReadAt: true },
     });
-    const autresParticipants = participants.map(p => p.utilisateurId).filter(id => id !== auteurId);
+    const autresParticipants = participants.map((p) => p.utilisateurId).filter((id) => id !== auteurId);
     const exclus = await getIdsUtilisateursExclus(auteurId);
-    if (autresParticipants.some(id => exclus.includes(id))) {
+    if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
 
@@ -220,34 +254,37 @@ export async function GET(req) {
             emoji: true,
             utilisateurId: true,
             utilisateur: { select: { pseudo: true } },
-          }
-        }
+          },
+        },
       },
     });
 
     messages.reverse(); // Chronologique
+    console.log("Messages envoyés au frontend:", messages.map((m) => ({ id: m.id, imageUrl: m.imageUrl })));
 
     // Destinataire (si besoin)
     const destinataire = autresParticipants.length === 1
       ? await prisma.utilisateur.findUnique({
           where: { id: autresParticipants[0] },
-          select: { id: true, pseudo: true, photoUrl: true }
+          select: { id: true, pseudo: true, photoUrl: true },
         })
       : null;
 
-    // ⬇️ **Ajoute ce bloc pour retourner lastReads**
+    // Retourne lastReads
     const lastReads = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true, lastReadAt: true },
     });
 
-    return NextResponse.json({
-      success: true,
-      messages,
-      destinataire,
-      lastReads, // ⬅️ Ajoute au retour
-    }, { status: 200 });
-
+    return NextResponse.json(
+      {
+        success: true,
+        messages,
+        destinataire,
+        lastReads,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Erreur dans GET /api/messages :", error);
     return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });

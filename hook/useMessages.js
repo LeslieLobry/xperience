@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Realtime } from "ably";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
@@ -10,6 +10,9 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [lastReads, setLastReads] = useState([]);
   const MESSAGES_LIMIT = 30;
+
+  // Référence pour stocker les timers d'effacement des messages éphémères
+  const ephemeralTimers = useRef({});
 
   // Chargement initial des messages ET des statuts de lecture
   useEffect(() => {
@@ -56,7 +59,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       });
     };
 
-    // Réaction reçue (maintenant, liste complète !)
+    // Réaction reçue (liste complète)
     const onReaction = (msg) => {
       const { messageId, reactions } = msg.data;
       setMessages((prev) =>
@@ -112,47 +115,46 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   }, [conversationId, messages, isLoadingMore, hasMore]);
 
   // Envoi d'un message
-const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) => {
-  let res, result;
-  // Si data est un FormData (cas image)
-  if (data instanceof FormData) {
-    res = await fetch("/api/messages", {
-      method: "POST",
-      body: data,
-    });
-  } else {
-    // Sinon, message texte classique
-    if (!data.trim()) return null;
-    const payload = {
-      conversationId,
-      contenu: data,
-      type,
-    };
-    if (envoyeur) payload.envoyeur = envoyeur;
-    if (prenom1) payload.prenom1 = prenom1;
-    if (prenom2) payload.prenom2 = prenom2;
+  const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) => {
+    let res, result;
+    // Si data est un FormData (cas image, audio, etc.)
+    if (data instanceof FormData) {
+      res = await fetch("/api/messages", {
+        method: "POST",
+        body: data,
+      });
+    } else {
+      // Sinon, message texte classique
+      if (!data.trim()) return null;
+      const payload = {
+        conversationId,
+        contenu: data,
+        type,
+      };
+      if (envoyeur) payload.envoyeur = envoyeur;
+      if (prenom1) payload.prenom1 = prenom1;
+      if (prenom2) payload.prenom2 = prenom2;
 
-    res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  }
+      res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
 
-  result = await res.json();
+    result = await res.json();
 
-  if (result.success) {
-    // Publie sur Ably pour tous les utilisateurs de la conv
-    const channel = ably.channels.get(`conversation-${conversationId}`);
-    channel.publish("message", result.message);
-    setMessages((prev) => [...prev, result.message]);
-    setTexte && setTexte("");
-    return result.message;
-  }
+    if (result.success) {
+      // Publie sur Ably pour tous les utilisateurs de la conversation
+      const channel = ably.channels.get(`conversation-${conversationId}`);
+      channel.publish("message", result.message);
+      setMessages((prev) => [...prev, result.message]);
+      setTexte && setTexte("");
+      return result.message;
+    }
 
-  return null;
-};
-
+    return null;
+  };
 
   // Réaction à un message (corrigé)
   const handleReaction = async (messageId, emoji) => {
@@ -177,6 +179,26 @@ const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) 
     }
   };
 
+  // Gestion des timers : suppression après clic sur message éphémère
+  const lancerSuppressionAvecDelai = (messageId) => {
+    if (ephemeralTimers.current[messageId]) {
+      // Timer déjà lancé, on ne fait rien
+      return;
+    }
+    ephemeralTimers.current[messageId] = setTimeout(() => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      delete ephemeralTimers.current[messageId];
+    }, 5000);
+  };
+
+  // Nettoyage timers au démontage
+  useEffect(() => {
+    return () => {
+      Object.values(ephemeralTimers.current).forEach(clearTimeout);
+      ephemeralTimers.current = {};
+    };
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -187,5 +209,6 @@ const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) 
     loadMoreMessages,
     lastReads,
     setLastReads,
+    lancerSuppressionAvecDelai,
   };
 }

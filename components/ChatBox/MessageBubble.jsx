@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
-import "./MessageBubble.css"
+import MessageEphemere from "../MessageEphemere/MessageEphemere";
+
+import "./MessageBubble.css";
+
 export default function MessageBubble({
   msg,
   utilisateur,
@@ -44,9 +47,9 @@ export default function MessageBubble({
     "😮‍💨": "Soupir de plaisir",
     "👄": "Envie de t’embrasser",
   };
+
   const [selectedPack, setSelectedPack] = useState(emojiPack);
   const [showPicker, setShowPicker] = useState(false);
-
   const pickerRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -81,7 +84,10 @@ export default function MessageBubble({
     previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
 
   const heure = msg.createdAt
-    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? new Date(msg.createdAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
 
   let statutTexte = "";
@@ -99,7 +105,7 @@ export default function MessageBubble({
     }
   }
 
-  // --- CORRECTION : regroupement des réactions par emoji, calcule le nombre d'utilisateurs pour chaque emoji
+  // Regroupement des réactions par emoji, avec nombre d'utilisateurs
   const groupedReactions = Object.entries(
     (msg.reactions || []).reduce((acc, r) => {
       if (!acc[r.emoji]) acc[r.emoji] = new Set();
@@ -107,7 +113,11 @@ export default function MessageBubble({
       return acc;
     }, {})
   );
-  // ---
+
+  // Affichage du message éphémère via MessageEphemere
+  if (msg.type === "EPHEMERE") {
+    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id}/>;
+  }
 
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
@@ -119,11 +129,11 @@ export default function MessageBubble({
             className="author-avatar"
           />
           <div>
-            {msg.prenomEnvoyeur
-              ? <span className="author-name">{msg.prenomEnvoyeur}</span>
-              : <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
-            }
-            {/* 👇 AFFICHAGE prénoms du couple SI L'AUTEUR EST UN COUPLE */}
+            {msg.prenomEnvoyeur ? (
+              <span className="author-name">{msg.prenomEnvoyeur}</span>
+            ) : (
+              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+            )}
             {auteurIsCouple && prenomsCouple && (
               <span className="author-couple-names">({prenomsCouple})</span>
             )}
@@ -139,7 +149,7 @@ export default function MessageBubble({
         <p className="message-text">{msg.contenu}</p>
       )}
 
-       {isOwn && (
+      {isOwn && (
         <button
           className="delete-message-button"
           onClick={() => onDelete?.(msg.id)}
@@ -148,89 +158,88 @@ export default function MessageBubble({
           🗑️
         </button>
       )}
-<div className="div-react">
-      {/* Affichage des réactions */}
-      <div className={`emoji-action-wrapper ${isOwn ? "right" : "left"}`}>
-        <button
-          ref={buttonRef}
-          onClick={() => setShowPicker(!showPicker)}
-          className="emoji-fixed-btn"
-          type="button"
-        >
-          😊
-        </button>
-      {groupedReactions.length > 0 && (
-        <div className="message-reactions">
-          {groupedReactions.map(([emoji, utilisateursSet]) => {
-            const nb = utilisateursSet.size;
-            return (
-              <span
-                key={emoji}
-                className={`reaction-item ${
-                  msg.reactions?.some(
-                    (r) =>
-                      r.emoji === emoji &&
-                      r.utilisateurId === utilisateur.id
-                  )
-                    ? "user-reaction"
-                    : ""
-                }`}
-                title={
-                  (emojiTooltips[emoji] || "") +
-                  " — " +
-                  (nb > 1 ? `${nb} personnes` : "1 personne")
-                }
-              >
-                {emoji} {nb}
-              </span>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Wrapper du bouton + barre d'émojis */}
-
-        {showPicker && (
-          <div ref={pickerRef} className={`reaction-bar-container ${isOwn ? "open-left" : "open-right"}`}>
-            <div className="emoji-pack-selector">
-              <select
-                id="emoji-pack-select"
-                value={selectedPack}
-                onChange={(e) => setSelectedPack(e.target.value)}
-              >
-                {Object.keys(emojiPacks).map((packKey) => (
-                  <option key={packKey} value={packKey}>
-                    {packKey.charAt(0).toUpperCase() + packKey.slice(1)}
-                  </option>
-                ))}
-              </select>
+      <div className="div-react">
+        {/* Affichage des réactions */}
+        <div className={`emoji-action-wrapper ${isOwn ? "right" : "left"}`}>
+          <button
+            ref={buttonRef}
+            onClick={() => setShowPicker(!showPicker)}
+            className="emoji-fixed-btn"
+            type="button"
+          >
+            😊
+          </button>
+          {groupedReactions.length > 0 && (
+            <div className="message-reactions">
+              {groupedReactions.map(([emoji, utilisateursSet]) => {
+                const nb = utilisateursSet.size;
+                return (
+                  <span
+                    key={emoji}
+                    className={`reaction-item ${
+                      msg.reactions?.some(
+                        (r) => r.emoji === emoji && r.utilisateurId === utilisateur.id
+                      )
+                        ? "user-reaction"
+                        : ""
+                    }`}
+                    title={
+                      (emojiTooltips[emoji] || "") +
+                      " — " +
+                      (nb > 1 ? `${nb} personnes` : "1 personne")
+                    }
+                  >
+                    {emoji} {nb}
+                  </span>
+                );
+              })}
             </div>
-            <div className="reaction-bar">
-              {emojiPacks[selectedPack].map((emo) => (
-                <button
-                  key={emo}
-                  className="reaction-option"
-                  title={emojiTooltips[emo] || ""}
-                  onClick={() => {
-                    onReact?.(msg.id, emo);
-                    setShowPicker(false);
-                  }}
+          )}
+
+          {/* Barre d'émojis */}
+          {showPicker && (
+            <div
+              ref={pickerRef}
+              className={`reaction-bar-container ${isOwn ? "open-left" : "open-right"}`}
+            >
+              <div className="emoji-pack-selector">
+                <select
+                  id="emoji-pack-select"
+                  value={selectedPack}
+                  onChange={(e) => setSelectedPack(e.target.value)}
                 >
-                  {emo}
-                </button>
-                
-              ))}
+                  {Object.keys(emojiPacks).map((packKey) => (
+                    <option key={packKey} value={packKey}>
+                      {packKey.charAt(0).toUpperCase() + packKey.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="reaction-bar">
+                {emojiPacks[selectedPack].map((emo) => (
+                  <button
+                    key={emo}
+                    className="reaction-option"
+                    title={emojiTooltips[emo] || ""}
+                    onClick={() => {
+                      onReact?.(msg.id, emo);
+                      setShowPicker(false);
+                    }}
+                  >
+                    {emo}
+                  </button>
+                ))}
+              </div>
             </div>
-                
-          </div>
-          
-        )}
+          )}
+        </div>
       </div>
-    <div className="message-meta">
+
+      <div className="message-meta">
         <span className="message-time">{heure}</span>
         {isOwn && <span className="message-status">{statutTexte}</span>}
       </div>
-    </div>
     </div>
   );
 }
