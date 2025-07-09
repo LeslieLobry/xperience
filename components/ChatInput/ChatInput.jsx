@@ -282,6 +282,24 @@ export default function ChatInput({
 
       {/* FORM PRINCIPAL */}
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
+                 <textarea
+            className="input-text"
+            ref={textareaRef}
+            value={texte}
+            placeholder="Écris un message…"
+            onChange={(e) => {
+              setTexte(e.target.value);
+              if (onTyping) onTyping();
+              autoResize();
+            }}
+            onInput={autoResize}
+            rows={1}
+            style={{
+              resize: "none",
+              overflow: "hidden",
+             
+            }}
+          />
         <div className="input-wrapper" style={{ alignItems: "center" }}>
           {/* Bouton prendre photo */}
           {/* <button
@@ -306,29 +324,16 @@ export default function ChatInput({
             htmlFor="file-upload"
             className="chat-input-photo-btn"
             title="Envoyer une photo"
-            style={{ cursor: "pointer", fontSize: "1.3em", marginRight: 6 }}
           >
-            🖼️
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-up-icon lucide-image-up"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg>
           </label>
-
-          {/* Bouton Snap (message éphémère) */}
           <button
             type="button"
             className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
-            style={{
-              marginRight: 8,
-              background: ephemere ? "#ffe0b3" : "#eee",
-              border: "1px solid #e53",
-              borderRadius: 5,
-              color: ephemere ? "#e53" : "#555",
-              cursor: "pointer",
-              padding: "2px 6px",
-              fontWeight: "bold",
-            }}
             onClick={() => setEphemere((v) => !v)}
             title="Message éphémère (Snap)"
           >
-            🕒 éphémère
+           <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" class="icon"  version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z"  /></svg>
           </button>
 
           {/* Aperçu image */}
@@ -410,31 +415,10 @@ export default function ChatInput({
             </div>
           )}
 
-          <textarea
-            className="input-text"
-            ref={textareaRef}
-            value={texte}
-            placeholder="Écris un message…"
-            onChange={(e) => {
-              setTexte(e.target.value);
-              if (onTyping) onTyping();
-              autoResize();
-            }}
-            onInput={autoResize}
-            rows={1}
-            style={{
-              resize: "none",
-              overflow: "hidden",
-              minHeight: 38,
-              maxHeight: 130,
-            }}
-          />
-
           {/* MICRO */}
           <button
             type="button"
             className="chat-input-mic-btn"
-            style={{ fontSize: "1.3em", marginLeft: 6 }}
             onClick={isRecording ? stopAudioRecording : startAudioRecording}
             title={
               isRecording
@@ -442,18 +426,23 @@ export default function ChatInput({
                 : "Envoyer un message audio"
             }
           >
-            {isRecording ? "⏹️" : "🎤"}
+            {isRecording ? "⏹️" : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" class="bi bi-mic" viewBox="0 0 16 16">
+  <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
+  <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
+</svg>}
           </button>
 
           {/* EMOJI */}
           <button
             type="button"
             className="chat-input-emoji-btn"
-            style={{ fontSize: "1.3em", marginLeft: 6 }}
             onClick={() => setShowEmojiPicker((v) => !v)}
             title="Insérer un emoji"
           >
-            😃
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" class="bi bi-emoji-smile" viewBox="0 0 16 16">
+  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+  <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5"/>
+</svg>
           </button>
         </div>
 

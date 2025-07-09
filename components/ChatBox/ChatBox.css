@@ -326,16 +326,10 @@
   padding: 8px;
 }
 .input-wrapper {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  border-radius: 16px;
-  padding: 6px 10px;
   flex: 1;
-  position: relative;
-}
+ }
 .input-text {
-  flex: 1;
+  flex: 6 1;
   font-size: 1rem;
   padding: 10px 12px;
   border: none;
@@ -515,4 +509,10 @@
 }
 @media screen and (max-width: 768px) {
   .chat-input { flex-direction: column; }
+}
+.chat-input-ephemere-btn,
+.chat-input-mic-btn,
+.chat-input-emoji-btn{
+  background-color: transparent;
+  border: none;
 }
