@@ -57,13 +57,32 @@ export async function POST(req) {
   const lien = formData.get("lien") || null;
 
   // 🔥 Prise en charge 1 ou plusieurs dates
-  let dates = formData.getAll("dates[]");
-  if (!dates.length) dates = formData.getAll("dates");
+  let dates = formData.getAll("dates");
   if (!dates.length && formData.get("date")) dates = [formData.get("date")];
   dates = dates.filter((d) => !!d); // filtre les vides
+dates = dates.flatMap(d =>
+  typeof d === "string" && d.includes(",")
+    ? d.split(",").map(s => s.trim())
+    : [d]
+);
+
+  // Log pour debug
+  console.log("dates reçues via formData :", dates);
 
   if (!titre || !description || !lieu || !type || !acces || !dates.length) {
     return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
+  }
+
+  // Conversion et vérification des dates
+  const parsedDates = dates
+    .map((d) => {
+      const dateObj = new Date(d);
+      return isNaN(dateObj) ? null : dateObj;
+    })
+    .filter(Boolean);
+
+  if (!parsedDates.length) {
+    return NextResponse.json({ error: "Aucune date valide transmise" }, { status: 400 });
   }
 
   // Image upload sur S3 (ou null)
@@ -100,34 +119,35 @@ export async function POST(req) {
     }
   }
 
- try {
-  await prisma.evenement.create({
-    data: {
-      titre,
-      description,
-      dates: dates.map(d => new Date(d)), // <-- tableau de dates
-      lieu,
-      type,
-      acces,
-      heureDebut,
-      heureFin,
-      tarifCouple,
-      tarifFemme,
-      tarifHomme,
-      imageUrl,
-      latitude,
-      longitude,
-      lien,
-      createur: { connect: { id: user.id } },
-    },
-  });
+  try {
+    await prisma.evenement.create({
+      data: {
+        titre,
+        description,
+        dates: parsedDates, // tableau de dates validées !
+        lieu,
+        type,
+        acces,
+        heureDebut,
+        heureFin,
+        tarifCouple,
+        tarifFemme,
+        tarifHomme,
+        imageUrl,
+        latitude,
+        longitude,
+        lien,
+        createur: { connect: { id: user.id } },
+      },
+    });
 
-  return NextResponse.json({ success: true });
-} catch (err) {
-  console.error("❌ Erreur création événement :", err);
-  return NextResponse.json({ error: "Erreur serveur", details: err.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("❌ Erreur création événement :", err);
+    return NextResponse.json({ error: "Erreur serveur", details: err.message }, { status: 500 });
+  }
 }
-}
+
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
 
@@ -157,11 +177,10 @@ export async function GET(req) {
     });
     const now = new Date();
 
-evenements = evenements.filter((evt) =>
-  Array.isArray(evt.dates) &&
-  evt.dates.some((d) => new Date(d) >= now)
-);
-
+    evenements = evenements.filter((evt) =>
+      Array.isArray(evt.dates) &&
+      evt.dates.some((d) => new Date(d) >= now)
+    );
 
     // 👉 Filtrage sur dates (array)
     if (dateDebut || dateFin) {

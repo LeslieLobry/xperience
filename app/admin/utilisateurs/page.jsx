@@ -60,18 +60,18 @@ export default function AdminUtilisateurs() {
             <th>Rôle</th>
           </tr>
         </thead>
-        <tbody>
-          {utilisateurs.map((u) => (
-            <tr key={u.id}>
-              <td>{u.id}</td>
-              <td>{u.pseudo}</td>
-              <td>
-               <a href={`mailto:${u.email}`}>{u.email}</a>
-              </td>
-              <td>{u.role || "utilisateur"}</td>
-            </tr>
-          ))}
-        </tbody>
+       <tbody className="body-util">
+  {utilisateurs.map((u) => (
+    <tr key={u.id}>
+      <td data-label="ID">{u.id}</td>
+      <td data-label="Pseudo">{u.pseudo}</td>
+      <td data-label="Email">
+        <a href={`mailto:${u.email}`}>{u.email}</a>
+      </td>
+      <td data-label="Rôle">{u.role || "utilisateur"}</td>
+    </tr>
+  ))}
+</tbody>
         <tfoot>
   <tr>
     <td colSpan="4" style={{ textAlign: "right", fontWeight: "bold" }}>

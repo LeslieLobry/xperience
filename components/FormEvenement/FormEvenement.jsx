@@ -147,12 +147,14 @@ export default function FormEvenement({
       formData.append("tarifFemme", form.tarifFemme ?? "");
       formData.append("tarifHomme", form.tarifHomme ?? "");
       // Dates
-      const nonEmptyDates = dates.filter(Boolean);
-      if (nonEmptyDates.length === 1) {
-        formData.append("date", nonEmptyDates[0]);
-      } else {
-        nonEmptyDates.forEach((d) => formData.append("dates[]", d));
-      }
+      // Dates
+const nonEmptyDates = dates
+  .map(d => (typeof d === "string" ? d.trim() : ""))
+  .filter(d => d && !isNaN(new Date(d))); // ne garde que les vraies dates
+
+nonEmptyDates.forEach((d) => formData.append("dates", d));
+
+
       // Image
       if (imageFile) formData.append("image", imageFile);
 
@@ -179,21 +181,27 @@ export default function FormEvenement({
     <div className="creer-contenant">
       <h2 className="creer-title">{titre}</h2>
       <form
-        onSubmit={onSubmit ? (e) => {
-          e.preventDefault();
-          // Utilise la signature classique pour update : onSubmit(formData, dates, imageFile, latitude, longitude, pays)
-          onSubmit({
-            ...form,
-            dates,
-            imageFile,
-            latitude,
-            longitude,
-            pays,
-          });
-        } : handleSubmit}
-        encType="multipart/form-data"
-        className="event-form"
-      >
+  onSubmit={onSubmit ? (e) => {
+    e.preventDefault();
+    onSubmit({
+      ...form,
+      dates: Array.isArray(dates)
+        ? dates.flatMap(d =>
+            typeof d === "string" && d.includes(",")
+              ? d.split(",").map(s => s.trim())
+              : [d]
+          )
+        : [],
+      imageFile,
+      latitude,
+      longitude,
+      pays,
+    });
+  } : handleSubmit}
+  encType="multipart/form-data"
+  className="event-form"
+>
+
         {error && <p className="error-message">{error}</p>}
 
         <select name="pays" value={pays} onChange={e => setPays(e.target.value)} style={{ marginBottom: 8 }}>

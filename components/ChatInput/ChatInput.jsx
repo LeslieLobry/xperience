@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef, useState, useEffect } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -16,245 +14,183 @@ export default function ChatInput({
   stopRecording,
   recording,
 }) {
+  // ... (tes states existants)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [pr1, setPr1] = useState(""); // Pour prénom 1
-  const [pr2, setPr2] = useState(""); // Pour prénom 2
-  const [loadingPrenoms, setLoadingPrenoms] = useState(false);
-  const [prenomsOK, setPrenomsOK] = useState(false); // Passera à true après POST ou si déjà existant
-  const [membreParlant, setMembreParlant] = useState(""); // <- par défaut vide !
+  // pour l'image upload classique
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
-  const textareaRef = useRef(null);
 
-  // → Fetch prénoms si utilisateur couple
+  // -- CAMERA / WEBCAM
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+
+  // Ouvre la caméra
+  const handleOpenCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setCameraStream(stream);
+      setShowCamera(true);
+    } catch (err) {
+      alert("Impossible d'accéder à la caméra.");
+      setShowCamera(false);
+    }
+  };
+
+  // Stoppe la caméra
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  // Quand la caméra s’ouvre, attache le flux vidéo
   useEffect(() => {
-    if (utilisateur.type !== "couple") return;
-    setLoadingPrenoms(true);
-    fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.prenoms) {
-          setPr1(data.prenoms.prenom1 || "");
-          setPr2(data.prenoms.prenom2 || "");
-          setPrenomsOK(true);
-          setMembreParlant(data.prenoms.prenom1 || "Le couple");
-        } else {
-          setPrenomsOK(false);
-        }
-      })
-      .finally(() => setLoadingPrenoms(false));
-  }, [conversationId, utilisateur.type]);
-
-  // → Submit prénoms pour le couple dans la conversation
-  const handlePrenomsSubmit = async (e) => {
-    e.preventDefault();
-    if (!pr1.trim() || !pr2.trim()) return;
-    setLoadingPrenoms(true);
-    const res = await fetch("/api/prenoms-couple", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversationId,
-        prenom1: pr1,
-        prenom2: pr2,
-      }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setPrenomsOK(true);
-      setMembreParlant(pr1);
+    if (showCamera && videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
     }
-    setLoadingPrenoms(false);
+    // Clean up à la fermeture du composant
+    return () => stopCamera();
+    // eslint-disable-next-line
+  }, [showCamera, cameraStream]);
+
+  // Capture une photo de la webcam/caméra
+  const handleTakePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 360;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        setImagePreview(URL.createObjectURL(blob));
+        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+        stopCamera();
+      }
+    }, "image/jpeg", 0.90);
   };
 
-  // → Gère la saisie dans le chat + typing
-  const handleTyping = (e) => {
-    const value = e.target.value;
-    setTexte(value);
-    if (onTyping) onTyping();
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "auto";
-      textarea.style.height = `${textarea.scrollHeight}px`;
-    }
-  };
-
-  // → Submit message texte OU image
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Cas : envoi d'image sélectionnée (même si pas de texte)
-    if (imageFile) {
-      const formData = new FormData();
-      formData.append("image", imageFile);
-      formData.append("conversationId", conversationId);
-      formData.append("type", "IMAGE");
-      if (texte) formData.append("contenu", texte);
-      if (utilisateur.type === "couple") formData.append("envoyeur", membreParlant);
-
-      await onMessageSent(formData, "IMAGE");
-      setImageFile(null);
-      setImagePreview(null);
-      setTexte("");
-      return;
-    }
-
-    // Sinon : message texte classique
-    if (!texte.trim()) return;
-    if (utilisateur.type === "couple") {
-      await onMessageSent(texte, "TEXTE", membreParlant);
-    } else {
-      await onMessageSent(texte, "TEXTE");
-    }
-    setTexte("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-  };
-
-  // → Envoi d’une photo (preview local + garde le fichier dans le state)
+  // --- UPLOAD IMAGE DEPUIS CAMERA OU FICHIER ---
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setImagePreview(url);
     setImageFile(file);
-    // Reset input pour pouvoir ré-uploader la même image plus tard si besoin
     e.target.value = "";
   };
 
-  // → Retirer le preview
+  // Supprime le preview image
   const removePreview = () => {
     setImagePreview(null);
     setImageFile(null);
   };
 
+  // Submit : envoie texte OU image
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Envoi d’image (fichier classique ou photo prise)
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+      formData.append("conversationId", conversationId);
+      formData.append("type", "IMAGE");
+      if (texte) formData.append("contenu", texte);
+      await onMessageSent(formData, "IMAGE");
+      setImageFile(null);
+      setImagePreview(null);
+      setTexte("");
+      return;
+    }
+    // Sinon message texte
+    if (!texte.trim()) return;
+    await onMessageSent(texte, "TEXTE");
+    setTexte("");
+  };
+
   return (
     <>
-      {utilisateur.type === "couple" && !prenomsOK ? (
-        // → Inputs pour entrer les prénoms (une seule fois)
-        <form className="chat-input" onSubmit={handlePrenomsSubmit} style={{ flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input
-              type="text"
-              placeholder="Prénom membre 1"
-              value={pr1}
-              onChange={e => setPr1(e.target.value)}
-              style={{ width: 120 }}
-              disabled={loadingPrenoms}
-              autoFocus
-            />
-            <input
-              type="text"
-              placeholder="Prénom membre 2"
-              value={pr2}
-              onChange={e => setPr2(e.target.value)}
-              style={{ width: 120 }}
-              disabled={loadingPrenoms}
-            />
-            <button type="submit" disabled={loadingPrenoms || !pr1 || !pr2}>
-              Valider
-            </button>
+      {/* CAMERA MODAL */}
+      {showCamera && (
+        <div className="camera-modal" style={{
+          position: "fixed", zIndex: 1002, left: 0, top: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center",
+          flexDirection: "column"
+        }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{ width: 340, height: 250, borderRadius: 14, background: "#222" }}
+          />
+          <div style={{ marginTop: 18 }}>
+            <button onClick={handleTakePhoto} style={{ fontSize: 22, marginRight: 24 }}>📸 Prendre la photo</button>
+            <button onClick={stopCamera} style={{ fontSize: 18, color: "#fff", background: "#e53" }}>Annuler</button>
           </div>
-        </form>
-      ) : (
-        // → Champ classique + select qui parle + photo
-        <form className="chat-input" onSubmit={handleSubmit}>
-          <div className="input-wrapper" style={{ alignItems: "center" }}>
-            {utilisateur.type === "couple" && (
-              <select
-                className="select-membre"
-                value={membreParlant}
-                onChange={e => setMembreParlant(e.target.value)}
-              >
-                <option value={pr1}>{pr1}</option>
-                <option value={pr2}>{pr2}</option>
-                <option value="Le couple">Le couple</option>
-              </select>
-            )}
-
-            {/* Ajoute le bouton photo */}
-            <input
-              type="file"
-              accept="image/*"
-              id="file-upload"
-              style={{ display: "none" }}
-              onChange={handleImageUpload}
-            />
-            <label htmlFor="file-upload" className="chat-input-photo-btn" title="Envoyer une photo" style={{ cursor: "pointer", fontSize: "1.4em", marginRight: 6 }}>
-              📷
-            </label>
-
-            {/* Aperçu de l'image si sélectionnée */}
-            {imagePreview && (
-              <div style={{ position: "relative", marginRight: 8 }}>
-                <img
-                  src={imagePreview}
-                  alt="Aperçu"
-                  style={{
-                    maxWidth: 50,
-                    maxHeight: 50,
-                    borderRadius: 8,
-                    objectFit: "cover",
-                    border: "1px solid #ccc",
-                  }}
-                />
-                <button
-                  type="button"
-                  style={{
-                    position: "absolute",
-                    top: -6,
-                    right: -6,
-                    background: "#fff",
-                    border: "1px solid #ccc",
-                    borderRadius: "50%",
-                    width: 22,
-                    height: 22,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: "#d00",
-                  }}
-                  onClick={removePreview}
-                  title="Supprimer"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            <textarea
-              ref={textareaRef}
-              className="input-text"
-              value={texte}
-              placeholder="Écris un message…"
-              onChange={handleTyping}
-              rows={1}
-              style={{ resize: "none" }}
-            />
-
-            <button
-              type="button"
-              onClick={recording ? stopRecording : startRecording}
-              className={`audio-btn ${recording ? "recording" : ""}`}
-            >
-              {recording ? "🟥" : "🎙️"}
-            </button>
-
-            <button
-              type="button"
-              className="emoji-btn"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-              😊
-            </button>
-          </div>
-
-          <button type="submit" className="message-btn">
-            {imageFile ? "Envoyer l'image" : "Envoyer"}
-          </button>
-        </form>
+        </div>
       )}
 
+      {/* FORM PRINCIPAL */}
+      <form className="chat-input" onSubmit={handleSubmit}>
+        <div className="input-wrapper" style={{ alignItems: "center" }}>
+          {/* Bouton prendre photo */}
+          <button
+            type="button"
+            className="chat-input-photo-btn"
+            style={{ fontSize: "1.4em", marginRight: 5 }}
+            onClick={handleOpenCamera}
+            title="Prendre une photo"
+          >
+            📸
+          </button>
+          {/* Upload classique */}
+          <input
+            type="file"
+            accept="image/*"
+            id="file-upload"
+            style={{ display: "none" }}
+            onChange={handleImageUpload}
+          />
+          <label htmlFor="file-upload" className="chat-input-photo-btn" title="Envoyer une photo" style={{ cursor: "pointer", fontSize: "1.3em", marginRight: 6 }}>
+            🖼️
+          </label>
+          {/* Aperçu de la photo (fichier ou caméra) */}
+          {imagePreview && (
+            <div style={{ position: "relative", marginRight: 8 }}>
+              <img src={imagePreview} alt="Aperçu" style={{
+                maxWidth: 60, maxHeight: 60, borderRadius: 8,
+                objectFit: "cover", border: "1px solid #ccc"
+              }} />
+              <button type="button" style={{
+                position: "absolute", top: -8, right: -8,
+                background: "#fff", border: "1px solid #ccc", borderRadius: "50%",
+                width: 22, height: 22, cursor: "pointer", fontSize: 12, color: "#d00"
+              }} onClick={removePreview} title="Supprimer">
+                ×
+              </button>
+            </div>
+          )}
+
+          <textarea
+            className="input-text"
+            value={texte}
+            placeholder="Écris un message…"
+            onChange={e => { setTexte(e.target.value); if (onTyping) onTyping(); }}
+            rows={1}
+            style={{ resize: "none" }}
+          />
+          {/* (Ajoute ici tes boutons audio, emoji, etc) */}
+        </div>
+        <button type="submit" className="message-btn">
+          {imageFile ? "Envoyer l'image" : "Envoyer"}
+        </button>
+      </form>
+
+      {/* Emoji picker */}
       {showEmojiPicker && (
         <div className="emoji-picker-container">
           <Picker
