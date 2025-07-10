@@ -190,8 +190,10 @@ const startCall = async (video = true) => {
     Room = livekit.Room;
     createLocalTracks = livekit.createLocalTracks;
   }
+console.log("participantsAutres", participantsAutres, "utilisateur", utilisateur);
 
   participantsAutres.forEach((p) => {
+      console.log("Notif call envoyée à", p.id, "moi:", utilisateur.id);
     if (p.id !== utilisateur.id) {
       ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
         from: utilisateur,
