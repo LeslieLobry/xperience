@@ -356,12 +356,15 @@ export default function ChatBox({ conversationId, utilisateur }) {
         onClose={hangupCall}
       />
 
-      <VideoCallView
-        inCall={inCall}
-        remoteTracks={remoteTracks}
-        startCall={startCall}
-        hangupCall={hangupCall}
-      />
+      {inCall && !!window.localVideoTrack && (
+  <VideoCallView
+    inCall={inCall}
+    remoteTracks={remoteTracks}
+    startCall={startCall}
+    hangupCall={hangupCall}
+  />
+)}
+
 
       <MessagesList
         messages={messages}
