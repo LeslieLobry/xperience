@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Realtime } from "ably";
-import dynamic from "next/dynamic"; // corrigé ici
+import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
 import Spinner from "../Spinner/Spinner";
 
@@ -97,7 +97,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     };
   }, [utilisateur?.id, inCall]);
 
-  // Listen "call:refused" pour notif refus (appelant)
+  // Listen "call:refused" pour notif refus (appelant) -- CORRIGÉ ICI
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -351,8 +351,8 @@ export default function ChatBox({ conversationId, utilisateur }) {
       <ChatHeader
         participants={participantsAutres}
         inCall={inCall}
-        onCallAudio={startCall}
-        onCallVideo={startCall}
+        onCallAudio={() => startCall(false)} 
+        onCallVideo={() => startCall(true)}
         onClose={hangupCall}
       />
 
