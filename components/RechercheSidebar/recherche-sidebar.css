@@ -73,6 +73,7 @@
     padding: 1rem;
     color: white;
     font-size: 26px;
+    
   }
 }
 .section-group {
@@ -88,6 +89,7 @@
   justify-content: center;
   align-items: center;
   min-height: 120px;
+  border: none;
 }
 
 .go-recherche-link {
