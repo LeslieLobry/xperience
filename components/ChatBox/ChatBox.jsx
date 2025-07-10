@@ -175,7 +175,6 @@ const handleIncomingCall = ({ data }) => {
 
 const startCall = async (video = true) => {
   if (inCall) {
-    // Notifie les autres uniquement si déjà en appel (optionnel)
     participantsAutres.forEach((p) => {
       if (p.id !== utilisateur.id) {
         ably.channels.get(`notification-${p.id}`).publish("call:busy", {
@@ -192,7 +191,7 @@ const startCall = async (video = true) => {
     createLocalTracks = livekit.createLocalTracks;
   }
 
-  // 💥 ENVOIE LA NOTIF UNIQUEMENT ICI, et UNIQUEMENT AUX AUTRES (jamais à toi-même)
+  // 👇 ENVOIE LA NOTIF ICI, à tous sauf toi !
   participantsAutres.forEach((p) => {
     if (p.id !== utilisateur.id) {
       ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
@@ -203,6 +202,7 @@ const startCall = async (video = true) => {
     }
   });
 
+  // Suite inchangée...
   const res = await fetch("/api/livekit/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -241,7 +241,6 @@ const startCall = async (video = true) => {
   localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
   setInCall(true);
 };
-
 
   const hangupCall = () => {
     if (room) {
