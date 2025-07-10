@@ -219,6 +219,7 @@
 input[type="range"].profil-range {
   display: inline-block !important;
   opacity: 1 !important;
+    height: 32px !important;
   visibility: visible !important;
   pointer-events: auto !important;
   width: 120px !important;
@@ -228,6 +229,72 @@ input[type="range"].profil-range {
   position: static !important;
   z-index: 99 !important;
 }
+.profil-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: url("/masque.png") center center / cover no-repeat, transparent; 
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+   margin-top: -10px;
+}
+
+
+/* Firefox */
+.profil-range::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: url("/masque.png") center center / cover no-repeat, #fff;
+  cursor: pointer;
+}
+
+/* Edge/IE */
+.profil-range::-ms-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: url("/masque.png") center center / cover no-repeat, #da2727;
+  cursor: pointer;
+}
+
+/* Facultatif : style du track */
+.profil-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #5a626e;
+  height: 6px;
+  border-radius: 6px;
+  outline: none;
+  margin: 0 10px;
+}
+.profil-range::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #5a626e;
+  border-radius: 6px;
+}
+.profil-range::-moz-range-track {
+  height: 6px;
+  background: #5a626e;
+  border-radius: 6px;
+}
+.profil-range::-ms-fill-lower, .profil-range::-ms-fill-upper {
+  background: #5a626e;
+  border-radius: 6px;
+}
+
+/* Pour éviter les bords moches sur Firefox */
+.profil-range:focus {
+  outline: none;
+}
+
+/* Cache le contour bleu sur Edge */
+.profil-range::-ms-tooltip {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .grid-profil {
     grid-template-columns: 1fr 1fr;
