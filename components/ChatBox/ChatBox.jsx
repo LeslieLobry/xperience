@@ -192,16 +192,17 @@ const startCall = async (video = true) => {
   }
 console.log("participantsAutres", participantsAutres, "utilisateur", utilisateur);
 
-  participantsAutres.forEach((p) => {
-      console.log("Notif call envoyée à", p.id, "moi:", utilisateur.id);
-    if (p.id !== utilisateur.id) {
-      ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
-        from: utilisateur,
-        room: conversationId,
-        type: video ? "video" : "audio",
-      });
-    }
+  participantsAutres
+  .filter((p) => p.id !== utilisateur.id)
+  .forEach((p) => {
+    ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
+      from: utilisateur,
+      room: conversationId,
+      type: video ? "video" : "audio",
+    });
   });
+console.log("Appel lancé, notifications envoyées à :", participantsAutres.filter((p) => p.id !== utilisateur.id).map(p => p.id));
+
   const res = await fetch("/api/livekit/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
