@@ -26,26 +26,25 @@ export default function Navbar() {
   const router = useRouter();
   const menuRef = useRef();
   const popupRef = useRef();
-const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-const fetchUnreadMessages = async () => {
-  try {
-    const res = await fetch("/api/messages/nonlus", {
-      credentials: "include",
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setUnreadCount(data.length); // <- on compte le nombre de messages non lus
+  const fetchUnreadMessages = async () => {
+    try {
+      const res = await fetch("/api/messages/nonlus", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.length); // <- on compte le nombre de messages non lus
+      }
+    } catch (err) {
+      console.error("Erreur fetch unread messages", err);
     }
-  } catch (err) {
-    console.error("Erreur fetch unread messages", err);
-  }
-};
-
-useEffect(() => {
-  if (localUser) fetchUnreadMessages();
-}, [localUser]);
+  };
+  useEffect(() => {
+    if (localUser) fetchUnreadMessages();
+  }, [localUser]);
 
   // Synchroniser localUser avec le user du contexte
   useEffect(() => {
@@ -141,14 +140,7 @@ useEffect(() => {
     <nav className="navbar">
       <div className="navbar-left">
         <Link href="/accueil-page">
-          <Image
-            src={logo}
-            alt="logo xpérience"
-            width={120}
-            height={120}
-            className="navbar-logo"
-            priority
-          />
+          <Image src={logo} alt="logo xpérience" width={120} height={120} className="navbar-logo" priority />
         </Link>
         {localUser && (
           <h3 className="navbar-pseudo">
@@ -157,29 +149,26 @@ useEffect(() => {
         )}
       </div>
 
-      <div
-        className={`burger ${menuOpen ? "open" : ""}`}
-        onClick={() => setMenuOpen(!menuOpen)}
-      >
+      <div className={`burger ${menuOpen ? "open" : "" }`} onClick={()=> setMenuOpen(!menuOpen)}>
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
       </div>
 
-      <ul ref={menuRef} className={`navLinks ${menuOpen ? "active" : ""}`}>
-{navLinks.map((link) => (
-  <li key={link.href} onClick={() => {
-    setMenuOpen(false);
-    if (link.href === "/messagerie") setUnreadCount(0);
-  }}>
-    <Link href={link.href} className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}>
-      {link.label}
-      {link.href === "/messagerie" && unreadCount > 0 && (
-        <span className="messagerie-badge">{unreadCount}</span>
-      )}
-    </Link>
-  </li>
-))}
+      <ul ref={menuRef} className={`navLinks ${menuOpen ? "active" : "" }`}>
+        {navLinks.map((link) => (
+          <li key={link.href} onClick={() => {
+            setMenuOpen(false);
+            if (link.href === "/messagerie") setUnreadCount(0);
+          }}>
+            <Link href={link.href} className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}>
+              {link.label}
+              {link.href === "/messagerie" && unreadCount > 0 && (
+                <span className="messagerie-badge">{unreadCount}</span>
+              )}
+            </Link>
+          </li>
+        ))}
         {localUser?.role === "ADMIN" && (
           <li onClick={() => setMenuOpen(false)}>
             <Link href="/admin">🛠 Admin</Link>
@@ -189,31 +178,21 @@ useEffect(() => {
         {localUser ? (
           <li className="nav-avatar-wrapper">
             <div className="nav-avatar-container" onClick={handleAvatarClick}>
-              <Image
-                src={
-                  localUser.photoUrl
-                    ? localUser.photoUrl.startsWith("http") ||
-                      localUser.photoUrl.startsWith("/uploads")
-                      ? localUser.photoUrl
-                      : `/uploads/${localUser.photoUrl}`
-                    : "/default.jpg"
-                }
-                alt="Photo de profil"
-                width={40}
-                height={40}
-                className="nav-avatar"
-              />
+              <Image src={
+                localUser.photoUrl
+                  ? localUser.photoUrl.startsWith("http") ||
+                    localUser.photoUrl.startsWith("/uploads")
+                    ? localUser.photoUrl
+                    : `/uploads/${localUser.photoUrl}`
+                  : "/default.jpg"
+              } alt="Photo de profil" width={40} height={40} className="nav-avatar" />
               {notifCount > 0 && (
                 <span className="notif-badge-on-avatar">{notifCount}</span>
               )}
             </div>
 
             {dropdownOpen && (
-              <div
-                className="nav-combined-popup"
-                ref={popupRef}
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className="nav-combined-popup" ref={popupRef} onClick={(e)=> e.stopPropagation()}>
                 <div className="notif-section">
                   <ul>
                     {notifications.length === 0 && (
@@ -221,12 +200,33 @@ useEffect(() => {
                     )}
                     {notifications.map((notif) => (
                       <li key={notif.id}>
-                        <a
-                          href={notif.lien || "#"}
-                          onClick={() => setDropdownOpen(false)}
-                        >
-                          {notif.message}
-                        </a>
+                        {/* --- MODIF: gestion lien interne/externe --- */}
+                        {notif.lien && notif.lien.startsWith("/")
+                          ? (
+                            // Lien interne Next.js
+                            <span
+                              className="notif-link"
+                              style={{ cursor: "pointer", color: "#8c6a5d" }}
+                              onClick={() => {
+                                setDropdownOpen(false);
+                                router.push(notif.lien);
+                              }}
+                            >
+                              {notif.message}
+                            </span>
+                          )
+                          : (
+                            // Lien externe ou pas de lien
+                            <a
+                              href={notif.lien || "#"}
+                              target={notif.lien ? "_blank" : undefined}
+                              rel={notif.lien ? "noopener noreferrer" : undefined}
+                              onClick={() => setDropdownOpen(false)}
+                            >
+                              {notif.message}
+                            </a>
+                          )
+                        }
                         <small>
                           {new Date(notif.createdAt).toLocaleString()}
                         </small>
@@ -236,22 +236,38 @@ useEffect(() => {
                 </div>
                 <hr />
                 <div className="profil-actions">
-                  <button
-                    onClick={() => handleGoTo(`/profil/${localUser.id}`)}
-                    className="btn-link"
-                  >
-                    Mon profil
-                  </button>
-                  <button
-                    onClick={() => handleGoTo("/parametres")}
-                    className="btn-link"
-                  >
-                  Paramètres
-                  </button>
-                  <button onClick={handleLogout} className="btn-dec">
-                    Déconnexion
-                  </button>
-                </div>
+  <button
+    onClick={() => {
+      setDropdownOpen(false);
+      setMenuOpen(false);
+      handleGoTo(`/profil/${localUser.id}`);
+    }}
+    className="btn-link"
+  >
+    Mon profil
+  </button>
+  <button
+    onClick={() => {
+      setDropdownOpen(false);
+      setMenuOpen(false);
+      handleGoTo("/parametres");
+    }}
+    className="btn-link"
+  >
+    Paramètres
+  </button>
+  <button
+    onClick={() => {
+      setDropdownOpen(false);
+      setMenuOpen(false);
+      handleLogout();
+    }}
+    className="btn-dec"
+  >
+    Déconnexion
+  </button>
+</div>
+
               </div>
             )}
           </li>
@@ -265,4 +281,4 @@ useEffect(() => {
       </ul>
     </nav>
   );
-}
+} 

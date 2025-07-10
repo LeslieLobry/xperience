@@ -52,8 +52,9 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
         <p className="pref-rep">{profil.type || "..."}</p>
       </div>
       <div className="membre-colum">
+        
         <div className="membre-1">
-          <h3>Membre 1 </h3>
+           {profil.type?.toLowerCase() === "couple" && <h3>Membre 1</h3>}
           <div className="pref-details">
             <p className="pref-nom">Âge :</p>
             <p className="pref-rep">{profil.age ? `${profil.age} ans` : "..."}</p>
