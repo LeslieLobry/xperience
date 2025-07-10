@@ -50,20 +50,21 @@ export default function ChatBox({ conversationId, utilisateur }) {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
 
-    const handleIncomingCall = ({ data }) => {
-      setAppelEntrant(data);
-      if (sonnerieRef.current) {
-        sonnerieRef.current.currentTime = 0;
-        sonnerieRef.current.play();
-      }
-      appelTimeoutRef.current = setTimeout(() => {
-        setAppelEntrant(null);
-        if (sonnerieRef.current) {
-          sonnerieRef.current.pause();
-          sonnerieRef.current.currentTime = 0;
-        }
-      }, 30000);
-    };
+const handleIncomingCall = ({ data }) => {
+  // Si j’ai envoyé l’appel, je n’affiche pas la notif
+  if (data.from?.id === utilisateur.id) {
+    console.log("Je reçois mon propre appel, je n'affiche rien.");
+    return;
+  }
+  if (appelEntrant || inCall) {
+    console.log("Ignoré : appel déjà en attente ou en cours");
+    return;
+  }
+  setAppelEntrant(data);
+  // ... (le reste inchangé)
+};
+
+
 
     channel.subscribe("call:incoming", handleIncomingCall);
 
@@ -172,68 +173,75 @@ export default function ChatBox({ conversationId, utilisateur }) {
 
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
-  const startCall = async (video = true) => {
-    if (inCall) {
-      participantsAutres.forEach((p) => {
+const startCall = async (video = true) => {
+  if (inCall) {
+    // Notifie les autres uniquement si déjà en appel (optionnel)
+    participantsAutres.forEach((p) => {
+      if (p.id !== utilisateur.id) {
         ably.channels.get(`notification-${p.id}`).publish("call:busy", {
           from: utilisateur,
           room: conversationId,
         });
-      });
-      return;
-    }
-    if (!Room || !createLocalTracks) {
-      const livekit = await import("livekit-client");
-      Room = livekit.Room;
-      createLocalTracks = livekit.createLocalTracks;
-    }
-
-    const res = await fetch("/api/livekit/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        identity: `user_${utilisateur.id}`,
-        room: conversationId,
-      }),
+      }
     });
+    return;
+  }
+  if (!Room || !createLocalTracks) {
+    const livekit = await import("livekit-client");
+    Room = livekit.Room;
+    createLocalTracks = livekit.createLocalTracks;
+  }
 
-    const data = await res.json();
-    if (!res.ok || !data.token) {
-      console.error("❌ Erreur token LiveKit :", data);
-      return;
-    }
-
-    const token = data.token;
-    const newRoom = new Room();
-    setRoom(newRoom);
-
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      setRemoteTracks((prev) => [
-        ...prev.filter((t) => t.id !== participant.identity),
-        { id: participant.identity, nom: participant.identity, track },
-      ]);
-    });
-
-    newRoom.on("trackUnsubscribed", (_, __, participant) => {
-      setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
-    });
-
-    const localTracks = await createLocalTracks({ audio: true, video });
-    const localVideoTrack = localTracks.find((t) => t.kind === "video");
-    if (localVideoTrack) window.localVideoTrack = localVideoTrack;
-
-    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
-    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-    setInCall(true);
-
-    participantsAutres.forEach((p) => {
+  // 💥 ENVOIE LA NOTIF UNIQUEMENT ICI, et UNIQUEMENT AUX AUTRES (jamais à toi-même)
+  participantsAutres.forEach((p) => {
+    if (p.id !== utilisateur.id) {
       ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
         from: utilisateur,
         room: conversationId,
         type: video ? "video" : "audio",
       });
-    });
-  };
+    }
+  });
+
+  const res = await fetch("/api/livekit/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      identity: `user_${utilisateur.id}`,
+      room: conversationId,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.token) {
+    console.error("❌ Erreur token LiveKit :", data);
+    return;
+  }
+
+  const token = data.token;
+  const newRoom = new Room();
+  setRoom(newRoom);
+
+  newRoom.on("trackSubscribed", (track, publication, participant) => {
+    setRemoteTracks((prev) => [
+      ...prev.filter((t) => t.id !== participant.identity),
+      { id: participant.identity, nom: participant.identity, track },
+    ]);
+  });
+
+  newRoom.on("trackUnsubscribed", (_, __, participant) => {
+    setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
+  });
+
+  const localTracks = await createLocalTracks({ audio: true, video });
+  const localVideoTrack = localTracks.find((t) => t.kind === "video");
+  if (localVideoTrack) window.localVideoTrack = localVideoTrack;
+
+  await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
+  localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+  setInCall(true);
+};
+
 
   const hangupCall = () => {
     if (room) {
