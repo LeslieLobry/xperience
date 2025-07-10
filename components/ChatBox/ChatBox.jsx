@@ -45,18 +45,19 @@ export default function ChatBox({ conversationId, utilisateur }) {
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
+const handleIncomingCall = ({ data }) => {
+  console.log("[Ably] call:incoming reçu ! > Object utilisateur:", utilisateur.id, data);
+  if (data.from?.id === utilisateur.id) return;
+  if (appelEntrant || inCall) return;
+  setAppelEntrant(data);
 
-    const handleIncomingCall = ({ data }) => {
-      console.log("[Ably] call:incoming reçu ! > Object utilisateur:", utilisateur.id, data);
-      if (data.from?.id === utilisateur.id) {
-        // C’est moi qui ai lancé l’appel, je skip.
-        return;
-      }
-      if (appelEntrant || inCall) {
-        return;
-      }
-      setAppelEntrant(data);
-    };
+  // ➜ Ajoute ce bloc pour lancer la sonnerie
+  if (sonnerieRef.current) {
+    sonnerieRef.current.currentTime = 0;
+    sonnerieRef.current.play().catch(() => {});
+  }
+};
+
 
     channel.subscribe("call:incoming", handleIncomingCall);
     return () => {
