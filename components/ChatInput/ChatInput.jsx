@@ -4,35 +4,49 @@ import data from "@emoji-mart/data";
 import "./ChatInput.css";
 
 export default function ChatInput({
-  utilisateur,
-  conversationId,
-  texte,
-  setTexte,
-  onMessageSent,
-  onTyping,
+utilisateur,
+conversationId,
+texte,
+setTexte,
+onMessageSent,
+onTyping,
 }) {
-  // --- AUDIO
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioBlob, setAudioBlob] = useState(null);
-  const [audioUrl, setAudioUrl] = useState(null);
-  const audioChunks = useRef([]);
-  const textareaRef = useRef();
+// --- AUDIO
+const [isRecording, setIsRecording] = useState(false);
+const [mediaRecorder, setMediaRecorder] = useState(null);
+const [audioBlob, setAudioBlob] = useState(null);
+const [audioUrl, setAudioUrl] = useState(null);
+const audioChunks = useRef([]);
+const textareaRef = useRef();
 
-  function autoResize() {
-    const ta = textareaRef.current;
-    if (ta) {
-      ta.style.height = "auto";
-      ta.style.height = ta.scrollHeight + "px";
-    }
+function autoResize() {
+const ta = textareaRef.current;
+if (ta) {
+ta.style.height = "auto";
+ta.style.height = ta.scrollHeight + "px";
+}
+}
+
+useEffect(() => {
+autoResize();
+}, [texte]);
+
+// --- EMOJI
+const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+const emoticonsMap = {
+":)": "😊",
+":-)": "😊",
+":(": "😢",
+":-(": "😢",
+";)": "😉",
+":D": "😄",
+":-D": "😄",
+"<3": "❤️" , ":p" : "😛" , ":-p" : "😛" , ":'(" : "😭" , ":o" : "😮" , ":-o" : "😮" }; function
+  replaceEmoticonsWithEmojis(text) { return Object.keys(emoticonsMap).reduce( (acc, emoticon)=>
+  acc.split(emoticon).join(emoticonsMap[emoticon]),
+  text
+  );
   }
-
-  useEffect(() => {
-    autoResize();
-  }, [texte]);
-
-  // --- EMOJI
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // --- IMAGE
   const [imagePreview, setImagePreview] = useState(null);
@@ -46,178 +60,176 @@ export default function ChatInput({
 
   // --- MICRO / AUDIO ---
   const startAudioRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new window.MediaRecorder(stream);
-      audioChunks.current = [];
+  try {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const recorder = new window.MediaRecorder(stream);
+  audioChunks.current = [];
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunks.current.push(e.data);
-        }
-      };
-      recorder.onstop = () => {
-        if (audioChunks.current.length) {
-          const blob = new Blob(audioChunks.current, { type: "audio/webm" });
-          setAudioBlob(blob);
-          setAudioUrl(URL.createObjectURL(blob));
-        } else {
-          setAudioBlob(null);
-          setAudioUrl(null);
-        }
-        audioChunks.current = [];
-        stream.getTracks().forEach((track) => track.stop());
-      };
+  recorder.ondataavailable = (e) => {
+  if (e.data.size > 0) {
+  audioChunks.current.push(e.data);
+  }
+  };
+  recorder.onstop = () => {
+  if (audioChunks.current.length) {
+  const blob = new Blob(audioChunks.current, { type: "audio/webm" });
+  setAudioBlob(blob);
+  setAudioUrl(URL.createObjectURL(blob));
+  } else {
+  setAudioBlob(null);
+  setAudioUrl(null);
+  }
+  audioChunks.current = [];
+  stream.getTracks().forEach((track) => track.stop());
+  };
 
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-      recorder.start();
-    } catch (err) {
-      alert("Impossible d'accéder au micro.");
-    }
+  setMediaRecorder(recorder);
+  setIsRecording(true);
+  recorder.start();
+  } catch (err) {
+  alert("Impossible d'accéder au micro.");
+  }
   };
 
   const stopAudioRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.requestData?.();
-      setTimeout(() => {
-        mediaRecorder.stop();
-        setIsRecording(false);
-      }, 100);
-    }
+  if (mediaRecorder && isRecording) {
+  mediaRecorder.requestData?.();
+  setTimeout(() => {
+  mediaRecorder.stop();
+  setIsRecording(false);
+  }, 100);
+  }
   };
 
   const removeAudioPreview = () => {
-    setAudioBlob(null);
-    setAudioUrl(null);
+  setAudioBlob(null);
+  setAudioUrl(null);
   };
 
   // --- CAMERA ---
   const handleOpenCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setCameraStream(stream);
-      setShowCamera(true);
-    } catch (err) {
-      alert("Impossible d'accéder à la caméra.");
-      setShowCamera(false);
-    }
+  try {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  setCameraStream(stream);
+  setShowCamera(true);
+  } catch (err) {
+  alert("Impossible d'accéder à la caméra.");
+  setShowCamera(false);
+  }
   };
 
   const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
-    setShowCamera(false);
+  if (cameraStream) {
+  cameraStream.getTracks().forEach((track) => track.stop());
+  setCameraStream(null);
+  }
+  setShowCamera(false);
   };
 
   useEffect(() => {
-    if (showCamera && videoRef.current && cameraStream) {
-      videoRef.current.srcObject = cameraStream;
-    }
-    return () => stopCamera();
+  if (showCamera && videoRef.current && cameraStream) {
+  videoRef.current.srcObject = cameraStream;
+  }
+  return () => stopCamera();
   }, [showCamera, cameraStream]);
 
   const handleTakePhoto = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 480;
-    canvas.height = video.videoHeight || 360;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (blob) {
-        setImagePreview(URL.createObjectURL(blob));
-        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
-        stopCamera();
-      }
-    }, "image/jpeg", 0.9);
+  if (!videoRef.current) return;
+  const video = videoRef.current;
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 480;
+  canvas.height = video.videoHeight || 360;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob((blob) => {
+  if (blob) {
+  setImagePreview(URL.createObjectURL(blob));
+  setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+  stopCamera();
+  }
+  }, "image/jpeg", 0.9);
   };
 
   // --- UPLOAD IMAGE ---
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
-    setImageFile(file);
-    e.target.value = "";
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  setImagePreview(url);
+  setImageFile(file);
+  e.target.value = "";
   };
 
   const removePreview = () => {
-    setImagePreview(null);
-    setImageFile(null);
+  setImagePreview(null);
+  setImageFile(null);
   };
 
   // --- SUBMIT LOGIC ---
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    // Image
-    if (imageFile) {
-      const formData = new FormData();
-      formData.append("image", imageFile);
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
-      if (texte) formData.append("contenu", texte);
-      console.log("[ChatInput] Envoi image avec type", ephemere ? "EPHEMERE" : "IMAGE");
-      await onMessageSent(formData);
-      setImageFile(null);
-      setImagePreview(null);
-      setTexte("");
-      setEphemere(false);
-      return;
-    }
+  // Image
+  if (imageFile) {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+  formData.append("conversationId", conversationId);
+  formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
+  if (texte) formData.append("contenu", texte);
+  console.log("[ChatInput] Envoi image avec type", ephemere ? "EPHEMERE" : "IMAGE");
+  await onMessageSent(formData);
+  setImageFile(null);
+  setImagePreview(null);
+  setTexte("");
+  setEphemere(false);
+  return;
+  }
 
-    // Audio
-    if (audioBlob) {
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "audio.webm");
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
-      console.log("[ChatInput] Envoi audio avec type", ephemere ? "EPHEMERE" : "AUDIO");
-      await onMessageSent(formData);
-      setAudioBlob(null);
-      setAudioUrl(null);
-      setTexte("");
-      setEphemere(false);
-      return;
-    }
+  // Audio
+  if (audioBlob) {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "audio.webm");
+  formData.append("conversationId", conversationId);
+  formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
+  console.log("[ChatInput] Envoi audio avec type", ephemere ? "EPHEMERE" : "AUDIO");
+  await onMessageSent(formData);
+  setAudioBlob(null);
+  setAudioUrl(null);
+  setTexte("");
+  setEphemere(false);
+  return;
+  }
 
-    // Texte
-    if (!texte.trim()) return;
-    console.log("[ChatInput] Envoi texte avec type", ephemere ? "EPHEMERE" : "TEXTE");
-    await onMessageSent(texte, ephemere ? "EPHEMERE" : "TEXTE");
-    setTexte("");
-    setEphemere(false);
+  // Texte
+  if (!texte.trim()) return;
+  console.log("[ChatInput] Envoi texte avec type", ephemere ? "EPHEMERE" : "TEXTE");
+  await onMessageSent(texte, ephemere ? "EPHEMERE" : "TEXTE");
+  setTexte("");
+  setEphemere(false);
   };
 
   // --- Notification éphémère ---
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
 
   useEffect(() => {
-    if (showEphemereNotif) {
-      const timer = setTimeout(() => {
-        setShowEphemereNotif(false);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
+  if (showEphemereNotif) {
+  const timer = setTimeout(() => {
+  setShowEphemereNotif(false);
+  }, 5000);
+  return () => clearTimeout(timer);
+  }
   }, [showEphemereNotif]);
 
   const handleSubmitWithNotif = async (e) => {
-    if (ephemere) setShowEphemereNotif(true);
-    await handleSubmit(e);
+  if (ephemere) setShowEphemereNotif(true);
+  await handleSubmit(e);
   };
 
   return (
-    <>
-      {/* CAMERA MODAL */}
-      {showCamera && (
-        <div
-          className="camera-modal"
-          style={{
+  <>
+    {/* CAMERA MODAL */}
+    {showCamera && (
+    <div className="camera-modal" style={{
             position: "fixed",
             zIndex: 1002,
             left: 0,
@@ -229,40 +241,27 @@ export default function ChatInput({
             alignItems: "center",
             justifyContent: "center",
             flexDirection: "column",
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
+          }}>
+      <video ref={videoRef} autoPlay playsInline style={{
               width: 340,
               height: 250,
               borderRadius: 14,
               background: "#222",
-            }}
-          />
-          <div style={{ marginTop: 18 }}>
-            <button
-              onClick={handleTakePhoto}
-              style={{ fontSize: 22, marginRight: 24 }}
-            >
-              📸 Prendre la photo
-            </button>
-            <button
-              onClick={stopCamera}
-              style={{ fontSize: 18, color: "#fff", background: "#e53" }}
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      )}
+            }} />
+      <div style={{ marginTop: 18 }}>
+        <button onClick={handleTakePhoto} style={{ fontSize: 22, marginRight: 24 }}>
+          📸 Prendre la photo
+        </button>
+        <button onClick={stopCamera} style={{ fontSize: 18, color: "#fff", background: "#e53" }}>
+          Annuler
+        </button>
+      </div>
+    </div>
+    )}
 
-      {/* Notification éphémère */}
-      {showEphemereNotif && (
-        <div
-          style={{
+    {/* Notification éphémère */}
+    {showEphemereNotif && (
+    <div style={{
             position: "fixed",
             bottom: 10,
             left: "50%",
@@ -274,24 +273,21 @@ export default function ChatInput({
             fontWeight: "bold",
             zIndex: 1100,
             boxShadow: "0 0 10px rgba(229, 83, 83, 0.7)",
-          }}
-        >
-          Photo éphémère envoyée ! Elle disparaîtra dans 5 secondes…
-        </div>
-      )}
+          }}>
+      Photo éphémère envoyée ! Elle disparaîtra dans 5 secondes…
+    </div>
+    )}
 
-      {/* FORM PRINCIPAL */}
-      <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-                 <textarea
-            className="input-text"
-            ref={textareaRef}
-            value={texte}
-            placeholder="Écris un message…"
-            onChange={(e) => {
-              setTexte(e.target.value);
-              if (onTyping) onTyping();
-              autoResize();
-            }}
+    {/* FORM PRINCIPAL */}
+    <form className="chat-input" onSubmit={handleSubmitWithNotif}>
+      <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e)=> {
+  const value = e.target.value;
+  const withEmojis = replaceEmoticonsWithEmojis(value);
+  setTexte(withEmojis);
+  if (onTyping) onTyping();
+  autoResize();
+}}
+
             onInput={autoResize}
             rows={1}
             style={{

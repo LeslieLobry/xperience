@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-// import "./VerificationIdentite.css";
+import "./verif.css";
 
 export default function VerificationIdentitePage() {
   const [loading, setLoading] = useState(false);

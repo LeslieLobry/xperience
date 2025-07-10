@@ -74,6 +74,9 @@ export default async function AccueilPage() {
       return new Date(nextDateA) - new Date(nextDateB);
     })
     .slice(0, 3);
+console.log("user:", user);
+console.log("verifIdentite:", user.verificationIdentite);
+console.log("verifDeadline:", user.verificationDeadline);
 
   return (
     <div className="accueil-page">

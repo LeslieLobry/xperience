@@ -1,0 +1,18 @@
+.verif-identite-container{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    align-items: center;
+    margin: 16px;
+    color: white;
+}
+.verif-identite-container h1 {
+    color:#e0c084 ;
+}
+.verif-identite-container button {
+    background-color: #e0c084;
+    color: white;
+    padding: 16px;
+    border-radius: 16px;
+}
