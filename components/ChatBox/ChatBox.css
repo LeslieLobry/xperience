@@ -395,11 +395,12 @@
   background: #111;
   padding: 10px;
   border-radius: 8px;
+  height: 4000rem;
   margin-bottom: 10px;
 }
 .video-call-container video {
   width: 100%;
-  max-height: 60vh;
+  /* max-height: 60vh; */
   border-radius: 8px;
   margin: 5px;
   background: #000;
