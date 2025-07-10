@@ -77,9 +77,8 @@
 
 .grid-profil {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr ;
   gap: 1.5rem;
- 
 }
 
 .profil-card-link {
@@ -228,4 +227,9 @@ input[type="range"].profil-range {
   background: transparent !important;
   position: static !important;
   z-index: 99 !important;
+}
+@media (max-width: 768px) {
+  .grid-profil {
+    grid-template-columns: 1fr 1fr;
+  }
 }
