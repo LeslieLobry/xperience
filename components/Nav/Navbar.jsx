@@ -206,7 +206,6 @@ export default function Navbar() {
                             // Lien interne Next.js
                             <span
                               className="notif-link"
-                              style={{ cursor: "pointer", color: "#8c6a5d" }}
                               onClick={() => {
                                 setDropdownOpen(false);
                                 router.push(notif.lien);

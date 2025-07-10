@@ -125,4 +125,7 @@
     flex-direction: column;
     align-items: center;
   }
+  .toggle-box{
+    flex-direction: column;
+  }
 }

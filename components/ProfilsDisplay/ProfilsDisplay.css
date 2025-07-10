@@ -299,4 +299,9 @@ input[type="range"].profil-range {
   .grid-profil {
     grid-template-columns: 1fr 1fr;
   }
+  .toggle-box{
+    flex-direction: column !important;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
 }
