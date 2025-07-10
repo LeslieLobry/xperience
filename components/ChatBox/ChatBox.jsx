@@ -33,6 +33,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const audioChunks = useRef([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [prenomsCouple, setPrenomsCouple] = useState(null);
+  const messagesEndRef = useRef(null);
 
   function formatDurationFront(seconds) {
     if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
@@ -159,7 +160,12 @@ const handleIncomingCall = ({ data }) => {
   useEffect(() => {
     if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
-
+useEffect(() => {
+  // Dès qu'il y a un message en plus, scroll tout en bas !
+  if (messagesEndRef.current) {
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }
+}, [messages]);
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
   const startCall = async (video = true) => {

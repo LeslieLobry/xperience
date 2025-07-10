@@ -15,7 +15,7 @@ export default function MessagesList({
   prenomsCouple = null,
 }) {
   const containerRef = useRef();
-
+  const endRef = useRef();
   // → Fonction utilitaire pour avoir les prénoms au bon format string
   const getPrenomsCoupleString = (msg) => {
     // Si le message a prénom1 et prénom2 (ex : stocké dans la DB)
@@ -65,7 +65,11 @@ export default function MessagesList({
     container?.addEventListener("scroll", handleScroll);
     return () => container?.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
-
+ useEffect(() => {
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
   let lastDate = null;
 
   return (
@@ -118,6 +122,7 @@ export default function MessagesList({
           </div>
         );
       })}
+      <div ref={endRef} style={{ height: 1 }} />
       <div style={{ height: 20 }} />
     </div>
   );
