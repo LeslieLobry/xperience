@@ -51,7 +51,7 @@ export default function ChatBox({ conversationId, utilisateur }) {
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
 
 const handleIncomingCall = ({ data }) => {
-  // Si j’ai envoyé l’appel, je n’affiche pas la notif
+  console.log("[Ably] call:incoming reçu !", data, "utilisateur:", utilisateur.id);
   if (data.from?.id === utilisateur.id) {
     console.log("Je reçois mon propre appel, je n'affiche rien.");
     return;
@@ -61,13 +61,8 @@ const handleIncomingCall = ({ data }) => {
     return;
   }
   setAppelEntrant(data);
-  // ... (le reste inchangé)
 };
-
-
-
     channel.subscribe("call:incoming", handleIncomingCall);
-
     return () => {
       channel.unsubscribe("call:incoming", handleIncomingCall);
       clearTimeout(appelTimeoutRef.current);
