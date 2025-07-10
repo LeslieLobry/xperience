@@ -106,11 +106,7 @@ export async function POST(req) {
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
-
-    let prenomEnvoyeur = null;
-    if (envoyeur && user.type === "couple") {
-      prenomEnvoyeur = envoyeur;
-    }
+let prenomEnvoyeur = body.prenomEnvoyeur || null;
 
     const message = await prisma.message.create({
       data: {

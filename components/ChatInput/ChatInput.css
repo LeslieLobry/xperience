@@ -6,3 +6,7 @@
 .select-membre option{
   color: #e0c084
 }
+.input-prenom{
+  background-color: transparent;
+  color: #e0c084;
+}

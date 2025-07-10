@@ -121,25 +121,30 @@ export default function MessageBubble({
 
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-      {showAuthorInfo && (
-        <div className="author-info">
-          <img
-            src={msg.auteur?.photoUrl || "/default.jpg"}
-            alt={msg.auteur?.pseudo || "Utilisateur"}
-            className="author-avatar"
-          />
-          <div>
-            {msg.prenomEnvoyeur ? (
-              <span className="author-name">{msg.prenomEnvoyeur}</span>
-            ) : (
-              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
-            )}
-            {auteurIsCouple && prenomsCouple && (
-              <span className="author-couple-names">({prenomsCouple})</span>
-            )}
-          </div>
-        </div>
+   {showAuthorInfo && (
+  <div className="author-info">
+    <img
+      src={msg.auteur?.photoUrl || "/default.jpg"}
+      alt={msg.auteur?.pseudo || "Utilisateur"}
+      className="author-avatar"
+    />
+    <div>
+      {/* Prénom envoyeur si présent, sinon pseudo */}
+      {msg.prenomEnvoyeur ? (
+        <span className="author-name">{msg.prenomEnvoyeur}</span>
+      ) : (
+        <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
       )}
+      {/* Si c'est un couple, affiche les prénoms du couple après */}
+      {auteurIsCouple && prenomsCouple && (
+        <span className="author-couple-names" style={{marginLeft: 4, color: "#b5a06c", fontSize: "0.95em", fontStyle: "italic"}}>
+          ({prenomsCouple})
+        </span>
+      )}
+    </div>
+  </div>
+)}
+
 
       {msg.type === "IMAGE" && msg.imageUrl ? (
         <img src={msg.imageUrl} alt="image envoyée" className="message-image" />

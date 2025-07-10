@@ -119,21 +119,26 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     let res, result;
     // Si data est un FormData (cas image, audio, etc.)
     if (data instanceof FormData) {
+      // Patch ici : si on t'envoie le prénom envoyeur, tu le passes
+      // Si jamais tu passes par onMessageSent(formData) et tu veux forcer à ajouter le champ
+      // => déjà fait côté ChatInput, donc rien à changer ici, on laisse l'appel tel quel
       res = await fetch("/api/messages", {
         method: "POST",
         body: data,
       });
     } else {
-      // Sinon, message texte classique
-      if (!data.trim()) return null;
+      // data peut être string ou un objet (contenant contenu, type, conversationId, etc)
+      if (typeof data === "string") {
+        if (!data.trim()) return null;
+        data = { contenu: data, type };
+      }
+      if (!data.contenu || !data.contenu.trim()) return null;
+
+      // PATCH : on fusionne tout ce qui est transmis
       const payload = {
         conversationId,
-        contenu: data,
-        type,
+        ...data, // <-- donc prenomEnvoyeur sera bien transmis si fourni par le ChatInput
       };
-      if (envoyeur) payload.envoyeur = envoyeur;
-      if (prenom1) payload.prenom1 = prenom1;
-      if (prenom2) payload.prenom2 = prenom2;
 
       res = await fetch("/api/messages", {
         method: "POST",
