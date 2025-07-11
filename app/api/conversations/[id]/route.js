@@ -44,8 +44,7 @@ export async function GET(req) {
   }
 }
 
-export async function DELETE(req, context) {
-  const { params } = await context;
+export async function DELETE(req, { params }) {
   const user = await getUserFromToken();
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
