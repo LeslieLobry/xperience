@@ -25,6 +25,13 @@ export default function ChatInput({
   const [prenomsOK, setPrenomsOK] = useState(false);
   const [membreParlant, setMembreParlant] = useState("couple");
 
+  // --- DETECTION SAFARI ---
+  function isSafariIOS() {
+    if (typeof window === "undefined") return false;
+    const ua = window.navigator.userAgent;
+    return /iP(ad|hone|od).+Version\/[\d.]+.*Safari/i.test(ua);
+  }
+
   // Fetch prénoms si utilisateur couple
   useEffect(() => {
     if (utilisateur.type !== "couple") return;
@@ -273,21 +280,21 @@ export default function ChatInput({
     console.log("[ChatInput] Envoi texte avec type", ephemere ? "EPHEMERE" : "TEXTE");
 
     if (utilisateur.type === "couple" && prenomsOK) {
-  await onMessageSent({
-    contenu: texte,
-    type: ephemere ? "EPHEMERE" : "TEXTE",
-    conversationId,
-    prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant, // <---- ICI
-    prenom1: pr1,
-    prenom2: pr2,
-  });
-} else {
-  await onMessageSent({
-    contenu: texte,
-    type: ephemere ? "EPHEMERE" : "TEXTE",
-    conversationId,
-  });
-}
+      await onMessageSent({
+        contenu: texte,
+        type: ephemere ? "EPHEMERE" : "TEXTE",
+        conversationId,
+        prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
+        prenom1: pr1,
+        prenom2: pr2,
+      });
+    } else {
+      await onMessageSent({
+        contenu: texte,
+        type: ephemere ? "EPHEMERE" : "TEXTE",
+        conversationId,
+      });
+    }
     setTexte("");
     setEphemere(false);
   };
@@ -374,16 +381,15 @@ export default function ChatInput({
       )}
       {utilisateur.type === "couple" && prenomsOK && (
         <select
-  className="select-membre"
-  value={membreParlant}
-  onChange={e => setMembreParlant(e.target.value)}
-  style={{ marginRight: 8, marginBottom: 8 }}
->
-  <option value={pr1}>{pr1}</option>
-  <option value={pr2}>{pr2}</option>
-  <option value="couple">Le couple</option>
-</select>
-
+          className="select-membre"
+          value={membreParlant}
+          onChange={e => setMembreParlant(e.target.value)}
+          style={{ marginRight: 8, marginBottom: 8 }}
+        >
+          <option value={pr1}>{pr1}</option>
+          <option value={pr2}>{pr2}</option>
+          <option value="couple">Le couple</option>
+        </select>
       )}
 
       {/* Notification éphémère */}
@@ -407,6 +413,27 @@ export default function ChatInput({
 
       {/* FORM PRINCIPAL */}
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
+
+        {/* ALERTE MICRO SAFARI */}
+        {isSafariIOS() && (
+          <div style={{
+            background: "#fff3cd",
+            color: "#856404",
+            padding: 8,
+            borderRadius: 6,
+            marginBottom: 8,
+            border: "1px solid #ffeeba",
+            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            maxWidth: 360
+          }}>
+            <span style={{ fontWeight: 600 }}>⚠️ Micro non compatible&nbsp;:</span>
+            Sur iPhone/iPad (Safari), l’enregistrement audio peut ne pas fonctionner à cause des restrictions Apple.
+          </div>
+        )}
+
         <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e) => {
           const value = e.target.value;
           const withEmojis = replaceEmoticonsWithEmojis(value);
@@ -419,7 +446,6 @@ export default function ChatInput({
           style={{
             resize: "none",
             overflow: "hidden",
-
           }}
         />
         <div className="input-wrapper" style={{ alignItems: "center" }}>
