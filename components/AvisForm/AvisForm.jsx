@@ -40,7 +40,7 @@ export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
       {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit} className="form-css">
-        <label>Commentaire :</label>
+       
         <textarea
           placeholder="Votre message..."
           value={commentaire}

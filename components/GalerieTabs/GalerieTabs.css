@@ -1,9 +1,9 @@
 .galeries-tabs{
    border :1px solid var(--gold);
    background-color: rgba(255, 255, 255, 0.05);
-  padding:20px;
+  padding:5px;
   border-radius: 16px;
-
+width: 100%;
 }
 .tabs-buttons {
   display: flex;

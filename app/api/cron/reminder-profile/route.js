@@ -40,7 +40,7 @@ export async function GET() {
         🔐 Une photo, une description, vos préférences... Il ne vous reste qu’un petit pas à faire pour plonger dans l’univers du désir, de l’élégance et de la liberté.
       </p>
       <div style="margin:2em 0;">
-        <a href="https://x-periences.fr/profil"
+        <a href="https://x-periences.fr/accueil-page"
           style="display:inline-block;background:#1a1a1a;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:18px;letter-spacing:1px;">
           ➡️ Compléter mon profil maintenant
         </a>
