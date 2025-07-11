@@ -12,7 +12,7 @@ export default function RechercheResultats() {
   const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
+    const params = searchParams.toString();
     if (!params.toString()) return;
 
     setLoading(true);
@@ -58,6 +58,9 @@ export default function RechercheResultats() {
               <h2 className="profil-card-title">{u.pseudo}</h2>
               <p className="profil-card-details">
                 {u.age} ans - {u.localisation}
+              </p>
+              <p className="profil-card-type">
+                {u.type}
               </p>
             </div>
           </div>

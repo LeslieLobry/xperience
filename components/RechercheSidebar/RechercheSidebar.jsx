@@ -1,7 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useImperativeHandle, forwardRef } from "react";
 import "./recherche-sidebar.css";
+import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal"; // adapte le chemin si besoin
 import { usePathname } from "next/navigation";
+import ReconnaissanceVocale from "../ReconnaissanceVocale/ReconnaissanceVocale";
+
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -13,15 +16,32 @@ function useIsMobile(breakpoint = 768) {
   }, [breakpoint]);
   return isMobile;
 }
-export default function RechercheSidebar({ onSearch }) {
+
+// Nettoie les filtres incohérents (autourDeMoi prioritaire sur localisation)
+function cleanFormFilters(formIn) {
+  let form = { ...formIn };
+
+  if (form.autourDeMoi) {
+    form.localisation = "";
+  } else if (form.localisation) {
+    form.autourDeMoi = false;
+    if (!form.rayon) delete form.rayon;
+  }
+  if (!form.autourDeMoi) delete form.autourDeMoi;
+  return form;
+}
+
+const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref) {
+  console.log("RechercheSidebar: composant MONTÉ !");
   const [form, setForm] = useState({
     pseudo: "", type: [], orientation: [], rechercheType: [],
     ageMin: "", ageMax: "", localisation: "",
     photo: false, description: false, statut: "all",
     experience: [], fumeur: [], silhouette: [],
     taille: [], origines: [], yeux: [], cheveux: [],
-    recherches: [], envies: []
+    recherches: [], envies: [], rayon: "", autourDeMoi: false
   });
+  const [resumeVocal, setResumeVocal] = useState("");
 
   const [openSections, setOpenSections] = useState({
     identite: false,
@@ -35,8 +55,25 @@ export default function RechercheSidebar({ onSearch }) {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Prend en charge tout le changement des champs
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === "autourDeMoi") {
+      setForm((prev) => ({
+        ...prev,
+        autourDeMoi: checked,
+        localisation: checked ? "" : prev.localisation
+      }));
+      return;
+    }
+    if (name === "localisation" && value) {
+      setForm((prev) => ({
+        ...prev,
+        localisation: value,
+        autourDeMoi: false
+      }));
+      return;
+    }
     if (type === "checkbox" && Array.isArray(form[name])) {
       setForm((prev) => ({
         ...prev,
@@ -49,14 +86,36 @@ export default function RechercheSidebar({ onSearch }) {
     }
   };
 
+  // Soumission du formulaire classique (clic bouton ou entrée)
   const handleSubmit = (e) => {
-    e.preventDefault();
-    onSearch?.(form);
-  };
-const isMobile = useIsMobile(768);
-const pathname = usePathname()
+  e.preventDefault();
+  console.log("RechercheSidebar : handleSubmit avec filtres", form);
+  onSearch?.(cleanFormFilters(form));
+};
 
-if (isMobile && pathname !== "/recherche") {
+
+  // --- Injection vocale des filtres ---
+  useImperativeHandle(ref, () => ({
+    handleVocalFiltres(filtres) {
+      setForm((prev) => {
+        const result = { ...prev };
+        Object.entries(filtres).forEach(([k, v]) => {
+          if (Array.isArray(result[k]) && Array.isArray(v)) {
+            result[k] = [...new Set([...result[k], ...v])];
+          } else {
+            result[k] = v;
+          }
+        });
+        onSearch?.(cleanFormFilters(filtres));
+        return result;
+      });
+    }
+  }));
+
+  const isMobile = useIsMobile(768);
+  const pathname = usePathname();
+
+  if (isMobile && pathname !== "/recherche") {
     return (
       <aside className="recherche-sidebar recherche-sidebar--mobile">
         <a href="/recherche" className="go-recherche-link">
@@ -69,6 +128,34 @@ if (isMobile && pathname !== "/recherche") {
   return (
     <aside className="recherche-sidebar">
       <h2>🔎 Recherche</h2>
+      <div style={{ marginBottom: 24 }}>
+        {/* <ReconnaissanceVocale
+          onResult={texte => {
+            setResumeVocal(texte);
+            const filtres = extraireFiltresVocal(texte);
+            setForm(prev => ({ ...prev, ...filtres }));
+            console.log("[Vocal] Filtres extraits:", filtres);
+            onSearch?.(cleanFormFilters(filtres));
+          }}
+        /> */}
+        {resumeVocal && (
+          <div
+            style={{
+              margin: "12px 0 20px 0",
+              padding: "12px 20px",
+              borderRadius: 8,
+              background: "#fffbe7",
+              color: "#c4903a",
+              fontWeight: "bold",
+              fontSize: 17,
+              boxShadow: "0 2px 10px #e0c08444",
+              maxWidth: 700
+            }}
+          >
+            <span style={{ opacity: 0.7 }}>Recherche vocale&nbsp;:</span> «&nbsp;{resumeVocal}&nbsp;»
+          </div>
+        )}
+      </div>
       <form onSubmit={handleSubmit}>
         {/* PSEUDO */}
         <input
@@ -124,14 +211,38 @@ if (isMobile && pathname !== "/recherche") {
             <input type="number" name="ageMin" placeholder="Min" value={form.ageMin} onChange={handleChange} min={18} />
             <input type="number" name="ageMax" placeholder="Max" value={form.ageMax} onChange={handleChange} min={18} />
           </div>
-          <input type="text" name="localisation" placeholder="Ville" value={form.localisation} onChange={handleChange} />
+          <input
+            type="text"
+            name="localisation"
+            placeholder="Ville"
+            value={form.localisation}
+            onChange={handleChange}
+          />
+          <input
+            type="number"
+            name="rayon"
+            placeholder="Rayon (km)"
+            value={form.rayon}
+            min={1}
+            max={200}
+            onChange={handleChange}
+          />
+          {/* Ajoute une case "autour de moi" */}
+          <label>
+            <input
+              type="checkbox"
+              name="autourDeMoi"
+              checked={!!form.autourDeMoi}
+              onChange={handleChange}
+            />
+            Autour de moi
+          </label>
           <label><input type="checkbox" name="photo" checked={form.photo} onChange={handleChange} />Avec photo</label>
           <label><input type="checkbox" name="description" checked={form.description} onChange={handleChange} />Avec description</label>
           <h4>Statut</h4>
           <label><input type="radio" name="statut" value="all" checked={form.statut === "all"} onChange={handleChange} />Tous</label>
           <label><input type="radio" name="statut" value="en_ligne" checked={form.statut === "en_ligne"} onChange={handleChange} />En ligne</label>
         </Section>
-
         <button type="submit" className="recherche-button">Rechercher</button>
       </form>
     </aside>
@@ -157,15 +268,16 @@ if (isMobile && pathname !== "/recherche") {
     );
   }
 
-function Section({ title, open, toggle, children }) {
-  return (
-    <div className={`section-group ${open ? "open" : ""}`}>
-      <h3 onClick={toggle} className="section-toggle">
-        {open ? "−" : "+"} {title}
-      </h3>
-      {open && <div className="section-content">{children}</div>}
-    </div>
-  );
-}
+  function Section({ title, open, toggle, children }) {
+    return (
+      <div className={`section-group ${open ? "open" : ""}`}>
+        <h3 onClick={toggle} className="section-toggle">
+          {open ? "−" : "+"} {title}
+        </h3>
+        {open && <div className="section-content">{children}</div>}
+      </div>
+    );
+  }
+});
 
-}
+export default RechercheSidebar;
