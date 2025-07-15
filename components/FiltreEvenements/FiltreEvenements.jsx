@@ -201,26 +201,27 @@ export default function FiltreEvenements({ onFilterChange }) {
         />
       </div>
 
-      <div className="filtre-access">
+      {/* <div className="filtre-access">
         <h4>Accès</h4>
-        <label>
+        <label className="label">
           <input
             type="checkbox"
             checked={acces.includes("hommes")}
             onChange={() => handleCheckbox("hommes", acces, setAcces)}
+            className="acces-input"
           />
           Hommes seuls acceptés
         </label>
-        <br />
-        <label>
+        <label className="label">
           <input
             type="checkbox"
             checked={acces.includes("femmes_couples")}
             onChange={() => handleCheckbox("femmes_couples", acces, setAcces)}
+             className="acces-input"
           />
           Femmes et couples uniquement
         </label>
-      </div>
+      </div> */}
 
       <Button
         title="Rechercher"

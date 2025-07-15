@@ -272,7 +272,7 @@ nonEmptyDates.forEach((d) => formData.append("dates", d));
           + Ajouter une date
         </button>
         {/* FIN MULTI-DATES */}
-
+{/* 
         <select
           name="heureDebut"
           onChange={handleChange}
@@ -285,9 +285,9 @@ nonEmptyDates.forEach((d) => formData.append("dates", d));
               {heure}
             </option>
           ))}
-        </select>
+        </select> */}
 
-        <select
+        {/* <select
           name="heureFin"
           onChange={handleChange}
           value={form.heureFin ?? ""}
@@ -299,7 +299,7 @@ nonEmptyDates.forEach((d) => formData.append("dates", d));
               {heure}
             </option>
           ))}
-        </select>
+        </select> */}
 
         <div className="autocomplete-wrapper">
           <input
@@ -335,7 +335,7 @@ nonEmptyDates.forEach((d) => formData.append("dates", d));
           value={form.lien ?? ""}
           onChange={handleChange}
         />
-
+{/* 
         <input
           name="tarifCouple"
           placeholder="Tarif couple (€)"
@@ -356,7 +356,7 @@ nonEmptyDates.forEach((d) => formData.append("dates", d));
           type="number"
           value={form.tarifHomme ?? ""}
           onChange={handleChange}
-        />
+        /> */}
 
         <input
           type="file"

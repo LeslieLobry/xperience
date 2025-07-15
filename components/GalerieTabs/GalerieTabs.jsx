@@ -11,12 +11,14 @@ export default function GaleriesTabs({ publicPhotos, galeriePrivee, editable, ut
 
   return (
     <div className="galeries-tabs">
+      
+      <h3 className="profil-section-title">Galerie</h3>
       <div className="tabs-buttons">
         <button
           className={activeTab === 'publique' ? 'active' : ''}
           onClick={() => setActiveTab('publique')}
         >
-          Galerie publique
+         Galerie publique
         </button>
         <button
           className={activeTab === 'privee' ? 'active' : ''}

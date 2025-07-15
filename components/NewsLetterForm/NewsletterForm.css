@@ -20,7 +20,7 @@
 
 input[type="email"] {
   width: 100%;
-  padding: 0.8rem 1rem;
+  padding: 8px 16px;
   border: 1px solid #e0c084;
   border-radius: 8px;
   color: #fff;

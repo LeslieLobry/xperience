@@ -129,7 +129,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
     <aside className="recherche-sidebar">
       <h2>🔎 Recherche</h2>
       <div style={{ marginBottom: 24 }}>
-        {/* <ReconnaissanceVocale
+        <ReconnaissanceVocale
           onResult={texte => {
             setResumeVocal(texte);
             const filtres = extraireFiltresVocal(texte);
@@ -137,7 +137,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
             console.log("[Vocal] Filtres extraits:", filtres);
             onSearch?.(cleanFormFilters(filtres));
           }}
-        /> */}
+        />
         {resumeVocal && (
           <div
             style={{

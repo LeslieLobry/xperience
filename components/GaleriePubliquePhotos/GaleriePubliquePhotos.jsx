@@ -50,7 +50,6 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
 
   return (
     <div className="profil-section">
-      <h3 className="profil-section-title">Galerie publique</h3>
       <div className="gallery-grid">
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id}>

@@ -384,7 +384,6 @@ export default function ChatInput({
           className="select-membre"
           value={membreParlant}
           onChange={e => setMembreParlant(e.target.value)}
-          style={{ marginRight: 8, marginBottom: 8 }}
         >
           <option value={pr1}>{pr1}</option>
           <option value={pr2}>{pr2}</option>

@@ -28,7 +28,8 @@
 }
 
 .filtre-access {
-  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 .input-ville-wrapper {
   position: relative;
@@ -159,4 +160,13 @@
   border: solid #f0d084;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+.acces-input{
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+.label{
+  display: flex;
+  gap: 8px;
 }

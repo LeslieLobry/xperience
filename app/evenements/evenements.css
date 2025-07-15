@@ -67,6 +67,8 @@
     border: 1px #e0c084 solid ;
     align-items: center;
     gap: 16px;
+    padding: 8px;
+    border-radius: 16px;
 }
 .evenements-grid{
     display: flex;

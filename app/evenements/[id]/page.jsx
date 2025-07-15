@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
 import Button from "../../../components/Button/Button"; // ajoute l'import si besoin
 import "./id.css";
+import { color } from "framer-motion";
 
 export default function PageEvenement() {
   const { id } = useParams();
@@ -102,15 +103,15 @@ export default function PageEvenement() {
 
   return (
     <div className="evenement-container">
-      <Button
+      <button
         title="← Retour"
         onClick={() => router.push("/evenements")}
         color="#e0c084"
-        className="filtre-btn"
-        style={{ marginBottom: "1rem" }}
-      />
-
-      <h1>{evenement.titre}</h1>
+        className="retour"
+      >Retour</button>
+      <div className="event-grid">
+  <div className="img-title">
+      <h1 className="titre-event">{evenement.titre}</h1>
 
       {evenement.imageUrl && (
         <img
@@ -119,8 +120,15 @@ export default function PageEvenement() {
           className="evenement-image"
         />
       )}
-
+      </div>
+      <div className="description-contenant">
+      <h2>Description</h2>
+      <p>{evenement.description}</p>
+</div>
+</div>
+<div className="event-details-description">
       <div className="evenement-details">
+        <h2 className="event-details-title">Infos</h2>
         <p>
           <strong>Date{datesAffichees.length > 1 ? "s" : ""} :</strong>{" "}
           {datesAffichees.length
@@ -128,17 +136,17 @@ export default function PageEvenement() {
             : "?"}
         </p>
         <p>
-          <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin}
+          {/* <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin} */}
         </p>
         <p>
           <strong>Lieu :</strong> {evenement.lieu}
         </p>
-        <p>
+        {/* <p>
           <strong>Type :</strong> {evenement.type}
-        </p>
-        <p>
+        </p> */}
+        {/* <p>
           <strong>Accès :</strong> {evenement.acces}
-        </p>
+        </p> */}
 
         {evenement.lien && (
           <p>
@@ -154,15 +162,13 @@ export default function PageEvenement() {
         )}
       </div>
 
-      <h2>Description</h2>
-      <p>{evenement.description}</p>
-
-      <h2>Tarifs</h2>
+</div>
+      {/* <h2>Tarifs</h2>
       <ul>
         <li>Couples : {evenement.tarifCouple ?? "?"} €</li>
         <li>Femmes : {evenement.tarifFemme ?? "?"} €</li>
         <li>Hommes : {evenement.tarifHomme ?? "?"} €</li>
-      </ul>
+      </ul> */}
 
       <h2>Participants ({evenement.participants?.length || 0})</h2>
       <ul>
@@ -174,13 +180,14 @@ export default function PageEvenement() {
       {confirmation && <p className="confirmation-message">{confirmation}</p>}
 
       {user && (
-        <Button
-          title={dejaInscrit ? "Se désinscrire" : "Participer"}
-          onClick={dejaInscrit ? seDesinscrire : participer}
-          color={dejaInscrit ? "#e57c73" : "#e0c084"}
-          className="filtre-btn"
-          style={{ marginTop: "1rem" }}
-        />
+     <button
+  onClick={dejaInscrit ? seDesinscrire : participer}
+  className="retour"
+    title={dejaInscrit ? "Se désinscrire" : "Participer"} // ← ça c'est l'infobulle au survol, tu peux garder si tu veux
+>
+  {dejaInscrit ? "Se désinscrire" : "Participer"}
+</button>
+
       )}
 
       {isAdmin && (

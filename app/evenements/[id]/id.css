@@ -1,17 +1,12 @@
 .evenement-container{
-position: relative;
 display: flex;
 flex-direction: column;
-justify-content: center;
-align-items: center;
-min-height: 100vh;
-width: 100%;
 padding: 2rem;
 box-sizing: border-box;
 z-index: 1; 
 overflow: hidden; 
-color:#f5ece0;
-gap: 25px; 
+color:#ccc
+
 }
 .evenement-container::before{
      content: "";
@@ -33,4 +28,67 @@ gap: 25px;
   background-color: #ccc;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.img-title
+{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-around;
+    color:#e0c084;
+    flex-direction: column;
+}
+.evenement-image{
+  width: 46%;
+}
+.event-details-title{
+  color: #e0c084;
+}
+.evenement-details{
+   border: 1px solid #e0c084;
+  padding: 8px;
+  border-radius: 16px;
+  width: 50%;
+}
+
+.event-details-description {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.description-contenant h2{
+color: #e0c084;
+}
+.event-grid{
+  display: flex;
+}
+.description-contenant {
+  border: 1px solid #e0c084;
+  padding: 8px;
+  border-radius: 16px;
+  width: 65%;
+}
+.retour{
+  padding: 8px 16px !important;
+  width: 25% !important;
+  background-color: #e0c084;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 16px;
+}
+@media screen and (max-width: 768px) {
+  .event-grid{
+    flex-direction:column ;
+    gap: 16px;
+  }
+  .event-details-description{
+    width: 100%;
+  }
+  .description-contenant{
+    width: 100%;
+  }
+  .evenement-details{
+    width: 100%;
+  }
 }
