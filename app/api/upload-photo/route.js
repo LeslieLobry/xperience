@@ -1,3 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '100mb'  // Ou 50mb, ou la taille souhaitée
+    }
+  }
+}
+
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '../../../lib/prisma';
