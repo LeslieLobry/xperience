@@ -21,7 +21,6 @@ const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), { ssr: f
 const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
 const DemandesAccesGalerie = dynamic(() => import("../DemandesAccesGalerie/DemandesAccesGalerie"), { ssr: false });
 
-// ===== Modal pour afficher la photo en grand =====
 function SimpleModal({ open, onClose, children }) {
   if (!open) return null;
   return (
@@ -78,6 +77,11 @@ export default function Profil({ user, connectedUser }) {
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Pour chaque modal d’édition
+  const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
+  const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
+  const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
+
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
   useEffect(() => {
@@ -121,8 +125,36 @@ export default function Profil({ user, connectedUser }) {
     return () => clearInterval(interval);
   }, [isOwnProfile]);
 
+  // Champs à éditer via ProfilDetailsForm
+  const profilDetailsFields = [
+    "Taille", "Silhouette", "Origines", "Âge", "Fume", "Yeux", "Cheveux",
+    "Taille du/de la partenaire", "Silhouette du/de la partenaire",
+    "Origines du/de la partenaire", "Âge du/de la partenaire",
+    "Fume du/de la partenaire", "Yeux du/de la partenaire", "Cheveux du/de la partenaire"
+  ];
+
+  function handleEditField(champ) {
+    if (champ === "Description") setOpenDescriptionModal(true);
+    else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
+    else if (champ === "Photo de profil") setOpenPhotoUploader(true);
+    // Ajoute ici d’autres modals si besoin
+  }
+
   return (
     <div className="profil-page">
+      {/* Modal d’upload photo déclenché par la complétion */}
+      <SimpleModal open={openPhotoUploader} onClose={() => setOpenPhotoUploader(false)}>
+        <PhotoUploader
+          priority
+          currentUrl={photoUrl}
+          isOwnProfile={isOwnProfile}
+          onUpload={(url) => {
+            setPhotoUrl(url);
+            setOpenPhotoUploader(false);
+          }}
+        />
+      </SimpleModal>
+
       <div className="profil-header-horizontal">
         <div className="profil-header-row">
           <div className="profil-avatar-horizontal">
@@ -178,14 +210,31 @@ export default function Profil({ user, connectedUser }) {
           </div>
         </div>
       </div>
-      {isOwnProfile && <ProfilCompletionBox user={user} completion={completion} />}
+
+      {isOwnProfile && (
+        <ProfilCompletionBox
+          user={user}
+          completion={completion}
+          onEditField={handleEditField}
+        />
+      )}
 
       <div className="grid">
-        <DescriptionCard editable={isOwnProfile} description={user.description} />
+        <DescriptionCard
+          editable={isOwnProfile}
+          description={user.description}
+          isModalOpen={openDescriptionModal}
+          setIsModalOpen={setOpenDescriptionModal}
+        />
         <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriePrivee} editable={isOwnProfile} utilisateurId={user.id} visiteurId={connectedUser.id} />
         {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
         <PreferencesSummary editable={isOwnProfile} user={user} />
-        <ProfilDetailsSummary editable={isOwnProfile} user={user} />
+        <ProfilDetailsSummary
+          editable={isOwnProfile}
+          user={user}
+          isModalOpen={openProfilDetailsModal}
+          setIsModalOpen={setOpenProfilDetailsModal}
+        />
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />

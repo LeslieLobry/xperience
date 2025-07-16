@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '../Modal/Modal';
 import Button from '../Button/Button';
 import '../DescriptionCard/descriptionCard.css';
@@ -8,13 +8,22 @@ import '../DescriptionCard/descriptionCard.css';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 
-export default function DescriptionCard({ editable = false, description = "" }) {
+export default function DescriptionCard({
+  editable = false,
+  description = "",
+  isModalOpen,
+  setIsModalOpen
+}) {
   const [currentDescription, setCurrentDescription] = useState(description);
   const [tempDescription, setTempDescription] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Si la description change côté parent, on met à jour
+  useEffect(() => {
+    setCurrentDescription(description);
+  }, [description]);
 
   const handleSave = async () => {
     setSaving(true);

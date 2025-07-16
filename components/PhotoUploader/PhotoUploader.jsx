@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
@@ -8,7 +8,6 @@ function isVideoFile(fileOrUrl) {
   if (!fileOrUrl) return false;
   if (typeof fileOrUrl === "string")
     return /\.(mp4|webm|ogg|mov)$/i.test(fileOrUrl);
-  // Côté input file
   if (fileOrUrl.type) return fileOrUrl.type.startsWith("video/");
   return false;
 }
@@ -24,6 +23,12 @@ export default function PhotoUploader({
   const fileInputRef = useRef(null);
   const [preview, setPreview] = useState(currentUrl);
   const [previewType, setPreviewType] = useState(isVideoFile(currentUrl) ? "video" : "image");
+
+  // 🔥 Synchronise preview à chaque changement de currentUrl (utile en modal !)
+  useEffect(() => {
+    setPreview(currentUrl);
+    setPreviewType(isVideoFile(currentUrl) ? "video" : "image");
+  }, [currentUrl]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];

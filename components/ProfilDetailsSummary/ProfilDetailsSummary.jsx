@@ -4,9 +4,13 @@ import Modal from "../Modal/Modal";
 import ProfilDetailsForm from "../ProfilDetailsForm/ProfilDetailsForm";
 import Button from "../Button/Button";
 
-export default function ProfilDetailsSummary({ editable = false, user = null }) {
+export default function ProfilDetailsSummary({
+  editable = false,
+  user = null,
+  isModalOpen,
+  setIsModalOpen
+}) {
   const [profil, setProfil] = useState(user);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
 
   // Charge le profil depuis l'API si non fourni en props
@@ -52,9 +56,8 @@ export default function ProfilDetailsSummary({ editable = false, user = null }) 
         <p className="pref-rep">{profil.type || "..."}</p>
       </div>
       <div className="membre-colum">
-        
         <div className="membre-1">
-           {profil.type?.toLowerCase() === "couple" && <h3>Membre 1</h3>}
+          {profil.type?.toLowerCase() === "couple" && <h3>Membre 1</h3>}
           <div className="pref-details">
             <p className="pref-nom">Âge :</p>
             <p className="pref-rep">{profil.age ? `${profil.age} ans` : "..."}</p>
