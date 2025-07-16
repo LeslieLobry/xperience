@@ -175,11 +175,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         </div>
       )}
 
-      {afficherPlus && (
-        <Link href="/profils" className="afficher-plus">
-          Afficher plus
-        </Link>
-      )}
+      {afficherPlus && !filtrerProches && (
+  <Link href="/profils" className="afficher-plus">
+    Afficher plus
+  </Link>
+)}
+
     </div>
   );
 }

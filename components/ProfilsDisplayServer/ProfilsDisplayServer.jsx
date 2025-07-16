@@ -26,7 +26,7 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
       type: true,
     },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take:25
   });
 return <ProfilsDisplay profils={profils} afficherPlus={true} />;
 
