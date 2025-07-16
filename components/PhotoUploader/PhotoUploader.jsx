@@ -4,6 +4,15 @@ import { useRef, useState } from 'react';
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
+function isVideoFile(fileOrUrl) {
+  if (!fileOrUrl) return false;
+  if (typeof fileOrUrl === "string")
+    return /\.(mp4|webm|ogg|mov)$/i.test(fileOrUrl);
+  // Côté input file
+  if (fileOrUrl.type) return fileOrUrl.type.startsWith("video/");
+  return false;
+}
+
 export default function PhotoUploader({
   currentUrl,
   onUpload,
@@ -14,10 +23,20 @@ export default function PhotoUploader({
 }) {
   const fileInputRef = useRef(null);
   const [preview, setPreview] = useState(currentUrl);
+  const [previewType, setPreviewType] = useState(isVideoFile(currentUrl) ? "video" : "image");
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Détecte image ou vidéo côté preview local
+    if (isVideoFile(file)) {
+      setPreviewType("video");
+      setPreview(URL.createObjectURL(file));
+    } else {
+      setPreviewType("image");
+      setPreview(URL.createObjectURL(file));
+    }
 
     const formData = new FormData();
     formData.append('photo', file);
@@ -44,7 +63,7 @@ export default function PhotoUploader({
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Upload échoué :", errorText);
-        alert("Erreur lors de l'envoi de la photo.");
+        alert("Erreur lors de l'envoi du fichier.");
         return;
       }
 
@@ -52,6 +71,7 @@ export default function PhotoUploader({
       const url = data.photoUrl;
 
       setPreview(url);
+      setPreviewType(isVideoFile(file) ? "video" : "image");
       if (onUpload) onUpload(isGallery ? data : url);
     } catch (err) {
       console.error("Erreur réseau :", err);
@@ -70,21 +90,27 @@ export default function PhotoUploader({
       onClick={handleClick}
     >
       {!isGallery && preview && (
-        <>
-          <div className="photo-preview-wrapper">
+        <div className="photo-preview-wrapper">
+          {previewType === "video" ? (
+            <video
+              src={preview}
+              controls
+              className="photo-preview"
+              style={{ maxWidth: "100%", maxHeight: "160px" }}
+            />
+          ) : (
             <img
               src={preview || "/images/default-avatar.png"}
               alt="Photo de profil"
               className="photo-preview"
             />
-          </div>
-
+          )}
           {isOwnProfile && (
             <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
               <Camera className="camera-icon" />
             </label>
           )}
-        </>
+        </div>
       )}
 
       {isGallery && (
@@ -97,7 +123,7 @@ export default function PhotoUploader({
         id="photo-upload"
         type="file"
         ref={fileInputRef}
-        accept="image/*"
+        accept="image/*,video/*"
         style={{ visibility: 'hidden', width: 0, height: 0 }}
         onChange={handleFileChange}
       />
