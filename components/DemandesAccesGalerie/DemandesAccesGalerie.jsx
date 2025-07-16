@@ -4,11 +4,15 @@ import Image from "next/image";
 
 export default function DemandesAccesGalerie() {
   const [demandes, setDemandes] = useState([]);
+  const [noGalerie, setNoGalerie] = useState(false);
 
   useEffect(() => {
     fetch("/api/galerie-privee/demandes")
       .then(res => res.json())
-      .then(setDemandes);
+      .then(data => {
+        if (data.error === "NO_GALERIE") setNoGalerie(true);
+        else setDemandes(data);
+      });
   }, []);
 
   const handleAction = async (id, action) => {
@@ -17,9 +21,19 @@ export default function DemandesAccesGalerie() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ statut: action }),
     });
-
     setDemandes(prev => prev.filter(d => d.id !== id));
   };
+
+  if (noGalerie) {
+    return (
+      <div className="profil-section">
+        <h3 className="profil-section-title">Demandes d'accès à votre galerie privée</h3>
+        <div style={{ textAlign: "center", padding: "1rem" }}>
+          <p style={{ color: "#888", marginTop: "0.5rem" }}>Pas de galerie privée pour le moment.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="profil-section">

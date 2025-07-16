@@ -11,9 +11,21 @@ export async function GET() {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
+  // On vérifie si l'utilisateur a une galerie privée
+  const galeriePrivee = await prisma.galeriePrivee.findUnique({
+    where: { utilisateurId: user.id },
+    select: { id: true }
+  });
+
+  if (!galeriePrivee) {
+    // Nouveau: flag spécial pour le frontend
+    return NextResponse.json({ error: "NO_GALERIE" }, { status: 200 });
+  }
+
+  // On récupère les demandes si la galerie existe
   const demandes = await prisma.demandeAcces.findMany({
     where: {
-      galeriePrivee: { utilisateurId: user.id },
+      galeriePriveeId: galeriePrivee.id,
       statut: "EN_ATTENTE",
     },
     include: {

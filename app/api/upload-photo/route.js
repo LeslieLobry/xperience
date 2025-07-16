@@ -5,8 +5,6 @@ import { getUserFromToken } from '../../../lib/auth';
 import { s3 } from '../../../lib/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
-// ... importations inchangées ...
-
 export async function POST(req) {
   const cookieStore = cookies();
   const user = await getUserFromToken(cookieStore);
