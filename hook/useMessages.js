@@ -14,23 +14,33 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   // Référence pour stocker les timers d'effacement des messages éphémères
   const ephemeralTimers = useRef({});
 
+  // --- PATCH: fetch "refetchable" conversation/messages/participants ---
+const refetchConversation = useCallback(async () => {
+  if (!conversationId) return;
+  const res = await fetch(
+    `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
+  );
+  const data = await res.json();
+  if (data.success) {
+    setMessages(data.messages || []);
+    // PATCH pour groupes ou DM
+    if (data.participants) {
+      setParticipantsAutres(data.participants.filter(u => u.id !== utilisateur.id));
+    } else if (data.destinataire) {
+      setParticipantsAutres([data.destinataire]);
+    } else {
+      setParticipantsAutres([]);
+    }
+    setHasMore((data.messages || []).length === MESSAGES_LIMIT);
+    setLastReads(data.lastReads || []);
+  }
+}, [conversationId, utilisateur.id]);
+  // ----------------------------------------------------------------------
+
   // Chargement initial des messages ET des statuts de lecture
   useEffect(() => {
-    if (!conversationId) return;
-    const fetchMessages = async () => {
-      const res = await fetch(
-        `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
-      );
-      const data = await res.json();
-      if (data.success) {
-        setMessages(data.messages || []);
-        setParticipantsAutres(data.destinataire ? [data.destinataire] : []);
-        setHasMore((data.messages || []).length === MESSAGES_LIMIT);
-        setLastReads(data.lastReads || []);
-      }
-    };
-    fetchMessages();
-  }, [conversationId]);
+    refetchConversation();
+  }, [refetchConversation]);
 
   // Abonnement temps réel Ably pour cette conversation
   useEffect(() => {
@@ -119,27 +129,20 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     let res, result;
     // Si data est un FormData (cas image, audio, etc.)
     if (data instanceof FormData) {
-      // Patch ici : si on t'envoie le prénom envoyeur, tu le passes
-      // Si jamais tu passes par onMessageSent(formData) et tu veux forcer à ajouter le champ
-      // => déjà fait côté ChatInput, donc rien à changer ici, on laisse l'appel tel quel
       res = await fetch("/api/messages", {
         method: "POST",
         body: data,
       });
     } else {
-      // data peut être string ou un objet (contenant contenu, type, conversationId, etc)
       if (typeof data === "string") {
         if (!data.trim()) return null;
         data = { contenu: data, type };
       }
       if (!data.contenu || !data.contenu.trim()) return null;
-
-      // PATCH : on fusionne tout ce qui est transmis
       const payload = {
         conversationId,
-        ...data, // <-- donc prenomEnvoyeur sera bien transmis si fourni par le ChatInput
+        ...data,
       };
-
       res = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,7 +164,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     return null;
   };
 
-  // Réaction à un message (corrigé)
+  // Réaction à un message
   const handleReaction = async (messageId, emoji) => {
     const res = await fetch(`/api/messages/${messageId}/react`, {
       method: "POST",
@@ -187,7 +190,6 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   // Gestion des timers : suppression après clic sur message éphémère
   const lancerSuppressionAvecDelai = (messageId) => {
     if (ephemeralTimers.current[messageId]) {
-      // Timer déjà lancé, on ne fait rien
       return;
     }
     ephemeralTimers.current[messageId] = setTimeout(() => {
@@ -215,5 +217,6 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     lastReads,
     setLastReads,
     lancerSuppressionAvecDelai,
+      refetchParticipants: refetchConversation,
   };
 }

@@ -213,11 +213,11 @@ export async function GET(req) {
     const auteurId = user.id;
 
     // Vérification d’accès
-    const participants = await prisma.participant.findMany({
+    const participantsMeta = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true, lastReadAt: true },
     });
-    const autresParticipants = participants.map((p) => p.utilisateurId).filter((id) => id !== auteurId);
+    const autresParticipants = participantsMeta.map((p) => p.utilisateurId).filter((id) => id !== auteurId);
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
@@ -267,16 +267,28 @@ export async function GET(req) {
       : null;
 
     // Retourne lastReads
-    const lastReads = await prisma.participant.findMany({
+    const lastReads = participantsMeta.map((p) => ({
+      utilisateurId: p.utilisateurId,
+      lastReadAt: p.lastReadAt,
+    }));
+
+    // Ajoute TOUS les participants (avec leurs infos, pour affichage header)
+    const allParticipants = await prisma.participant.findMany({
       where: { conversationId },
-      select: { utilisateurId: true, lastReadAt: true },
+      select: {
+        utilisateur: {
+          select: { id: true, pseudo: true, photoUrl: true, type: true }
+        }
+      }
     });
+    const participants = allParticipants.map((p) => p.utilisateur); // Voilà le header propre
 
     return NextResponse.json(
       {
         success: true,
         messages,
         destinataire,
+        participants, // Pour le header
         lastReads,
       },
       { status: 200 }
@@ -286,3 +298,5 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
   }
 }
+
+

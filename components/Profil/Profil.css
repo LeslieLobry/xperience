@@ -202,6 +202,9 @@ list-style: none;
   align-items: center;
   gap:16px ; 
   }
+  .profil-name{
+    font-size: 22px;
+  }
   .membre-colum{
     flex-direction: column;
     gap: 32px;

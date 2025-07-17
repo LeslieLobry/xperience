@@ -518,3 +518,21 @@
   background-color: transparent;
   border: none;
 }
+
+/* === Modal ajout === */
+.add-participant-modal {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 3000;
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #0002;
+  min-width: 290px;
+}
+.add-participant-modal h3 {
+  margin-top: 0;
+  text-align: center;
+}

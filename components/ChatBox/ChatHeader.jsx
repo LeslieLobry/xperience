@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Phone, Video, X } from "lucide-react";
 import "./ChatBox.css";
 
-export default function ChatHeader({ participants = [], onCallAudio, onCallVideo, onClose, inCall }) {
+export default function ChatHeader({ participants = [], onCallAudio, onCallVideo, onClose, inCall,  onAddParticipant, }) {
   return (
     <div className="chat-header">
       <div className="chat-participants">
@@ -22,18 +22,23 @@ export default function ChatHeader({ participants = [], onCallAudio, onCallVideo
         )}
       </div>
 
-      <div className="chat-actions">
-        {!inCall && (
-          <>
-           <button onClick={() => onCallAudio()} title="Appel audio"><Phone /></button>
-           <button onClick={() => onCallVideo()} title="Appel vidéo"><Video /></button>
-          </>
-        )}
-        {inCall && (
-          <button onClick={onClose} title="Raccrocher"><X /></button>
-        )}
-      </div>
-     
+ <div className="chat-actions">
+  {/* Bouton ajout participant */}
+  {!inCall && onAddParticipant && (
+    <button onClick={onAddParticipant} title="Ajouter un membre">
+      ➕
+    </button>
+  )}
+  {!inCall && (
+    <>
+      <button onClick={() => onCallAudio()} title="Appel audio"><Phone /></button>
+      <button onClick={() => onCallVideo()} title="Appel vidéo"><Video /></button>
+    </>
+  )}
+  {inCall && (
+    <button onClick={onClose} title="Raccrocher"><X /></button>
+  )}
+</div>
     </div>
   );
 }

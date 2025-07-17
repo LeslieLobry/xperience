@@ -33,15 +33,13 @@ return(
         </ul>
     </div>
     <div className="footer-contact">
-        <Link href="/contact"  target="_blank" rel="noopener noreferrer" className="footer-contact-link">
-         <h2>Nous Contacter</h2>
-        </Link>
+       
 
         <NewsletterForm />
     </div>
     <div className="footer-reseau">
   <h2>Nos réseaux</h2>
-
+<div className="reseau">
   <a
     href="https://www.facebook.com/profile.php?id=61576828662100&locale=fr_FR"
     target="_blank"
@@ -66,7 +64,10 @@ return(
     <Image src={tik} alt="TikTok" width={50} className="footer-insta" />
   </a>
 </div>
-
+ <Link href="/contact"  target="_blank" rel="noopener noreferrer" className="footer-contact-link">
+         <h2>Nous Contacter</h2>
+        </Link>
+</div>
 </div>
 )
 }

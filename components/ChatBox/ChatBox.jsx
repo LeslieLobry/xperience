@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
 import { useMessages } from "../../hook/useMessages";
 import { useTyping } from "../../hook/useTyping";
+import AddParticipantList from "../AddParticipantList/AddParticipantList";
+
 import "./ChatBox.css";
 
 const ChatHeader = dynamic(() => import("./ChatHeader"), { ssr: false });
@@ -34,6 +36,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [prenomsCouple, setPrenomsCouple] = useState(null);
   const messagesEndRef = useRef(null);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [addUserInput, setAddUserInput] = useState("");
+  const [addUserError, setAddUserError] = useState("");
+  const [addUserLoading, setAddUserLoading] = useState(false);
 
   function formatDurationFront(seconds) {
     if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
@@ -67,28 +73,28 @@ const handleIncomingCall = ({ data }) => {
     };
   }, [utilisateur?.id, appelEntrant, inCall]);
 
-  // Listen "call:accepted" pour stopper notif/sonnerie côté appelant
-  useEffect(() => {
-    if (!utilisateur?.id) return;
-    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+// Listen "call:accepted" pour stopper notif/sonnerie côté appelant et rejoindre l'appel des DEUX côtés
+useEffect(() => {
+  if (!utilisateur?.id) return;
+  const channel = ably.channels.get(`notification-${utilisateur.id}`);
 
-    const handleCallAccepted = ({ data }) => {
-      setAppelEntrant(null);
-      setInCall(true);
-      if (sonnerieRef.current) {
-        sonnerieRef.current.pause();
-        sonnerieRef.current.currentTime = 0;
-      }
-      if (!inCall) {
-        startCall(data.type === "video");
-      }
-    };
+  const handleCallAccepted = ({ data }) => {
+    setAppelEntrant(null);
+    if (sonnerieRef.current) {
+      sonnerieRef.current.pause();
+      sonnerieRef.current.currentTime = 0;
+    }
+    // Toujours join la room dès qu'on reçoit "accepted"
+    startCall(data.type === "video");
+    setInCall(true);
+  };
 
-    channel.subscribe("call:accepted", handleCallAccepted);
-    return () => {
-      channel.unsubscribe("call:accepted", handleCallAccepted);
-    };
-  }, [utilisateur?.id, inCall]);
+  channel.subscribe("call:accepted", handleCallAccepted);
+  return () => {
+    channel.unsubscribe("call:accepted", handleCallAccepted);
+  };
+}, [utilisateur?.id]);
+
 
   // Listen "call:refused"
   useEffect(() => {
@@ -347,7 +353,33 @@ useEffect(() => {
       console.error("Erreur suppression message :", err);
     }
   };
-
+const handleAddParticipant = async () => {
+  setAddUserError("");
+  if (!addUserInput.trim()) return setAddUserError("Champ vide !");
+  setAddUserLoading(true);
+  try {
+    const res = await fetch(`/api/conversations/${conversationId}/add-participant`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
+    });
+    const data = await res.json();
+    setAddUserLoading(false);
+    if (data.success) {
+      setShowAddParticipant(false);
+      setAddUserInput("");
+      setAddUserError("");
+      // Si tu as un hook qui peut refetch les participants, appelle-le ici
+      // sinon reload brutal :
+      window.location.reload();
+    } else {
+      setAddUserError(data.error || "Erreur lors de l'ajout.");
+    }
+  } catch (err) {
+    setAddUserLoading(false);
+    setAddUserError("Erreur réseau.");
+  }
+};
   // **** RENDER ****
   return (
     <div className="chatbox-container">
@@ -357,8 +389,23 @@ useEffect(() => {
         onCallAudio={() => startCall(false)}
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}
+        onAddParticipant={() => setShowAddParticipant(true)}
       />
-
+{showAddParticipant && (
+  <div className="add-participant-modal">
+    <h3>Ajouter un membre</h3>
+    <AddParticipantList
+      conversationId={conversationId}
+      participants={participantsAutres.concat(utilisateur)}
+      onClose={() => {
+        setShowAddParticipant(false);
+        setAddUserError("");
+        setAddUserInput("");
+      }}
+      onAdded={() => window.location.reload()} // ou un refetch dynamique selon ta logique
+    />
+  </div>
+)}
       {inCall && !!window.localVideoTrack && (
         <VideoCallView
           inCall={inCall}
