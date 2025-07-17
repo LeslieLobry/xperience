@@ -40,6 +40,10 @@ export default function ChatBox({ conversationId, utilisateur }) {
   const [addUserInput, setAddUserInput] = useState("");
   const [addUserError, setAddUserError] = useState("");
   const [addUserLoading, setAddUserLoading] = useState(false);
+  const [callStartTime, setCallStartTime] = useState(null);
+const [callDuration, setCallDuration] = useState("0:00");
+const callTimerRef = useRef(null);
+
 
   function formatDurationFront(seconds) {
     if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return "0:00";
