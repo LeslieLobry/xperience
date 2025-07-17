@@ -71,7 +71,7 @@
   color: #ccc;
 }
 .input-email {
-  color: #63177d !important;            /* Texte violet foncé */
+  color: #e0c084!important;            /* Texte violet foncé */
   border: 2px solid #F6D391 !important; /* Bordure violette */
   font-weight: 900;
   font-size: 25px;
