@@ -536,3 +536,17 @@
   margin-top: 0;
   text-align: center;
 }
+
+.message-systeme {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  font-size: 0.99em;
+  opacity: 0.92;
+  margin: 10px 0;
+  letter-spacing: 0.01em;
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+

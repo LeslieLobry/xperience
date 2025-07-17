@@ -118,6 +118,14 @@ export default function MessageBubble({
   if (msg.type === "EPHEMERE") {
     return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id}/>;
   }
+// Si c'est un message SYSTEME, on affiche centré & spécial, puis on s'arrête là
+if (msg.type === "SYSTEME") {
+  return (
+    <div className="message-systeme">
+      <span>📝 {msg.texte || msg.contenu}</span>
+    </div>
+  );
+}
 
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>

@@ -11,7 +11,8 @@ export default function ListeConversations({ userId, onSelectConversation }) {
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
+  const [renamingId, setRenamingId] = useState(null); 
+  const [newName, setNewName] = useState("");
   const fetchConversations = async () => {
     try {
       const res = await fetch("/api/conversations");
@@ -73,6 +74,29 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       console.error("❌ Erreur serveur :", err);
     }
   };
+const handleRename = async (id) => {
+  try {
+    const res = await fetch(`/api/conversations/${id}/rename`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom: newName }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, nom: data.conversation.nom } : c
+        )
+      );
+      setRenamingId(null);
+      setNewName("");
+    } else {
+      alert(data.error || "Erreur lors du renommage");
+    }
+  } catch (err) {
+    alert("Erreur réseau");
+  }
+};
 
   // HANDLE SELECT = mark-as-read (POST) + badge à 0
   const handleSelect = async (id) => {
@@ -144,7 +168,33 @@ export default function ListeConversations({ userId, onSelectConversation }) {
               onClick={() => handleSelect(conv.id)}
             >
               <div className="conv-info">
-                <div className="conv-pseudo">{pseudo}</div>
+              <div className="conv-pseudo">
+  {renamingId === conv.id ? (
+    <>
+      <input
+        value={newName}
+        onChange={e => setNewName(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") handleRename(conv.id); }}
+        autoFocus
+        style={{ width: 120, marginRight: 6 }}
+        maxLength={40}
+      />
+      <button onClick={() => handleRename(conv.id)}>OK</button>
+      <button onClick={() => { setRenamingId(null); setNewName(""); }}>Annuler</button>
+    </>
+  ) : (
+    <>
+      {conv.nom || pseudo}
+      <button
+        className="rename-conv-button"
+        onClick={e => { e.stopPropagation(); setRenamingId(conv.id); setNewName(conv.nom || ""); }}
+        title="Renommer cette conversation"
+        style={{ marginLeft: 8, fontSize: 14, background: "none", border: "none", cursor: "pointer" }}
+      >✏️</button>
+    </>
+  )}
+</div>
+
                 {unreadCount > 0 && (
                   <span className="notif-badge">{unreadCount}</span>
                 )}
