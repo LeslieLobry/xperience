@@ -18,7 +18,8 @@ const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), { ssr: false }
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 let Room, createLocalTracks;
 
-export default function ChatBox({ conversationId, utilisateur,onBack, }) {
+export default function ChatBox({ conversationId, utilisateur, onBack }) {
+  // --------------------- STATES ----------------------
   const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inCall, setInCall] = useState(false);
@@ -27,45 +28,39 @@ export default function ChatBox({ conversationId, utilisateur,onBack, }) {
   const [appelEntrant, setAppelEntrant] = useState(null);
   const [appelRefuse, setAppelRefuse] = useState(false);
   const [appelOccupe, setAppelOccupe] = useState(false);
-  const sonnerieRef = useRef(null);
-  const appelTimeoutRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const audioChunks = useRef([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [prenomsCouple, setPrenomsCouple] = useState(null);
-  const messagesEndRef = useRef(null);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addUserInput, setAddUserInput] = useState("");
   const [addUserError, setAddUserError] = useState("");
   const [addUserLoading, setAddUserLoading] = useState(false);
-
-  // === TIMER D'APPEL ===
   const [callStartTime, setCallStartTime] = useState(null);
   const [callDuration, setCallDuration] = useState("0:00");
+  const [recording, setRecording] = useState(false);
+
+  // --------------------- REFS ----------------------
+  const sonnerieRef = useRef(null);
+  const appelTimeoutRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunks = useRef([]);
+  const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
 
-  // Appel quand tu démarres/acceptes l'appel
-const startTimer = () => {
-  const start = Date.now();
-  setCallStartTime(start);
-  setCallDuration("0:00");
-  if (callTimerRef.current) clearInterval(callTimerRef.current);
+  // --------------------- HOOKS (à placer AVANT les useEffect qui les utilisent) ----------------------
+  const {
+    messages,
+    lastReads,
+    setMessages,
+    participantsAutres,
+    envoyerMessage,
+    handleReaction,
+    loadMoreMessages,
+    hasMore,
+  } = useMessages(conversationId, utilisateur, setTexte);
 
-  callTimerRef.current = setInterval(() => {
-    const diff = Math.floor((Date.now() - start) / 1000);
-    const min = Math.floor(diff / 60);
-    const sec = diff % 60;
-    setCallDuration(`${min}:${sec < 10 ? "0" + sec : sec}`);
-  }, 1000);
-};
+  const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
 
-
-  // Appel quand tu raccroches
-  const stopTimer = () => {
-    clearInterval(callTimerRef.current);
-    setCallStartTime(null);
-    setCallDuration("0:00");
-  };
+  // --------------------- USEEFFECTS ----------------------
 
   // Listen notifications d'appel entrant (Ably)
   useEffect(() => {
@@ -100,13 +95,12 @@ const startTimer = () => {
       }
       startCall(data.type === "video");
       setInCall(true);
-      startTimer(); // <-- Ajoute ici le timer quand tu acceptes
+      startTimer();
     };
     channel.subscribe("call:accepted", handleCallAccepted);
     return () => {
       channel.unsubscribe("call:accepted", handleCallAccepted);
     };
-    // eslint-disable-next-line
   }, [utilisateur?.id]);
 
   // Listen "call:refused"
@@ -127,7 +121,6 @@ const startTimer = () => {
     return () => {
       channel.unsubscribe("call:refused", handleCallRefused);
     };
-    // eslint-disable-next-line
   }, [utilisateur?.id]);
 
   // Listen "call:busy"
@@ -148,24 +141,22 @@ const startTimer = () => {
     return () => {
       channel.unsubscribe("call:busy", handleCallBusy);
     };
-    // eslint-disable-next-line
   }, [utilisateur?.id]);
-// Listen "call:hangup" => coupe l'appel aussi côté peer si 1v1
-useEffect(() => {
-  if (!utilisateur?.id) return;
-  const channel = ably.channels.get(`notification-${utilisateur.id}`);
-  const handleCallHangup = ({ data }) => {
-    // On vérifie qu'on est bien dans une 1v1
-    if (participantsAutres.length === 1) {
-      hangupCall();
-    }
-  };
-  channel.subscribe("call:hangup", handleCallHangup);
-  return () => {
-    channel.unsubscribe("call:hangup", handleCallHangup);
-  };
-  // participantsAutres.length dans la dépendance pour être sûr qu'on a bien la bonne valeur
-}, [utilisateur?.id, participantsAutres.length]);
+
+  // Listen "call:hangup"
+  useEffect(() => {
+    if (!utilisateur?.id) return;
+    const channel = ably.channels.get(`notification-${utilisateur.id}`);
+    const handleCallHangup = ({ data }) => {
+      if (participantsAutres && participantsAutres.length === 1) {
+        hangupCall();
+      }
+    };
+    channel.subscribe("call:hangup", handleCallHangup);
+    return () => {
+      channel.unsubscribe("call:hangup", handleCallHangup);
+    };
+  }, [utilisateur?.id, participantsAutres?.length]); // SAFE
 
   // Fetch prénoms couple
   useEffect(() => {
@@ -181,17 +172,6 @@ useEffect(() => {
       });
   }, [conversationId, utilisateur.type]);
 
-  const {
-    messages,
-    lastReads,
-    setMessages,
-    participantsAutres,
-    envoyerMessage,
-    handleReaction,
-    loadMoreMessages,
-    hasMore,
-  } = useMessages(conversationId, utilisateur, setTexte);
-
   useEffect(() => {
     if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
@@ -202,127 +182,148 @@ useEffect(() => {
     }
   }, [messages]);
 
-  const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
+  // --------------------- TIMER APPEL ----------------------
 
-const startCall = async (video = true) => {
-  if (inCall) {
-    participantsAutres.forEach((p) => {
-      if (p.id !== utilisateur.id) {
-        ably.channels.get(`notification-${p.id}`).publish("call:busy", {
-          from: utilisateur,
-          room: conversationId,
-        });
-      }
-    });
-    return;
-  }
-  if (!Room || !createLocalTracks) {
-    const livekit = await import("livekit-client");
-    Room = livekit.Room;
-    createLocalTracks = livekit.createLocalTracks;
-  }
-  participantsAutres
-    .filter((p) => p.id !== utilisateur.id)
-    .forEach((p) => {
-      ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
-        from: utilisateur,
-        room: conversationId,
-        type: video ? "video" : "audio",
+  const startTimer = () => {
+    const start = Date.now();
+    setCallStartTime(start);
+    setCallDuration("0:00");
+    if (callTimerRef.current) clearInterval(callTimerRef.current);
+
+    callTimerRef.current = setInterval(() => {
+      const diff = Math.floor((Date.now() - start) / 1000);
+      const min = Math.floor(diff / 60);
+      const sec = diff % 60;
+      setCallDuration(`${min}:${sec < 10 ? "0" + sec : sec}`);
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    clearInterval(callTimerRef.current);
+    setCallStartTime(null);
+    setCallDuration("0:00");
+  };
+
+  // --------------------- APPEL LIVEKIT ----------------------
+
+  const startCall = async (video = true) => {
+    if (inCall) {
+      participantsAutres.forEach((p) => {
+        if (p.id !== utilisateur.id) {
+          ably.channels.get(`notification-${p.id}`).publish("call:busy", {
+            from: utilisateur,
+            room: conversationId,
+          });
+        }
       });
-    });
-
-  const res = await fetch("/api/livekit/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      identity: `user_${utilisateur.id}`,
-      room: conversationId,
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.token) {
-    console.error("❌ Erreur token LiveKit :", data);
-    return;
-  }
-
-  const token = data.token;
-  const newRoom = new Room();
-  setRoom(newRoom);
-
-  // === LOG les événements de la room
-  newRoom.on("participantConnected", (participant) => {
-    console.log("[LiveKit] participantConnected", participant.identity);
-  });
-  newRoom.on("participantDisconnected", (participant) => {
-    console.log("[LiveKit] participantDisconnected", participant.identity);
-  });
-
-  newRoom.on("trackSubscribed", (track, publication, participant) => {
-    const id = participant.identity + '-' + track.kind;
-    console.log("[LiveKit] trackSubscribed", { id, kind: track.kind, participant: participant.identity, track });
-    setRemoteTracks((prev) => [
-      ...prev.filter((t) => t.id !== id), // << ID unique !
-      { id, nom: participant.identity, track }, // << ID unique !
-    ]);
-  });
-
-  newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-    const id = participant.identity + '-' + track.kind;
-    console.log("[LiveKit] trackUnsubscribed", { id, kind: track.kind, participant: participant.identity, track });
-    setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
-  });
-
-  const localTracks = await createLocalTracks({ audio: true, video });
-  console.log("[startCall] localTracks (créés):", localTracks, "user:", utilisateur.id);
-
-  // LOG le publishing des tracks
-  localTracks.forEach((track) => {
-    console.log("[startCall] Publishing local track", track.kind, "track:", track, "user:", utilisateur.id);
-  });
-
-  const localVideoTrack = localTracks.find((t) => t.kind === "video");
-  if (localVideoTrack) window.localVideoTrack = localVideoTrack;
-
-  await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
-  console.log("[startCall] Room joined:", conversationId, "Identity:", utilisateur.id);
-
-  localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-  setInCall(true);
-  startTimer(); // <-- Timer démarré à chaque appel lancé
-};
-
-
-const hangupCall = () => {
-  if (room) {
-    // Si c'est 1v1 (participantsAutres.length === 1)
-    if (participantsAutres.length === 1) {
-      const otherId = participantsAutres[0]?.id;
-      if (otherId && utilisateur.id !== otherId) {
-        ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
+      return;
+    }
+    if (!Room || !createLocalTracks) {
+      const livekit = await import("livekit-client");
+      Room = livekit.Room;
+      createLocalTracks = livekit.createLocalTracks;
+    }
+    participantsAutres
+      .filter((p) => p.id !== utilisateur.id)
+      .forEach((p) => {
+        ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
           from: utilisateur,
           room: conversationId,
+          type: video ? "video" : "audio",
         });
+      });
+
+    const res = await fetch("/api/livekit/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identity: `user_${utilisateur.id}`,
+        room: conversationId,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.token) {
+      console.error("❌ Erreur token LiveKit :", data);
+      return;
+    }
+
+    const token = data.token;
+    const newRoom = new Room();
+    setRoom(newRoom);
+
+    // === LOG les événements de la room
+    newRoom.on("participantConnected", (participant) => {
+      console.log("[LiveKit] participantConnected", participant.identity);
+    });
+    newRoom.on("participantDisconnected", (participant) => {
+      console.log("[LiveKit] participantDisconnected", participant.identity);
+    });
+
+    newRoom.on("trackSubscribed", (track, publication, participant) => {
+      const id = participant.identity + '-' + track.kind;
+      console.log("[LiveKit] trackSubscribed", { id, kind: track.kind, participant: participant.identity, track });
+      setRemoteTracks((prev) => [
+        ...prev.filter((t) => t.id !== id), // << ID unique !
+        { id, nom: participant.identity, track }, // << ID unique !
+      ]);
+    });
+
+    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+      const id = participant.identity + '-' + track.kind;
+      console.log("[LiveKit] trackUnsubscribed", { id, kind: track.kind, participant: participant.identity, track });
+      setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
+    });
+
+    const localTracks = await createLocalTracks({ audio: true, video });
+    console.log("[startCall] localTracks (créés):", localTracks, "user:", utilisateur.id);
+
+    // LOG le publishing des tracks
+    localTracks.forEach((track) => {
+      console.log("[startCall] Publishing local track", track.kind, "track:", track, "user:", utilisateur.id);
+    });
+
+    const localVideoTrack = localTracks.find((t) => t.kind === "video");
+    if (localVideoTrack) window.localVideoTrack = localVideoTrack;
+
+    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
+    console.log("[startCall] Room joined:", conversationId, "Identity:", utilisateur.id);
+
+    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+    setInCall(true);
+    startTimer(); // <-- Timer démarré à chaque appel lancé
+  };
+
+  const hangupCall = () => {
+    if (room) {
+      // Si c'est 1v1 (participantsAutres.length === 1)
+      if (participantsAutres && participantsAutres.length === 1) {
+        const otherId = participantsAutres[0]?.id;
+        if (otherId && utilisateur.id !== otherId) {
+          ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
+            from: utilisateur,
+            room: conversationId,
+          });
+        }
       }
+      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
+      room.disconnect();
+      setRoom(null);
+      setRemoteTracks([]);
+      setInCall(false);
+      stopTimer();
+      if (window.localVideoTrack) {
+        window.localVideoTrack.stop();
+        delete window.localVideoTrack;
+      }
+    } else {
+      setInCall(false);
+      stopTimer();
     }
-    room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
-    room.disconnect();
-    setRoom(null);
-    setRemoteTracks([]);
-    setInCall(false);
-    stopTimer();
-    if (window.localVideoTrack) {
-      window.localVideoTrack.stop();
-      delete window.localVideoTrack;
-    }
-  } else {
-    setInCall(false);
-    stopTimer();
-  }
-};
+  };
 
+  // --------------------- ENREGISTREMENT AUDIO ----------------------
 
-  const [recording, setRecording] = useState(false);
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -391,9 +392,7 @@ const hangupCall = () => {
         formData.append("type", "AUDIO");
         formData.append("duree", duree);
 
-        const res = await fetch("/api/messages/audio", { method: "POST", body: formData });
-        const data = await res.json();
-        if (data.success) setMessages((prev) => [...prev, data.message]);
+        await fetch("/api/messages/audio", { method: "POST", body: formData });
       };
 
       mediaRecorderRef.current.start();
@@ -410,7 +409,10 @@ const hangupCall = () => {
       mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
     }
   };
- const handleDelete = async (messageId) => {
+
+  // --------------------- HANDLERS MESSAGES ----------------------
+
+  const handleDelete = async (messageId) => {
     try {
       const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
       if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -418,31 +420,35 @@ const hangupCall = () => {
       console.error("Erreur suppression message :", err);
     }
   };
-const handleAddParticipant = async () => {
-  setAddUserError("");
-  if (!addUserInput.trim()) return setAddUserError("Champ vide !");
-  setAddUserLoading(true);
-  try {
-    const res = await fetch(`/api/conversations/${conversationId}/add-participant`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
-    });
-    const data = await res.json();
-    setAddUserLoading(false);
-    if (data.success) {
-      setShowAddParticipant(false);
-      setAddUserInput("");
-      setAddUserError("");
-      window.location.reload();
-    } else {
-      setAddUserError(data.error || "Erreur lors de l'ajout.");
+
+  const handleAddParticipant = async () => {
+    setAddUserError("");
+    if (!addUserInput.trim()) return setAddUserError("Champ vide !");
+    setAddUserLoading(true);
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/add-participant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
+      });
+      const data = await res.json();
+      setAddUserLoading(false);
+      if (data.success) {
+        setShowAddParticipant(false);
+        setAddUserInput("");
+        setAddUserError("");
+        window.location.reload();
+      } else {
+        setAddUserError(data.error || "Erreur lors de l'ajout.");
+      }
+    } catch (err) {
+      setAddUserLoading(false);
+      setAddUserError("Erreur réseau.");
     }
-  } catch (err) {
-    setAddUserLoading(false);
-    setAddUserError("Erreur réseau.");
-  }
-};
+  };
+
+  // --------------------- RENDER ----------------------
+
   return (
     <div className="chatbox-container">
       <ChatHeader
@@ -457,11 +463,11 @@ const handleAddParticipant = async () => {
 
       {/* TIMER D'APPEL */}
       {inCall && (
-        <div className="call-timer" style={{ 
+        <div className="call-timer" style={{
           position: "absolute",
           left: 0, right: 0, top: 25, textAlign: "center",
           fontWeight: 500, color: "#7d5d2a", fontSize: "1.1em",
-          zIndex: 20, letterSpacing: "1px" 
+          zIndex: 20, letterSpacing: "1px"
         }}>
           ⏱️ {callDuration}
         </div>
@@ -519,14 +525,10 @@ const handleAddParticipant = async () => {
         setShowEmojiPicker={setShowEmojiPicker}
         onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
           if (isImage) {
-            const res = await fetch("/api/messages", {
+            await fetch("/api/messages", {
               method: "POST",
               body: contenu,
             });
-            const data = await res.json();
-            if (data.success && data.message) {
-              setMessages((prev) => [...prev, data.message]);
-            }
           } else {
             await envoyerMessage(contenu, type, membreParlant);
           }
