@@ -153,8 +153,7 @@ const refetchConversation = useCallback(async () => {
     result = await res.json();
 
   if (result.success) {
-  const channel = ably.channels.get(`conversation-${conversationId}`);
-  channel.publish("message", result.message);
+  
   setTexte && setTexte("");
   return result.message;
 }
