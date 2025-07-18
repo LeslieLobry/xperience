@@ -436,7 +436,7 @@ const handleAddParticipant = async () => {
         </div>
       )}
 
-      {inCall && !!window.localVideoTrack && (
+      {inCall && (
         <VideoCallView
           inCall={inCall}
           remoteTracks={remoteTracks}
