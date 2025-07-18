@@ -150,6 +150,22 @@ const startTimer = () => {
     };
     // eslint-disable-next-line
   }, [utilisateur?.id]);
+// Listen "call:hangup" => coupe l'appel aussi côté peer si 1v1
+useEffect(() => {
+  if (!utilisateur?.id) return;
+  const channel = ably.channels.get(`notification-${utilisateur.id}`);
+  const handleCallHangup = ({ data }) => {
+    // On vérifie qu'on est bien dans une 1v1
+    if (participantsAutres.length === 1) {
+      hangupCall();
+    }
+  };
+  channel.subscribe("call:hangup", handleCallHangup);
+  return () => {
+    channel.unsubscribe("call:hangup", handleCallHangup);
+  };
+  // participantsAutres.length dans la dépendance pour être sûr qu'on a bien la bonne valeur
+}, [utilisateur?.id, participantsAutres.length]);
 
   // Fetch prénoms couple
   useEffect(() => {
@@ -277,23 +293,34 @@ const startCall = async (video = true) => {
 };
 
 
-  const hangupCall = () => {
-    if (room) {
-      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
-      room.disconnect();
-      setRoom(null);
-      setRemoteTracks([]);
-      setInCall(false);
-      stopTimer();
-      if (window.localVideoTrack) {
-        window.localVideoTrack.stop();
-        delete window.localVideoTrack;
+const hangupCall = () => {
+  if (room) {
+    // Si c'est 1v1 (participantsAutres.length === 1)
+    if (participantsAutres.length === 1) {
+      const otherId = participantsAutres[0]?.id;
+      if (otherId && utilisateur.id !== otherId) {
+        ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
+          from: utilisateur,
+          room: conversationId,
+        });
       }
-    } else {
-      setInCall(false);
-      stopTimer();
     }
-  };
+    room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
+    room.disconnect();
+    setRoom(null);
+    setRemoteTracks([]);
+    setInCall(false);
+    stopTimer();
+    if (window.localVideoTrack) {
+      window.localVideoTrack.stop();
+      delete window.localVideoTrack;
+    }
+  } else {
+    setInCall(false);
+    stopTimer();
+  }
+};
+
 
   const [recording, setRecording] = useState(false);
   const startRecording = async () => {
