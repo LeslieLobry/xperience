@@ -45,7 +45,13 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const audioChunks = useRef([]);
   const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
-
+const audioContextRef = useRef(null);
+const mediaStreamRef = useRef(null);
+const scriptProcessorRef = useRef(null);
+const audioDataRef = useRef({
+  buffer: [],
+  length: 0,
+});
   // --------------------- HOOKS (à placer AVANT les useEffect qui les utilisent) ----------------------
   const {
     messages,
@@ -277,11 +283,10 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     const id = participant.identity + '-' + track.kind;
     setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
   });
-
+ await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
   const localTracks = await createLocalTracks({ audio: true, video });
   localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-  await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
-  setInCall(true);
+   setInCall(true);
   startTimer();
 };
 
@@ -303,7 +308,7 @@ const hangupCall = () => {
     setRemoteTracks([]);
     setInCall(false);
     stopTimer();
-    stopAllMediaStreams(); // <--- 👈 nettoie tout proprement
+    stopAllMediaStreams(); 
   } else {
     setInCall(false);
     stopTimer();
@@ -312,7 +317,6 @@ const hangupCall = () => {
 };
 
 function stopAllMediaStreams() {
-  // Arrête tous les tracks des <video> et <audio>
   document.querySelectorAll("video, audio").forEach((el) => {
     if (el.srcObject && el.srcObject.getTracks) {
       el.srcObject.getTracks().forEach((track) => track.stop());
@@ -330,93 +334,110 @@ function stopAllMediaStreams() {
   }
 }
 
-  // --------------------- ENREGISTREMENT AUDIO ----------------------
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunks.current = [];
+// --------------------- ENREGISTREMENT AUDIO ----------------------
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunks.current.push(event.data);
-      };
+const startRecording = async () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioContextRef.current = new AudioContext();
 
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
+    mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+    scriptProcessorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
-        const duree = await new Promise((resolve) => {
-          const audio = document.createElement("audio");
-          audio.src = URL.createObjectURL(audioBlob);
-          audio.preload = "metadata";
+    source.connect(scriptProcessorRef.current);
+    scriptProcessorRef.current.connect(audioContextRef.current.destination);
 
-          let resolved = false;
+    audioDataRef.current = { buffer: [], length: 0 };
 
-          audio.onloadedmetadata = () => {
-            if (audio.duration === Infinity) {
-              audio.currentTime = 1e101;
-              audio.ontimeupdate = () => {
-                audio.ontimeupdate = null;
-                let seconds = audio.duration;
-                if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
-                  resolve("0:00");
-                } else {
-                  const m = Math.floor(seconds / 60);
-                  const s = Math.floor(seconds % 60);
-                  const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
-                  console.log("[AUDIO] HACKED duration:", seconds, dureeStr);
-                  resolve(dureeStr);
-                }
-                URL.revokeObjectURL(audio.src);
-                resolved = true;
-              };
-            } else {
-              let seconds = audio.duration;
-              if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
-                resolve("0:00");
-              } else {
-                const m = Math.floor(seconds / 60);
-                const s = Math.floor(seconds % 60);
-                const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
-                console.log("[AUDIO] duration:", seconds, dureeStr);
-                resolve(dureeStr);
-              }
-              URL.revokeObjectURL(audio.src);
-              resolved = true;
-            }
-          };
+    scriptProcessorRef.current.onaudioprocess = (event) => {
+      const channelData = event.inputBuffer.getChannelData(0);
+      audioDataRef.current.buffer.push(new Float32Array(channelData));
+      audioDataRef.current.length += channelData.length;
+    };
 
-          setTimeout(() => {
-            if (!resolved) {
-              resolve("0:00");
-              URL.revokeObjectURL(audio.src);
-            }
-          }, 3000);
-        });
+    setRecording(true);
+  } catch (err) {
+    console.error("Erreur démarrage enregistrement :", err);
+  }
+};
 
-        const formData = new FormData();
-        formData.append("audio", audioBlob);
-        formData.append("conversationId", conversationId);
-        formData.append("type", "AUDIO");
-        formData.append("duree", duree);
+const stopRecording = async () => {
+  if (!audioContextRef.current) return;
 
-        await fetch("/api/messages/audio", { method: "POST", body: formData });
-      };
+  scriptProcessorRef.current.disconnect();
+  audioContextRef.current.close();
 
-      mediaRecorderRef.current.start();
-      setRecording(true);
-    } catch (err) {
-      console.error("Erreur enregistrement :", err);
+  mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+
+  const flatBuffer = flattenBuffers(audioDataRef.current.buffer, audioDataRef.current.length);
+  const sampleRate = audioContextRef.current.sampleRate || 44100;
+  const wavBlob = encodeWAV(flatBuffer, sampleRate);
+
+  audioDataRef.current = { buffer: [], length: 0 };
+  setRecording(false);
+
+  const formData = new FormData();
+  formData.append("audio", wavBlob, "recording.wav");
+  formData.append("conversationId", conversationId);
+  formData.append("type", "AUDIO");
+
+  try {
+    await fetch("/api/messages/audio", { method: "POST", body: formData });
+  } catch (e) {
+    console.error("Erreur upload audio :", e);
+  }
+};
+
+function flattenBuffers(buffers, length) {
+  const result = new Float32Array(length);
+  let offset = 0;
+  buffers.forEach((buffer) => {
+    result.set(buffer, offset);
+    offset += buffer.length;
+  });
+  return result;
+}
+
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
     }
-  };
+  }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-    }
-  };
+  writeString(view, 0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, "WAVE");
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // mono channel
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  writeString(view, 36, "data");
+  view.setUint32(40, samples.length * 2, true);
+
+  floatTo16BitPCM(view, 44, samples);
+
+  return new Blob([view], { type: "audio/wav" });
+}
+
+function floatTo16BitPCM(output, offset, input) {
+  for (let i = 0; i < input.length; i++, offset += 2) {
+    let s = Math.max(-1, Math.min(1, input[i]));
+    s = s < 0 ? s * 0x8000 : s * 0x7fff;
+    output.setInt16(offset, s, true);
+  }
+}
+
+
 
   // --------------------- HANDLERS MESSAGES ----------------------
 
