@@ -116,3 +116,8 @@
   font-size: 1rem;
   letter-spacing: 1px;
 }
+@media (max-width: 768px){
+  .video-call-container{
+    height: 70vh;
+  }
+}
