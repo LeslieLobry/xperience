@@ -74,7 +74,9 @@ ul {
   font-size: 25px;
   color: white;
 }
-
+button[type=submit]{
+  color: white;
+}
 @media (width <= 768px){
   .logo-contenant img{
   width: 90%;

@@ -435,7 +435,9 @@
   font-size: 20px;
   cursor: pointer;
 }
-
+.message-btn{
+  color: white;
+}
 .audio-btn.recording {
   color: red;
 }
