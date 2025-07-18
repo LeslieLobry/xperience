@@ -235,6 +235,7 @@ const startTimer = () => {
     setRoom(newRoom);
 
     newRoom.on("trackSubscribed", (track, publication, participant) => {
+        console.log("[trackSubscribed]", track, publication, participant);
       setRemoteTracks((prev) => [
         ...prev.filter((t) => t.id !== participant.identity),
         { id: participant.identity, nom: participant.identity, track },
@@ -246,6 +247,7 @@ const startTimer = () => {
     });
 
     const localTracks = await createLocalTracks({ audio: true, video });
+    console.log("[startCall] localTracks", localTracks);
     const localVideoTrack = localTracks.find((t) => t.kind === "video");
     if (localVideoTrack) window.localVideoTrack = localVideoTrack;
 

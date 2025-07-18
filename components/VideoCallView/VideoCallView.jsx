@@ -6,25 +6,23 @@ export default function VideoCallView({ inCall, remoteTracks }) {
   const localVideoRef = useRef(null);
 
   // Attach local video
-useEffect(() => {
-  const videoEl = localVideoRef.current;
-  const localTrack = window.localVideoTrack;
-  console.log("[VideoCallView] Attaching local video:", localTrack);
+  useEffect(() => {
+    const videoEl = localVideoRef.current;
+    const localTrack = window.localVideoTrack;
+    console.log("[VideoCallView] Attaching local video:", localTrack);
 
-  if (!videoEl) return;
+    if (!videoEl) return;
 
-  // Réinitialise le flux avant tout nouvel attach
-  if (videoEl.srcObject) videoEl.srcObject = null;
+    if (videoEl.srcObject) videoEl.srcObject = null;
 
-  if (localTrack && localTrack.kind === "video") {
-    if (typeof localTrack.attach === "function") {
-      localTrack.attach(videoEl); // LiveKit style
-    } else if (localTrack.mediaStream) {
-      videoEl.srcObject = localTrack.mediaStream; // WebRTC natif
+    if (localTrack && localTrack.kind === "video") {
+      if (typeof localTrack.attach === "function") {
+        localTrack.attach(videoEl); // LiveKit style
+      } else if (localTrack.mediaStream) {
+        videoEl.srcObject = localTrack.mediaStream; // WebRTC natif
+      }
     }
-  }
-}, [inCall, window.localVideoTrack]);
-
+  }, [inCall, window.localVideoTrack]);
 
   // Attach remote tracks
   useEffect(() => {
@@ -38,7 +36,15 @@ useEffect(() => {
       // AUDIO
       if (track.kind === "audio") {
         const el = document.getElementById(`remote-audio-${id}`);
-        if (el && track.attach) track.attach(el);
+        if (el && track.attach) {
+          track.attach(el);
+          el.volume = 1;
+          el.muted = false;
+          setTimeout(() => {
+            console.log("[AUDIO attach][srcObject]", el.srcObject, el);
+          }, 100);
+        }
+        console.log("[AUDIO attach]", id, el, track);
       }
     });
   }, [remoteTracks]);
@@ -49,8 +55,9 @@ useEffect(() => {
   const audioParticipants = remoteTracks
     .filter(t => t.track.kind === "audio")
     .map(({ id, pseudo, photoUrl }) => ({ id, pseudo, photoUrl }));
- const showLocalVideo = !!window.localVideoTrack && window.localVideoTrack.kind === "video";
-    return (
+  const showLocalVideo = !!window.localVideoTrack && window.localVideoTrack.kind === "video";
+
+  return (
     <div className="video-call-container">
       {/* Remote video tracks */}
       {remoteTracks.filter(t => t.track.kind === "video").map(({ id, pseudo, photoUrl }) => (
@@ -70,13 +77,14 @@ useEffect(() => {
         </div>
       ))}
 
-      {/* Remote audio tracks */}
+      {/* Remote audio tracks - visible + log */}
       {remoteTracks.filter(t => t.track.kind === "audio").map(({ id }) => (
         <audio
           key={id}
           id={`remote-audio-${id}`}
           autoPlay
-          style={{ display: "none" }}
+          controls
+          style={{ background: "#fee", minWidth: 120, marginBottom: 8 }}
         />
       ))}
 
