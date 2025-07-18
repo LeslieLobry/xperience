@@ -5,6 +5,9 @@ import "./VideoCallView.css";
 export default function VideoCallView({ inCall, remoteTracks }) {
   const localVideoRef = useRef(null);
 
+  // Debug : Affiche tous les tracks
+  console.log("[RENDER remoteTracks]", remoteTracks);
+
   // Attach local video
   useEffect(() => {
     const videoEl = localVideoRef.current;
@@ -12,14 +15,12 @@ export default function VideoCallView({ inCall, remoteTracks }) {
     console.log("[VideoCallView] Attaching local video:", localTrack);
 
     if (!videoEl) return;
-
     if (videoEl.srcObject) videoEl.srcObject = null;
-
     if (localTrack && localTrack.kind === "video") {
       if (typeof localTrack.attach === "function") {
-        localTrack.attach(videoEl); // LiveKit style
+        localTrack.attach(videoEl);
       } else if (localTrack.mediaStream) {
-        videoEl.srcObject = localTrack.mediaStream; // WebRTC natif
+        videoEl.srcObject = localTrack.mediaStream;
       }
     }
   }, [inCall, window.localVideoTrack]);
@@ -31,11 +32,13 @@ export default function VideoCallView({ inCall, remoteTracks }) {
       // VIDEO
       if (track.kind === "video") {
         const el = document.getElementById(`remote-video-${id}`);
+        console.log("[VIDEO attach]", id, el, track);
         if (el && track.attach) track.attach(el);
       }
       // AUDIO
       if (track.kind === "audio") {
         const el = document.getElementById(`remote-audio-${id}`);
+        console.log("[AUDIO attach]", id, el, track);
         if (el && track.attach) {
           track.attach(el);
           el.volume = 1;
@@ -44,7 +47,6 @@ export default function VideoCallView({ inCall, remoteTracks }) {
             console.log("[AUDIO attach][srcObject]", el.srcObject, el);
           }, 100);
         }
-        console.log("[AUDIO attach]", id, el, track);
       }
     });
   }, [remoteTracks]);

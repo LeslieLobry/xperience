@@ -234,17 +234,18 @@ const startTimer = () => {
     const newRoom = new Room();
     setRoom(newRoom);
 
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-        console.log("[trackSubscribed]", track, publication, participant);
-      setRemoteTracks((prev) => [
-        ...prev.filter((t) => t.id !== participant.identity),
-        { id: participant.identity, nom: participant.identity, track },
-      ]);
-    });
+   newRoom.on("trackSubscribed", (track, publication, participant) => {
+  const id = participant.identity + '-' + track.kind;
+  setRemoteTracks((prev) => [
+    ...prev.filter((t) => t.id !== id),      // << ID unique !
+    { id, nom: participant.identity, track },// << ID unique !
+  ]);
+});
 
-    newRoom.on("trackUnsubscribed", (_, __, participant) => {
-      setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
-    });
+newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+  const id = participant.identity + '-' + track.kind;
+  setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
+});
 
     const localTracks = await createLocalTracks({ audio: true, video });
     console.log("[startCall] localTracks", localTracks);
