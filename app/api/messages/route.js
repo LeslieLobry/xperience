@@ -5,8 +5,9 @@ import { resend } from "../../../lib/resend";
 import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
-import Ably from "ably/promises";
+import Ably from "ably";
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
+
 
 
 // Config S3
