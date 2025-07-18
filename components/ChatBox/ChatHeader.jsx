@@ -49,12 +49,6 @@ export default function ChatHeader({
                 src={p.photoUrl || "/default-avatar.png"}
                 alt={p.pseudo}
                 className="participant-avatar"
-                onClick={e => {
-                  if (window.innerWidth <= 768) {
-                    e.preventDefault();
-                    // Option : alert(p.pseudo);  // ou retire cette ligne pour ne rien faire
-                  }
-                }}
               />
               <span className="participant-name">{p.pseudo}</span>
             </Link>
