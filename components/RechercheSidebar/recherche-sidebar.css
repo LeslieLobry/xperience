@@ -67,12 +67,12 @@
   background-color: transparent;
 }
 
-@media (width >= 768px) {
+@media screen and (width <= 768px) {
   .recherche-sidebar {
-    max-width: 300px;
-    padding: 1rem;
+        padding: 1rem;
     color: white;
     font-size: 26px;
+    border: none;
   }
 }
 
