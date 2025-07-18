@@ -237,7 +237,12 @@ const startTimer = () => {
     newRoom.on("trackSubscribed", (track, publication, participant) => {
       setRemoteTracks((prev) => [
         ...prev.filter((t) => t.id !== participant.identity),
-        { id: participant.identity, nom: participant.identity, track },
+       {
+  id: participant.identity,
+  pseudo: remoteUser?.pseudo || participant.identity,
+  photoUrl: remoteUser?.photoUrl || null,
+  track
+}
       ]);
     });
 
@@ -318,14 +323,15 @@ const startTimer = () => {
         </div>
       )}
 
-      {inCall && !!window.localVideoTrack && (
-        <VideoCallView
-          inCall={inCall}
-          remoteTracks={remoteTracks}
-          startCall={startCall}
-          hangupCall={hangupCall}
-        />
-      )}
+     {inCall && (
+  <VideoCallView
+    inCall={inCall}
+    remoteTracks={remoteTracks}
+    startCall={startCall}
+    hangupCall={hangupCall}
+  />
+)}
+
 
       <MessagesList
         messages={messages}
