@@ -412,7 +412,7 @@ const handleAddParticipant = async () => {
       {inCall && (
         <div className="call-timer" style={{ 
           position: "absolute",
-          left: 0, right: 0, top: 56, textAlign: "center",
+          left: 0, right: 0, top: 25, textAlign: "center",
           fontWeight: 500, color: "#7d5d2a", fontSize: "1.1em",
           zIndex: 20, letterSpacing: "1px" 
         }}>
