@@ -5,6 +5,7 @@ import { resend } from "../../../lib/resend";
 import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
+import { Realtime } from "ably";
 
 // Config S3
 const s3 = new S3Client({
@@ -15,6 +16,8 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
+const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+
 
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
@@ -136,7 +139,7 @@ let prenomEnvoyeur = body.prenomEnvoyeur || null;
         },
       },
     });
-
+await ably.channels.get(`conversation-${conversationId}`).publish("message", message);
     console.log("Message créé en base :", message);
 
     await prisma.conversation.update({
