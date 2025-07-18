@@ -233,18 +233,21 @@ const startTimer = () => {
     const token = data.token;
     const newRoom = new Room();
     setRoom(newRoom);
+newRoom.on("trackSubscribed", (track, publication, participant) => {
+  // Ajoute cette ligne juste avant le setRemoteTracks :
+  const remoteUser = participantsAutres.find(u => `user_${u.id}` === participant.identity);
 
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      setRemoteTracks((prev) => [
-        ...prev.filter((t) => t.id !== participant.identity),
-       {
-  id: participant.identity,
-  pseudo: remoteUser?.pseudo || participant.identity,
-  photoUrl: remoteUser?.photoUrl || null,
-  track
-}
-      ]);
-    });
+  setRemoteTracks((prev) => [
+    ...prev.filter((t) => t.id !== participant.identity),
+    {
+      id: participant.identity,
+      pseudo: remoteUser?.pseudo || participant.identity,
+      photoUrl: remoteUser?.photoUrl || null,
+      track
+    }
+  ]);
+});
+
 
     newRoom.on("trackUnsubscribed", (_, __, participant) => {
       setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
