@@ -18,7 +18,7 @@ const navLinks = [
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const [localUser, setLocalUser] = useState(user); // localUser pour forcer re-render
+  const [localUser, setLocalUser] = useState(user);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -36,7 +36,7 @@ export default function Navbar() {
       });
       if (res.ok) {
         const data = await res.json();
-        setUnreadCount(data.length); // <- on compte le nombre de messages non lus
+        setUnreadCount(data.length);
       }
     } catch (err) {
       console.error("Erreur fetch unread messages", err);
@@ -46,22 +46,18 @@ export default function Navbar() {
     if (localUser) fetchUnreadMessages();
   }, [localUser]);
 
-  // Synchroniser localUser avec le user du contexte
   useEffect(() => {
     setLocalUser(user);
   }, [user]);
 
-  // Click en dehors pour fermer menus/popup
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Fermeture popup profil/notif
       if (
         popupRef.current &&
         !popupRef.current.contains(event.target)
       ) {
         setDropdownOpen(false);
       }
-      // Fermeture menu burger mobile
       if (
         menuRef.current &&
         !menuRef.current.contains(event.target)
@@ -76,11 +72,10 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("/api/logout", {
+      await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
       });
-      const data = await res.json();
       logout();
       router.push("/connexion");
     } catch (err) {
@@ -130,7 +125,6 @@ export default function Navbar() {
     }
   };
 
-  // Naviguer ET fermer le dropdown AVANT
   const handleGoTo = (href) => {
     setDropdownOpen(false);
     router.push(href);
@@ -149,13 +143,14 @@ export default function Navbar() {
         )}
       </div>
 
-      <div className={`burger ${menuOpen ? "open" : "" }`} onClick={()=> setMenuOpen(!menuOpen)}>
+      <div className={`burger${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(!menuOpen)}>
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
       </div>
 
-      <ul ref={menuRef} className={`navLinks ${menuOpen ? "active" : "" }`}>
+      {/* CSS: .nav-links */}
+      <ul ref={menuRef} className={`nav-links${menuOpen ? " active" : ""}`}>
         {navLinks.map((link) => (
           <li key={link.href} onClick={() => {
             setMenuOpen(false);
@@ -178,21 +173,27 @@ export default function Navbar() {
         {localUser ? (
           <li className="nav-avatar-wrapper">
             <div className="nav-avatar-container" onClick={handleAvatarClick}>
-              <Image src={
-                localUser.photoUrl
-                  ? localUser.photoUrl.startsWith("http") ||
-                    localUser.photoUrl.startsWith("/uploads")
-                    ? localUser.photoUrl
-                    : `/uploads/${localUser.photoUrl}`
-                  : "/default.jpg"
-              } alt="Photo de profil" width={40} height={40} className="nav-avatar" />
+              <Image
+                src={
+                  localUser.photoUrl
+                    ? localUser.photoUrl.startsWith("http") ||
+                      localUser.photoUrl.startsWith("/uploads")
+                      ? localUser.photoUrl
+                      : `/uploads/${localUser.photoUrl}`
+                    : "/default.jpg"
+                }
+                alt="Photo de profil"
+                width={40}
+                height={40}
+                className="nav-avatar"
+              />
               {notifCount > 0 && (
                 <span className="notif-badge-on-avatar">{notifCount}</span>
               )}
             </div>
 
             {dropdownOpen && (
-              <div className="nav-combined-popup" ref={popupRef} onClick={(e)=> e.stopPropagation()}>
+              <div className="nav-combined-popup" ref={popupRef} onClick={(e) => e.stopPropagation()}>
                 <div className="notif-section">
                   <ul>
                     {notifications.length === 0 && (
@@ -200,10 +201,8 @@ export default function Navbar() {
                     )}
                     {notifications.map((notif) => (
                       <li key={notif.id}>
-                        {/* --- MODIF: gestion lien interne/externe --- */}
                         {notif.lien && notif.lien.startsWith("/")
                           ? (
-                            // Lien interne Next.js
                             <span
                               className="notif-link"
                               onClick={() => {
@@ -215,7 +214,6 @@ export default function Navbar() {
                             </span>
                           )
                           : (
-                            // Lien externe ou pas de lien
                             <a
                               href={notif.lien || "#"}
                               target={notif.lien ? "_blank" : undefined}
@@ -235,38 +233,37 @@ export default function Navbar() {
                 </div>
                 <hr />
                 <div className="profil-actions">
-  <button
-    onClick={() => {
-      setDropdownOpen(false);
-      setMenuOpen(false);
-      handleGoTo(`/profil/${localUser.id}`);
-    }}
-    className="btn-link"
-  >
-    Mon profil
-  </button>
-  <button
-    onClick={() => {
-      setDropdownOpen(false);
-      setMenuOpen(false);
-      handleGoTo("/parametres");
-    }}
-    className="btn-link"
-  >
-    Paramètres
-  </button>
-  <button
-    onClick={() => {
-      setDropdownOpen(false);
-      setMenuOpen(false);
-      handleLogout();
-    }}
-    className="btn-dec"
-  >
-    Déconnexion
-  </button>
-</div>
-
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setMenuOpen(false);
+                      handleGoTo(`/profil/${localUser.id}`);
+                    }}
+                    className="btn-link"
+                  >
+                    Mon profil
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setMenuOpen(false);
+                      handleGoTo("/parametres");
+                    }}
+                    className="btn-link"
+                  >
+                    Paramètres
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="btn-dec"
+                  >
+                    Déconnexion
+                  </button>
+                </div>
               </div>
             )}
           </li>
@@ -280,4 +277,4 @@ export default function Navbar() {
       </ul>
     </nav>
   );
-} 
+}

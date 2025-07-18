@@ -8,7 +8,7 @@
   gap: 1rem;
   padding: 1rem;
   background-color: transparent;
-  box-shadow: inset -2px 0 6px rgba(224, 192, 132, 0.05);
+  box-shadow: inset -2px 0 6px rgb(224 192 132 / 5%);
 }
 
 .conversation-header {
@@ -124,6 +124,7 @@
 .start-search-link:hover {
   text-decoration: underline;
 }
+
 .notif-badge {
   display: inline-block;
   min-width: 18px;
@@ -137,7 +138,7 @@
   vertical-align: middle;
 }
 
-@media screen and (max-width: 768px){
+@media screen and (width <= 768px){
   .liste-conversations {
 max-width: none;
 color: #e0c084;

@@ -16,7 +16,7 @@
 .accueil-page::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background-image: url('../../public/images/skin.jpg');
   background-repeat: no-repeat;
   background-size: cover;
@@ -69,7 +69,7 @@
   padding: 1rem;
   text-align: center;
   background-color: transparent;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
 }
 
 .profil-photo {
@@ -85,7 +85,7 @@
 .profil-card-title {
   color: #e0c084;
   text-align: center;
-  word-break: break-word;
+  word-break: word-break;
   margin: 0.5rem 0;
 }
 
@@ -119,12 +119,13 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .grid-accueil {
     display: flex;
     flex-direction: column;
     align-items: center;
   }
+
   .toggle-box{
     flex-direction: column;
   }

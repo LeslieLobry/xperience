@@ -22,9 +22,11 @@ table {
   font-size: 1.05rem;
   margin-bottom: 12px;
 }
+
 .body-util{
   color: white;
 }
+
 th, td {
   text-align: left;
   padding: 12px 10px;
@@ -40,9 +42,11 @@ th {
 tbody tr {
   border-bottom: 1px solid #e0c084;
 }
+
 tbody tr:last-child {
   border-bottom: none;
 }
+
 tfoot td {
   background:transparent;
   font-size: 1.09rem;
@@ -57,19 +61,21 @@ a[href^="mailto:"] {
   transition: color .15s;
   word-break: break-all;
 }
+
 a[href^="mailto:"]:hover {
   color: #351179;
   text-decoration: underline;
 }
 
 /* -------- Responsive -------- */
-@media (max-width: 600px) {
+@media (width <= 600px) {
   .admin-utilisateurs {
-    padding: 8px 1vw 32px 1vw;
+    padding: 8px 1vw 32px;
     border-radius: 0;
     box-shadow: none;
     min-width: 0;
   }
+
   table,
   thead,
   tbody,
@@ -80,9 +86,11 @@ a[href^="mailto:"]:hover {
     display: block;
     width: 100%;
   }
+
   thead {
     display: none; /* Cache l’en-tête sur mobile */
   }
+
   tbody tr,
   tfoot tr {
     margin-bottom: 16px;
@@ -92,6 +100,7 @@ a[href^="mailto:"]:hover {
     box-shadow: 0 1px 4px #0001;
     padding: 8px 0;
   }
+
   td {
     padding: 8px 10px;
     display: flex;
@@ -99,9 +108,11 @@ a[href^="mailto:"]:hover {
     align-items: center;
     border-bottom: 0;
     font-size: 1rem;
+
     /* Ajoute le label avant chaque champ */
     position: relative;
   }
+
   td::before {
     content: attr(data-label);
     font-weight: bold;
@@ -111,6 +122,7 @@ a[href^="mailto:"]:hover {
     font-size: 0.98em;
     opacity: 0.95;
   }
+
   tfoot td {
     padding: 13px 10px;
     font-size: 1.05rem;

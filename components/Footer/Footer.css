@@ -10,6 +10,7 @@
     border-top: 1px solid var(--primary-color);
 
 }
+
 .footer-contenant h2 {
     color: var(--primary-color);
     text-decoration: underline;
@@ -58,17 +59,20 @@
 .footer-reseau a:hover img {
     transform: scale(1.1);
 }
+
 .footer-contact-link{
 margin-left: 3px;
 }
+
 /* 🎯 RESPONSIVE VERSION */
-@media screen and (max-width: 768px) {
+@media screen and (width <= 768px) {
     .footer-contenant {
         flex-direction: column;
         align-items: center;
         text-align: center;
         gap: 0;
     }
+
     .footer-logo img{
         width: 100px;
     }
@@ -80,9 +84,11 @@ margin-left: 3px;
     .footer-contenant li {
         font-size: 0.9rem;
     }
+
     .footer-ul{
         align-items: flex-start;
     }
+
     .footer-reseau h2 {
         width: 100%;
     }

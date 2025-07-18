@@ -13,10 +13,11 @@
     color:#f5ece0;
     gap: 25px;
 }
+
 .creer-contenant::before{
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     background-image: url('../../../public//images/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
@@ -24,27 +25,33 @@
     opacity: 0.3; /* ici tu règles la transparence de l'image */
     z-index: -1; /* pour que l'image reste en fond */
 }
+
 .creer-title{
     color: #f6D391;
     font-size: 64px;
 }
+
 .creer-contenant input {
     background-color: transparent;
     border: none;
     font-size: 24px;
     color: white;
 }
+
 .event-form{
     display: flex;
     flex-direction: column;
     width: 50%;
     gap: 36px;
-}.creer-description{
+}
+
+.creer-description{
     height: 100px;
     color: white;
     background-color: transparent;
     font-size: 20px;
 }
+
 .acces-select{
     font-size: 20px;
 }

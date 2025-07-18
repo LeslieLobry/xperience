@@ -54,6 +54,7 @@ button {
   color: #d00;
   font-size: 0.9rem;
 }
+
 .security-section input::placeholder {
   color: #e0c084;
   opacity: 1;

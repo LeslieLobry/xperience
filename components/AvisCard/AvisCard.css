@@ -1,9 +1,8 @@
 .avis-card {
   backdrop-filter: blur(4px);
-  background: rgba(31, 29, 27, 0.6);
+  background: rgb(31 29 27 / 60%);
   border: 1px solid #e0c084;
   border-radius: 12px;
-  padding: 1rem;
   margin-bottom: 1rem;
   color: #e0c084;
   padding: 1rem;
@@ -37,7 +36,7 @@
   padding: .6rem;
   border-radius: 8px;
   border: 1px solid #8c6a5d;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgb(0 0 0 / 25%);
   color: #f0e4d2;
   resize: vertical;
 }

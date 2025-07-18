@@ -17,7 +17,7 @@
 .connexion-contenant::before {
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     background-image: url('../../public//images/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
@@ -25,14 +25,17 @@
     opacity: 0.3; 
     z-index: -1; 
 }
+
 .connexion-title{
     color: #F6D391;
 }
+
 .form-connexion{
     display: flex;
     flex-direction: column;
     gap: 25px;
 }
+
 .form-connexion input {
     padding: 25px;
     border-radius: 25px;
@@ -43,13 +46,16 @@
     border: 2px #F6D391 solid;
     font-size: 25px;
 }
+
 .form-connexion ::placeholder{
     color: #F6D391;
     opacity: 1;
 }
+
 .form-connexion :not(:placeholder-shown){
     background-color: transparent;
 }
+
 .input-wrapper {
   position: relative;
 }
@@ -70,6 +76,7 @@
   cursor: pointer;
   color: #ccc;
 }
+
 .input-email {
   color: #e0c084!important;            /* Texte violet foncé */
   border: 2px solid #F6D391 !important; /* Bordure violette */
@@ -79,18 +86,22 @@
   border-radius: 25px;
   transition: border-color 0.2s, background 0.2s;
 }
+
 .input-email::placeholder {
   color: #e0c084 !important;   
   opacity: 1;
 }
+
 input{
     font-weight: normal !important;
 }
+
 .btn-connection{
     color: white;
     font-weight: normal;
     background-color: #e0c084;
 }
+
 .button-blanc {
   color: #fff !important;
   font-weight: 400 !important;

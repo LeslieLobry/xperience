@@ -5,35 +5,36 @@
   width: 100%;
   max-width: 450px;
   color: #f8f8f8;
-  box-shadow: 0 0 20px rgba(224, 192, 132, 0.2);
+  box-shadow: 0 0 20px rgb(224 192 132 / 20%);
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
 .modal-conversation h3 {
-  font-size: 2.5rem !important;
+  font-size: 2.5rem; /* !important supprimé */
   color: #e0c084;
   margin-bottom: 1rem;
   text-align: center;
-
 }
 
 .select-utilisateurs {
   color: #000;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .select-utilisateurs .react-select__control {
   border-radius: 6px;
   border: 1px solid #e0c084;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .select-utilisateurs .react-select__menu {
   z-index: 100;
 }
 
 .modal-conversation .erreur {
-  color: #ff4444;
+  color: #f44;
   font-weight: 500;
   font-size: 0.95rem;
   text-align: center;
@@ -62,5 +63,5 @@
 }
 
 .modal-conversation .annuler:hover {
-  background-color: rgba(224, 192, 132, 0.1);
+  background-color: rgb(224 192 132 / 10%);
 }

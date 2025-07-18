@@ -8,8 +8,9 @@
     height: 100%;
     border-radius: 16px;
     padding: 5px;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgb(255 255 255 / 5%);
 }
+
 /* Pour le message de confirmation */
 .description-message {
   margin-top: 0.5rem;
@@ -25,15 +26,24 @@
 .emoji-picker-container {
   margin-top: 12px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
   overflow: hidden;
 }
+
 .description-card p {
   white-space: pre-line;
 }
 
 /* Animation légère */
 @keyframes fadein {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+

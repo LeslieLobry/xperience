@@ -9,13 +9,16 @@
     --gold: #e0c084;
 
 }
+
 img, body {
   user-select: none;
   -webkit-user-drag: none;
 }
+
 img {
   user-select: none;
   -webkit-user-drag: none;
+
   /* pointer-events: none; */
 }
 
@@ -37,8 +40,7 @@ body {
 
 body {
   color: var(--foreground);
-  color: var(--foreground);
- font-family: 'Inter', sans-serif;
+ font-family: Inter, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -54,6 +56,7 @@ a {
   text-decoration: none;
   font-weight: normal;
 }
+
 h1, h2, h3,
 .navbar a,
 .logo-text,
@@ -61,32 +64,38 @@ h1, h2, h3,
   font-weight:normal;
   color: var(--gold);
 }
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
   }
 }
+
 input::placeholder {
-  color: rgb(245, 241, 241);
+  color: rgb(245 241 241);
   opacity: 1;
 }
+
 .css-1u9des2-indicatorSeparator{
   display: none;
 }
+
 .css-8gsnlb-control{
   align-items: center;
 }
+
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  box-shadow: 0 0 0 1000px transparent inset !important;
   background-color: transparent !important;
   color: white !important;
   -webkit-text-fill-color: white !important;
   transition: background-color 5000s ease-in-out 0s;
 }
-@media (max-width: 768px){
+
+@media (width <= 768px){
   body{
     font-size: 16px;
   }

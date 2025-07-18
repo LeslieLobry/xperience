@@ -10,8 +10,9 @@
   justify-content:flex-end;
   margin-top: 3rem;
 }
+
 button {
-  font-family: "Crimson Text", serif !important;
+  font-family: "Crimson Text", serif;
 }
 
 .bouton-header {
@@ -19,6 +20,7 @@ button {
   gap: 25px;
   margin-right: 2%;
 }
+
 .logo-contenant{
   display: flex;
   justify-content:center ;
@@ -36,13 +38,16 @@ button {
   width: 50%;
   text-align: justify;
 }
+
 ul {
   list-style-type: none;
 }
+
 .text{
   display: flex;
   justify-content: center;
 }
+
 .image-components{
   display: flex;
   width: 100%;
@@ -54,23 +59,27 @@ ul {
   display: flex;  
   justify-content: center;
 }
+
 .cl{
   display: flex;
   width: 100%;
 }
+
 .cl img{
   width: 100%;
   height: fit-content;
 }
+
 .text-bas p{
   font-size: 25px;
   color: white;
 }
-@media (max-width: 768px){
 
+@media (width <= 768px){
   .logo-contenant img{
   width: 90%;
 }
+
 .masque-contenant img{
   width: 50%;
 }

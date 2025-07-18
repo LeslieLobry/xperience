@@ -2,18 +2,19 @@
     color: #e0c084;
     background-color: transparent;
     border: none;
+    width: 25%;
+  padding: 8px;
 }
+
 .select-membre option{
   color: #e0c084
 }
+
 .input-prenom{
   background-color: transparent;
   color: #e0c084;
 }
-.select-membre {
-  width: 25%;
-  padding: 8px;
-}
+
 .input-wrapper{
   color: #e0c084;
 }

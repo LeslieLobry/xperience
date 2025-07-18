@@ -15,42 +15,49 @@
     font-size: 25px;
     text-align: center;
 }
+
 .reset-container ::before{
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-image: ('../../public/images/skin.jpg');
+    inset: 0;
+    background-image:url('../../public/images/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;
     opacity: 0.1; /* ici tu règles la transparence de l'image */
     z-index: -1; /* pour que l'image reste en fond */
 }
+
 .reset-title{
     color:#e0c084
 
 }
+
 .reset-form{
     display: flex;
     justify-content: center;
 
 }
+
 .reset-input{
     padding: 5%;
     font-size: 16px
 }
+
 .reset-input::placeholder {
     color: #e0c084;
     opacity: 1;
     
   }
+
 .reset-button{
     padding: 5%;
     background-color: #e0c084;
     color: #f5ece0;
     font-size: 16px
 }
-@media screen and (max-width: 768px){
+
+@media screen and (width <= 768px){
 .reset-form{
     display: flex;
     flex-direction: column;

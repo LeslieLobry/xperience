@@ -11,13 +11,13 @@
     z-index: 1; 
     overflow: hidden; 
     color:#f5ece0;
-    gap:;
+
 }
 
 .article-container::before {
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     background-image: url('../../../public/images/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
@@ -25,6 +25,7 @@
     opacity: 0.3;
     z-index: -1;
 }
+
   .article-title {
     font-size: 2em;
     color: #e0c084;
@@ -39,6 +40,7 @@
     font-size: 1.1em;
     line-height: 1.6;
   }
+
   .back-to-blog-button {
   display: inline-block;
   margin-bottom: 2rem;

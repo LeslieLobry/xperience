@@ -3,32 +3,24 @@
   border-radius: 8px;
   padding: 1rem;
   border: 1px solid #e0c084; 
+  width: 100%;
+  max-width: 100%;
 }
+
 .recherche-sidebar h2 {
   font-size: 1.2rem;
   margin-bottom: 1rem;
 }
-.input-recherche{
+
+.input-recherche {
   background-color: transparent;
   border: 1px solid #e0c084;
 }
+
 .recherche-sidebar form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-.section-toggle{
-  color: #e0c084;
-}
-.recherche-sidebar input[type="text"],
-.recherche-sidebar input[type="number"] {
-  width: 100%;
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  color: #e0c084;
-  font-size: 24px;
-  background-color: transparent;
 }
 
 .filters-group {
@@ -54,28 +46,36 @@
 .recherche-button:hover {
   background-color: #74584a;
 }
+
+/* Section toggle : groupé pour éviter le duplicate */
 .section-toggle {
+  color: #e0c084;
   cursor: pointer;
   margin-bottom: 0.5rem;
-  /* font-weight: bold; */
   font-weight: normal;
   font-size: 26px;
 }
 
-.recherche-sidebar {
+.recherche-sidebar input[type="text"],
+.recherche-sidebar input[type="number"] {
   width: 100%;
-  max-width: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  color: #e0c084;
+  font-size: 24px;
+  background-color: transparent;
 }
 
-@media (min-width: 768px) {
+@media (width >= 768px) {
   .recherche-sidebar {
     max-width: 300px;
     padding: 1rem;
     color: white;
     font-size: 26px;
-    
   }
 }
+
 .section-group {
   margin-bottom: 0;
 }
@@ -83,8 +83,10 @@
 .section-group.open {
   margin-bottom: 1rem;
 }
-.recherche-sidebar--mobile {
-  /* Tu peux customiser l'affichage mobile ici */
+
+/* Nommage kebab-case pour le mobile */
+.recherche-sidebar-mobile {
+  /* Customise l'affichage mobile ici */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -98,10 +100,10 @@
   padding: 12px 20px;
   border-radius: 20px;
   background: #e0c084;
-  color:#e2e2fa;
+  color: #e2e2fa;
   font-weight: normal;
   text-decoration: none;
-  box-shadow: 0 2px 8px rgba(70,70,90,0.10);
+  box-shadow: 0 2px 8px rgb(70 70 90 / 10%);
   transition: background 0.2s;
 }
 

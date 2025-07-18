@@ -15,7 +15,7 @@
 .page-partenaires::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background-image: url('../../public/images/skin.jpg');
   background-repeat: no-repeat;
   background-size: cover;
@@ -30,6 +30,7 @@
   margin-bottom: 2rem;
   color: #e0c084;
 }
+
 .grid-partenaire{
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -44,12 +45,12 @@
 }
 
 .carte-partenaire {
-  background-color: rgba(18, 24, 38, 0.9);
+  background-color: rgb(18 24 38 / 90%);
   border: 1px solid #2a2f45;
   border-radius: 12px;
   padding: 1.5rem;
   text-align: center;
-  box-shadow: 0 0 8px rgba(224, 192, 132, 0.1);
+  box-shadow: 0 0 8px rgb(224 192 132 / 10%);
   transition: transform 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -60,7 +61,7 @@
 
 .carte-partenaire:hover {
   transform: translateY(-5px);
-  box-shadow: 0 0 12px rgba(224, 192, 132, 0.3);
+  box-shadow: 0 0 12px rgb(224 192 132 / 30%);
 }
 
 .carte-partenaire h2 {
@@ -88,7 +89,8 @@
 .partenaire-lien:hover {
   background-color: #cfb276;
 }
-@media (max-width: 768px){
+
+@media (width <= 768px){
 .cartes-partenaires{
   grid-template-columns: 1fr;
 }

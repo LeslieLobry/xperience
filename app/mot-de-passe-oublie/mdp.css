@@ -15,10 +15,11 @@
     font-size: 25px;
     text-align: center;
 }
+
 .motdepasse-container ::before{
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     background-image: url('../../public/images/skin.jpg');
     background-repeat: no-repeat;
     background-size: cover;
@@ -26,21 +27,26 @@
     opacity: 0.1; /* ici tu règles la transparence de l'image */
     z-index: -1; /* pour que l'image reste en fond */
 }
+
 .motdepasse-title{
     color:#e0c084
 }
+
 .motdepasse-description{
     color: #f5ece0;
     
 }
+
 .motdepasse-input::placeholder {
     color: #e0c084;
     opacity: 1;
   }
+
   .motdepasse-input{
-    color: #e0c084 !important;
+    color: #e0c084;
     padding: 3%;
   }
+
   .motdepasse-message.success {
     color:#e0c084; 
    
@@ -49,11 +55,13 @@
   .motdepasse-message.error {
     color: red;
   }
+
   .motdepasse-button{
     padding: 3%; 
     background-color: #e0c084;
     color: #f5ece0;
   }
+
   .motdepasse-form{
     display: flex;
     justify-content: center;

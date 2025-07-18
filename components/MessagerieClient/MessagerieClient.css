@@ -30,7 +30,7 @@
 }
 
 /* Responsive mobile */
-@media screen and (max-width: 768px) {
+@media screen and (width <= 768px) {
   .messagerie-page {
     flex-direction: column;
     width: 100%;

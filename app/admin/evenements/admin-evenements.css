@@ -26,16 +26,16 @@
 .admin-evenements-table td {
   padding: 10px;
   text-align: left;
-  border-bottom: 1px solid rgba(224, 192, 132, 0.3);
+  border-bottom: 1px solid rgb(224 192 132 / 30%);
 }
 
 .admin-evenements-table th {
-  background-color: rgba(224, 192, 132, 0.1);
+  background-color: rgb(224 192 132 / 10%);
   color: #e0c084;
 }
 
 .admin-evenements-table tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgb(255 255 255 / 5%);
 }
 
 .admin-evenements-table button {

@@ -13,13 +13,16 @@
   transition: background 0.2s;
   font-weight: 500;
 }
+
 .ephemere-preview:hover,
 .ephemere-preview:focus {
   background: #26263a;
 }
+
 .ephemere-eye {
   font-size: 1.4em;
 }
+
 .ephemere-label {
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -34,16 +37,19 @@
   align-items: center;
   animation: fadein 0.22s;
 }
+
 @keyframes fadein {
   from { opacity: 0; } to { opacity: 1; }
 }
+
 .ephemere-modal-bg {
   position: absolute;
   inset: 0;
-  background: rgba(10, 10, 22, 0.94);
+  background: rgb(10 10 22 / 94%);
   z-index: 0;
   pointer-events: none;
 }
+
 .ephemere-modal-content {
   position: relative;
   z-index: 1;
@@ -53,6 +59,7 @@
   max-width: 95vw;
   max-height: 90vh;
 }
+
 .ephemere-image {
   max-width: 90vw;
   max-height: 60vh;
@@ -61,25 +68,30 @@
   margin-bottom: 24px;
   object-fit: contain;
 }
+
 .ephemere-timer-wrapper {
   position: relative;
   width: 62px;
   height: 62px;
   margin-bottom: 10px;
 }
+
 .ephemere-timer-svg {
   position: absolute;
   top: 0; left: 0; width: 62px; height: 62px;
   transform: rotate(-90deg);
 }
+
 .ephemere-timer-bg {
   stroke: #444;
   opacity: 0.3;
 }
+
 .ephemere-timer-circle {
   stroke: #4ee04e;
   transition: stroke-dashoffset 1s linear;
 }
+
 .ephemere-timer-number {
   position: absolute;
   top: 50%; left: 50%;
@@ -89,29 +101,33 @@
   color: #fff;
   text-shadow: 0 2px 6px #000a;
 }
+
 .ephemere-infos {
   margin-top: 6px;
   color: #e0e0e0;
   font-size: 1em;
   text-align: center;
-  background: rgba(25,25,30,0.7);
+  background: rgb(25 25 30 / 70%);
   padding: 0.3em 1.2em;
   border-radius: 2em;
 }
 
-@media (max-width: 600px) {
+@media (width <= 600px) {
   .ephemere-modal-content {
     max-width: 100vw;
     max-height: 100vh;
   }
+
   .ephemere-image {
     max-width: 98vw;
     max-height: 38vh;
   }
+
   .ephemere-timer-wrapper {
     width: 48px;
     height: 48px;
   }
+
   .ephemere-timer-svg {
     width: 48px;
     height: 48px;

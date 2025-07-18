@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   padding: 2rem;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgb(0 0 0 / 40%);
   border-radius: 12px;
   max-width: 700px;
   margin: auto;
@@ -14,11 +14,13 @@
   justify-content: center;
   margin-bottom: 1.5rem;
 }
+
 .visite-titre{
   color: #e0c084;
   font-size: 64px;
-  font-weight: normal !important;
+  font-weight: normal;
 }
+
 .visites-tabs button {
   background: none;
   border: none;
@@ -46,7 +48,7 @@
   display: flex;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid rgb(255 255 255 / 20%);
 }
 
 .visite-item:last-child {
@@ -74,14 +76,13 @@
 }
 
 .visite-nom {
-
   font-size: 32px;
   color: #e0c084;
 }
 
 .visite-date {
   font-size: 0.85rem;
-  color: #bbbbbb;
+  color: #bbb;
   margin-top: 0.2rem;
 }
 
@@ -90,5 +91,5 @@
   text-align: center;
   margin-top: 2rem;
   font-style: italic;
-  color: #dddddd;
+  color: #ddd;
 }

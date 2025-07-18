@@ -10,22 +10,21 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
-
 }
 
 .gallery-slot {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background-color: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
   transition: transform 0.2s ease, box-shadow 0.3s;
 }
 
 .gallery-slot:hover {
   transform: scale(1.03);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 30%);
 }
 
 .gallery-slot img {
@@ -34,6 +33,15 @@
   object-fit: cover;
   display: block;
   transition: transform 0.3s ease-in-out;
+}
+
+/* 👉 CORRECTION : .lightbox-content img doit venir AVANT le :hover */
+.lightbox-content img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 0;
 }
 
 .gallery-slot img:hover {
@@ -46,7 +54,7 @@
   justify-content: center;
   border: 2px dashed #e0c084;
   min-height: 160px;
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgb(255 255 255 / 2%);
   transition: border-color 0.3s;
 }
 
@@ -58,7 +66,7 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgb(0 0 0 / 70%);
   color: #fff;
   border: none;
   border-radius: 50%;
@@ -69,7 +77,7 @@
 }
 
 .delete-button:hover {
-  background-color: rgba(255, 0, 0, 0.8);
+  background-color: rgb(255 0 0 / 80%);
 }
 
 .lightbox {
@@ -78,7 +86,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(10, 10, 10, 0.95);
+  background-color: rgb(10 10 10 / 95%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -98,30 +106,17 @@
   overflow: hidden;
 }
 
-.lightbox-content img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-  border-radius: 0;
-}
-
+/* 👉 CORRECTION : Place les boutons d’abord */
 .lightbox-close,
 .lightbox-prev,
 .lightbox-next {
   position: absolute;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgb(255 255 255 / 90%);
   border: none;
   border-radius: 50%;
   padding: 8px;
   cursor: pointer;
   transition: background-color 0.3s ease;
-}
-
-.lightbox-close:hover,
-.lightbox-prev:hover,
-.lightbox-next:hover {
-  background-color: #e0c084;
 }
 
 .lightbox-close {
@@ -144,8 +139,14 @@
   z-index: 2;
 }
 
-@media screen and (max-width: 600px) {
- 
+/* 👉 Puis les :hover ensuite */
+.lightbox-close:hover,
+.lightbox-prev:hover,
+.lightbox-next:hover {
+  background-color: #e0c084;
+}
+
+@media screen and (width <= 600px) {
   .gallery-slot.empty {
     min-height: 140px;
   }

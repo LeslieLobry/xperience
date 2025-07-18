@@ -20,16 +20,19 @@
 .chat-messages::-webkit-scrollbar {
   width: 6px;
 }
+
 .chat-messages::-webkit-scrollbar-thumb {
   background: #e0c084;
   border-radius: 4px;
 }
+
 .message-item {
   margin-bottom: 14px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
+
 .message-item {
   margin-bottom: 14px;
   display: flex;
@@ -57,7 +60,7 @@
 }
 
 .message-bubble {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgb(255 255 255 / 10%);
   padding: 10px 14px;
   border-radius: 12px;
   max-width: 420px;
@@ -85,7 +88,7 @@
   padding: 10px 12px;
   border-radius: 20px;
   font-size: 1rem;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgb(255 255 255 / 10%);
   color: #fff;
 }
 

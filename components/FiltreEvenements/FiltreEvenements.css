@@ -5,6 +5,7 @@
   max-width: 500px;
   gap: 16px ;
 }
+
 .filtre-dates {
   display: flex;
   gap: 0.5rem;
@@ -24,13 +25,22 @@
 }
 
 .filtre-range {
+  appearance: none;
   width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #f0d084 0%, #f0d084 var(--progress), white var(--progress), white 100%);
+  outline: none;
+  padding: 0;
+  box-sizing: content-box;
 }
+
 
 .filtre-access {
   display: flex;
   flex-direction: column;
 }
+
 .input-ville-wrapper {
   position: relative;
 }
@@ -75,11 +85,13 @@
 .suggestions li:hover {
   background-color: #282727;
 }
+
 .filtre-date::-webkit-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
   
 }
+
 .custom-button {
   padding: 12px 24px;
   font-weight: bold;
@@ -94,27 +106,16 @@
   background-color: #f5ece0;
   transform: translateY(-2px);
 }
+
 .filtre-input{
   background-color: transparent;
   border: none;
   font-size: 20px;
   color: #eee;
 }
-.filtre-range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(to right, #f0d084 0%, #f0d084 var(--progress), white var(--progress), white 100%);
-  outline: none;
-  padding: 0;
-  box-sizing: content-box;
-}
 
 /* Chrome, Edge, Safari */
 .filtre-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
   appearance: none;
   width: 60px;
   height: 40px;
@@ -161,11 +162,13 @@
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+
 .acces-input{
   display: flex;
   flex-direction: row;
   gap: 8px;
 }
+
 .label{
   display: flex;
   gap: 8px;

@@ -4,7 +4,7 @@
   background-color: #1c1f26;
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 10px rgb(255 255 255 / 5%);
   color: #e0c084;
   font-family: 'Segoe UI', sans-serif;
   display: flex; 

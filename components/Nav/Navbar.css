@@ -17,25 +17,25 @@
   font-style: italic;
 }
 
-.navLinks {
+.nav-links {
   list-style: none;
   display: flex;
   gap: 1.5rem;
   transition: transform 0.3s ease-in-out;
   align-items: center;
   position: relative;
-  overflow: visible; /* ✅ Important pour afficher le dropdown */
+  overflow: visible;
   z-index: 998;
 }
 
-.navLinks li a {
+.nav-links li a {
   text-decoration: none;
   color: var(--primary-color);
   transition: color 0.3s ease;
   font-size: 24px;
 }
 
-.navLinks li a:hover {
+.nav-links li a:hover {
   color: #8c6a5d;
 }
 
@@ -66,22 +66,23 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .burger {
     display: flex;
   }
-.nav-combined-popup{
-    position: static !important;     
-    top: auto !important;            
-    right: auto !important;          
-    width: 100% !important;          
-    max-height: none;     
-    border: none; 
+
+  .nav-combined-popup {
+    position: static;
+    top: auto ;
+    right: auto;
+    width: 100% ;
+    max-height: none;
+    border: none;
     box-shadow: none;
-    background-image: none !important;
- 
-}
-  .navLinks {
+    background-image: none ;
+  }
+
+  .nav-links {
     display: flex;
     align-items: flex-start;
     position: absolute;
@@ -94,21 +95,21 @@
     border-left: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     z-index: 998;
-    overflow: visible; 
+    overflow: visible;
     gap: 0;
   }
 
-  .navLinks.active {
+  .nav-links.active {
     transform: translateX(0);
   }
 
-  .navLinks li {
+  .nav-links li {
     padding: 0.5rem 0;
   }
 }
 
 .nav-avatar-wrapper {
-  position: relative; 
+  position: relative;
   cursor: pointer;
 }
 
@@ -141,14 +142,14 @@
   user-select: none;
   pointer-events: auto;
   cursor: pointer;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 2px rgb(0 0 0 / 30%);
   z-index: 10;
 }
 
 /* Popup notifications + actions */
 .nav-combined-popup {
   position: absolute;
-  top: 60px; /* juste sous l'avatar */
+  top: 60px;
   right: 0;
   width: 320px;
   max-height: 500px;
@@ -156,21 +157,22 @@
   color: #e0c084;
   border: 1px solid #ddd;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
   z-index: 1000;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
-  animation: fadeInUp 0.2s ease-out;
+  animation: fade-in-up 0.2s ease-out;
 }
 
-@keyframes fadeInUp {
+@keyframes fade-in-up {
   from {
     opacity: 0;
     transform: translateY(5px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -230,10 +232,10 @@
   color: #e0c084;
 }
 
-
-.btn-dec{
-  color:#e0c084 !important;
+.btn-dec {
+  color: #e0c084;
 }
+
 .messagerie-badge {
   display: inline-block;
   background: #e0c084;

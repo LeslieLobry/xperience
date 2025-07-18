@@ -25,7 +25,7 @@
 .statut-switch .slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background-color: #ccc;
   border-radius: 34px;
   transition: 0.4s;

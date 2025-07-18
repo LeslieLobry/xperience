@@ -27,7 +27,8 @@
   border-radius: 50%;
   object-fit: cover;
 }
-@media (max-width: 700px) {
+
+@media (width <= 700px) {
   .page-recherche{
     flex-direction: column;
   }

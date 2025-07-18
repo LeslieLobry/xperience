@@ -34,6 +34,7 @@
   cursor: pointer;
   transition: background 0.13s;
 }
+
 .add-participant-item.selected {
   background: #eee6c1;
 }
@@ -49,13 +50,6 @@
 .add-participant-pseudo {
   font-size: 16px;
   color: #333;
-}
-
-.add-participant-empty {
-  color: #aaa;
-  font-size: 14px;
-  padding: 12px 0;
-  text-align: center;
 }
 
 .add-participant-actions {
@@ -74,6 +68,7 @@
   cursor: pointer;
   transition: opacity 0.2s;
 }
+
 .btn-add-participant:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -95,6 +90,7 @@
   font-size: 15px;
   text-align: center;
 }
+
 .add-participant-suggestions {
     position: absolute;
   width: 100%; 
@@ -109,8 +105,9 @@
   top: 54px; 
   border-radius: 0 0 12px 12px;
   box-shadow: 0 6px 20px #ccb07630;
-  animation: fadeIn 0.13s;
+  animation: fade-in 0.13s;
 }
+
 .add-participant-suggestion {
   display: flex;
   align-items: center;
@@ -122,17 +119,25 @@
   background: #fff;
   transition: background 0.13s, color 0.13s
 }
+
 .add-participant-suggestion:hover {
    background: #f6ecd6;
   color: #a68c4d;
 }
+
 .add-participant-empty {
   color: #aaa;
   font-size: 14px;
   padding: 12px 0;
   text-align: center;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-6px);}
-  to   { opacity: 1; transform: translateY(0);}
+
+@keyframes fade-in {
+  from { opacity: 0;
+     transform: translateY(-6px);
+    }
+
+  to   {
+     opacity: 1; transform: translateY(0);
+    }
 }
