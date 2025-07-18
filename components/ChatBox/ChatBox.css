@@ -10,18 +10,22 @@
 /* === Header === */
 .chat-header {
   display: flex;
+  align-items: center; 
   justify-content: space-between;
-  align-items: center;
-  padding: 0.7rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid #e0c08444;
+  gap: 12px;
+  padding: 0.5rem 1rem;
+  min-height: 54px; 
+  position: relative;
+  background: transparent; 
+  border: 1px #e0c084 solid;
 }
 .chat-participants {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  max-width: 80%;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0; 
 }
 .participant-info {
   display: flex;
@@ -59,7 +63,13 @@
 .chat-actions button:hover {
   opacity: 0.8;
 }
-
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
 /* === Zone messages === */
 .chat-messages {
   display: flex;
@@ -550,3 +560,8 @@
   pointer-events: none;
 }
 
+@media (max-width: 768px) {
+  .participant-name {
+    display: none !important;
+  }
+}

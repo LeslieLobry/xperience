@@ -22,23 +22,27 @@ export async function GET() {
     const user = await getUserFromToken();
     if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const unreadMessages = await prisma.message.findMany({
-      where: {
-        lu: false,
-        auteurId: { not: user.id },
-        conversation: {
-          participants: {
-            some: { utilisateurId: user.id }
-          }
-        }
+const unreadMessages = await prisma.message.findMany({
+  where: {
+    lu: false,
+    auteurId: { not: user.id },
+    conversation: {
+      participants: {
+        some: {
+          utilisateurId: user.id,
+          supprimé: false,    // AJOUT ICI !!
+        },
       },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: {
-        auteur: { select: { id: true, pseudo: true } },
-        conversation: true,
-      },
-    });
+    },
+  },
+  orderBy: { createdAt: "desc" },
+  take: 20,
+  include: {
+    auteur: { select: { id: true, pseudo: true } },
+    conversation: true,
+  },
+});
+
 
     return NextResponse.json(unreadMessages);
   } catch (error) {

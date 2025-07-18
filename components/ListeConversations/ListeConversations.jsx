@@ -13,11 +13,22 @@ export default function ListeConversations({ userId, onSelectConversation }) {
   const [showModal, setShowModal] = useState(false);
   const [renamingId, setRenamingId] = useState(null); 
   const [newName, setNewName] = useState("");
+
+  // Déduplication lors du fetch
   const fetchConversations = async () => {
     try {
       const res = await fetch("/api/conversations");
       const data = await res.json();
-      setConversations(data.conversations || []);
+      // Déduplication ici
+      const uniqueConvs = [];
+      const ids = new Set();
+      (data.conversations || []).forEach((c) => {
+        if (!ids.has(c.id)) {
+          ids.add(c.id);
+          uniqueConvs.push(c);
+        }
+      });
+      setConversations(uniqueConvs);
     } catch (err) {
       console.error("❌ Erreur chargement conversations :", err);
     }
@@ -74,29 +85,30 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       console.error("❌ Erreur serveur :", err);
     }
   };
-const handleRename = async (id) => {
-  try {
-    const res = await fetch(`/api/conversations/${id}/rename`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom: newName }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, nom: data.conversation.nom } : c
-        )
-      );
-      setRenamingId(null);
-      setNewName("");
-    } else {
-      alert(data.error || "Erreur lors du renommage");
+
+  const handleRename = async (id) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}/rename`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: newName }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === id ? { ...c, nom: data.conversation.nom } : c
+          )
+        );
+        setRenamingId(null);
+        setNewName("");
+      } else {
+        alert(data.error || "Erreur lors du renommage");
+      }
+    } catch (err) {
+      alert("Erreur réseau");
     }
-  } catch (err) {
-    alert("Erreur réseau");
-  }
-};
+  };
 
   // HANDLE SELECT = mark-as-read (POST) + badge à 0
   const handleSelect = async (id) => {
@@ -105,7 +117,6 @@ const handleRename = async (id) => {
       onSelectConversation(id);
     }
 
-    // Appelle la route pour marquer comme lu
     try {
       await fetch(`/api/conversations/${id}/mark-as-read`, {
         method: "POST",
@@ -113,15 +124,11 @@ const handleRename = async (id) => {
         body: JSON.stringify({ userId }),
       });
 
-      // Optimiste : badge non-lu = 0 tout de suite
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === id ? { ...conv, unreadCount: 0 } : conv
         )
       );
-
-      // Si tu veux forcer le refresh ably sur plusieurs devices :
-      // ably.channels.get(`notification-${userId}`).publish("refresh-conversations", {});
     } catch (err) {
       console.error("Erreur lors de la mise à jour des non-lus :", err);
     }
@@ -136,14 +143,14 @@ const handleRename = async (id) => {
         </button>
       </div>
 
-      {conversations.length === 0 && (
-        <div className="no-conversation-message">
-          <p>Aucune conversation pour l’instant.</p>
-          <a href="/recherche" className="start-search-link">
-            Trouver des profils à contacter
-          </a>
-        </div>
-      )}
+    {conversations.length === 0 && !selectedId && (
+  <div className="no-conversation-message">
+    <p>Aucune conversation pour l’instant.</p>
+    <a href="/recherche" className="start-search-link">
+      Trouver des profils à contacter
+    </a>
+  </div>
+)}
 
       {conversations.map((conv) => {
         const autres = conv.participants
@@ -168,33 +175,32 @@ const handleRename = async (id) => {
               onClick={() => handleSelect(conv.id)}
             >
               <div className="conv-info">
-              <div className="conv-pseudo">
-  {renamingId === conv.id ? (
-    <>
-      <input
-        value={newName}
-        onChange={e => setNewName(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") handleRename(conv.id); }}
-        autoFocus
-        style={{ width: 120, marginRight: 6 }}
-        maxLength={40}
-      />
-      <button onClick={() => handleRename(conv.id)}>OK</button>
-      <button onClick={() => { setRenamingId(null); setNewName(""); }}>Annuler</button>
-    </>
-  ) : (
-    <>
-      {conv.nom || pseudo}
-      <button
-        className="rename-conv-button"
-        onClick={e => { e.stopPropagation(); setRenamingId(conv.id); setNewName(conv.nom || ""); }}
-        title="Renommer cette conversation"
-        style={{ marginLeft: 8, fontSize: 14, background: "none", border: "none", cursor: "pointer" }}
-      >✏️</button>
-    </>
-  )}
-</div>
-
+                <div className="conv-pseudo">
+                  {renamingId === conv.id ? (
+                    <>
+                      <input
+                        value={newName}
+                        onChange={e => setNewName(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") handleRename(conv.id); }}
+                        autoFocus
+                        style={{ width: 120, marginRight: 6 }}
+                        maxLength={40}
+                      />
+                      <button onClick={() => handleRename(conv.id)}>OK</button>
+                      <button onClick={() => { setRenamingId(null); setNewName(""); }}>Annuler</button>
+                    </>
+                  ) : (
+                    <>
+                      {conv.nom || pseudo}
+                      <button
+                        className="rename-conv-button"
+                        onClick={e => { e.stopPropagation(); setRenamingId(conv.id); setNewName(conv.nom || ""); }}
+                        title="Renommer cette conversation"
+                        style={{ marginLeft: 8, fontSize: 14, background: "none", border: "none", cursor: "pointer" }}
+                      >✏️</button>
+                    </>
+                  )}
+                </div>
                 {unreadCount > 0 && (
                   <span className="notif-badge">{unreadCount}</span>
                 )}
@@ -211,16 +217,16 @@ const handleRename = async (id) => {
         );
       })}
 
-      {showModal && (
-        <CreateConversationModal
-          currentUserId={userId}
-          onClose={() => setShowModal(false)}
-          onCreated={(conv) => {
-            setConversations((prev) => [conv, ...prev]);
-            setShowModal(false);
-          }}
-        />
-      )}
+    {showModal && (
+  <CreateConversationModal
+    currentUserId={userId}
+    onClose={() => setShowModal(false)}
+    onCreated={() => {           // <-- PAS d'argument ici !
+      fetchConversations();      // <-- On refetch à chaque création
+      setShowModal(false);
+    }}
+  />
+)}
     </aside>
   );
 }

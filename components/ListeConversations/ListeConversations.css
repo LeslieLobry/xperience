@@ -136,3 +136,11 @@
   margin-left: 8px;
   vertical-align: middle;
 }
+
+@media screen and (max-width: 768px){
+  .liste-conversations {
+max-width: none;
+color: #e0c084;
+  }
+  
+}

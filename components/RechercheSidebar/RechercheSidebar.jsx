@@ -1,10 +1,15 @@
 "use client";
 import React, { useState, useImperativeHandle, forwardRef } from "react";
 import "./recherche-sidebar.css";
-import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal"; // adapte le chemin si besoin
+import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal";
 import { usePathname } from "next/navigation";
 import ReconnaissanceVocale from "../ReconnaissanceVocale/ReconnaissanceVocale";
-
+function normalizeToDb(val) {
+  return val
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -20,7 +25,6 @@ function useIsMobile(breakpoint = 768) {
 // Nettoie les filtres incohérents (autourDeMoi prioritaire sur localisation)
 function cleanFormFilters(formIn) {
   let form = { ...formIn };
-
   if (form.autourDeMoi) {
     form.localisation = "";
   } else if (form.localisation) {
@@ -31,8 +35,9 @@ function cleanFormFilters(formIn) {
   return form;
 }
 
+const DEFAULT_RAYON = 20;
+
 const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref) {
-  console.log("RechercheSidebar: composant MONTÉ !");
   const [form, setForm] = useState({
     pseudo: "", type: [], orientation: [], rechercheType: [],
     ageMin: "", ageMax: "", localisation: "",
@@ -42,6 +47,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
     recherches: [], envies: [], rayon: "", autourDeMoi: false
   });
   const [resumeVocal, setResumeVocal] = useState("");
+  const [loadingGeo, setLoadingGeo] = useState(false);
 
   const [openSections, setOpenSections] = useState({
     identite: false,
@@ -55,44 +61,37 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Prend en charge tout le changement des champs
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (name === "autourDeMoi") {
-      setForm((prev) => ({
-        ...prev,
-        autourDeMoi: checked,
-        localisation: checked ? "" : prev.localisation
-      }));
-      return;
-    }
-    if (name === "localisation" && value) {
-      setForm((prev) => ({
-        ...prev,
-        localisation: value,
-        autourDeMoi: false
-      }));
-      return;
-    }
-    if (type === "checkbox" && Array.isArray(form[name])) {
-      setForm((prev) => ({
-        ...prev,
-        [name]: checked ? [...prev[name], value] : prev[name].filter((v) => v !== value),
-      }));
-    } else if (type === "checkbox") {
-      setForm((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
-  };
+  // --- Centralise la gestion "recherche" pour formulaire et vocal ---
+const handleSearch = (formRaw) => {
+  const form = cleanFormFilters(formRaw);
 
-  // Soumission du formulaire classique (clic bouton ou entrée)
-  const handleSubmit = (e) => {
-  e.preventDefault();
-  console.log("RechercheSidebar : handleSubmit avec filtres", form);
-  onSearch?.(cleanFormFilters(form));
+  // Normalise toutes les valeurs de type "choix" AVANT envoi (orientation, type, rechercheType, etc.)
+  const normalizeArray = arr => (Array.isArray(arr) ? arr.map(normalizeToDb) : []);
+  form.orientation = normalizeArray(form.orientation);
+  form.type = normalizeArray(form.type);
+  form.rechercheType = normalizeArray(form.rechercheType);
+  form.recherches = normalizeArray(form.recherches);
+
+  if (form.autourDeMoi) {
+    setLoadingGeo(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const latitude = pos.coords.latitude;
+        const longitude = pos.coords.longitude;
+        const rayon = form.rayon || DEFAULT_RAYON;
+        setLoadingGeo(false);
+        onSearch?.({ ...form, latitude, longitude, rayon });
+      },
+      (err) => {
+        setLoadingGeo(false);
+        alert("Impossible de récupérer ta position");
+        onSearch?.(form); // fallback, sans geo
+      }
+    );
+  } else {
+    onSearch?.(form);
+  }
 };
-
 
   // --- Injection vocale des filtres ---
   useImperativeHandle(ref, () => ({
@@ -106,7 +105,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
             result[k] = v;
           }
         });
-        onSearch?.(cleanFormFilters(filtres));
+        handleSearch(result);
         return result;
       });
     }
@@ -125,6 +124,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
     );
   }
 
+  // --- Handler pour le submit formulaire classique ---
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    handleSearch(form);
+  };
+
   return (
     <aside className="recherche-sidebar">
       <h2>🔎 Recherche</h2>
@@ -135,7 +140,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
             const filtres = extraireFiltresVocal(texte);
             setForm(prev => ({ ...prev, ...filtres }));
             console.log("[Vocal] Filtres extraits:", filtres);
-            onSearch?.(cleanFormFilters(filtres));
+            handleSearch({ ...form, ...filtres });
           }}
         /> */}
         {resumeVocal && (
@@ -155,6 +160,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
             <span style={{ opacity: 0.7 }}>Recherche vocale&nbsp;:</span> «&nbsp;{resumeVocal}&nbsp;»
           </div>
         )}
+        {loadingGeo && (
+          <div style={{ color: "#e0c084", fontWeight: 600, marginBottom: 8 }}>
+            ⏳ Récupération de ta position...
+          </div>
+        )}
       </div>
       <form onSubmit={handleSubmit}>
         {/* PSEUDO */}
@@ -170,7 +180,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
         {/* IDENTITÉ */}
         <Section title="Identité" open={openSections.identite} toggle={() => toggleSection("identite")}>
           {renderCheckboxGroup("Type", "type", ["Homme", "Femme", "Couple", "Groupe"])}
-          {renderCheckboxGroup("Orientation", "orientation", ["Hétéro", "Bi", "Pan", "Ouvert"])}
+          {renderCheckboxGroup("Orientation", "orientation", ["Hétéro", "Bi", "Pan", "Ouvert", "Lesbienne"])}
           {renderCheckboxGroup("Type de recherche", "rechercheType", [
             "Je le garde pour moi", "Virtuel uniquement", "Virtuel et peut-être plus",
             "Réel seulement", "Réel & Virtuel", "Je ne sais pas, c’est à voir",
@@ -243,10 +253,42 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
           <label><input type="radio" name="statut" value="all" checked={form.statut === "all"} onChange={handleChange} />Tous</label>
           <label><input type="radio" name="statut" value="en_ligne" checked={form.statut === "en_ligne"} onChange={handleChange} />En ligne</label>
         </Section>
-        <button type="submit" className="recherche-button">Rechercher</button>
+        <button type="submit" className="recherche-button" disabled={loadingGeo}>
+          {loadingGeo ? "Recherche..." : "Rechercher"}
+        </button>
       </form>
     </aside>
   );
+
+  function handleChange(e) {
+    const { name, value, type, checked } = e.target;
+    if (name === "autourDeMoi") {
+      setForm((prev) => ({
+        ...prev,
+        autourDeMoi: checked,
+        localisation: checked ? "" : prev.localisation
+      }));
+      return;
+    }
+    if (name === "localisation" && value) {
+      setForm((prev) => ({
+        ...prev,
+        localisation: value,
+        autourDeMoi: false
+      }));
+      return;
+    }
+    if (type === "checkbox" && Array.isArray(form[name])) {
+      setForm((prev) => ({
+        ...prev,
+        [name]: checked ? [...prev[name], value] : prev[name].filter((v) => v !== value),
+      }));
+    } else if (type === "checkbox") {
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
+  }
 
   function renderCheckboxGroup(title, name, options) {
     return (

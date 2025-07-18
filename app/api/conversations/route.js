@@ -44,10 +44,45 @@ export async function POST(req) {
       const idsSorted = conv.participants.map((p) => p.utilisateurId).sort();
       return JSON.stringify(idsSorted) === JSON.stringify(inputIdsSorted);
     });
-
-    if (existingConversation) {
-      return NextResponse.json({ conversation: existingConversation, existed: true });
-    }
+if (existingConversation) {
+  // Vérifie si currentUser a supprimé sa participation (soft delete)
+  const myParticipant = existingConversation.participants.find(
+    (p) => p.utilisateurId === currentUser.id
+  );
+  if (myParticipant && myParticipant.supprimé) {
+    // On restaure ce participant !
+    await prisma.participant.update({
+      where: { id: myParticipant.id },
+      data: { supprimé: false },
+    });
+    // Recharge la conv à jour (participants et messages)
+    const restoredConv = await prisma.conversation.findUnique({
+      where: { id: existingConversation.id },
+      include: {
+        participants: {
+          include: {
+            utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
+          },
+        },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            contenu: true,
+            type: true,
+            createdAt: true,
+            auteurId: true,
+            lu: true,
+          },
+        },
+      },
+    });
+    return NextResponse.json({ conversation: restoredConv, existed: true, restored: true });
+  }
+  // Sinon, conv déjà active
+  return NextResponse.json({ conversation: existingConversation, existed: true });
+}
 
     const conversation = await prisma.conversation.create({
       data: {

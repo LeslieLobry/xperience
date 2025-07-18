@@ -18,7 +18,7 @@ const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), { ssr: false }
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 let Room, createLocalTracks;
 
-export default function ChatBox({ conversationId, utilisateur }) {
+export default function ChatBox({ conversationId, utilisateur,onBack, }) {
   const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inCall, setInCall] = useState(false);
@@ -406,6 +406,7 @@ const handleAddParticipant = async () => {
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}
         onAddParticipant={() => setShowAddParticipant(true)}
+        onBack={onBack}
       />
 
       {/* TIMER D'APPEL */}

@@ -40,9 +40,9 @@ export default function CreateConversationModal({ currentUserId, onClose, onCrea
 
     const data = await res.json();
 
-    if (res.ok) {
-      onCreated(data.conversation);
-      onClose();
+   if (res.ok) {
+  onCreated();  
+  onClose();
     } else {
       setErreur(data.error || "Erreur");
     }

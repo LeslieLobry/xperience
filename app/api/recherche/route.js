@@ -98,7 +98,11 @@ export async function GET(req) {
       },
     }),
     ...(type.length && { type: { in: type } }),
-    ...(orientation.length && { orientation: { in: orientation } }),
+    ...(orientation.length && {
+  OR: orientation.map((o) => ({
+    orientation: { equals: o, mode: "insensitive" }
+  }))
+}),
     ...(rechercheType.length && { rechercheType: { in: rechercheType } }),
     ...(experience.length && { experience: { in: experience } }),
     ...(fumeur.length && { fumeur: { in: fumeur } }),
