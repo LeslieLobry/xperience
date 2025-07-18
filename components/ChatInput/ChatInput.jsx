@@ -502,30 +502,39 @@ export default function ChatInput({
           )}
 
           {/* Aperçu audio */}
-          {audioUrl && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginLeft: 8,
-              }}
-            >
-              <audio controls src={audioUrl} style={{ marginRight: 8 }} />
-              <button
-                type="button"
-                onClick={removeAudioPreview}
-                title="Supprimer l'audio"
-                style={{
-                  color: "#d00",
-                  fontSize: 18,
-                  border: "none",
-                  background: "none",
-                }}
-              >
-                ×
-              </button>
-            </div>
-          )}
+       {audioBlob && !isRecording && (
+  <div
+    className="audio-file-ready"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      marginLeft: 8,
+      background: "#f7f7f7",
+      borderRadius: 8,
+      padding: "6px 14px",
+      marginBottom: 4,
+      fontSize: 15,
+    }}
+  >
+    <span role="img" aria-label="audio" style={{ fontSize: 22, marginRight: 8 }}>🎤</span>
+    <span>Message audio prêt à envoyer</span>
+    <button
+      type="button"
+      onClick={removeAudioPreview}
+      title="Supprimer l'audio"
+      style={{
+        color: "#d00",
+        fontSize: 18,
+        border: "none",
+        background: "none",
+        marginLeft: 12,
+        cursor: "pointer"
+      }}
+    >
+      ×
+    </button>
+  </div>
+)}
           {/* Bouton prendre photo */}
           {/* <button
             type="button"
