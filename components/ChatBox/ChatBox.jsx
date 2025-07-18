@@ -233,21 +233,13 @@ const startTimer = () => {
     const token = data.token;
     const newRoom = new Room();
     setRoom(newRoom);
-newRoom.on("trackSubscribed", (track, publication, participant) => {
-  // Ajoute cette ligne juste avant le setRemoteTracks :
-  const remoteUser = participantsAutres.find(u => `user_${u.id}` === participant.identity);
 
-  setRemoteTracks((prev) => [
-    ...prev.filter((t) => t.id !== participant.identity),
-    {
-      id: participant.identity,
-      pseudo: remoteUser?.pseudo || participant.identity,
-      photoUrl: remoteUser?.photoUrl || null,
-      track
-    }
-  ]);
-});
-
+    newRoom.on("trackSubscribed", (track, publication, participant) => {
+      setRemoteTracks((prev) => [
+        ...prev.filter((t) => t.id !== participant.identity),
+        { id: participant.identity, nom: participant.identity, track },
+      ]);
+    });
 
     newRoom.on("trackUnsubscribed", (_, __, participant) => {
       setRemoteTracks((prev) => prev.filter((t) => t.id !== participant.identity));
@@ -282,11 +274,126 @@ newRoom.on("trackSubscribed", (track, publication, participant) => {
   };
 
   const [recording, setRecording] = useState(false);
-  const startRecording = async () => { /* ... inchangé ... */ };
-  const stopRecording = () => { /* ... inchangé ... */ };
-  const handleDelete = async (messageId) => { /* ... inchangé ... */ };
-  const handleAddParticipant = async () => { /* ... inchangé ... */ };
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunks.current = [];
 
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunks.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
+
+        const duree = await new Promise((resolve) => {
+          const audio = document.createElement("audio");
+          audio.src = URL.createObjectURL(audioBlob);
+          audio.preload = "metadata";
+
+          let resolved = false;
+
+          audio.onloadedmetadata = () => {
+            if (audio.duration === Infinity) {
+              audio.currentTime = 1e101;
+              audio.ontimeupdate = () => {
+                audio.ontimeupdate = null;
+                let seconds = audio.duration;
+                if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+                  resolve("0:00");
+                } else {
+                  const m = Math.floor(seconds / 60);
+                  const s = Math.floor(seconds % 60);
+                  const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+                  console.log("[AUDIO] HACKED duration:", seconds, dureeStr);
+                  resolve(dureeStr);
+                }
+                URL.revokeObjectURL(audio.src);
+                resolved = true;
+              };
+            } else {
+              let seconds = audio.duration;
+              if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+                resolve("0:00");
+              } else {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                const dureeStr = `${m}:${s < 10 ? "0" + s : s}`;
+                console.log("[AUDIO] duration:", seconds, dureeStr);
+                resolve(dureeStr);
+              }
+              URL.revokeObjectURL(audio.src);
+              resolved = true;
+            }
+          };
+
+          setTimeout(() => {
+            if (!resolved) {
+              resolve("0:00");
+              URL.revokeObjectURL(audio.src);
+            }
+          }, 3000);
+        });
+
+        const formData = new FormData();
+        formData.append("audio", audioBlob);
+        formData.append("conversationId", conversationId);
+        formData.append("type", "AUDIO");
+        formData.append("duree", duree);
+
+        const res = await fetch("/api/messages/audio", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.success) setMessages((prev) => [...prev, data.message]);
+      };
+
+      mediaRecorderRef.current.start();
+      setRecording(true);
+    } catch (err) {
+      console.error("Erreur enregistrement :", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+    }
+  };
+ const handleDelete = async (messageId) => {
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
+      if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch (err) {
+      console.error("Erreur suppression message :", err);
+    }
+  };
+const handleAddParticipant = async () => {
+  setAddUserError("");
+  if (!addUserInput.trim()) return setAddUserError("Champ vide !");
+  setAddUserLoading(true);
+  try {
+    const res = await fetch(`/api/conversations/${conversationId}/add-participant`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
+    });
+    const data = await res.json();
+    setAddUserLoading(false);
+    if (data.success) {
+      setShowAddParticipant(false);
+      setAddUserInput("");
+      setAddUserError("");
+      window.location.reload();
+    } else {
+      setAddUserError(data.error || "Erreur lors de l'ajout.");
+    }
+  } catch (err) {
+    setAddUserLoading(false);
+    setAddUserError("Erreur réseau.");
+  }
+};
   return (
     <div className="chatbox-container">
       <ChatHeader
@@ -326,15 +433,14 @@ newRoom.on("trackSubscribed", (track, publication, participant) => {
         </div>
       )}
 
-     {inCall && (
-  <VideoCallView
-    inCall={inCall}
-    remoteTracks={remoteTracks}
-    startCall={startCall}
-    hangupCall={hangupCall}
-  />
-)}
-
+      {inCall && !!window.localVideoTrack && (
+        <VideoCallView
+          inCall={inCall}
+          remoteTracks={remoteTracks}
+          startCall={startCall}
+          hangupCall={hangupCall}
+        />
+      )}
 
       <MessagesList
         messages={messages}

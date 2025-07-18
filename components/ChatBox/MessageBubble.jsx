@@ -165,7 +165,10 @@ if (msg.type === "SYSTEME") {
       {isOwn && (
         <button
           className="delete-message-button"
-          onClick={() => onDelete?.(msg.id)}
+          onClick={() => {
+  console.log('Suppression', msg.id);  // Ajoute ce log pour tester
+  onDelete?.(msg.id)
+}}
           title="Supprimer ce message"
         >
           🗑️

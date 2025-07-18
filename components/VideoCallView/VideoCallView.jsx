@@ -6,13 +6,25 @@ export default function VideoCallView({ inCall, remoteTracks }) {
   const localVideoRef = useRef(null);
 
   // Attach local video
-  useEffect(() => {
-    const videoEl = localVideoRef.current;
-    const localTrack = window.localVideoTrack;
-    if (videoEl && localTrack && localTrack.kind === "video") {
-      localTrack.attach(videoEl);
+useEffect(() => {
+  const videoEl = localVideoRef.current;
+  const localTrack = window.localVideoTrack;
+  console.log("[VideoCallView] Attaching local video:", localTrack);
+
+  if (!videoEl) return;
+
+  // Réinitialise le flux avant tout nouvel attach
+  if (videoEl.srcObject) videoEl.srcObject = null;
+
+  if (localTrack && localTrack.kind === "video") {
+    if (typeof localTrack.attach === "function") {
+      localTrack.attach(videoEl); // LiveKit style
+    } else if (localTrack.mediaStream) {
+      videoEl.srcObject = localTrack.mediaStream; // WebRTC natif
     }
-  }, [inCall]);
+  }
+}, [inCall, window.localVideoTrack]);
+
 
   // Attach remote tracks
   useEffect(() => {
