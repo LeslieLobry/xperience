@@ -37,10 +37,9 @@ export default function VideoCallView({ inCall, remoteTracks }) {
   const audioParticipants = remoteTracks
     .filter(t => t.track.kind === "audio")
     .map(({ id, pseudo, photoUrl }) => ({ id, pseudo, photoUrl }));
-
-  return (
+ const showLocalVideo = !!window.localVideoTrack && window.localVideoTrack.kind === "video";
+    return (
     <div className="video-call-container">
-
       {/* Remote video tracks */}
       {remoteTracks.filter(t => t.track.kind === "video").map(({ id, pseudo, photoUrl }) => (
         <div className="remote-video-wrapper" key={id}>
@@ -59,7 +58,7 @@ export default function VideoCallView({ inCall, remoteTracks }) {
         </div>
       ))}
 
-      {/* Remote audio tracks (toujours, même pour vidéo) */}
+      {/* Remote audio tracks */}
       {remoteTracks.filter(t => t.track.kind === "audio").map(({ id }) => (
         <audio
           key={id}
@@ -92,18 +91,20 @@ export default function VideoCallView({ inCall, remoteTracks }) {
         </div>
       )}
 
-      {/* Local video (affiché même en audio, pour cohérence UI) */}
-      <div className="local-video-fixed">
-        <video
-          id="local-video"
-          ref={localVideoRef}
-          autoPlay
-          muted
-          playsInline
-          className="local-video"
-        />
-        <div className="video-label local">Moi</div>
-      </div>
+      {/* Local video (visible seulement si vidéo activée) */}
+      {showLocalVideo && (
+        <div className="local-video-fixed">
+          <video
+            id="local-video"
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="local-video"
+          />
+          <div className="video-label local">Moi</div>
+        </div>
+      )}
     </div>
   );
 }
