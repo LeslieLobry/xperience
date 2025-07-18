@@ -294,33 +294,49 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     startTimer(); // <-- Timer démarré à chaque appel lancé
   };
 
-  const hangupCall = () => {
-    if (room) {
-      // Si c'est 1v1 (participantsAutres.length === 1)
-      if (participantsAutres && participantsAutres.length === 1) {
-        const otherId = participantsAutres[0]?.id;
-        if (otherId && utilisateur.id !== otherId) {
-          ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
-            from: utilisateur,
-            room: conversationId,
-          });
-        }
+const hangupCall = () => {
+  if (room) {
+    if (participantsAutres && participantsAutres.length === 1) {
+      const otherId = participantsAutres[0]?.id;
+      if (otherId && utilisateur.id !== otherId) {
+        ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
+          from: utilisateur,
+          room: conversationId,
+        });
       }
-      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
-      room.disconnect();
-      setRoom(null);
-      setRemoteTracks([]);
-      setInCall(false);
-      stopTimer();
-      if (window.localVideoTrack) {
-        window.localVideoTrack.stop();
-        delete window.localVideoTrack;
-      }
-    } else {
-      setInCall(false);
-      stopTimer();
     }
-  };
+    room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
+    room.disconnect();
+    setRoom(null);
+    setRemoteTracks([]);
+    setInCall(false);
+    stopTimer();
+    stopAllMediaStreams(); // <--- 👈 nettoie tout proprement
+  } else {
+    setInCall(false);
+    stopTimer();
+    stopAllMediaStreams();
+  }
+};
+
+function stopAllMediaStreams() {
+  // Arrête tous les tracks des <video> et <audio>
+  document.querySelectorAll("video, audio").forEach((el) => {
+    if (el.srcObject && el.srcObject.getTracks) {
+      el.srcObject.getTracks().forEach((track) => track.stop());
+      el.srcObject = null;
+    }
+  });
+  // Arrête aussi les flux stockés en variable globale
+  if (window.localStream && window.localStream.getTracks) {
+    window.localStream.getTracks().forEach((track) => track.stop());
+    window.localStream = null;
+  }
+  if (window.localVideoTrack) {
+    window.localVideoTrack.stop();
+    delete window.localVideoTrack;
+  }
+}
 
   // --------------------- ENREGISTREMENT AUDIO ----------------------
 
