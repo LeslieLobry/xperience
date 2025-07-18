@@ -5,7 +5,9 @@ import { resend } from "../../../lib/resend";
 import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
-import { Realtime } from "ably";
+import Ably from "ably/promises";
+const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
+
 
 // Config S3
 const s3 = new S3Client({
@@ -16,7 +18,7 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
-const ably = new Realtime(process.env.ABLY_API_KEY_SERVER);
+
 
 
 export async function POST(req) {
