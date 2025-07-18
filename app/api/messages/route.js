@@ -16,7 +16,7 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
-const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+const ably = new Realtime(process.env.ABLY_API_KEY_SERVER);
 
 
 export async function POST(req) {
