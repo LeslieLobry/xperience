@@ -45,13 +45,14 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const audioChunks = useRef([]);
   const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
-const audioContextRef = useRef(null);
-const mediaStreamRef = useRef(null);
-const scriptProcessorRef = useRef(null);
-const audioDataRef = useRef({
-  buffer: [],
-  length: 0,
-});
+  const audioContextRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const scriptProcessorRef = useRef(null);
+  const audioDataRef = useRef({
+    buffer: [],
+    length: 0,
+  });
+
   // --------------------- HOOKS (à placer AVANT les useEffect qui les utilisent) ----------------------
   const {
     messages,
@@ -68,7 +69,6 @@ const audioDataRef = useRef({
 
   // --------------------- USEEFFECTS ----------------------
 
-  // Listen notifications d'appel entrant (Ably)
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -89,7 +89,6 @@ const audioDataRef = useRef({
     };
   }, [utilisateur?.id, appelEntrant, inCall]);
 
-  // Listen "call:accepted"
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -109,7 +108,6 @@ const audioDataRef = useRef({
     };
   }, [utilisateur?.id]);
 
-  // Listen "call:refused"
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -129,7 +127,6 @@ const audioDataRef = useRef({
     };
   }, [utilisateur?.id]);
 
-  // Listen "call:busy"
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -149,7 +146,6 @@ const audioDataRef = useRef({
     };
   }, [utilisateur?.id]);
 
-  // Listen "call:hangup"
   useEffect(() => {
     if (!utilisateur?.id) return;
     const channel = ably.channels.get(`notification-${utilisateur.id}`);
@@ -162,9 +158,8 @@ const audioDataRef = useRef({
     return () => {
       channel.unsubscribe("call:hangup", handleCallHangup);
     };
-  }, [utilisateur?.id, participantsAutres?.length]); // SAFE
+  }, [utilisateur?.id, participantsAutres?.length]);
 
-  // Fetch prénoms couple
   useEffect(() => {
     if (utilisateur.type !== "couple" || !conversationId) {
       setPrenomsCouple(null);
@@ -213,231 +208,241 @@ const audioDataRef = useRef({
   // --------------------- APPEL LIVEKIT ----------------------
 
   const startCall = async (video = true, initiateur = true) => {
-  if (inCall) {
-    participantsAutres.forEach((p) => {
-      if (p.id !== utilisateur.id) {
-        ably.channels.get(`notification-${p.id}`).publish("call:busy", {
-          from: utilisateur,
-          room: conversationId,
+    if (inCall) {
+      participantsAutres.forEach((p) => {
+        if (p.id !== utilisateur.id) {
+          ably.channels.get(`notification-${p.id}`).publish("call:busy", {
+            from: utilisateur,
+            room: conversationId,
+          });
+        }
+      });
+      return;
+    }
+
+    if (!Room || !createLocalTracks) {
+      const livekit = await import("livekit-client");
+      Room = livekit.Room;
+      createLocalTracks = livekit.createLocalTracks;
+    }
+
+    if (initiateur) {
+      participantsAutres
+        .filter((p) => p.id !== utilisateur.id)
+        .forEach((p) => {
+          ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
+            from: utilisateur,
+            room: conversationId,
+            type: video ? "video" : "audio",
+          });
         });
+    }
+
+    const res = await fetch("/api/livekit/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identity: `user_${utilisateur.id}`,
+        room: conversationId,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.token) {
+      console.error("❌ Erreur token LiveKit :", data);
+      return;
+    }
+
+    const token = data.token;
+    const newRoom = new Room();
+    setRoom(newRoom);
+
+    newRoom.on("participantConnected", (participant) => {
+      console.log("[LiveKit] participantConnected", participant.identity);
+    });
+
+    newRoom.on("participantDisconnected", (participant) => {
+      console.log("[LiveKit] participantDisconnected", participant.identity);
+    });
+
+    newRoom.on("trackSubscribed", (track, publication, participant) => {
+      const id = participant.identity + '-' + track.kind;
+      setRemoteTracks((prev) => [
+        ...prev.filter((t) => t.id !== id),
+        { id, nom: participant.identity, track },
+      ]);
+    });
+
+    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+      const id = participant.identity + '-' + track.kind;
+      setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
+    });
+
+    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
+
+    const localTracks = await createLocalTracks({ audio: true, video });
+
+    // Stockage global de la vidéo locale pour le composant vidéo
+    const localVideoTrack = localTracks.find(t => t.kind === "video");
+    if (localVideoTrack) {
+      window.localVideoTrack = localVideoTrack;
+    }
+
+    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+
+    setInCall(true);
+    startTimer();
+  };
+
+
+  const hangupCall = () => {
+    if (room) {
+      if (participantsAutres && participantsAutres.length === 1) {
+        const otherId = participantsAutres[0]?.id;
+        if (otherId && utilisateur.id !== otherId) {
+          ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
+            from: utilisateur,
+            room: conversationId,
+          });
+        }
+      }
+
+      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
+
+      // ATTEND la déconnexion avant cleanup
+      room.disconnect().then(() => {
+        setRoom(null);
+        setRemoteTracks([]);
+        setInCall(false);
+        stopTimer();
+        stopAllMediaStreams();
+      });
+
+    } else {
+      setInCall(false);
+      stopTimer();
+      stopAllMediaStreams();
+    }
+  };
+
+  function stopAllMediaStreams() {
+    document.querySelectorAll("video, audio").forEach((el) => {
+      if (el.srcObject && el.srcObject.getTracks) {
+        el.srcObject.getTracks().forEach((track) => track.stop());
+        el.srcObject = null;
       }
     });
-    return;
-  }
-
-  if (!Room || !createLocalTracks) {
-    const livekit = await import("livekit-client");
-    Room = livekit.Room;
-    createLocalTracks = livekit.createLocalTracks;
-  }
-
-  // 🔴 Évite de publier un nouvel appel si on est en réponse d'un appel existant
-  if (initiateur) {
-    participantsAutres
-      .filter((p) => p.id !== utilisateur.id)
-      .forEach((p) => {
-        ably.channels.get(`notification-${p.id}`).publish("call:incoming", {
-          from: utilisateur,
-          room: conversationId,
-          type: video ? "video" : "audio",
-        });
-      });
-  }
-
-  const res = await fetch("/api/livekit/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      identity: `user_${utilisateur.id}`,
-      room: conversationId,
-    }),
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.token) {
-    console.error("❌ Erreur token LiveKit :", data);
-    return;
-  }
-
-  const token = data.token;
-  const newRoom = new Room();
-  setRoom(newRoom);
-
-  newRoom.on("participantConnected", (participant) => {
-    console.log("[LiveKit] participantConnected", participant.identity);
-  });
-
-  newRoom.on("participantDisconnected", (participant) => {
-    console.log("[LiveKit] participantDisconnected", participant.identity);
-  });
-
-  newRoom.on("trackSubscribed", (track, publication, participant) => {
-    const id = participant.identity + '-' + track.kind;
-    setRemoteTracks((prev) => [
-      ...prev.filter((t) => t.id !== id),
-      { id, nom: participant.identity, track },
-    ]);
-  });
-
-  newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-    const id = participant.identity + '-' + track.kind;
-    setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
-  });
- await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
-  const localTracks = await createLocalTracks({ audio: true, video });
-  localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-   setInCall(true);
-  startTimer();
-};
-
-
-const hangupCall = () => {
-  if (room) {
-    if (participantsAutres && participantsAutres.length === 1) {
-      const otherId = participantsAutres[0]?.id;
-      if (otherId && utilisateur.id !== otherId) {
-        ably.channels.get(`notification-${otherId}`).publish("call:hangup", {
-          from: utilisateur,
-          room: conversationId,
-        });
-      }
+    if (window.localStream && window.localStream.getTracks) {
+      window.localStream.getTracks().forEach((track) => track.stop());
+      window.localStream = null;
     }
-    room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
-    room.disconnect();
-    setRoom(null);
-    setRemoteTracks([]);
-    setInCall(false);
-    stopTimer();
-    stopAllMediaStreams(); 
-  } else {
-    setInCall(false);
-    stopTimer();
-    stopAllMediaStreams();
-  }
-};
-
-function stopAllMediaStreams() {
-  document.querySelectorAll("video, audio").forEach((el) => {
-    if (el.srcObject && el.srcObject.getTracks) {
-      el.srcObject.getTracks().forEach((track) => track.stop());
-      el.srcObject = null;
+    if (window.localVideoTrack) {
+      window.localVideoTrack.stop();
+      delete window.localVideoTrack;
     }
-  });
-  // Arrête aussi les flux stockés en variable globale
-  if (window.localStream && window.localStream.getTracks) {
-    window.localStream.getTracks().forEach((track) => track.stop());
-    window.localStream = null;
   }
-  if (window.localVideoTrack) {
-    window.localVideoTrack.stop();
-    delete window.localVideoTrack;
-  }
-}
 
+  // --------------------- ENREGISTREMENT AUDIO ----------------------
 
-// --------------------- ENREGISTREMENT AUDIO ----------------------
+  const startRecording = async () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioContextRef.current = new AudioContext();
 
-const startRecording = async () => {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    audioContextRef.current = new AudioContext();
+      mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const source = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+      scriptProcessorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
-    mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const source = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
-    scriptProcessorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+      source.connect(scriptProcessorRef.current);
+      scriptProcessorRef.current.connect(audioContextRef.current.destination);
 
-    source.connect(scriptProcessorRef.current);
-    scriptProcessorRef.current.connect(audioContextRef.current.destination);
+      audioDataRef.current = { buffer: [], length: 0 };
+
+      scriptProcessorRef.current.onaudioprocess = (event) => {
+        const channelData = event.inputBuffer.getChannelData(0);
+        audioDataRef.current.buffer.push(new Float32Array(channelData));
+        audioDataRef.current.length += channelData.length;
+      };
+
+      setRecording(true);
+    } catch (err) {
+      console.error("Erreur démarrage enregistrement :", err);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!audioContextRef.current) return;
+
+    scriptProcessorRef.current.disconnect();
+    audioContextRef.current.close();
+
+    mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+
+    const flatBuffer = flattenBuffers(audioDataRef.current.buffer, audioDataRef.current.length);
+    const sampleRate = audioContextRef.current.sampleRate || 44100;
+    const wavBlob = encodeWAV(flatBuffer, sampleRate);
 
     audioDataRef.current = { buffer: [], length: 0 };
+    setRecording(false);
 
-    scriptProcessorRef.current.onaudioprocess = (event) => {
-      const channelData = event.inputBuffer.getChannelData(0);
-      audioDataRef.current.buffer.push(new Float32Array(channelData));
-      audioDataRef.current.length += channelData.length;
-    };
+    const formData = new FormData();
+    formData.append("audio", wavBlob, "recording.wav");
+    formData.append("conversationId", conversationId);
+    formData.append("type", "AUDIO");
 
-    setRecording(true);
-  } catch (err) {
-    console.error("Erreur démarrage enregistrement :", err);
+    try {
+      await fetch("/api/messages/audio", { method: "POST", body: formData });
+    } catch (e) {
+      console.error("Erreur upload audio :", e);
+    }
+  };
+
+  function flattenBuffers(buffers, length) {
+    const result = new Float32Array(length);
+    let offset = 0;
+    buffers.forEach((buffer) => {
+      result.set(buffer, offset);
+      offset += buffer.length;
+    });
+    return result;
   }
-};
 
-const stopRecording = async () => {
-  if (!audioContextRef.current) return;
+  function encodeWAV(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
 
-  scriptProcessorRef.current.disconnect();
-  audioContextRef.current.close();
+    function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
 
-  mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+    writeString(view, 0, "RIFF");
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(view, 8, "WAVE");
+    writeString(view, 12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, "data");
+    view.setUint32(40, samples.length * 2, true);
 
-  const flatBuffer = flattenBuffers(audioDataRef.current.buffer, audioDataRef.current.length);
-  const sampleRate = audioContextRef.current.sampleRate || 44100;
-  const wavBlob = encodeWAV(flatBuffer, sampleRate);
+    floatTo16BitPCM(view, 44, samples);
 
-  audioDataRef.current = { buffer: [], length: 0 };
-  setRecording(false);
-
-  const formData = new FormData();
-  formData.append("audio", wavBlob, "recording.wav");
-  formData.append("conversationId", conversationId);
-  formData.append("type", "AUDIO");
-
-  try {
-    await fetch("/api/messages/audio", { method: "POST", body: formData });
-  } catch (e) {
-    console.error("Erreur upload audio :", e);
+    return new Blob([view], { type: "audio/wav" });
   }
-};
 
-function flattenBuffers(buffers, length) {
-  const result = new Float32Array(length);
-  let offset = 0;
-  buffers.forEach((buffer) => {
-    result.set(buffer, offset);
-    offset += buffer.length;
-  });
-  return result;
-}
-
-function encodeWAV(samples, sampleRate) {
-  const buffer = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buffer);
-
-  function writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
+  function floatTo16BitPCM(output, offset, input) {
+    for (let i = 0; i < input.length; i++, offset += 2) {
+      let s = Math.max(-1, Math.min(1, input[i]));
+      s = s < 0 ? s * 0x8000 : s * 0x7fff;
+      output.setInt16(offset, s, true);
     }
   }
-
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, 1, true); // mono channel
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); // byte rate
-  view.setUint16(32, 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
-  writeString(view, 36, "data");
-  view.setUint32(40, samples.length * 2, true);
-
-  floatTo16BitPCM(view, 44, samples);
-
-  return new Blob([view], { type: "audio/wav" });
-}
-
-function floatTo16BitPCM(output, offset, input) {
-  for (let i = 0; i < input.length; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, input[i]));
-    s = s < 0 ? s * 0x8000 : s * 0x7fff;
-    output.setInt16(offset, s, true);
-  }
-}
-
-
 
   // --------------------- HANDLERS MESSAGES ----------------------
 
@@ -490,14 +495,22 @@ function floatTo16BitPCM(output, offset, input) {
         onBack={onBack}
       />
 
-      {/* TIMER D'APPEL */}
       {inCall && (
-        <div className="call-timer" style={{
-          position: "absolute",
-          left: 0, right: 0, top: 25, textAlign: "center",
-          fontWeight: 500, color: "#7d5d2a", fontSize: "1.1em",
-          zIndex: 20, letterSpacing: "1px"
-        }}>
+        <div
+          className="call-timer"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 25,
+            textAlign: "center",
+            fontWeight: 500,
+            color: "#7d5d2a",
+            fontSize: "1.1em",
+            zIndex: 20,
+            letterSpacing: "1px",
+          }}
+        >
           ⏱️ {callDuration}
         </div>
       )}
@@ -540,7 +553,10 @@ function floatTo16BitPCM(output, offset, input) {
       />
 
       {isTyping && typingPseudo && (
-        <div className="typing-notif" style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}>
+        <div
+          className="typing-notif"
+          style={{ color: "#888", fontStyle: "italic", margin: "0 0 4px 8px" }}
+        >
           {typingPseudo} est en train d&apos;écrire...
         </div>
       )}
@@ -581,22 +597,22 @@ function floatTo16BitPCM(output, offset, input) {
 
       <NotificationAppelEntrant
         appel={appelEntrant && appelEntrant.from?.id !== utilisateur.id ? appelEntrant : null}
-onAccepter={(type) => {
-  clearTimeout(appelTimeoutRef.current);
-  setAppelEntrant(null);
-  sonnerieRef.current?.pause();
-  sonnerieRef.current.currentTime = 0;
-  if (appelEntrant?.from?.id) {
-    ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
-      from: utilisateur,
-      room: conversationId,
-      type,
-    });
-  }
-  startCall(type === "video", false); // <-- Ici initiateur = false (appel entrant)
-  setInCall(true);
-  startTimer();
-}}
+        onAccepter={(type) => {
+          clearTimeout(appelTimeoutRef.current);
+          setAppelEntrant(null);
+          sonnerieRef.current?.pause();
+          sonnerieRef.current.currentTime = 0;
+          if (appelEntrant?.from?.id) {
+            ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
+              from: utilisateur,
+              room: conversationId,
+              type,
+            });
+          }
+          startCall(type === "video", false);
+          setInCall(true);
+          startTimer();
+        }}
         onRefuser={() => {
           clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
