@@ -206,23 +206,27 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
   // --------------------- APPEL LIVEKIT ----------------------
 
-  const startCall = async (video = true) => {
-    if (inCall) {
-      participantsAutres.forEach((p) => {
-        if (p.id !== utilisateur.id) {
-          ably.channels.get(`notification-${p.id}`).publish("call:busy", {
-            from: utilisateur,
-            room: conversationId,
-          });
-        }
-      });
-      return;
-    }
-    if (!Room || !createLocalTracks) {
-      const livekit = await import("livekit-client");
-      Room = livekit.Room;
-      createLocalTracks = livekit.createLocalTracks;
-    }
+  const startCall = async (video = true, initiateur = true) => {
+  if (inCall) {
+    participantsAutres.forEach((p) => {
+      if (p.id !== utilisateur.id) {
+        ably.channels.get(`notification-${p.id}`).publish("call:busy", {
+          from: utilisateur,
+          room: conversationId,
+        });
+      }
+    });
+    return;
+  }
+
+  if (!Room || !createLocalTracks) {
+    const livekit = await import("livekit-client");
+    Room = livekit.Room;
+    createLocalTracks = livekit.createLocalTracks;
+  }
+
+  // 🔴 Évite de publier un nouvel appel si on est en réponse d'un appel existant
+  if (initiateur) {
     participantsAutres
       .filter((p) => p.id !== utilisateur.id)
       .forEach((p) => {
@@ -232,67 +236,55 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           type: video ? "video" : "audio",
         });
       });
+  }
 
-    const res = await fetch("/api/livekit/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        identity: `user_${utilisateur.id}`,
-        room: conversationId,
-      }),
-    });
+  const res = await fetch("/api/livekit/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      identity: `user_${utilisateur.id}`,
+      room: conversationId,
+    }),
+  });
 
-    const data = await res.json();
-    if (!res.ok || !data.token) {
-      console.error("❌ Erreur token LiveKit :", data);
-      return;
-    }
+  const data = await res.json();
+  if (!res.ok || !data.token) {
+    console.error("❌ Erreur token LiveKit :", data);
+    return;
+  }
 
-    const token = data.token;
-    const newRoom = new Room();
-    setRoom(newRoom);
+  const token = data.token;
+  const newRoom = new Room();
+  setRoom(newRoom);
 
-    // === LOG les événements de la room
-    newRoom.on("participantConnected", (participant) => {
-      console.log("[LiveKit] participantConnected", participant.identity);
-    });
-    newRoom.on("participantDisconnected", (participant) => {
-      console.log("[LiveKit] participantDisconnected", participant.identity);
-    });
+  newRoom.on("participantConnected", (participant) => {
+    console.log("[LiveKit] participantConnected", participant.identity);
+  });
 
-    newRoom.on("trackSubscribed", (track, publication, participant) => {
-      const id = participant.identity + '-' + track.kind;
-      console.log("[LiveKit] trackSubscribed", { id, kind: track.kind, participant: participant.identity, track });
-      setRemoteTracks((prev) => [
-        ...prev.filter((t) => t.id !== id), // << ID unique !
-        { id, nom: participant.identity, track }, // << ID unique !
-      ]);
-    });
+  newRoom.on("participantDisconnected", (participant) => {
+    console.log("[LiveKit] participantDisconnected", participant.identity);
+  });
 
-    newRoom.on("trackUnsubscribed", (track, publication, participant) => {
-      const id = participant.identity + '-' + track.kind;
-      console.log("[LiveKit] trackUnsubscribed", { id, kind: track.kind, participant: participant.identity, track });
-      setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
-    });
+  newRoom.on("trackSubscribed", (track, publication, participant) => {
+    const id = participant.identity + '-' + track.kind;
+    setRemoteTracks((prev) => [
+      ...prev.filter((t) => t.id !== id),
+      { id, nom: participant.identity, track },
+    ]);
+  });
 
-    const localTracks = await createLocalTracks({ audio: true, video });
-    console.log("[startCall] localTracks (créés):", localTracks, "user:", utilisateur.id);
+  newRoom.on("trackUnsubscribed", (track, publication, participant) => {
+    const id = participant.identity + '-' + track.kind;
+    setRemoteTracks((prev) => prev.filter((t) => t.id !== id));
+  });
 
-    // LOG le publishing des tracks
-    localTracks.forEach((track) => {
-      console.log("[startCall] Publishing local track", track.kind, "track:", track, "user:", utilisateur.id);
-    });
+  const localTracks = await createLocalTracks({ audio: true, video });
+  localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+  await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
+  setInCall(true);
+  startTimer();
+};
 
-    const localVideoTrack = localTracks.find((t) => t.kind === "video");
-    if (localVideoTrack) window.localVideoTrack = localVideoTrack;
-
-    await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, token);
-    console.log("[startCall] Room joined:", conversationId, "Identity:", utilisateur.id);
-
-    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
-    setInCall(true);
-    startTimer(); // <-- Timer démarré à chaque appel lancé
-  };
 
 const hangupCall = () => {
   if (room) {
@@ -568,22 +560,22 @@ function stopAllMediaStreams() {
 
       <NotificationAppelEntrant
         appel={appelEntrant && appelEntrant.from?.id !== utilisateur.id ? appelEntrant : null}
-        onAccepter={(type) => {
-          clearTimeout(appelTimeoutRef.current);
-          setAppelEntrant(null);
-          sonnerieRef.current?.pause();
-          sonnerieRef.current.currentTime = 0;
-          if (appelEntrant?.from?.id) {
-            ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
-              from: utilisateur,
-              room: conversationId,
-              type,
-            });
-          }
-          startCall(type === "video");
-          setInCall(true);
-          startTimer();
-        }}
+onAccepter={(type) => {
+  clearTimeout(appelTimeoutRef.current);
+  setAppelEntrant(null);
+  sonnerieRef.current?.pause();
+  sonnerieRef.current.currentTime = 0;
+  if (appelEntrant?.from?.id) {
+    ably.channels.get(`notification-${appelEntrant.from.id}`).publish("call:accepted", {
+      from: utilisateur,
+      room: conversationId,
+      type,
+    });
+  }
+  startCall(type === "video", false); // <-- Ici initiateur = false (appel entrant)
+  setInCall(true);
+  startTimer();
+}}
         onRefuser={() => {
           clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
