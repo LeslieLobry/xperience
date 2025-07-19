@@ -1,23 +1,61 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
+console.log("MessageAudio MONTÉ !");
 
-function formatAffichageDuree(duree) {
-  if (!duree) return "0:00";
-  if (/^\d+:\d{2}$/.test(duree)) return duree;
-  // Si c'est en secondes, convertit (ex: 62 => 1:02)
-  const sec = Math.floor(Number(duree));
-  const min = Math.floor(sec / 60);
-  const reste = (sec % 60).toString().padStart(2, "0");
-  return `${min}:${reste}`;
+// Convertit "1:23" en secondes (83)
+function dureeStringToSec(str) {
+  if (!str) return 0;
+  const parts = str.split(":");
+  if (parts.length !== 2) return 0;
+  const min = parseInt(parts[0], 10) || 0;
+  const sec = parseInt(parts[1], 10) || 0;
+  return min * 60 + sec;
+}
+function formatAffichageDuree(secs) {
+  if (typeof secs === "string" && /^\d+:\d{2}$/.test(secs)) return secs;
+  if (typeof secs !== "number" || isNaN(secs)) return "0:00";
+  const min = Math.floor(secs / 60);
+  const sec = Math.floor(secs % 60).toString().padStart(2, "0");
+  return `${min}:${sec}`;
 }
 
 export default function MessageAudio({ url, duration }) {
+   console.log("[AUDIO] duration prop:", duration, typeof duration, url);
+   console.log("MessageAudio rendu", { url, duration });
+
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [current, setCurrent] = useState(0);
   const [total, setTotal] = useState(0);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+useEffect(() => {
+  const audio = audioRef.current;
+  if (!audio) return;
+  function handleNativePlay() {
+    console.log("NATIVE AUDIO PLAY");
+    setIsPlaying(true);
+  }
+  function handleNativePause() {
+    console.log("NATIVE AUDIO PAUSE");
+    setIsPlaying(false);
+  }
+  audio.addEventListener("play", handleNativePlay);
+  audio.addEventListener("pause", handleNativePause);
+  return () => {
+    audio.removeEventListener("play", handleNativePlay);
+    audio.removeEventListener("pause", handleNativePause);
+  };
+}, []);
+  // Dès qu'on a la durée du player
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (audio && audio.duration && !isNaN(audio.duration)) {
+      setTotal(audio.duration);
+      setAudioLoaded(true);
+    }
+  };
 
   // Play/Pause toggle
   const handleToggle = () => {
@@ -52,16 +90,27 @@ export default function MessageAudio({ url, duration }) {
     }
   };
 
+  // Fallback total (si metadata pas dispo)
+  let totalAffiche = total > 0
+    ? total
+    : dureeStringToSec(duration);
+
   return (
     <div className="audio-bubble" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <button
-        className="playpause-button"
-        onClick={handleToggle}
-        aria-label={isPlaying ? "Pause" : "Play"}
-        style={{ border: "none", background: "none", cursor: "pointer" }}
-      >
-        {isPlaying ? <Pause /> : <Play />}
-      </button>
+<button
+  className="playpause-button"
+  onClick={() => {
+    console.log("BTN CLICK");
+    handleToggle();
+  }}
+  aria-label={isPlaying ? "Pause" : "Play"}
+  style={{ border: "none", background: "none", cursor: "pointer" }}
+>
+  TEST
+  {isPlaying ? <Pause /> : <Play />}
+</button>
+
+
       <div
         className="audio-progress"
         style={{
@@ -87,18 +136,29 @@ export default function MessageAudio({ url, duration }) {
           }}
         />
       </div>
-      <span className="duration" style={{ fontVariantNumeric: "tabular-nums", fontSize: 13, minWidth: 38, textAlign: "right" }}>
-        {formatAffichageDuree(current)} / {formatAffichageDuree(duration || total)}
+      <span className="duration" style={{ fontVariantNumeric: "tabular-nums", fontSize: 13, minWidth: 55, textAlign: "right" }}>
+        {formatAffichageDuree(current)} / {
+          // Si la durée réelle du player est connue, on affiche en priorité, sinon la valeur prop
+          formatAffichageDuree(totalAffiche)
+        }
       </span>
-      <audio
-        ref={audioRef}
-        src={url}
-        onEnded={handleEnded}
-        onPause={() => setIsPlaying(false)}
-        onPlay={() => setIsPlaying(true)}
-        onTimeUpdate={handleTimeUpdate}
-        preload="auto"
-      />
+     <audio
+  ref={audioRef}
+  src={url}
+  onLoadedMetadata={handleLoadedMetadata}
+  onEnded={handleEnded}
+  onPause={() => {
+    console.log("AUDIO PAUSE");
+    setIsPlaying(false);
+  }}
+  onPlay={() => {
+    console.log("AUDIO PLAY");
+    setIsPlaying(true);
+  }}
+  onTimeUpdate={handleTimeUpdate}
+  preload="auto"
+/>
+
     </div>
   );
 }

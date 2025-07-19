@@ -48,6 +48,7 @@ export async function POST(req) {
         envoyeur: formData.get("envoyeur") || null,
         prenom1: formData.get("prenom1") || null,
         prenom2: formData.get("prenom2") || null,
+        duree: formData.get("duree") || null,
       };
 
       // Sélectionne le fichier selon le type et présence dans formData
@@ -123,7 +124,7 @@ let prenomEnvoyeur = body.prenomEnvoyeur || null;
         audioUrl,
         videoUrl,
         type,
-        duree: null,
+        duree: body.duree || null,
         lu: false,
         envoyeur: envoyeur || null,
         prenomEnvoyeur: prenomEnvoyeur || null,

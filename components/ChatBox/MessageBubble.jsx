@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
-
 import "./MessageBubble.css";
 
 export default function MessageBubble({
@@ -75,7 +74,6 @@ export default function MessageBubble({
   }, [showPicker]);
 
   const isOwn = msg.auteurId === utilisateur.id;
-
   const auteurIsCouple = msg.auteur?.type === "couple";
   const showAuthorInfo =
     auteurIsCouple ||
@@ -116,48 +114,61 @@ export default function MessageBubble({
 
   // Affichage du message éphémère via MessageEphemere
   if (msg.type === "EPHEMERE") {
-    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id}/>;
+    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
   }
-// Si c'est un message SYSTEME, on affiche centré & spécial, puis on s'arrête là
-if (msg.type === "SYSTEME") {
-  return (
-    <div className="message-systeme">
-      <span>📝 {msg.texte || msg.contenu}</span>
-    </div>
-  );
-}
+  // Si c'est un message SYSTEME, on affiche centré & spécial, puis on s'arrête là
+  if (msg.type === "SYSTEME") {
+    return (
+      <div className="message-systeme">
+        <span>📝 {msg.texte || msg.contenu}</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-   {showAuthorInfo && (
-  <div className="author-info">
-    <img
-      src={msg.auteur?.photoUrl || "/default.jpg"}
-      alt={msg.auteur?.pseudo || "Utilisateur"}
-      className="author-avatar"
-    />
-    <div>
-      {/* Prénom envoyeur si présent, sinon pseudo */}
-      {msg.prenomEnvoyeur ? (
-        <span className="author-name">{msg.prenomEnvoyeur}</span>
-      ) : (
-        <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+      {showAuthorInfo && (
+        <div className="author-info">
+          <img
+            src={msg.auteur?.photoUrl || "/default.jpg"}
+            alt={msg.auteur?.pseudo || "Utilisateur"}
+            className="author-avatar"
+          />
+          <div>
+            {msg.prenomEnvoyeur ? (
+              <span className="author-name">{msg.prenomEnvoyeur}</span>
+            ) : (
+              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+            )}
+            {auteurIsCouple && prenomsCouple && (
+              <span
+                className="author-couple-names"
+                style={{
+                  marginLeft: 4,
+                  color: "#b5a06c",
+                  fontSize: "0.95em",
+                  fontStyle: "italic",
+                }}
+              >
+                ({prenomsCouple})
+              </span>
+            )}
+          </div>
+        </div>
       )}
-      {/* Si c'est un couple, affiche les prénoms du couple après */}
-      {auteurIsCouple && prenomsCouple && (
-        <span className="author-couple-names" style={{marginLeft: 4, color: "#b5a06c", fontSize: "0.95em", fontStyle: "italic"}}>
-          ({prenomsCouple})
-        </span>
-      )}
-    </div>
-  </div>
-)}
 
-
+      {/* IMAGE */}
       {msg.type === "IMAGE" && msg.imageUrl ? (
         <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
       ) : msg.type === "AUDIO" && msg.audioUrl ? (
-        <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
+        <>
+          {console.log("[BUBBLE] MessageAudio rendu", {
+            duree: msg.duree,
+            url: msg.audioUrl,
+            msg,
+          })}
+          <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
+        </>
       ) : (
         <p className="message-text">{msg.contenu}</p>
       )}
@@ -166,9 +177,9 @@ if (msg.type === "SYSTEME") {
         <button
           className="delete-message-button"
           onClick={() => {
-  console.log('Suppression', msg.id);  // Ajoute ce log pour tester
-  onDelete?.(msg.id)
-}}
+            console.log('Suppression', msg.id);
+            onDelete?.(msg.id);
+          }}
           title="Supprimer ce message"
         >
           🗑️
