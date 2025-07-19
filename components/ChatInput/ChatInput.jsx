@@ -11,28 +11,192 @@ export default function ChatInput({
   onMessageSent,
   onTyping,
 }) {
-  // --- AUDIO
+  // AUDIO
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const audioStartRef = useRef(null);
+  const audioStopRef = useRef(null);
   const audioChunks = useRef([]);
   const textareaRef = useRef();
-  // --- COUPLE: Gestion prénoms & qui parle
+
+  // --- CALCUL DE LA DUREE
+  function formatDuration(secs) {
+    if (!secs || isNaN(secs) || !isFinite(secs) || secs < 0) return "0:01";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? "0" + s : s}`;
+  }
+
+  async function getAccurateDuration(blob) {
+    // 1. Chrono JS (ref)
+    let chrono = 0;
+    if (audioStartRef.current && audioStopRef.current) {
+      chrono = Math.round((audioStopRef.current - audioStartRef.current) / 1000);
+    }
+    // 2. Lecture blob
+    let html5 = null;
+    try {
+      html5 = await new Promise((resolve) => {
+        const audio = document.createElement("audio");
+        audio.preload = "metadata";
+        audio.src = URL.createObjectURL(blob);
+        audio.onloadedmetadata = function () {
+          let d = audio.duration;
+          console.log("[DEBUG] audio.duration HTML5 onloadedmetadata:", d);
+          URL.revokeObjectURL(audio.src);
+          if (d && isFinite(d) && d > 0) resolve(Math.round(d));
+          else resolve(null);
+        };
+        audio.onerror = function () {
+          console.warn("[DEBUG] audio.duration HTML5 error");
+          resolve(null);
+        };
+      });
+    } catch (err) {
+      console.warn("[DEBUG] getAccurateDuration error", err);
+    }
+    // 3. Prend le plus crédible
+    let duree = Math.max(chrono || 0, html5 || 0);
+    console.log("[DEBUG] chrono:", chrono, "html5:", html5, "retenu:", duree);
+    if (!duree || isNaN(duree) || duree < 1) duree = 1;
+    return formatDuration(duree);
+  }
+
+  // COUPLE
   const [pr1, setPr1] = useState("");
   const [pr2, setPr2] = useState("");
   const [loadingPrenoms, setLoadingPrenoms] = useState(false);
   const [prenomsOK, setPrenomsOK] = useState(false);
   const [membreParlant, setMembreParlant] = useState("couple");
 
-  // --- DETECTION SAFARI ---
-  function isSafariIOS() {
-    if (typeof window === "undefined") return false;
-    const ua = window.navigator.userAgent;
-    return /iP(ad|hone|od).+Version\/[\d.]+.*Safari/i.test(ua);
+  // EMOJI
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emoticonsMap = {
+    ":)": "😊", ":-)": "😊", ":(": "😢", ":-(": "😢", ";)": "😉",
+    ":D": "😄", ":-D": "😄", "<3": "❤️", ":p": "😛", ":-p": "😛",
+    ":'(": "😭", ":o": "😮", ":-o": "😮"
+  };
+  function replaceEmoticonsWithEmojis(text) {
+    return Object.keys(emoticonsMap).reduce(
+      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]), text
+    );
   }
 
-  // Fetch prénoms si utilisateur couple
+  // IMAGE/CAMERA
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [ephemere, setEphemere] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+
+  // --- AUDIO RECORDING ---
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new window.MediaRecorder(stream);
+      audioChunks.current = [];
+      audioStartRef.current = Date.now();
+      audioStopRef.current = null;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunks.current.push(e.data);
+        }
+      };
+      recorder.onstop = () => {
+        audioStopRef.current = Date.now();
+        if (audioChunks.current.length) {
+          const blob = new Blob(audioChunks.current, { type: "audio/webm" });
+          setAudioBlob(blob);
+          setAudioUrl(URL.createObjectURL(blob));
+        } else {
+          setAudioBlob(null);
+          setAudioUrl(null);
+        }
+        audioChunks.current = [];
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      recorder.start();
+    } catch (err) {
+      alert("Impossible d'accéder au micro.");
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.requestData?.();
+      setTimeout(() => {
+        mediaRecorder.stop();
+        setIsRecording(false);
+      }, 100);
+    }
+  };
+
+  const removeAudioPreview = () => {
+    setAudioBlob(null);
+    setAudioUrl(null);
+    audioStartRef.current = null;
+    audioStopRef.current = null;
+  };
+
+  // --- CAMERA ---
+  const handleOpenCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setCameraStream(stream);
+      setShowCamera(true);
+    } catch (err) {
+      alert("Impossible d'accéder à la caméra.");
+      setShowCamera(false);
+    }
+  };
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+  useEffect(() => {
+    if (showCamera && videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+    }
+    return () => stopCamera();
+  }, [showCamera, cameraStream]);
+  const handleTakePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 360;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        setImagePreview(URL.createObjectURL(blob));
+        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+        stopCamera();
+      }
+    }, "image/jpeg", 0.9);
+  };
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+    setImageFile(file);
+    e.target.value = "";
+  };
+  const removePreview = () => {
+    setImagePreview(null);
+    setImageFile(null);
+  };
+
+  // --- PRENOMS COUPLE ---
   useEffect(() => {
     if (utilisateur.type !== "couple") return;
     setLoadingPrenoms(true);
@@ -49,8 +213,6 @@ export default function ChatInput({
       })
       .finally(() => setLoadingPrenoms(false));
   }, [conversationId, utilisateur.type]);
-
-  // Submit prénoms pour le couple
   const handlePrenomsSubmit = async (e) => {
     e.preventDefault();
     if (!pr1.trim() || !pr2.trim()) return;
@@ -78,172 +240,34 @@ export default function ChatInput({
       ta.style.height = ta.scrollHeight + "px";
     }
   }
-
-  useEffect(() => {
-    autoResize();
-  }, [texte]);
-
-  // --- EMOJI
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emoticonsMap = {
-    ":)": "😊",
-    ":-)": "😊",
-    ":(": "😢",
-    ":-(": "😢",
-    ";)": "😉",
-    ":D": "😄",
-    ":-D": "😄",
-    "<3": "❤️",
-    ":p": "😛",
-    ":-p": "😛",
-    ":'(": "😭",
-    ":o": "😮",
-    ":-o": "😮",
-  };
-  function replaceEmoticonsWithEmojis(text) {
-    return Object.keys(emoticonsMap).reduce(
-      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]),
-      text
-    );
-  }
-
-  // --- IMAGE
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
-  const [ephemere, setEphemere] = useState(false);
-
-  // --- CAMERA / WEBCAM
-  const [showCamera, setShowCamera] = useState(false);
-  const [cameraStream, setCameraStream] = useState(null);
-  const videoRef = useRef(null);
-
-  // --- MICRO / AUDIO ---
-  const startAudioRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new window.MediaRecorder(stream);
-      audioChunks.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunks.current.push(e.data);
-        }
-      };
-      recorder.onstop = () => {
-        if (audioChunks.current.length) {
-          const blob = new Blob(audioChunks.current, { type: "audio/webm" });
-          setAudioBlob(blob);
-          setAudioUrl(URL.createObjectURL(blob));
-        } else {
-          setAudioBlob(null);
-          setAudioUrl(null);
-        }
-        audioChunks.current = [];
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-      recorder.start();
-    } catch (err) {
-      alert("Impossible d'accéder au micro.");
-    }
-  };
-
-  const stopAudioRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.requestData?.();
-      setTimeout(() => {
-        mediaRecorder.stop();
-        setIsRecording(false);
-      }, 100);
-    }
-  };
-
-  const removeAudioPreview = () => {
-    setAudioBlob(null);
-    setAudioUrl(null);
-  };
-
-  // --- CAMERA ---
-  const handleOpenCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setCameraStream(stream);
-      setShowCamera(true);
-    } catch (err) {
-      alert("Impossible d'accéder à la caméra.");
-      setShowCamera(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
-    setShowCamera(false);
-  };
-
-  useEffect(() => {
-    if (showCamera && videoRef.current && cameraStream) {
-      videoRef.current.srcObject = cameraStream;
-    }
-    return () => stopCamera();
-  }, [showCamera, cameraStream]);
-
-  const handleTakePhoto = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 480;
-    canvas.height = video.videoHeight || 360;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (blob) {
-        setImagePreview(URL.createObjectURL(blob));
-        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
-        stopCamera();
-      }
-    }, "image/jpeg", 0.9);
-  };
-
-  // --- UPLOAD IMAGE ---
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
-    setImageFile(file);
-    e.target.value = "";
-  };
-
-  const removePreview = () => {
-    setImagePreview(null);
-    setImageFile(null);
-  };
+  useEffect(() => { autoResize(); }, [texte]);
 
   // --- SUBMIT LOGIC ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Image
+    // IMAGE
     if (imageFile) {
       const formData = new FormData();
       formData.append("image", imageFile);
       formData.append("conversationId", conversationId);
       formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
       if (texte) formData.append("contenu", texte);
-
-      // Ajout couple si besoin
       if (utilisateur.type === "couple" && prenomsOK) {
         formData.append("membreParlant", membreParlant);
         formData.append("prenom1", pr1);
         formData.append("prenom2", pr2);
       }
+      // --- LOG formData IMAGE ---
+      console.log("[DEBUG] ENVOI IMAGE :");
+      for (let [key, val] of formData.entries()) {
+        if (key === "image" && val instanceof Blob) {
+          console.log(key, val, val.size, val.type);
+        } else {
+          console.log(key, val);
+        }
+      }
 
-      console.log("[ChatInput] Envoi image avec type", ephemere ? "EPHEMERE" : "IMAGE");
       await onMessageSent(formData);
       setImageFile(null);
       setImagePreview(null);
@@ -252,33 +276,47 @@ export default function ChatInput({
       return;
     }
 
-    // Audio
+    // AUDIO
     if (audioBlob) {
+      let duree = await getAccurateDuration(audioBlob);
+      console.log("[DEBUG FRONT] Durée calculée:", duree);
+      console.log("[DEBUG FRONT] userAgent:", navigator.userAgent);
       const formData = new FormData();
       formData.append("audio", audioBlob, "audio.webm");
       formData.append("conversationId", conversationId);
       formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
+      formData.append("duree", duree);
 
-      // Ajout couple si besoin
       if (utilisateur.type === "couple" && prenomsOK) {
         formData.append("membreParlant", membreParlant);
         formData.append("prenom1", pr1);
         formData.append("prenom2", pr2);
       }
 
-      console.log("[ChatInput] Envoi audio avec type", ephemere ? "EPHEMERE" : "AUDIO");
+      // --- LOG formData AUDIO ---
+      console.log("[DEBUG] ENVOI AUDIO :");
+      for (let [key, val] of formData.entries()) {
+        if (val instanceof Blob) {
+          console.log("FORMDATA ENVOYE :", key, val, val.size, val.type);
+        } else {
+          console.log("FORMDATA ENVOYE :", key, val);
+        }
+      }
+
       await onMessageSent(formData);
       setAudioBlob(null);
       setAudioUrl(null);
+      audioStartRef.current = null;
+      audioStopRef.current = null;
       setTexte("");
       setEphemere(false);
       return;
     }
 
-    // Texte
+    // TEXTE
     if (!texte.trim()) return;
-    console.log("[ChatInput] Envoi texte avec type", ephemere ? "EPHEMERE" : "TEXTE");
-
+    // --- LOG TEXTE ---
+    console.log("[DEBUG] ENVOI TEXTE :", texte);
     if (utilisateur.type === "couple" && prenomsOK) {
       await onMessageSent({
         contenu: texte,
@@ -301,21 +339,16 @@ export default function ChatInput({
 
   // --- Notification éphémère ---
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
-
   useEffect(() => {
     if (showEphemereNotif) {
-      const timer = setTimeout(() => {
-        setShowEphemereNotif(false);
-      }, 5000);
+      const timer = setTimeout(() => { setShowEphemereNotif(false); }, 5000);
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
-
   const handleSubmitWithNotif = async (e) => {
     if (ephemere) setShowEphemereNotif(true);
     await handleSubmit(e);
   };
-
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
@@ -412,27 +445,6 @@ export default function ChatInput({
 
       {/* FORM PRINCIPAL */}
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-
-        {/* ALERTE MICRO SAFARI */}
-        {isSafariIOS() && (
-          <div style={{
-            background: "#fff3cd",
-            color: "#856404",
-            padding: 8,
-            borderRadius: 6,
-            marginBottom: 8,
-            border: "1px solid #ffeeba",
-            fontSize: 14,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            maxWidth: 360
-          }}>
-            <span style={{ fontWeight: 600 }}>⚠️ Micro non compatible&nbsp;:</span>
-            Sur iPhone/iPad (Safari), l’enregistrement audio peut ne pas fonctionner à cause des restrictions Apple.
-          </div>
-        )}
-
         <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e) => {
           const value = e.target.value;
           const withEmojis = replaceEmoticonsWithEmojis(value);
@@ -448,7 +460,7 @@ export default function ChatInput({
           }}
         />
         <div className="input-wrapper" style={{ alignItems: "center" }}>
-                    {/* Aperçu image */}
+          {/* Aperçu image */}
           {imagePreview && (
             <div style={{ position: "relative", marginRight: 8 }}>
               <img
@@ -502,49 +514,39 @@ export default function ChatInput({
           )}
 
           {/* Aperçu audio */}
-       {audioBlob && !isRecording && (
-  <div
-    className="audio-file-ready"
-    style={{
-      display: "flex",
-      alignItems: "center",
-      marginLeft: 8,
-      background: "#f7f7f7",
-      borderRadius: 8,
-      padding: "6px 14px",
-      marginBottom: 4,
-      fontSize: 15,
-    }}
-  >
-    <span role="img" aria-label="audio" style={{ fontSize: 22, marginRight: 8 }}>🎤</span>
-    <span>Message audio prêt à envoyer</span>
-    <button
-      type="button"
-      onClick={removeAudioPreview}
-      title="Supprimer l'audio"
-      style={{
-        color: "#d00",
-        fontSize: 18,
-        border: "none",
-        background: "none",
-        marginLeft: 12,
-        cursor: "pointer"
-      }}
-    >
-      ×
-    </button>
-  </div>
-)}
-          {/* Bouton prendre photo */}
-          {/* <button
-            type="button"
-            className="chat-input-photo-btn"
-            style={{ fontSize: "1.4em", marginRight: 5 }}
-            onClick={handleOpenCamera}
-            title="Prendre une photo"
-          >
-            📸
-          </button> */}
+          {audioBlob && !isRecording && (
+            <div
+              className="audio-file-ready"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginLeft: 8,
+                background: "#f7f7f7",
+                borderRadius: 8,
+                padding: "6px 14px",
+                marginBottom: 4,
+                fontSize: 15,
+              }}
+            >
+              <span role="img" aria-label="audio" style={{ fontSize: 22, marginRight: 8 }}>🎤</span>
+              <span>Message audio prêt à envoyer</span>
+              <button
+                type="button"
+                onClick={removeAudioPreview}
+                title="Supprimer l'audio"
+                style={{
+                  color: "#d00",
+                  fontSize: 18,
+                  border: "none",
+                  background: "none",
+                  marginLeft: 12,
+                  cursor: "pointer"
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {/* Upload classique */}
           <input
@@ -569,8 +571,6 @@ export default function ChatInput({
           >
             <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
           </button>
-
-
 
           {/* MICRO */}
           <button

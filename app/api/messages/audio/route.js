@@ -14,7 +14,6 @@ const s3 = new S3Client({
 });
 
 // 🔁 utilitaire pour formater la durée en mm:ss
-// 🔁 utilitaire pour formater la durée en mm:ss (et gérer tous les cas foireux)
 function formatDuration(seconds) {
   if (
     !seconds ||
@@ -31,37 +30,54 @@ function formatDuration(seconds) {
 
 export async function POST(req) {
   try {
+    // --- Auth
     const user = await getUserFromToken();
     if (!user || !user.id) {
-      console.warn("🚫 Utilisateur non authentifié");
       return NextResponse.json(
         { success: false, message: "Utilisateur non authentifié" },
         { status: 401 }
       );
     }
 
+    // --- Récup formData
     const formData = await req.formData();
+    console.log("===== FORM DATA RECUE =====");
+    for (let entry of formData.entries()) {
+      console.log(entry[0], entry[1]);
+    }
+    console.log("===========================");
+
     const file = formData.get("audio");
     const conversationId = formData.get("conversationId");
-    let dureeClient = formData.get("duree"); // peut être null ou string
+    let dureeClient = formData.get("duree");
+
+    console.log("Durée reçue du client:", dureeClient);
 
     if (!file || !conversationId) {
-      console.warn("❌ Données manquantes :", { file, conversationId });
       return NextResponse.json(
         { success: false, message: "Fichier ou conversation manquant" },
         { status: 400 }
       );
     }
 
+    // --- Buffer et extension
     const buffer = Buffer.from(await file.arrayBuffer());
     const extension = file.name?.split(".").pop() || "webm";
     const fileName = `audios/${randomUUID()}.${extension}`;
 
     // 1️⃣ Correction sécurité sur la durée reçue du client
-    let duree = "";
-    if (typeof dureeClient === "string" && /^\d{1,3}:\d{2}$/.test(dureeClient) && !dureeClient.includes("NaN") && !dureeClient.includes("Infinity")) {
-      duree = dureeClient;
-    }
+  let duree = "";
+if (
+  typeof dureeClient === "string" &&
+  /^(\d{1,3}):(\d{1,2})$/.test(dureeClient) &&
+  !dureeClient.includes("NaN") &&
+  !dureeClient.includes("Infinity")
+) {
+  const parts = dureeClient.match(/^(\d{1,3}):(\d{1,2})$/);
+  let minutes = parts[1];
+  let secondes = parts[2].padStart(2, "0"); // ex: "5" => "05"
+  duree = `${minutes}:${secondes}`;
+}
 
     // 2️⃣ Si pas valide, tente d'extraire la durée serveur
     if (!duree) {
@@ -71,16 +87,23 @@ export async function POST(req) {
           duree = formatDuration(metadata.format.duration);
         }
       } catch (err) {
-        console.warn("⚠️ Erreur parseBuffer :", err.message);
+        console.warn("Erreur extraction durée metadata:", err);
       }
     }
 
-    // 3️⃣ Double sécurité : si toujours rien ou foireux, force à 0:00
-    if (!duree || duree.includes("NaN") || duree.includes("Infinity") || !/^\d{1,3}:\d{2}$/.test(duree)) {
+    // 3️⃣ Double sécurité : si toujours rien ou foireux, force à 0:00
+    if (
+      !duree ||
+      duree.includes("NaN") ||
+      duree.includes("Infinity") ||
+      !/^\d{1,3}:\d{2}$/.test(duree)
+    ) {
       duree = "0:00";
     }
 
-    // ⬆️ Upload vers S3
+    console.log("Durée finale enregistrée:", duree);
+
+    // ⬆️ Upload S3
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET,
@@ -89,7 +112,6 @@ export async function POST(req) {
         ContentType: file.type,
       })
     );
-
     const audioUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
 
     // 💾 Enregistrement en base
@@ -105,7 +127,7 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, message });
   } catch (error) {
-    console.error("❌ Erreur upload audio S3 :", error);
+    console.error("Erreur dans POST /api/messages/audio :", error);
     return NextResponse.json(
       { success: false, message: "Erreur serveur" },
       { status: 500 }
