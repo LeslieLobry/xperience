@@ -104,7 +104,7 @@ export default function MessageAudio({ url, duration }) {
           height: 8,
           borderRadius: 4,
           background: "#eee",
-          margin: "0 8px",
+  
           cursor: "pointer",
           position: "relative",
           minWidth: 60,

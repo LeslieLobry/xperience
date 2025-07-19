@@ -475,6 +475,9 @@
   .duration {
     font-size: 9px;
   }
+  .message-bubble.own{
+    width: 60%;
+  }
 }
 
 /* === Webcam / Visio === */
