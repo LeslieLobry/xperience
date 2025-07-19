@@ -521,14 +521,11 @@ export default function ChatInput({
                 display: "flex",
                 alignItems: "center",
                 marginLeft: 8,
-                background: "#f7f7f7",
+                background: "transparent",
                 borderRadius: 8,
-                padding: "6px 14px",
-                marginBottom: 4,
-                fontSize: 15,
+                fontSize: 8,
               }}
             >
-              <span role="img" aria-label="audio" style={{ fontSize: 22, marginRight: 8 }}>🎤</span>
               <span>Message audio prêt à envoyer</span>
               <button
                 type="button"
@@ -536,10 +533,9 @@ export default function ChatInput({
                 title="Supprimer l'audio"
                 style={{
                   color: "#d00",
-                  fontSize: 18,
+                  fontSize: 12,
                   border: "none",
-                  background: "none",
-                  marginLeft: 12,
+                  background: "transparent",
                   cursor: "pointer"
                 }}
               >
