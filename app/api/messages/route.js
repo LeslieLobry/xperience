@@ -7,6 +7,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
+
 // Config S3
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -16,6 +17,7 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
+
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
   console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
@@ -42,6 +44,7 @@ export async function POST(req) {
         prenom1: formData.get("prenom1") || null,
         prenom2: formData.get("prenom2") || null,
         duree: formData.get("duree") || null,
+        optimisticKey: formData.get("optimisticKey") || null,
       };
 
       // Sélectionne le fichier selon le type et présence dans formData
@@ -105,7 +108,7 @@ export async function POST(req) {
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
-let prenomEnvoyeur = body.prenomEnvoyeur || null;
+    let prenomEnvoyeur = body.prenomEnvoyeur || null;
 
     const message = await prisma.message.create({
       data: {
@@ -135,8 +138,15 @@ let prenomEnvoyeur = body.prenomEnvoyeur || null;
         },
       },
     });
-await ably.channels.get(`conversation-${conversationId}`).publish("message", message);
-       await prisma.conversation.update({
+
+    // PATCH: Ajoute optimisticKey pour le front
+    const optimisticKey = body.optimisticKey || null;
+    const messageWithOptimisticKey = { ...message, optimisticKey };
+
+    // Publish Ably avec optimisticKey (toujours présent sur le front)
+    await ably.channels.get(`conversation-${conversationId}`).publish("message", messageWithOptimisticKey);
+
+    await prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
@@ -189,7 +199,8 @@ await ably.channels.get(`conversation-${conversationId}`).publish("message", mes
       }
     })();
 
-    return NextResponse.json({ success: true, message }, { status: 200 });
+    // ✅ Réponse API avec optimisticKey inclus
+    return NextResponse.json({ success: true, message: messageWithOptimisticKey }, { status: 200 });
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
     return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
@@ -293,5 +304,3 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
   }
 }
-
-
