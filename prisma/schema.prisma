@@ -246,6 +246,8 @@ model Message {
   envoyeur       String?
   prenomEnvoyeur String?
   @@index([conversationId, id])
+  @@index([conversationId, createdAt])
+
   @@map("Message")
 }
 

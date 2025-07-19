@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 import "./ChatInput.css";
+import { CircleStop } from "lucide-react";
 
 export default function ChatInput({
   utilisateur,
@@ -20,6 +21,9 @@ export default function ChatInput({
   const audioStopRef = useRef(null);
   const audioChunks = useRef([]);
   const textareaRef = useRef();
+
+  // --- NOUVEAU: gestion envoi pour éviter double submit
+  const [isSending, setIsSending] = useState(false);
 
   // --- CALCUL DE LA DUREE
   function formatDuration(secs) {
@@ -137,6 +141,7 @@ export default function ChatInput({
   };
 
   const removeAudioPreview = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioBlob(null);
     setAudioUrl(null);
     audioStartRef.current = null;
@@ -166,6 +171,7 @@ export default function ChatInput({
       videoRef.current.srcObject = cameraStream;
     }
     return () => stopCamera();
+    // eslint-disable-next-line
   }, [showCamera, cameraStream]);
   const handleTakePhoto = () => {
     if (!videoRef.current) return;
@@ -177,6 +183,7 @@ export default function ChatInput({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
       if (blob) {
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
         setImagePreview(URL.createObjectURL(blob));
         setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
         stopCamera();
@@ -186,12 +193,14 @@ export default function ChatInput({
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     const url = URL.createObjectURL(file);
     setImagePreview(url);
     setImageFile(file);
     e.target.value = "";
   };
   const removePreview = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setImageFile(null);
   };
@@ -245,96 +254,110 @@ export default function ChatInput({
   // --- SUBMIT LOGIC ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSending) return;
+    setIsSending(true);
 
-    // IMAGE
-    if (imageFile) {
-      const formData = new FormData();
-      formData.append("image", imageFile);
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
-      if (texte) formData.append("contenu", texte);
-      if (utilisateur.type === "couple" && prenomsOK) {
-        formData.append("membreParlant", membreParlant);
-        formData.append("prenom1", pr1);
-        formData.append("prenom2", pr2);
-      }
-      // --- LOG formData IMAGE ---
-      console.log("[DEBUG] ENVOI IMAGE :");
-      for (let [key, val] of formData.entries()) {
-        if (key === "image" && val instanceof Blob) {
-          console.log(key, val, val.size, val.type);
-        } else {
-          console.log(key, val);
+    try {
+      // IMAGE
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        formData.append("conversationId", conversationId);
+        formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
+        if (texte) formData.append("contenu", texte);
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
         }
+        // --- LOG formData IMAGE ---
+        console.log("[DEBUG] ENVOI IMAGE :");
+        for (let [key, val] of formData.entries()) {
+          if (key === "image" && val instanceof Blob) {
+            console.log(key, val, val.size, val.type);
+          } else {
+            console.log(key, val);
+          }
+        }
+
+        await onMessageSent(formData);
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(null);
+        setImagePreview(null);
+        setTexte("");
+        setEphemere(false);
+        setIsSending(false);
+        return;
       }
 
-      await onMessageSent(formData);
-      setImageFile(null);
-      setImagePreview(null);
+      // AUDIO
+      if (audioBlob) {
+        let duree = await getAccurateDuration(audioBlob);
+        console.log("[DEBUG FRONT] Durée calculée:", duree);
+        console.log("[DEBUG FRONT] userAgent:", navigator.userAgent);
+        const formData = new FormData();
+        formData.append("audio", audioBlob, "audio.webm");
+        formData.append("conversationId", conversationId);
+        formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
+        formData.append("duree", duree);
+
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
+        }
+
+        // --- LOG formData AUDIO ---
+        console.log("[DEBUG] ENVOI AUDIO :");
+        for (let [key, val] of formData.entries()) {
+          if (val instanceof Blob) {
+            console.log("FORMDATA ENVOYE :", key, val, val.size, val.type);
+          } else {
+            console.log("FORMDATA ENVOYE :", key, val);
+          }
+        }
+
+        await onMessageSent(formData);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioBlob(null);
+        setAudioUrl(null);
+        audioStartRef.current = null;
+        audioStopRef.current = null;
+        setTexte("");
+        setEphemere(false);
+        setIsSending(false);
+        return;
+      }
+
+      // TEXTE
+      if (!texte.trim()) {
+        setIsSending(false);
+        return;
+      }
+      // --- LOG TEXTE ---
+      console.log("[DEBUG] ENVOI TEXTE :", texte);
+      if (utilisateur.type === "couple" && prenomsOK) {
+        await onMessageSent({
+          contenu: texte,
+          type: ephemere ? "EPHEMERE" : "TEXTE",
+          conversationId,
+          prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
+          prenom1: pr1,
+          prenom2: pr2,
+        });
+      } else {
+        await onMessageSent({
+          contenu: texte,
+          type: ephemere ? "EPHEMERE" : "TEXTE",
+          conversationId,
+        });
+      }
       setTexte("");
       setEphemere(false);
-      return;
+    } catch (err) {
+      console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
     }
-
-    // AUDIO
-    if (audioBlob) {
-      let duree = await getAccurateDuration(audioBlob);
-      console.log("[DEBUG FRONT] Durée calculée:", duree);
-      console.log("[DEBUG FRONT] userAgent:", navigator.userAgent);
-      const formData = new FormData();
-      formData.append("audio", audioBlob, "audio.webm");
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
-      formData.append("duree", duree);
-
-      if (utilisateur.type === "couple" && prenomsOK) {
-        formData.append("membreParlant", membreParlant);
-        formData.append("prenom1", pr1);
-        formData.append("prenom2", pr2);
-      }
-
-      // --- LOG formData AUDIO ---
-      console.log("[DEBUG] ENVOI AUDIO :");
-      for (let [key, val] of formData.entries()) {
-        if (val instanceof Blob) {
-          console.log("FORMDATA ENVOYE :", key, val, val.size, val.type);
-        } else {
-          console.log("FORMDATA ENVOYE :", key, val);
-        }
-      }
-
-      await onMessageSent(formData);
-      setAudioBlob(null);
-      setAudioUrl(null);
-      audioStartRef.current = null;
-      audioStopRef.current = null;
-      setTexte("");
-      setEphemere(false);
-      return;
-    }
-
-    // TEXTE
-    if (!texte.trim()) return;
-    // --- LOG TEXTE ---
-    console.log("[DEBUG] ENVOI TEXTE :", texte);
-    if (utilisateur.type === "couple" && prenomsOK) {
-      await onMessageSent({
-        contenu: texte,
-        type: ephemere ? "EPHEMERE" : "TEXTE",
-        conversationId,
-        prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
-        prenom1: pr1,
-        prenom2: pr2,
-      });
-    } else {
-      await onMessageSent({
-        contenu: texte,
-        type: ephemere ? "EPHEMERE" : "TEXTE",
-        conversationId,
-      });
-    }
-    setTexte("");
-    setEphemere(false);
+    setIsSending(false);
   };
 
   // --- Notification éphémère ---
@@ -437,9 +460,9 @@ export default function ChatInput({
           borderRadius: 25,
           fontWeight: "bold",
           zIndex: 1100,
-          boxShadow: "0 0 10px rgba(229, 83, 83, 0.7)",
+          boxShadow: "0 0 10px rgba(234, 215, 108, 0.7)",
         }}>
-          Photo éphémère envoyée ! Elle disparaîtra dans 5 secondes…
+          Photo éphémère envoyée!
         </div>
       )}
 
@@ -551,11 +574,13 @@ export default function ChatInput({
             id="file-upload"
             style={{ display: "none" }}
             onChange={handleImageUpload}
+            disabled={!!imageFile || isSending}
           />
           <label
             htmlFor="file-upload"
             className="chat-input-photo-btn"
             title="Envoyer une photo"
+            style={{ pointerEvents: (!!imageFile || isSending) ? "none" : "auto", opacity: (!!imageFile || isSending) ? 0.5 : 1 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-image-up-icon lucide-image-up"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg>
           </label>
@@ -578,8 +603,9 @@ export default function ChatInput({
                 ? "Arrêter l'enregistrement"
                 : "Envoyer un message audio"
             }
+            disabled={isSending}
           >
-            {isRecording ? "⏹️" : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-mic" viewBox="0 0 16 16">
+            {isRecording ? <CircleStop /> : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-mic" viewBox="0 0 16 16">
               <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
               <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
             </svg>}
@@ -591,6 +617,7 @@ export default function ChatInput({
             className="chat-input-emoji-btn"
             onClick={() => setShowEmojiPicker((v) => !v)}
             title="Insérer un emoji"
+            disabled={isSending}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-emoji-smile" viewBox="0 0 16 16">
               <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
@@ -603,6 +630,7 @@ export default function ChatInput({
           type="submit"
           className="message-btn"
           disabled={
+            isSending ||
             !(
               (audioBlob && !isRecording) ||
               imageFile ||
@@ -610,11 +638,13 @@ export default function ChatInput({
             )
           }
         >
-          {imageFile
-            ? "Envoyer l'image"
-            : audioBlob
-              ? "Envoyer l'audio"
-              : "Envoyer"}
+          {isSending
+            ? "Envoi…"
+            : imageFile
+              ? "Envoyer l'image"
+              : audioBlob
+                ? "Envoyer l'audio"
+                : "Envoyer"}
         </button>
       </form>
 

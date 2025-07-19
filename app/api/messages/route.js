@@ -7,9 +7,6 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
-
-
-
 // Config S3
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -19,15 +16,11 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
-
-
-
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
   console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
   let debugBody = "";
   try { debugBody = await req.clone().text(); } catch {}
-  console.log("POST /api/messages RAW BODY:", debugBody);
 
   try {
     const contentType = req.headers.get("content-type") || "";
@@ -88,7 +81,6 @@ export async function POST(req) {
       } else {
         body.imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
       }
-      console.log("URL construite :", body.imageUrl || body.audioUrl);
     }
 
     const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } = body;
@@ -144,9 +136,7 @@ let prenomEnvoyeur = body.prenomEnvoyeur || null;
       },
     });
 await ably.channels.get(`conversation-${conversationId}`).publish("message", message);
-    console.log("Message créé en base :", message);
-
-    await prisma.conversation.update({
+       await prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
@@ -263,7 +253,6 @@ export async function GET(req) {
     });
 
     messages.reverse(); // Chronologique
-    console.log("Messages envoyés au frontend:", messages.map((m) => ({ id: m.id, imageUrl: m.imageUrl })));
 
     // Destinataire (si besoin)
     const destinataire = autresParticipants.length === 1
@@ -301,7 +290,6 @@ export async function GET(req) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Erreur dans GET /api/messages :", error);
     return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
   }
 }

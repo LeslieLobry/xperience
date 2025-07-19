@@ -215,6 +215,6 @@ const refetchConversation = useCallback(async () => {
     lastReads,
     setLastReads,
     lancerSuppressionAvecDelai,
-      refetchParticipants: refetchConversation,
+    refetchParticipants: refetchConversation,
   };
 }
