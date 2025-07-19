@@ -9,6 +9,15 @@ function generateOptimisticKey() {
   return "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 100000);
 }
 
+// Fonction utilitaire pour choisir le meilleur mime-type audio
+function getSupportedAudioType() {
+  if (typeof window === "undefined" || !window.MediaRecorder) return "audio/webm";
+  if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
+  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
+  if (MediaRecorder.isTypeSupported("audio/mpeg")) return "audio/mpeg";
+  return "audio/webm";
+}
+
 export default function ChatInput({
   utilisateur,
   conversationId,
@@ -22,6 +31,7 @@ export default function ChatInput({
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [audioType, setAudioType] = useState(getSupportedAudioType());
   const audioStartRef = useRef(null);
   const audioStopRef = useRef(null);
   const audioChunks = useRef([]);
@@ -117,8 +127,13 @@ export default function ChatInput({
   // --- AUDIO RECORDING ---
   const startAudioRecording = async () => {
     try {
+      const supportedType = getSupportedAudioType();
+      setAudioType(supportedType);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new window.MediaRecorder(stream);
+      const recorder = new window.MediaRecorder(
+        stream,
+        supportedType ? { mimeType: supportedType } : undefined
+      );
       audioChunks.current = [];
       audioStartRef.current = Date.now();
       audioStopRef.current = null;
@@ -130,7 +145,7 @@ export default function ChatInput({
       recorder.onstop = () => {
         audioStopRef.current = Date.now();
         if (audioChunks.current.length) {
-          const blob = new Blob(audioChunks.current, { type: "audio/webm" });
+          const blob = new Blob(audioChunks.current, { type: supportedType || "audio/webm" });
           setAudioBlob(blob);
           setAudioUrl(URL.createObjectURL(blob));
         } else {
@@ -313,7 +328,11 @@ export default function ChatInput({
         const optimisticKey = generateOptimisticKey();
         let duree = await getAccurateDuration(audioBlob);
         const formData = new FormData();
-        formData.append("audio", audioBlob, "audio.webm");
+        let extension = "webm";
+        if (audioType === "audio/mp4") extension = "m4a";
+        if (audioType === "audio/mpeg") extension = "mp3";
+        formData.append("audio", audioBlob, `audio.${extension}`);
+        formData.append("audioType", audioType); // pour info backend/lecture
         formData.append("conversationId", conversationId);
         formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
         formData.append("duree", duree);
@@ -377,12 +396,12 @@ export default function ChatInput({
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
- const handleSubmitWithNotif = async (e) => {
-  e.preventDefault();
-  if (isSending) return;    // ← Ajoute cette ligne ici !
-  if (ephemere) setShowEphemereNotif(true);
-  await handleSubmit(e);
-};
+  const handleSubmitWithNotif = async (e) => {
+    e.preventDefault();
+    if (isSending) return;
+    if (ephemere) setShowEphemereNotif(true);
+    await handleSubmit(e);
+  };
 
   return (
     <>
@@ -599,7 +618,7 @@ export default function ChatInput({
             onClick={() => setEphemere((v) => !v)}
             title="Message éphémère (Snap)"
           >
-             <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
+            <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
           </button>
           {/* MICRO */}
           <button
@@ -669,4 +688,3 @@ export default function ChatInput({
     </>
   );
 }
-
