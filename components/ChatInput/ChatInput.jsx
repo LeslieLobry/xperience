@@ -87,6 +87,33 @@ export default function ChatInput({
       (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]), text
     );
   }
+ // --- IMAGE COMPRESSION ---
+  // Utilitaire pour compresser/redimensionner l'image
+  const compressImage = (file, maxSize = 900) =>
+    new Promise((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      img.onload = function () {
+        // Calcul du ratio pour respecter l'aspect
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        const width = Math.round(img.width * ratio);
+        const height = Math.round(img.height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: "image/jpeg" }));
+            URL.revokeObjectURL(url);
+          },
+          "image/jpeg",
+          0.7 // qualité (0.7 = 70%)
+        );
+      };
+      img.src = url;
+    });
 
   // IMAGE/CAMERA
   const [imagePreview, setImagePreview] = useState(null);
@@ -190,15 +217,25 @@ export default function ChatInput({
       }
     }, "image/jpeg", 0.9);
   };
-  const handleImageUpload = (e) => {
+ const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (imagePreview) URL.revokeObjectURL(imagePreview);
-    const url = URL.createObjectURL(file);
+
+    // COMPRESS!
+    let compressed = file;
+    try {
+      compressed = await compressImage(file, 900); // max 900px large/haut
+    } catch (err) {
+      // fallback sur l'image originale si erreur
+      compressed = file;
+    }
+    const url = URL.createObjectURL(compressed);
     setImagePreview(url);
-    setImageFile(file);
+    setImageFile(compressed);
     e.target.value = "";
   };
+
   const removePreview = () => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
@@ -568,15 +605,14 @@ export default function ChatInput({
           )}
 
           {/* Upload classique */}
-          <input
-            type="file"
-            accept="image/*"
-            id="file-upload"
-            capture="environment" 
-            style={{ display: "none" }}
-            onChange={handleImageUpload}
-            disabled={!!imageFile || isSending}
-          />
+        <input
+  type="file"
+  accept="image/*"
+  id="file-upload"
+  style={{ display: "none" }}
+  onChange={handleImageUpload}
+  disabled={!!imageFile || isSending}
+/>
           <label
             htmlFor="file-upload"
             className="chat-input-photo-btn"
