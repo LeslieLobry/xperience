@@ -162,11 +162,6 @@ export default function MessageBubble({
         <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
       ) : msg.type === "AUDIO" && msg.audioUrl ? (
         <>
-          {console.log("[BUBBLE] MessageAudio rendu", {
-            duree: msg.duree,
-            url: msg.audioUrl,
-            msg,
-          })}
           <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
         </>
       ) : (

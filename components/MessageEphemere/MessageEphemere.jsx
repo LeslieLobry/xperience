@@ -12,7 +12,7 @@ export default function MessageEphemere({ msg, onDelete, utilisateurId }) {
     String(utilisateurId) === String(msg.envoyeur);
 
   useEffect(() => {
-    console.log("utilisateurId:", utilisateurId, "msg.auteurId:", msg.auteurId, "msg.envoyeur:", msg.envoyeur, "isEnvoyeur:", isEnvoyeur);
+    
   }, [utilisateurId, msg.auteurId, msg.envoyeur]);
 
   useEffect(() => {
