@@ -65,11 +65,17 @@ export default function MessagesList({
     container?.addEventListener("scroll", handleScroll);
     return () => container?.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
- useEffect(() => {
-    if (endRef.current) {
-      endRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
+useEffect(() => {
+  const container = containerRef.current;
+  if (endRef.current && container) {
+    // Scroll jusqu'en bas (dernier message)
+    endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Décale légèrement pour ne pas coller au bas (évite le footer, barre d’input, etc)
+    setTimeout(() => {
+      container.scrollTop -= 60; // ajuste la valeur à la taille de ton footer (50, 80, etc)
+    }, 150);
+  }
+}, [messages]);
   let lastDate = null;
 
   return (

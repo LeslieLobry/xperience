@@ -46,6 +46,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({
@@ -178,10 +179,16 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   }, [messages.length]);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
+  if (messagesEndRef.current) {
+    // Scrolle vers le dernier message mais ajuste pour ne pas cacher sous le footer
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    setTimeout(() => {
+      // Décale un peu vers le haut pour ne pas être sous le footer (60px = à ajuster si besoin)
+      window.scrollBy(0, -6000);
+    }, 200);
+  }
+}, [messages]);
+
 
   // --------------------- TIMER APPEL ----------------------
 
@@ -540,17 +547,18 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         />
       )}
 
-      <MessagesList
-        messages={messages}
-        utilisateur={utilisateur}
-        onReact={handleReaction}
-        lastReads={lastReads}
-        typingPseudo={isTyping ? typingPseudo : null}
-        hasMore={hasMore}
-        onLoadMore={loadMoreMessages}
-        onDelete={handleDelete}
-        prenomsCouple={prenomsCouple}
-      />
+   <MessagesList
+  ref={messagesContainerRef}
+  messages={messages}
+  utilisateur={utilisateur}
+  onReact={handleReaction}
+  lastReads={lastReads}
+  typingPseudo={isTyping ? typingPseudo : null}
+  hasMore={hasMore}
+  onLoadMore={loadMoreMessages}
+  onDelete={handleDelete}
+  prenomsCouple={prenomsCouple}
+/>
 
       {isTyping && typingPseudo && (
         <div
