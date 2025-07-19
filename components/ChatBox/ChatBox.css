@@ -475,7 +475,8 @@
   .duration {
     font-size: 9px;
   }
-  .message-bubble.own{
+  .message-bubble.own,
+  .message-bubble.other{
     width: 60%;
   }
 }
