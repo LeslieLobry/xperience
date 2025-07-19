@@ -10,7 +10,25 @@
   color: white;
   background-color: transparent;
 }
-
+.nav-combined-popup {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  width: 320px;
+  max-height: 500px;
+  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
+  color: #e0c084;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  z-index: 1000;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  animation: fade-in-up 0.2s ease-out;
+}
 .navbar-pseudo {
   color: #a2b9c1;
   font-size: 24px;
