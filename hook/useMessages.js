@@ -48,27 +48,58 @@ const refetchConversation = useCallback(async () => {
     const channel = ably.channels.get(`conversation-${conversationId}`);
 
     // Nouveau message reçu
-    const onMessage = (msg) => {
-      setMessages((prev) => {
-        const exists = prev.some((m) => m.id === msg.data.id);
-        if (exists) return prev;
-        // ACK et LU
-        if (msg.data.auteurId !== utilisateur.id) {
-          fetch("/api/messages/acknowledge", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messageId: msg.data.id }),
-          });
-          fetch("/api/messages/mark-as-read", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messageId: msg.data.id }),
-          });
-        }
-        return [...prev, msg.data];
-      });
-    };
+const onMessage = (msg) => {
+  setMessages((prev) => {
+    // 1. Si la vraie réponse a un optimisticKey et qu’on a un message optimiste local avec ce champ
+    if (msg.data.optimisticKey) {
+      const idx = prev.findIndex((m) => m.optimisticKey === msg.data.optimisticKey);
+      if (idx !== -1) {
+        return [
+          ...prev.slice(0, idx),
+          msg.data,
+          ...prev.slice(idx + 1)
+        ];
+      }
+    }
 
+    // 2. Sinon, on fait l’ancien matching par id et heuristique
+    if (prev.some((m) => m.id === msg.data.id)) return prev;
+
+    const sameIdx = prev.findIndex(
+      (m) =>
+        String(m.id).startsWith("tmp-") &&
+        m.auteurId === msg.data.auteurId &&
+        m.type === msg.data.type &&
+        (
+          (m.type === "TEXTE" || m.type === "EPHEMERE") ? m.contenu === msg.data.contenu :
+          m.type === "IMAGE" ? true :
+          m.type === "AUDIO" ? true : false
+        )
+    );
+    if (sameIdx !== -1) {
+      return [
+        ...prev.slice(0, sameIdx),
+        msg.data,
+        ...prev.slice(sameIdx + 1)
+      ];
+    }
+    return [...prev, msg.data];
+  });
+
+  // ACK et LU (inchangé)
+  if (msg.data.auteurId !== utilisateur.id) {
+    fetch("/api/messages/acknowledge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId: msg.data.id }),
+    });
+    fetch("/api/messages/mark-as-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId: msg.data.id }),
+    });
+  }
+};
     // Réaction reçue (liste complète)
     const onReaction = (msg) => {
       const { messageId, reactions } = msg.data;

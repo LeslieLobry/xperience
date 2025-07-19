@@ -4,6 +4,11 @@ import data from "@emoji-mart/data";
 import "./ChatInput.css";
 import { CircleStop } from "lucide-react";
 
+// ===== UTILS =====
+function generateOptimisticKey() {
+  return "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 100000);
+}
+
 export default function ChatInput({
   utilisateur,
   conversationId,
@@ -22,10 +27,8 @@ export default function ChatInput({
   const audioChunks = useRef([]);
   const textareaRef = useRef();
 
-  // --- NOUVEAU: gestion envoi pour éviter double submit
   const [isSending, setIsSending] = useState(false);
 
-  // --- CALCUL DE LA DUREE
   function formatDuration(secs) {
     if (!secs || isNaN(secs) || !isFinite(secs) || secs < 0) return "0:01";
     const m = Math.floor(secs / 60);
@@ -34,12 +37,10 @@ export default function ChatInput({
   }
 
   async function getAccurateDuration(blob) {
-    // 1. Chrono JS (ref)
     let chrono = 0;
     if (audioStartRef.current && audioStopRef.current) {
       chrono = Math.round((audioStopRef.current - audioStartRef.current) / 1000);
     }
-    // 2. Lecture blob
     let html5 = null;
     try {
       html5 = await new Promise((resolve) => {
@@ -48,22 +49,14 @@ export default function ChatInput({
         audio.src = URL.createObjectURL(blob);
         audio.onloadedmetadata = function () {
           let d = audio.duration;
-          console.log("[DEBUG] audio.duration HTML5 onloadedmetadata:", d);
           URL.revokeObjectURL(audio.src);
           if (d && isFinite(d) && d > 0) resolve(Math.round(d));
           else resolve(null);
         };
-        audio.onerror = function () {
-          console.warn("[DEBUG] audio.duration HTML5 error");
-          resolve(null);
-        };
+        audio.onerror = function () { resolve(null); };
       });
-    } catch (err) {
-      console.warn("[DEBUG] getAccurateDuration error", err);
-    }
-    // 3. Prend le plus crédible
+    } catch (err) {}
     let duree = Math.max(chrono || 0, html5 || 0);
-    console.log("[DEBUG] chrono:", chrono, "html5:", html5, "retenu:", duree);
     if (!duree || isNaN(duree) || duree < 1) duree = 1;
     return formatDuration(duree);
   }
@@ -87,14 +80,12 @@ export default function ChatInput({
       (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]), text
     );
   }
- // --- IMAGE COMPRESSION ---
-  // Utilitaire pour compresser/redimensionner l'image
+  // --- IMAGE COMPRESSION ---
   const compressImage = (file, maxSize = 900) =>
     new Promise((resolve) => {
       const img = new window.Image();
       const url = URL.createObjectURL(file);
       img.onload = function () {
-        // Calcul du ratio pour respecter l'aspect
         const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
         const width = Math.round(img.width * ratio);
         const height = Math.round(img.height * ratio);
@@ -109,7 +100,7 @@ export default function ChatInput({
             URL.revokeObjectURL(url);
           },
           "image/jpeg",
-          0.7 // qualité (0.7 = 70%)
+          0.7
         );
       };
       img.src = url;
@@ -198,7 +189,6 @@ export default function ChatInput({
       videoRef.current.srcObject = cameraStream;
     }
     return () => stopCamera();
-    // eslint-disable-next-line
   }, [showCamera, cameraStream]);
   const handleTakePhoto = () => {
     if (!videoRef.current) return;
@@ -217,17 +207,15 @@ export default function ChatInput({
       }
     }, "image/jpeg", 0.9);
   };
- const handleImageUpload = async (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (imagePreview) URL.revokeObjectURL(imagePreview);
 
-    // COMPRESS!
     let compressed = file;
     try {
-      compressed = await compressImage(file, 900); // max 900px large/haut
+      compressed = await compressImage(file, 900);
     } catch (err) {
-      // fallback sur l'image originale si erreur
       compressed = file;
     }
     const url = URL.createObjectURL(compressed);
@@ -297,27 +285,20 @@ export default function ChatInput({
     try {
       // IMAGE
       if (imageFile) {
+        const optimisticKey = generateOptimisticKey();
         const formData = new FormData();
         formData.append("image", imageFile);
         formData.append("conversationId", conversationId);
         formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
+        formData.append("optimisticKey", optimisticKey);
         if (texte) formData.append("contenu", texte);
         if (utilisateur.type === "couple" && prenomsOK) {
           formData.append("membreParlant", membreParlant);
           formData.append("prenom1", pr1);
           formData.append("prenom2", pr2);
         }
-        // --- LOG formData IMAGE ---
-        console.log("[DEBUG] ENVOI IMAGE :");
-        for (let [key, val] of formData.entries()) {
-          if (key === "image" && val instanceof Blob) {
-            console.log(key, val, val.size, val.type);
-          } else {
-            console.log(key, val);
-          }
-        }
 
-        await onMessageSent(formData);
+        await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
         if (imagePreview) URL.revokeObjectURL(imagePreview);
         setImageFile(null);
         setImagePreview(null);
@@ -329,14 +310,14 @@ export default function ChatInput({
 
       // AUDIO
       if (audioBlob) {
+        const optimisticKey = generateOptimisticKey();
         let duree = await getAccurateDuration(audioBlob);
-        console.log("[DEBUG FRONT] Durée calculée:", duree);
-        console.log("[DEBUG FRONT] userAgent:", navigator.userAgent);
         const formData = new FormData();
         formData.append("audio", audioBlob, "audio.webm");
         formData.append("conversationId", conversationId);
         formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
         formData.append("duree", duree);
+        formData.append("optimisticKey", optimisticKey);
 
         if (utilisateur.type === "couple" && prenomsOK) {
           formData.append("membreParlant", membreParlant);
@@ -344,17 +325,7 @@ export default function ChatInput({
           formData.append("prenom2", pr2);
         }
 
-        // --- LOG formData AUDIO ---
-        console.log("[DEBUG] ENVOI AUDIO :");
-        for (let [key, val] of formData.entries()) {
-          if (val instanceof Blob) {
-            console.log("FORMDATA ENVOYE :", key, val, val.size, val.type);
-          } else {
-            console.log("FORMDATA ENVOYE :", key, val);
-          }
-        }
-
-        await onMessageSent(formData);
+        await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioBlob(null);
         setAudioUrl(null);
@@ -371,23 +342,24 @@ export default function ChatInput({
         setIsSending(false);
         return;
       }
-      // --- LOG TEXTE ---
-      console.log("[DEBUG] ENVOI TEXTE :", texte);
+      const optimisticKey = generateOptimisticKey();
       if (utilisateur.type === "couple" && prenomsOK) {
         await onMessageSent({
           contenu: texte,
           type: ephemere ? "EPHEMERE" : "TEXTE",
           conversationId,
+          optimisticKey,
           prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
           prenom1: pr1,
           prenom2: pr2,
-        });
+        }, "TEXTE", membreParlant, false, optimisticKey);
       } else {
         await onMessageSent({
           contenu: texte,
           type: ephemere ? "EPHEMERE" : "TEXTE",
           conversationId,
-        });
+          optimisticKey,
+        }, "TEXTE", undefined, false, optimisticKey);
       }
       setTexte("");
       setEphemere(false);
@@ -412,7 +384,6 @@ export default function ChatInput({
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
-        // Inputs pour entrer les prénoms
         <form className="chat-input" onSubmit={handlePrenomsSubmit} style={{ flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <input
@@ -484,7 +455,6 @@ export default function ChatInput({
         </select>
       )}
 
-      {/* Notification éphémère */}
       {showEphemereNotif && (
         <div style={{
           position: "fixed",
@@ -503,7 +473,6 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* FORM PRINCIPAL */}
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
         <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e) => {
           const value = e.target.value;
@@ -605,14 +574,14 @@ export default function ChatInput({
           )}
 
           {/* Upload classique */}
-        <input
-  type="file"
-  accept="image/*"
-  id="file-upload"
-  style={{ display: "none" }}
-  onChange={handleImageUpload}
-  disabled={!!imageFile || isSending}
-/>
+          <input
+            type="file"
+            accept="image/*"
+            id="file-upload"
+            style={{ display: "none" }}
+            onChange={handleImageUpload}
+            disabled={!!imageFile || isSending}
+          />
           <label
             htmlFor="file-upload"
             className="chat-input-photo-btn"
@@ -627,9 +596,8 @@ export default function ChatInput({
             onClick={() => setEphemere((v) => !v)}
             title="Message éphémère (Snap)"
           >
-            <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
+             <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
           </button>
-
           {/* MICRO */}
           <button
             type="button"
@@ -647,7 +615,6 @@ export default function ChatInput({
               <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
             </svg>}
           </button>
-
           {/* EMOJI */}
           <button
             type="button"
@@ -684,8 +651,6 @@ export default function ChatInput({
                 : "Envoyer"}
         </button>
       </form>
-
-      {/* Emoji picker */}
       {showEmojiPicker && (
         <div className="emoji-picker-container">
           <Picker
@@ -701,3 +666,4 @@ export default function ChatInput({
     </>
   );
 }
+

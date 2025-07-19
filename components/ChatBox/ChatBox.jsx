@@ -560,29 +560,90 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           {typingPseudo} est en train d&apos;écrire...
         </div>
       )}
+<ChatInput
+  utilisateur={utilisateur}
+  conversationId={conversationId}
+  texte={texte}
+  setTexte={setTexte}
+  showEmojiPicker={showEmojiPicker}
+  setShowEmojiPicker={setShowEmojiPicker}
+  onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+    // --- UI optimiste ---
+    const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 
-      <ChatInput
-        utilisateur={utilisateur}
-        conversationId={conversationId}
-        texte={texte}
-        setTexte={setTexte}
-        showEmojiPicker={showEmojiPicker}
-        setShowEmojiPicker={setShowEmojiPicker}
-        onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
-          if (isImage) {
-            await fetch("/api/messages", {
-              method: "POST",
-              body: contenu,
-            });
-          } else {
-            await envoyerMessage(contenu, type, membreParlant);
-          }
-        }}
-        onTyping={envoyerTyping}
-        startRecording={startRecording}
-        stopRecording={stopRecording}
-        recording={recording}
-      />
+   let optimisticMessage;
+if (isImage && contenu instanceof FormData) {
+  optimisticMessage = {
+    id: tmpId,
+    auteurId: utilisateur.id,
+    auteur: utilisateur, // 👈 ajoute tout l'objet, y compris pseudo/avatar etc.
+    pseudo: utilisateur.pseudo, // facultatif si tu préfères juste pseudo
+    type: contenu.get("type") || "IMAGE",
+    contenu: "[Image]",
+    createdAt: new Date().toISOString(),
+    statut: "pending",
+    ephemere: !!contenu.get("type") && contenu.get("type").toUpperCase() === "EPHEMERE",
+  };
+} else if (type === "AUDIO") {
+  optimisticMessage = {
+    id: tmpId,
+    auteurId: utilisateur.id,
+    auteur: utilisateur,
+    pseudo: utilisateur.pseudo,
+    type,
+    contenu: "[Audio]",
+    createdAt: new Date().toISOString(),
+    statut: "pending",
+    ephemere: false,
+  };
+} else {
+  optimisticMessage = {
+    id: tmpId,
+    auteurId: utilisateur.id,
+    auteur: utilisateur,
+    pseudo: utilisateur.pseudo,
+    type: type || "TEXTE",
+    contenu: typeof contenu === "string" ? contenu : contenu.contenu,
+    createdAt: new Date().toISOString(),
+    statut: "pending",
+    ephemere: type === "EPHEMERE",
+  };
+}
+
+    // Ajoute instantanément à la liste des messages
+    setMessages((msgs) => [...msgs, optimisticMessage]);
+
+    // Envoi réel
+    try {
+      let result;
+      if (isImage && contenu instanceof FormData) {
+        const res = await fetch("/api/messages", { method: "POST", body: contenu });
+        result = await res.json();
+        if (result?.message?.id) {
+          setMessages((msgs) =>
+            msgs.map((m) => m.id === tmpId ? result.message : m)
+          );
+        }
+      } else {
+        const message = await envoyerMessage(contenu, type, membreParlant);
+        if (message?.id) {
+          setMessages((msgs) =>
+            msgs.map((m) => m.id === tmpId ? message : m)
+          );
+        }
+      }
+    } catch (err) {
+      setMessages((msgs) =>
+        msgs.map((m) => m.id === tmpId ? { ...m, statut: "failed" } : m)
+      );
+    }
+  }}
+  onTyping={envoyerTyping}
+  startRecording={startRecording}
+  stopRecording={stopRecording}
+  recording={recording}
+/>
+
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">
