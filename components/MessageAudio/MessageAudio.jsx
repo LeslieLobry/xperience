@@ -124,12 +124,7 @@ export default function MessageAudio({ url, duration }) {
       </div>
       <span
         className="duration"
-        style={{
-          fontVariantNumeric: "tabular-nums",
-          fontSize: 13,
-          minWidth: 55,
-          textAlign: "right"
-        }}
+       
       >
         {formatAffichageDuree(current)} / {formatAffichageDuree(totalAffiche)}
       </span>

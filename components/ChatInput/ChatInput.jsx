@@ -572,6 +572,7 @@ export default function ChatInput({
             type="file"
             accept="image/*"
             id="file-upload"
+            capture="environment" 
             style={{ display: "none" }}
             onChange={handleImageUpload}
             disabled={!!imageFile || isSending}
