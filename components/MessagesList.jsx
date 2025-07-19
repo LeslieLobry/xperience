@@ -16,11 +16,10 @@ export default function MessagesList({
 }) {
   const containerRef = useRef();
   const endRef = useRef();
+
   // → Fonction utilitaire pour avoir les prénoms au bon format string
   const getPrenomsCoupleString = (msg) => {
-    // Si le message a prénom1 et prénom2 (ex : stocké dans la DB)
     if (msg.prenom1 && msg.prenom2) return `${msg.prenom1} & ${msg.prenom2}`;
-    // Si msg.prenomsCouple est un objet {prenom1, prenom2}
     if (
       msg.prenomsCouple &&
       typeof msg.prenomsCouple === "object" &&
@@ -29,14 +28,9 @@ export default function MessagesList({
     ) {
       return `${msg.prenomsCouple.prenom1} & ${msg.prenomsCouple.prenom2}`;
     }
-    // Si msg.prenomsCouple est une string
-    if (
-      msg.prenomsCouple &&
-      typeof msg.prenomsCouple === "string"
-    ) {
+    if (msg.prenomsCouple && typeof msg.prenomsCouple === "string") {
       return msg.prenomsCouple;
     }
-    // Sinon utiliser la prop parent si elle existe (string ou objet)
     if (
       prenomsCouple &&
       typeof prenomsCouple === "object" &&
@@ -45,37 +39,32 @@ export default function MessagesList({
     ) {
       return `${prenomsCouple.prenom1} & ${prenomsCouple.prenom2}`;
     }
-    if (
-      prenomsCouple &&
-      typeof prenomsCouple === "string"
-    ) {
+    if (prenomsCouple && typeof prenomsCouple === "string") {
       return prenomsCouple;
     }
-    // Rien à afficher
     return "";
   };
 
+  // Lazy loading des anciens messages au scroll haut
   useEffect(() => {
     const container = containerRef.current;
+    if (!container) return;
     const handleScroll = () => {
       if (container.scrollTop < 50 && hasMore) {
         onLoadMore();
       }
     };
-    container?.addEventListener("scroll", handleScroll);
-    return () => container?.removeEventListener("scroll", handleScroll);
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
-useEffect(() => {
-  const container = containerRef.current;
-  if (endRef.current && container) {
-    // Scroll jusqu'en bas (dernier message)
-    endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    // Décale légèrement pour ne pas coller au bas (évite le footer, barre d’input, etc)
-    setTimeout(() => {
-      container.scrollTop -= 60; // ajuste la valeur à la taille de ton footer (50, 80, etc)
-    }, 150);
-  }
-}, [messages]);
+
+  // Scroll toujours en bas (dernier message)
+  useEffect(() => {
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages]);
+
   let lastDate = null;
 
   return (
@@ -91,8 +80,6 @@ useEffect(() => {
           showDate = true;
           lastDate = msgDate;
         }
-
-        // Affichage "Aujourd'hui" / "Hier" / date classique
         let label = format(msgDate, "dd/MM/yyyy", { locale: fr });
         const now = new Date();
         if (isSameDay(msgDate, now)) label = "Aujourd'hui";
