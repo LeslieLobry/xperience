@@ -377,10 +377,13 @@ export default function ChatInput({
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
-  const handleSubmitWithNotif = async (e) => {
-    if (ephemere) setShowEphemereNotif(true);
-    await handleSubmit(e);
-  };
+ const handleSubmitWithNotif = async (e) => {
+  e.preventDefault();
+  if (isSending) return;    // ← Ajoute cette ligne ici !
+  if (ephemere) setShowEphemereNotif(true);
+  await handleSubmit(e);
+};
+
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
