@@ -220,18 +220,24 @@ export async function GET(req) {
     }
     const auteurId = user.id;
 
-    // Vérification d’accès
-    const participantsMeta = await prisma.participant.findMany({
+    // Récupère TOUS les participants et leur info (header + lastReads d'un coup)
+    const allParticipants = await prisma.participant.findMany({
       where: { conversationId },
-      select: { utilisateurId: true, lastReadAt: true },
+      select: {
+        utilisateurId: true,
+        lastReadAt: true,
+        utilisateur: { select: { id: true, pseudo: true, photoUrl: true, type: true } }
+      }
     });
-    const autresParticipants = participantsMeta.map((p) => p.utilisateurId).filter((id) => id !== auteurId);
+    const autresParticipants = allParticipants
+      .map((p) => p.utilisateurId)
+      .filter((id) => id !== auteurId);
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
 
-    // Fetch messages optimisé
+    // Fetch messages
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
@@ -262,40 +268,27 @@ export async function GET(req) {
         },
       },
     });
-
     messages.reverse(); // Chronologique
 
-    // Destinataire (si besoin)
-    const destinataire = autresParticipants.length === 1
-      ? await prisma.utilisateur.findUnique({
-          where: { id: autresParticipants[0] },
-          select: { id: true, pseudo: true, photoUrl: true },
-        })
-      : null;
-
-    // Retourne lastReads
-    const lastReads = participantsMeta.map((p) => ({
+    // Recompose lastReads et participants d'après allParticipants
+    const lastReads = allParticipants.map((p) => ({
       utilisateurId: p.utilisateurId,
       lastReadAt: p.lastReadAt,
     }));
+    const participants = allParticipants.map((p) => p.utilisateur);
 
-    // Ajoute TOUS les participants (avec leurs infos, pour affichage header)
-    const allParticipants = await prisma.participant.findMany({
-      where: { conversationId },
-      select: {
-        utilisateur: {
-          select: { id: true, pseudo: true, photoUrl: true, type: true }
-        }
-      }
-    });
-    const participants = allParticipants.map((p) => p.utilisateur); // Voilà le header propre
+    // Si vraiment besoin du destinataire DM :
+    let destinataire = null;
+    if (autresParticipants.length === 1) {
+      destinataire = participants.find((u) => u.id === autresParticipants[0]);
+    }
 
     return NextResponse.json(
       {
         success: true,
         messages,
         destinataire,
-        participants, // Pour le header
+        participants,
         lastReads,
       },
       { status: 200 }
