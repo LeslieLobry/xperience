@@ -2,18 +2,16 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
-import { type } from "os";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-function getUserFromToken() {
-  const headerList = headers();
+// getUserFromToken DOIT être async en Next.js app dir API
+async function getUserFromToken() {
+  const headerList = await headers();
   const cookieHeader = headerList.get("cookie") || "";
   const tokenMatch = cookieHeader.match(/token=([^;]+)/);
   const token = tokenMatch?.[1];
-
   if (!token || !JWT_SECRET) return null;
-
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch {
@@ -22,7 +20,7 @@ function getUserFromToken() {
 }
 
 export async function GET() {
-  const decoded = getUserFromToken();
+  const decoded = await getUserFromToken();
   if (!decoded) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
@@ -30,12 +28,13 @@ export async function GET() {
   const userId = decoded.id;
 
   try {
+    // -- PROMISE ALL OPTI --
     const [
       utilisateur,
       conversations,
       notifications,
       articles,
-      evenementsRaw
+      evenementsRaw,
     ] = await Promise.all([
       prisma.utilisateur.findUnique({
         where: { id: userId },
@@ -52,7 +51,6 @@ export async function GET() {
           verificationIdentite: true,
         },
       }),
-
       prisma.conversation.findMany({
         where: {
           participants: {
@@ -74,14 +72,12 @@ export async function GET() {
         orderBy: { updatedAt: "desc" },
         take: 10,
       }),
-
       prisma.notification.findMany({
         where: { utilisateurId: userId, lu: false },
         orderBy: { createdAt: "desc" },
         take: 10,
         select: { id: true, message: true, lien: true, createdAt: true },
       }),
-
       prisma.article.findMany({
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -92,7 +88,6 @@ export async function GET() {
           },
         },
       }),
-
       prisma.evenement.findMany({
         select: {
           id: true,
@@ -101,11 +96,16 @@ export async function GET() {
           dates: true,
           lieu: true,
         },
-        take: 20, // limite brute, vrai filtre ci-dessous
+        take: 20,
       }),
     ]);
 
-    // 👉 Filtrer et trier les événements à venir (dates >= aujourd'hui)
+    // Sécurité : utilisateur n'existe plus
+    if (!utilisateur) {
+      return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 401 });
+    }
+
+    // Trier/filtrer les évènements à venir
     const now = new Date();
     const evenements = (evenementsRaw || [])
       .filter(evt =>
