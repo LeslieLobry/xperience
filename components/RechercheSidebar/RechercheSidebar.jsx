@@ -142,7 +142,7 @@ const handleSearch = (formRaw) => {
             console.log("[Vocal] Filtres extraits:", filtres);
             handleSearch({ ...form, ...filtres });
           }}
-        /> */}
+        /> */}  
         {resumeVocal && (
           <div
             style={{
