@@ -1,129 +1,52 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import useSWR from "swr";
 import { Realtime } from "ably";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
+const MESSAGES_LIMIT = 30;
+const fetcher = (url) => fetch(url).then(res => res.json());
+
 export function useMessages(conversationId, utilisateur, setTexte) {
-  const [messages, setMessages] = useState([]);
-  const [participantsAutres, setParticipantsAutres] = useState([]);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastReads, setLastReads] = useState([]);
-  const MESSAGES_LIMIT = 30;
-
-  // Référence pour stocker les timers d'effacement des messages éphémères
-  const ephemeralTimers = useRef({});
-
-  // --- PATCH: fetch "refetchable" conversation/messages/participants ---
-const refetchConversation = useCallback(async () => {
-  if (!conversationId) return;
-  const res = await fetch(
-    `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
+  // 1. SWR pour messages/participants
+  const { data, error, isLoading, mutate } = useSWR(
+    conversationId ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}` : null,
+    fetcher
   );
-  const data = await res.json();
-  if (data.success) {
-    setMessages(data.messages || []);
-    // PATCH pour groupes ou DM
-    if (data.participants) {
-      setParticipantsAutres(data.participants.filter(u => u.id !== utilisateur.id));
-    } else if (data.destinataire) {
-      setParticipantsAutres([data.destinataire]);
-    } else {
-      setParticipantsAutres([]);
-    }
-    setHasMore((data.messages || []).length === MESSAGES_LIMIT);
-    setLastReads(data.lastReads || []);
-  }
-}, [conversationId, utilisateur.id]);
-  // ----------------------------------------------------------------------
 
-  // Chargement initial des messages ET des statuts de lecture
-  useEffect(() => {
-    refetchConversation();
-  }, [refetchConversation]);
+  const messages = data?.messages || [];
+  const participantsAutres = (data?.participants || []).filter(u => u.id !== utilisateur.id);
+  const hasMore = messages.length === MESSAGES_LIMIT;
+  const lastReads = data?.lastReads || [];
+
+  // Référence pour timers d'effacement messages éphémères
+  const ephemeralTimers = useRef({});
 
   // Abonnement temps réel Ably pour cette conversation
   useEffect(() => {
     if (!conversationId) return;
     const channel = ably.channels.get(`conversation-${conversationId}`);
 
-    // Nouveau message reçu
-const onMessage = (msg) => {
-  setMessages((prev) => {
-    // 1. Si la vraie réponse a un optimisticKey et qu’on a un message optimiste local avec ce champ
-    if (msg.data.optimisticKey) {
-      const idx = prev.findIndex((m) => m.optimisticKey === msg.data.optimisticKey);
-      if (idx !== -1) {
-        return [
-          ...prev.slice(0, idx),
-          msg.data,
-          ...prev.slice(idx + 1)
-        ];
+    const onMessage = (msg) => {
+      // Cas "optimistic update"
+      mutate(); // On refetch pour être synchro (sinon tu peux faire update local si tu veux)
+      // ACK et LU (inchangé)
+      if (msg.data.auteurId !== utilisateur.id) {
+        fetch("/api/messages/acknowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: msg.data.id }),
+        });
+        fetch("/api/messages/mark-as-read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: msg.data.id }),
+        });
       }
-    }
-
-    // 2. Sinon, on fait l’ancien matching par id et heuristique
-    if (prev.some((m) => m.id === msg.data.id)) return prev;
-
-    const sameIdx = prev.findIndex(
-      (m) =>
-        String(m.id).startsWith("tmp-") &&
-        m.auteurId === msg.data.auteurId &&
-        m.type === msg.data.type &&
-        (
-          (m.type === "TEXTE" || m.type === "EPHEMERE") ? m.contenu === msg.data.contenu :
-          m.type === "IMAGE" ? true :
-          m.type === "AUDIO" ? true : false
-        )
-    );
-    if (sameIdx !== -1) {
-      return [
-        ...prev.slice(0, sameIdx),
-        msg.data,
-        ...prev.slice(sameIdx + 1)
-      ];
-    }
-    return [...prev, msg.data];
-  });
-
-  // ACK et LU (inchangé)
-  if (msg.data.auteurId !== utilisateur.id) {
-    fetch("/api/messages/acknowledge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messageId: msg.data.id }),
-    });
-    fetch("/api/messages/mark-as-read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messageId: msg.data.id }),
-    });
-  }
-};
-    // Réaction reçue (liste complète)
-    const onReaction = (msg) => {
-      const { messageId, reactions } = msg.data;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, reactions }
-            : m
-        )
-      );
     };
 
-    // Statut de lecture reçu
-    const onRead = (msg) => {
-      setLastReads((prev) => {
-        const idx = prev.findIndex(r => r.utilisateurId === msg.data.utilisateurId);
-        if (idx > -1) {
-          const copy = [...prev];
-          copy[idx] = msg.data;
-          return copy;
-        }
-        return [...prev, msg.data];
-      });
-    };
+    const onReaction = () => { mutate(); };
+    const onRead = () => { mutate(); };
 
     channel.subscribe("message", onMessage);
     channel.subscribe("reaction", onReaction);
@@ -134,36 +57,30 @@ const onMessage = (msg) => {
       channel.unsubscribe("reaction", onReaction);
       channel.unsubscribe("read", onRead);
     };
-  }, [conversationId, utilisateur.id]);
+  }, [conversationId, utilisateur.id, mutate]);
 
   // Chargement des anciens messages (lazy loading)
   const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || isLoadingMore || !hasMore || messages.length === 0) return;
-    setIsLoadingMore(true);
+    if (!conversationId || !hasMore || messages.length === 0) return;
     const oldestMessageId = messages[0]?.id;
-
     const res = await fetch(
       `/api/messages?conversationId=${conversationId}&beforeId=${oldestMessageId}&limit=${MESSAGES_LIMIT}`
     );
     const data = await res.json();
-
     if (data.success && data.messages) {
-      setMessages((prev) => [...data.messages, ...prev]);
-      setHasMore(data.messages.length === MESSAGES_LIMIT);
+      // Concatène anciens + actuels (patch temporaire pour l'exemple, à adapter à ton UI)
+      mutate({
+        ...data,
+        messages: [...data.messages, ...messages],
+      }, false); // false = pas de refetch auto
     }
-
-    setIsLoadingMore(false);
-  }, [conversationId, messages, isLoadingMore, hasMore]);
+  }, [conversationId, messages, hasMore, mutate]);
 
   // Envoi d'un message
   const envoyerMessage = async (data, type = "TEXTE", envoyeur, prenom1, prenom2) => {
     let res, result;
-    // Si data est un FormData (cas image, audio, etc.)
     if (data instanceof FormData) {
-      res = await fetch("/api/messages", {
-        method: "POST",
-        body: data,
-      });
+      res = await fetch("/api/messages", { method: "POST", body: data });
     } else {
       if (typeof data === "string") {
         if (!data.trim()) return null;
@@ -180,16 +97,13 @@ const onMessage = (msg) => {
         body: JSON.stringify(payload),
       });
     }
-
     result = await res.json();
 
-  if (result.success) {
-  
-  setTexte && setTexte("");
-  return result.message;
-}
-
-
+    if (result.success) {
+      setTexte && setTexte("");
+      mutate(); // Refetch après envoi pour synchro
+      return result.message;
+    }
     return null;
   };
 
@@ -200,17 +114,9 @@ const onMessage = (msg) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emoji }),
     });
-
     const data = await res.json();
-
     if (data.success) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, reactions: data.reactions }
-            : m
-        )
-      );
+      mutate();
       const channel = ably.channels.get(`conversation-${conversationId}`);
       channel.publish("reaction", { messageId, reactions: data.reactions });
     }
@@ -222,7 +128,7 @@ const onMessage = (msg) => {
       return;
     }
     ephemeralTimers.current[messageId] = setTimeout(() => {
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      // Ce sera auto mis à jour via mutate/Ably côté serveur
       delete ephemeralTimers.current[messageId];
     }, 5000);
   };
@@ -237,15 +143,15 @@ const onMessage = (msg) => {
 
   return {
     messages,
-    setMessages,
     participantsAutres,
     envoyerMessage,
     handleReaction,
     hasMore,
     loadMoreMessages,
     lastReads,
-    setLastReads,
     lancerSuppressionAvecDelai,
-    refetchParticipants: refetchConversation,
+    mutate, // Pour rafraîchir si besoin
+    isLoading,
+    error,
   };
 }

@@ -54,7 +54,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     length: 0,
   });
 
-  // --------------------- HOOKS (à placer AVANT les useEffect qui les utilisent) ----------------------
+
   const {
     messages,
     lastReads,
@@ -63,7 +63,9 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     envoyerMessage,
     handleReaction,
     loadMoreMessages,
-    hasMore,
+     hasMore,
+    mutate, // important pour la resynchro après envoi !
+    isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
 
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(conversationId, utilisateur);
@@ -575,77 +577,82 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   setTexte={setTexte}
   showEmojiPicker={showEmojiPicker}
   setShowEmojiPicker={setShowEmojiPicker}
-  onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
-    // --- UI optimiste ---
-    const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+  const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+  let optimisticMessage;
+  if (isImage && contenu instanceof FormData) {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type: contenu.get("type") || "IMAGE",
+      contenu: "[Image]",
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere: !!contenu.get("type") && contenu.get("type").toUpperCase() === "EPHEMERE",
+    };
+  } else if (type === "AUDIO") {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type,
+      contenu: "[Audio]",
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere: false,
+    };
+  } else {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type: type || "TEXTE",
+      contenu: typeof contenu === "string" ? contenu : contenu.contenu,
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere: type === "EPHEMERE",
+    };
+  }
 
-   let optimisticMessage;
-if (isImage && contenu instanceof FormData) {
-  optimisticMessage = {
-    id: tmpId,
-    auteurId: utilisateur.id,
-    auteur: utilisateur, // 👈 ajoute tout l'objet, y compris pseudo/avatar etc.
-    pseudo: utilisateur.pseudo, // facultatif si tu préfères juste pseudo
-    type: contenu.get("type") || "IMAGE",
-    contenu: "[Image]",
-    createdAt: new Date().toISOString(),
-    statut: "pending",
-    ephemere: !!contenu.get("type") && contenu.get("type").toUpperCase() === "EPHEMERE",
-  };
-} else if (type === "AUDIO") {
-  optimisticMessage = {
-    id: tmpId,
-    auteurId: utilisateur.id,
-    auteur: utilisateur,
-    pseudo: utilisateur.pseudo,
-    type,
-    contenu: "[Audio]",
-    createdAt: new Date().toISOString(),
-    statut: "pending",
-    ephemere: false,
-  };
-} else {
-  optimisticMessage = {
-    id: tmpId,
-    auteurId: utilisateur.id,
-    auteur: utilisateur,
-    pseudo: utilisateur.pseudo,
-    type: type || "TEXTE",
-    contenu: typeof contenu === "string" ? contenu : contenu.contenu,
-    createdAt: new Date().toISOString(),
-    statut: "pending",
-    ephemere: type === "EPHEMERE",
-  };
-}
+  // ---- Ajoute via mutate (optimistic update) ----
+  mutate(
+    old => ({
+      ...old,
+      messages: [...(old?.messages || []), optimisticMessage],
+    }),
+    false // (false = pas de revalidation immédiate)
+  );
 
-    // Ajoute instantanément à la liste des messages
-    setMessages((msgs) => [...msgs, optimisticMessage]);
-
-    // Envoi réel
-    try {
-      let result;
-      if (isImage && contenu instanceof FormData) {
-        const res = await fetch("/api/messages", { method: "POST", body: contenu });
-        result = await res.json();
-        if (result?.message?.id) {
-          setMessages((msgs) =>
-            msgs.map((m) => m.id === tmpId ? result.message : m)
-          );
-        }
-      } else {
-        const message = await envoyerMessage(contenu, type, membreParlant);
-        if (message?.id) {
-          setMessages((msgs) =>
-            msgs.map((m) => m.id === tmpId ? message : m)
-          );
-        }
+  // ---- Envoi réel (API) ----
+  try {
+    let result;
+    if (isImage && contenu instanceof FormData) {
+      const res = await fetch("/api/messages", { method: "POST", body: contenu });
+      result = await res.json();
+      if (result?.message?.id) {
+        mutate(); // refetch pour synchroniser la liste avec le vrai message du serveur (remplace le tmp-)
       }
-    } catch (err) {
-      setMessages((msgs) =>
-        msgs.map((m) => m.id === tmpId ? { ...m, statut: "failed" } : m)
-      );
+    } else {
+      const message = await envoyerMessage(contenu, type, membreParlant);
+      if (message?.id) {
+        mutate(); // idem : resync
+      }
     }
-  }}
+  } catch (err) {
+    // Set statut failed sur le message tmp en cas d’erreur
+    mutate(old => ({
+      ...old,
+      messages: (old?.messages || []).map((m) =>
+        m.id === tmpId ? { ...m, statut: "failed" } : m
+      ),
+    }), false);
+  }
+}}
+
   onTyping={envoyerTyping}
   startRecording={startRecording}
   stopRecording={stopRecording}

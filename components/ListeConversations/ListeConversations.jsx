@@ -1,138 +1,88 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
 import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function ListeConversations({ userId, onSelectConversation }) {
-  const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [renamingId, setRenamingId] = useState(null); 
+  const [renamingId, setRenamingId] = useState(null);
   const [newName, setNewName] = useState("");
 
-  // Déduplication lors du fetch
-  const fetchConversations = async () => {
-    try {
-      const res = await fetch("/api/conversations");
-      const data = await res.json();
-      // Déduplication ici
-      const uniqueConvs = [];
-      const ids = new Set();
-      (data.conversations || []).forEach((c) => {
-        if (!ids.has(c.id)) {
-          ids.add(c.id);
-          uniqueConvs.push(c);
-        }
-      });
-      setConversations(uniqueConvs);
-    } catch (err) {
-      console.error("❌ Erreur chargement conversations :", err);
-    }
-  };
+  // SWR : fetch conversations
+  const {
+    data,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(userId ? "/api/conversations" : null, fetcher);
 
+  const conversations = (data?.conversations || []).filter(
+    (c, idx, arr) => arr.findIndex((cc) => cc.id === c.id) === idx
+  );
+
+  // Ably = refetch conversations à chaque notif
   useEffect(() => {
     if (!userId) return;
-
-    fetchConversations();
-
     const channel = ably.channels.get(`notification-${userId}`);
-
-    const handleNewMessage = () => {
-      fetchConversations();
-    };
-
+    const handleNewMessage = () => mutate();
     channel.subscribe("message", handleNewMessage);
     channel.subscribe("refresh-conversations", handleNewMessage);
-
     return () => {
       channel.unsubscribe("message", handleNewMessage);
       channel.unsubscribe("refresh-conversations", handleNewMessage);
     };
-  }, [userId]);
+  }, [userId, mutate]);
 
+  // Suppression conversation
   const handleDelete = async (id) => {
     if (!confirm("Supprimer cette conversation ?")) return;
-
-    try {
-      const res = await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (selectedId === id) {
-          setSelectedId(null);
-        }
-        if (typeof onSelectConversation === "function") {
-          onSelectConversation(null);
-        }
-      } else {
-        const text = await res.text();
-        let error;
-        try {
-          error = JSON.parse(text);
-        } catch {
-          error = { message: text || "Erreur inconnue" };
-        }
-        console.error("❌ Erreur suppression conversation :", error.message || error);
-      }
-    } catch (err) {
-      console.error("❌ Erreur serveur :", err);
+    await fetch(`/api/conversations/${id}`, { method: "DELETE", credentials: "include" });
+    mutate();
+    if (selectedId === id) {
+      setSelectedId(null);
+      if (typeof onSelectConversation === "function") onSelectConversation(null);
     }
   };
 
+  // Renommage conversation
   const handleRename = async (id) => {
-    try {
-      const res = await fetch(`/api/conversations/${id}/rename`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nom: newName }),
-      });
+    const res = await fetch(`/api/conversations/${id}/rename`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom: newName }),
+    });
+    if (res.ok) {
+      setRenamingId(null);
+      setNewName("");
+      mutate();
+    } else {
       const data = await res.json();
-      if (res.ok) {
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === id ? { ...c, nom: data.conversation.nom } : c
-          )
-        );
-        setRenamingId(null);
-        setNewName("");
-      } else {
-        alert(data.error || "Erreur lors du renommage");
-      }
-    } catch (err) {
-      alert("Erreur réseau");
+      alert(data.error || "Erreur lors du renommage");
     }
   };
 
-  // HANDLE SELECT = mark-as-read (POST) + badge à 0
+  // Sélection + badge à 0
   const handleSelect = async (id) => {
     setSelectedId(id);
-    if (typeof onSelectConversation === "function") {
-      onSelectConversation(id);
-    }
-
-    try {
-      await fetch(`/api/conversations/${id}/mark-as-read`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === id ? { ...conv, unreadCount: 0 } : conv
-        )
-      );
-    } catch (err) {
-      console.error("Erreur lors de la mise à jour des non-lus :", err);
-    }
+    if (typeof onSelectConversation === "function") onSelectConversation(id);
+    await fetch(`/api/conversations/${id}/mark-as-read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    mutate();
   };
+
+  if (error) {
+    return <aside className="liste-conversations">Erreur de chargement...</aside>;
+  }
 
   return (
     <aside className="liste-conversations">
@@ -143,26 +93,25 @@ export default function ListeConversations({ userId, onSelectConversation }) {
         </button>
       </div>
 
-    {conversations.length === 0 && !selectedId && (
-  <div className="no-conversation-message">
-    <p>Aucune conversation pour l’instant.</p>
-    <a href="/recherche" className="start-search-link">
-      Trouver des profils à contacter
-    </a>
-  </div>
-)}
+      {/* Message si aucune conversation */}
+      {conversations.length === 0 && !selectedId && (
+        <div className="no-conversation-message">
+          <p>Aucune conversation pour l’instant.</p>
+          <a href="/recherche" className="start-search-link">
+            Trouver des profils à contacter
+          </a>
+        </div>
+      )}
 
       {conversations.map((conv) => {
         const autres = conv.participants
           .filter((p) => p.utilisateurId !== userId)
           .map((p) => p.utilisateur)
           .filter(Boolean);
-
         const pseudo =
           autres.length === 1
             ? autres[0].pseudo
             : autres.map((u) => u.pseudo).join(", ");
-
         const unreadCount = conv.unreadCount || 0;
 
         return (
@@ -180,8 +129,8 @@ export default function ListeConversations({ userId, onSelectConversation }) {
                     <>
                       <input
                         value={newName}
-                        onChange={e => setNewName(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") handleRename(conv.id); }}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRename(conv.id); }}
                         autoFocus
                         style={{ width: 120, marginRight: 6 }}
                         maxLength={40}
@@ -217,16 +166,16 @@ export default function ListeConversations({ userId, onSelectConversation }) {
         );
       })}
 
-    {showModal && (
-  <CreateConversationModal
-    currentUserId={userId}
-    onClose={() => setShowModal(false)}
-    onCreated={() => {           // <-- PAS d'argument ici !
-      fetchConversations();      // <-- On refetch à chaque création
-      setShowModal(false);
-    }}
-  />
-)}
+      {showModal && (
+        <CreateConversationModal
+          currentUserId={userId}
+          onClose={() => setShowModal(false)}
+          onCreated={() => {
+            mutate();
+            setShowModal(false);
+          }}
+        />
+      )}
     </aside>
   );
 }
