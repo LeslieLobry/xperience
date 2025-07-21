@@ -68,6 +68,41 @@ export async function POST(req) {
       } else {
         fileName = `msg_${uuidv4()}.${ext}`;
       }
+// Détection automatique de visage de mineur (Sightengine) si IMAGE ou EPHEMERE
+if (
+  (body.type === "IMAGE" || body.type === "EPHEMERE") &&
+  file.type.startsWith("image/")
+) {
+  try {
+    const moderationForm = new FormData();
+    moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
+    moderationForm.append("models", "face-attributes");
+    moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
+    moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
+
+    const moderationRes = await fetch("https://api.sightengine.com/1.0/check.json", {
+      method: "POST",
+      body: moderationForm,
+    });
+
+    const moderationData = await moderationRes.json();
+
+    console.log("🧠 [CHAT] Sightengine:", JSON.stringify(moderationData, null, 2));
+
+    if (moderationData?.faces?.length) {
+      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.9);
+      if (hasMinor) {
+        return NextResponse.json(
+          { success: false, message: "Image refusée : visage mineur détecté (IA)." },
+          { status: 400 }
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Erreur modération image (message):", error);
+    return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500 });
+  }
+}
 
       await s3.send(
         new PutObjectCommand({

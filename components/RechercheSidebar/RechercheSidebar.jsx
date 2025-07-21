@@ -134,7 +134,7 @@ const handleSearch = (formRaw) => {
     <aside className="recherche-sidebar">
       <h2>🔎 Recherche</h2>
       <div style={{ marginBottom: 24 }}>
-        {/* <ReconnaissanceVocale
+        <ReconnaissanceVocale
           onResult={texte => {
             setResumeVocal(texte);
             const filtres = extraireFiltresVocal(texte);
@@ -142,7 +142,7 @@ const handleSearch = (formRaw) => {
             console.log("[Vocal] Filtres extraits:", filtres);
             handleSearch({ ...form, ...filtres });
           }}
-        /> */}
+        />
         {resumeVocal && (
           <div
             style={{

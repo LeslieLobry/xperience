@@ -1,10 +1,10 @@
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '100mb'  // Ou 50mb, ou la taille souhaitée
+      sizeLimit: '100mb',
     }
   }
-}
+};
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -34,6 +34,38 @@ export async function POST(req) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
+  // 🔎 MODÉRATION via Sightengine
+  try {
+    const moderationForm = new FormData();
+    moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
+    moderationForm.append("models", "face-attributes");
+    moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
+    moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
+
+    const moderationRes = await fetch("https://api.sightengine.com/1.0/check.json", {
+      method: "POST",
+      body: moderationForm,
+    });
+
+    const moderationData = await moderationRes.json();
+console.log("🧠 Sightengine response:", JSON.stringify(moderationData, null, 2));
+
+ if (moderationData?.faces?.length) {
+  const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.9); // ou 0.8 si tu veux être plus large
+  if (hasMinor) {
+    return NextResponse.json(
+      { success: false, message: "Photo refusée : visage mineur détecté (IA)." },
+      { status: 400 }
+    );
+  }
+}
+
+  } catch (error) {
+    console.error("Erreur modération image :", error);
+    return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500 });
+  }
+
+  // ✅ UPLOAD S3
   const filename = `photo_${user.id}_${Date.now()}_${file.name}`;
   const bucket = process.env.AWS_S3_BUCKET;
 
@@ -52,7 +84,6 @@ export async function POST(req) {
       where: { id: parseInt(galerieId) },
     });
 
-    // ✅ Création automatique si la galerie n'existe pas
     if (!galerie) {
       galerie = await prisma.galeriePrivee.create({
         data: {

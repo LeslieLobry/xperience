@@ -65,12 +65,19 @@ export default function PhotoUploader({
         credentials: 'include',
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Upload échoué :", errorText);
-        alert("Erreur lors de l'envoi du fichier.");
-        return;
-      }
+     if (!res.ok) {
+  let message = "Erreur lors de l'envoi du fichier.";
+  try {
+    const json = await res.json();
+    message = json.message || message;
+  } catch (err) {
+    console.error("Erreur lors de la lecture de la réponse JSON :", err);
+  }
+  console.error("Upload échoué :", message);
+  alert(message);
+  return;
+}
+
 
       const data = await res.json();
       const url = data.photoUrl;
