@@ -70,6 +70,7 @@ color: #e0c084;
 
 .event-grid{
   display: flex;
+  justify-content: space-around;
 }
 
 .description-contenant {
