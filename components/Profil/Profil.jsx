@@ -73,7 +73,7 @@ export default function Profil({ user, connectedUser }) {
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
-  const [presignedPhotoUrl, setPresignedPhotoUrl] = useState("/default.jpg"); // <-- Ajout
+  const [presignedPhotoUrl, setPresignedPhotoUrl] = useState("/default.jpg");
   const [statut, setStatut] = useState(user.statut);
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
   const [modalOpen, setModalOpen] = useState(false);
@@ -81,7 +81,10 @@ export default function Profil({ user, connectedUser }) {
   // Pour chaque modal d’édition
   const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
   const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
+
+  // Pour uploader une photo de profil
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
+  const [uploaderKey, setUploaderKey] = useState(Date.now());
 
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
@@ -157,15 +160,19 @@ export default function Profil({ user, connectedUser }) {
   function handleEditField(champ) {
     if (champ === "Description") setOpenDescriptionModal(true);
     else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
-    else if (champ === "Photo de profil") setOpenPhotoUploader(true);
+    else if (champ === "Photo de profil") {
+      setUploaderKey(Date.now()); // Force un composant neuf à chaque ouverture
+      setOpenPhotoUploader(true);
+    }
     // Ajoute ici d’autres modals si besoin
   }
 
   return (
     <div className="profil-page">
-      {/* Modal d’upload photo déclenché par la complétion */}
+      {/* Modal d’upload photo déclenché par la complétion ou le bouton "changer photo" */}
       <SimpleModal open={openPhotoUploader} onClose={() => setOpenPhotoUploader(false)}>
         <PhotoUploader
+          key={uploaderKey}
           priority
           currentUrl={photoUrl}
           isOwnProfile={isOwnProfile}
@@ -185,7 +192,10 @@ export default function Profil({ user, connectedUser }) {
                 priority
                 currentUrl={photoUrl}
                 isOwnProfile={isOwnProfile}
-                onUpload={setPhotoUrl}
+                onUpload={(url) => {
+                  setPhotoUrl(url);
+                  setUploaderKey(Date.now()); // Pour éviter un bug si tu changes direct après
+                }}
               />
             </div>
             {/* Affichage modal photo grand */}

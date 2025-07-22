@@ -133,16 +133,8 @@ export default function PhotoUploader({
     }
   };
 
-  const handleClick = () => {
-    if (!isGallery && !isOwnProfile) return;
-    fileInputRef.current?.click();
-  };
-
   return (
-    <div
-      className={`photo-upload-contenant ${isGallery ? 'gallery-mode' : ''}`}
-      onClick={handleClick}
-    >
+    <div className={`photo-upload-contenant ${isGallery ? 'gallery-mode' : ''}`}>
       {!isGallery && preview && (
         <div className="photo-preview-wrapper">
           {previewType === "video" ? (
@@ -164,7 +156,14 @@ export default function PhotoUploader({
             />
           )}
           {isOwnProfile && (
-            <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
+            // Uniquement l'icône déclenche l'input file :
+            <label
+              htmlFor="photo-upload"
+              className="camera-label"
+              title="Changer la photo"
+              style={{ cursor: "pointer" }}
+              onClick={e => e.stopPropagation()} // <- pour éviter toute propagation indésirable
+            >
               <Camera className="camera-icon" />
             </label>
           )}
