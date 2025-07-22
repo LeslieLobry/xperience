@@ -44,7 +44,7 @@ export default function AvisList({ cibleId, connectedUserId }) {
 
   return (
     <div className="avis-list">
-      <h2>Avis reçus</h2>
+      <h2>Ils parlent de moi </h2>
       {avisRecus.map((avis) => (
         <AvisCard
           key={avis.id}

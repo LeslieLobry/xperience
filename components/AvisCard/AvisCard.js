@@ -42,11 +42,11 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
         <Image
           src={avis.auteur.photoUrl || "/default.jpg"}
           alt={`Avatar de ${avis.auteur.pseudo}`}
-          width={44}
-          height={44}
+          width={24}
+          height={24}
           className="avis-avatar"
         />
-        <strong className="avis-author">{avis.auteur.pseudo}</strong>
+        <strong className="avis-author">{avis.auteur.pseudo}:</strong>
       </header>
 
       {isEditing ? (
@@ -76,8 +76,14 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
 
       {isAuteur && !isEditing && (
         <footer className="avis-footer">
-          <Button title="Modifier"   onClick={() => setIsEditing(true)}color="#e0c084" />
-          <Button title="Supprimer"  onClick={handleDelete} color="#8c6a5d" disabled={loading} />
+       <Button  title="Modifier"  onClick={() => setIsEditing(true)}  color="#e0c084" 
+        style={{    padding: '4px 10px', fontSize: 13, borderRadius: 5, minWidth: 0,
+  }}
+/>
+<Button  title="Supprimer" onClick={handleDelete} color="#8c6a5d" disabled={loading} 
+style={{ padding: '4px 10px', fontSize: 13, borderRadius: 5, minWidth: 0, }}
+/>
+
         </footer>
       )}
     </article>

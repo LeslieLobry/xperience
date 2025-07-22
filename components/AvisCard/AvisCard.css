@@ -1,18 +1,19 @@
 .avis-card {
-  backdrop-filter: blur(4px);
   background: rgb(31 29 27 / 60%);
   border: 1px solid #e0c084;
   border-radius: 12px;
   margin-bottom: 1rem;
   color: #e0c084;
-  padding: 1rem;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .avis-header {
   display: flex;
   align-items: center;
-  gap: .65rem;
-  margin-bottom: .6rem;
+  gap: 8px;
 }
 
 .avis-avatar {
@@ -23,12 +24,12 @@
 
 .avis-author {
   color: #d6a98c;
+  font-size: 10px;
+}
+.avis-commentaire{
+  font-size:12px ;
 }
 
-.avis-commentaire {
-  line-height: 1.4;
-  margin-bottom: .9rem;
-}
 
 .avis-textarea {
   width: 100%;
@@ -45,5 +46,4 @@
 .avis-footer {
   display: flex;
   gap: .6rem;
-  margin-top: .6rem;
 }

@@ -4,9 +4,9 @@ import { prisma } from "../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET(_, { params }) {
-  const cookieStore = cookies();
-  const user = getUserFromToken(cookieStore);
-  const cibleId = parseInt(params.cibleId);
+  const cookieStore = await cookies();           // OBLIGATOIRE
+  const user = await getUserFromToken(cookieStore); // à await si async !
+  const cibleId = parseInt(params.cibleId, 10);  // Toujours préciser base 10
 
   if (!user || !user.id || !cibleId) {
     return NextResponse.json({ estBloqué: false }, { status: 401 });

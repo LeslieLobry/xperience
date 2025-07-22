@@ -1,19 +1,35 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
+// Bonne pratique : instance Prisma globale en dev (évite les bugs Hot Reload Next.js)
+let prisma;
+if (process.env.NODE_ENV === "production") {
+  prisma = new PrismaClient();
+} else {
+  if (!global.prisma) {
+    global.prisma = new PrismaClient();
+  }
+  prisma = global.prisma;
+}
 
 export async function GET(req, context) {
+  const { params } = await context; 
+
+
+  if (!params?.id) {
+    
+    return NextResponse.json({ error: "ID requis" }, { status: 400 });
+  }
+
+  const cibleId = parseInt(params.id, 10);
+  if (isNaN(cibleId)) {
+    
+    return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+  }
+
   try {
-    console.log("📍 ID reçu dans API avis :", context.params.id);
-    const id = context.params.id;
-
-    if (!id) {
-      return NextResponse.json({ error: "ID requis" }, { status: 400 });
-    }
-
     const avis = await prisma.avis.findMany({
-      where: { cibleId: parseInt(id, 10) },
+      where: { cibleId },
       include: {
         auteur: {
           select: {
@@ -23,16 +39,18 @@ export async function GET(req, context) {
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
+
+    // Debug : affichage du résultat
+    console.log(`API avis - ${avis.length} avis trouvés pour cibleId=${cibleId}`);
 
     return NextResponse.json({ avis });
   } catch (error) {
-    console.error("Erreur dans API avis :", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
+    console.error("Erreur dans API avis :", error, error?.message, error?.stack);
+    return NextResponse.json(
+      { error: "Erreur serveur", details: error?.message },
+      { status: 500 }
+    );
   }
 }
