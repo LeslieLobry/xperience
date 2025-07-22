@@ -5,12 +5,45 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import '../ProfilsDisplay/ProfilsDisplay.css';
 
+// --- Ajoute le hook ici ---
+function usePresignedPhotos(users) {
+  const [photoUrls, setPhotoUrls] = useState({});
+  useEffect(() => {
+    let canceled = false;
+    async function fetchAll() {
+      const result = {};
+      await Promise.all(
+        users.map(async (user) => {
+          if (!user.photoUrl) { result[user.id] = "/default.jpg"; return; }
+          if (user.photoUrl.startsWith("http")) { result[user.id] = user.photoUrl; return; }
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: user.photoUrl }),
+            });
+            const data = await res.json();
+            result[user.id] = data.url || "/default.jpg";
+          } catch { result[user.id] = "/default.jpg"; }
+        })
+      );
+      if (!canceled) setPhotoUrls(result);
+    }
+    fetchAll();
+    return () => { canceled = true; };
+  }, [JSON.stringify(users)]);
+  return photoUrls;
+}
+
 export default function RechercheResultats() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // --- Ajoute le hook ici
+  const photoUrls = usePresignedPhotos(utilisateurs);
 
   useEffect(() => {
     const params = searchParams.toString();
@@ -51,13 +84,7 @@ export default function RechercheResultats() {
                   title={user.statut === "en_ligne" ? "En ligne" : "Hors ligne"}
                 />
                 <img
-                  src={
-                    user.photoUrl?.startsWith("http")
-                      ? user.photoUrl
-                      : user.photoUrl
-                      ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, "")}`
-                      : "/default.jpg"
-                  }
+                  src={photoUrls[user.id] || "/default.jpg"}
                   alt={user.pseudo}
                   className="profil-photo"
                   onError={(e) => {

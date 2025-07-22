@@ -1,6 +1,37 @@
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Phone, Video, X, Plus, ArrowLeft } from "lucide-react";
 import "./ChatBox.css";
+
+// --- Ajoute ce hook ici ---
+function usePresignedPhotos(participants) {
+  const [photoUrls, setPhotoUrls] = useState({});
+  useEffect(() => {
+    let canceled = false;
+    async function fetchAll() {
+      const result = {};
+      await Promise.all(
+        participants.map(async (p) => {
+          if (!p.photoUrl) { result[p.id] = "/default.jpg"; return; }
+          if (p.photoUrl.startsWith("http")) { result[p.id] = p.photoUrl; return; }
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: p.photoUrl }),
+            });
+            const data = await res.json();
+            result[p.id] = data.url || "/default.jpg";
+          } catch { result[p.id] = "/default.jpg"; }
+        })
+      );
+      if (!canceled) setPhotoUrls(result);
+    }
+    fetchAll();
+    return () => { canceled = true; };
+  }, [JSON.stringify(participants)]);
+  return photoUrls;
+}
 
 export default function ChatHeader({
   participants = [],
@@ -11,6 +42,7 @@ export default function ChatHeader({
   onAddParticipant,
   onBack,
 }) {
+  const photoUrls = usePresignedPhotos(participants);
   // Simple détection mobile JS (optionnel)
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
@@ -46,9 +78,10 @@ export default function ChatHeader({
               passHref
             >
               <img
-                src={p.photoUrl || "/default-avatar.png"}
+                src={photoUrls[p.id] || "/default.jpg"}
                 alt={p.pseudo}
                 className="participant-avatar"
+                onError={e => { e.target.onerror = null; e.target.src = "/default.jpg"; }}
               />
               <span className="participant-name">{p.pseudo}</span>
             </Link>

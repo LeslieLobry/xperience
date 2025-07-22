@@ -1,19 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import "./MessageEphemere.css";
 
+function usePresignedPhoto(photoKey) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    if (!photoKey) return setUrl("/default.jpg");
+    if (photoKey.startsWith("http")) {
+      setUrl(photoKey);
+      return;
+    }
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: photoKey }),
+    })
+      .then((res) => res.json())
+      .then((data) => setUrl(data.url || "/default.jpg"))
+      .catch(() => setUrl("/default.jpg"));
+  }, [photoKey]);
+
+  return url;
+}
+
 export default function MessageEphemere({ msg, onDelete, utilisateurId }) {
   const [open, setOpen] = useState(false);
   const [timer, setTimer] = useState(5);
   const intervalRef = useRef(null);
 
-  // Prend en compte auteurId et envoyeur (si couple)
-  const isEnvoyeur = 
-    String(utilisateurId) === String(msg.auteurId) || 
+  // Utilise le hook pour récupérer URL signée
+  const presignedUrl = usePresignedPhoto(msg.imageUrl);
+
+  const isEnvoyeur =
+    String(utilisateurId) === String(msg.auteurId) ||
     String(utilisateurId) === String(msg.envoyeur);
 
-  useEffect(() => {
-    
-  }, [utilisateurId, msg.auteurId, msg.envoyeur]);
+  useEffect(() => {}, [utilisateurId, msg.auteurId, msg.envoyeur]);
 
   useEffect(() => {
     if (open && !isEnvoyeur) {
@@ -77,22 +99,33 @@ export default function MessageEphemere({ msg, onDelete, utilisateurId }) {
         onClick={() => setOpen(true)}
         type="button"
       >
-        <span className="ephemere-eye" aria-hidden="true">👁️</span>
+        <span className="ephemere-eye" aria-hidden="true">
+          👁️
+        </span>
         <span className="ephemere-label">Photo éphémère reçue</span>
       </button>
     );
   }
 
   return (
-    <div className="ephemere-modal" role="dialog" aria-modal="true" aria-label="Photo éphémère">
+    <div
+      className="ephemere-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Photo éphémère"
+    >
       <div className="ephemere-modal-bg" />
       <div className="ephemere-modal-content">
         <img
-          src={msg.imageUrl || "https://i.postimg.cc/JzJj4jpb/marionlogo.jpg"}
+          src={presignedUrl || "/default.jpg"}
           alt="Photo éphémère"
           className="ephemere-image"
         />
-        <div className="ephemere-timer-wrapper" aria-live="polite" aria-atomic="true">
+        <div
+          className="ephemere-timer-wrapper"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <svg className="ephemere-timer-svg" viewBox="0 0 36 36">
             <circle
               className="ephemere-timer-bg"

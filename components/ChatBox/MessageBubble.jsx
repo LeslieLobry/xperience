@@ -3,6 +3,28 @@ import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
 
+function usePresignedPhoto(photoKey) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    if (!photoKey) return setUrl("/default.jpg");
+    if (photoKey.startsWith("http")) {
+      setUrl(photoKey);
+      return;
+    }
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: photoKey }),
+    })
+      .then(res => res.json())
+      .then(data => setUrl(data.url || "/default.jpg"))
+      .catch(() => setUrl("/default.jpg"));
+  }, [photoKey]);
+
+  return url;
+}
+
 export default function MessageBubble({
   msg,
   utilisateur,
@@ -11,7 +33,7 @@ export default function MessageBubble({
   onReact,
   onDelete,
   emojiPack = "sexy",
-  prenomsCouple = null, // <- NOUVEAU !
+  prenomsCouple = null,
 }) {
   const emojiPacks = {
     sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
@@ -103,6 +125,13 @@ export default function MessageBubble({
     }
   }
 
+  // 1️⃣  Prépare presigned pour l'avatar auteur
+  const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
+
+  // 2️⃣  Prépare presigned pour les images et l'audio du message
+  const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
+  const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
+
   // Regroupement des réactions par emoji, avec nombre d'utilisateurs
   const groupedReactions = Object.entries(
     (msg.reactions || []).reduce((acc, r) => {
@@ -130,7 +159,7 @@ export default function MessageBubble({
       {showAuthorInfo && (
         <div className="author-info">
           <img
-            src={msg.auteur?.photoUrl || "/default.jpg"}
+            src={auteurPhotoUrl || "/default.jpg"}
             alt={msg.auteur?.pseudo || "Utilisateur"}
             className="author-avatar"
           />
@@ -157,12 +186,12 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* IMAGE */}
+      {/* IMAGE ou AUDIO */}
       {msg.type === "IMAGE" && msg.imageUrl ? (
-        <img src={msg.imageUrl} alt="image envoyée" className="message-image" />
+        <img src={imageMsgUrl || "/default.jpg"} alt="image envoyée" className="message-image" />
       ) : msg.type === "AUDIO" && msg.audioUrl ? (
         <>
-          <MessageAudio url={msg.audioUrl} duration={msg.duree || "0:00"} />
+          <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
         </>
       ) : (
         <p className="message-text">{msg.contenu}</p>
@@ -172,7 +201,6 @@ export default function MessageBubble({
         <button
           className="delete-message-button"
           onClick={() => {
-            console.log('Suppression', msg.id);
             onDelete?.(msg.id);
           }}
           title="Supprimer ce message"

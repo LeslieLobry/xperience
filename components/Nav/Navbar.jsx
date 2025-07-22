@@ -28,6 +28,34 @@ export default function Navbar() {
   const popupRef = useRef();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // ➡️ AVATAR PRESIGNED URL
+  const [presignedPhoto, setPresignedPhoto] = useState("/default.jpg");
+  useEffect(() => {
+    async function loadPresigned() {
+      if (!localUser?.photoUrl) {
+        setPresignedPhoto("/default.jpg");
+        return;
+      }
+      if (localUser.photoUrl.startsWith("http")) {
+        setPresignedPhoto(localUser.photoUrl);
+        return;
+      }
+      // Demande la presigned URL côté backend
+      try {
+        const res = await fetch("/api/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: localUser.photoUrl }),
+        });
+        const data = await res.json();
+        setPresignedPhoto(data.url || "/default.jpg");
+      } catch {
+        setPresignedPhoto("/default.jpg");
+      }
+    }
+    loadPresigned();
+  }, [localUser?.photoUrl]);
+
   const fetchUnreadMessages = async () => {
     try {
       const res = await fetch("/api/messages/nonlus", {
@@ -174,14 +202,7 @@ export default function Navbar() {
           <li className="nav-avatar-wrapper">
             <div className="nav-avatar-container" onClick={handleAvatarClick}>
               <Image
-                src={
-                  localUser.photoUrl
-                    ? localUser.photoUrl.startsWith("http") ||
-                      localUser.photoUrl.startsWith("/uploads")
-                      ? localUser.photoUrl
-                      : `/uploads/${localUser.photoUrl}`
-                    : "/default.jpg"
-                }
+                src={presignedPhoto}
                 alt="Photo de profil"
                 width={40}
                 height={40}

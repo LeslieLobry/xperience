@@ -112,7 +112,8 @@ if (
         ContentType: file.type,
       })
     );
-    const audioUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+   const audioUrl = fileName; // 👈 Clé S3 seule, compatible avec presign !
+
 
     // 💾 Enregistrement en base
     const message = await prisma.message.create({

@@ -73,6 +73,7 @@ export default function Profil({ user, connectedUser }) {
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
+  const [presignedPhotoUrl, setPresignedPhotoUrl] = useState("/default.jpg"); // <-- Ajout
   const [statut, setStatut] = useState(user.statut);
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,6 +84,26 @@ export default function Profil({ user, connectedUser }) {
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
 
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
+
+  // 💡 Charge la presigned URL dès que photoUrl change
+  useEffect(() => {
+    if (!photoUrl) {
+      setPresignedPhotoUrl("/default.jpg");
+      return;
+    }
+    if (photoUrl.startsWith("http")) {
+      setPresignedPhotoUrl(photoUrl);
+      return;
+    }
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: photoUrl }),
+    })
+      .then(res => res.json())
+      .then(data => setPresignedPhotoUrl(data.url || "/default.jpg"))
+      .catch(() => setPresignedPhotoUrl("/default.jpg"));
+  }, [photoUrl]);
 
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
@@ -170,13 +191,7 @@ export default function Profil({ user, connectedUser }) {
             {/* Affichage modal photo grand */}
             <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
               <img
-                src={
-                  photoUrl?.startsWith("http")
-                    ? photoUrl
-                    : photoUrl
-                    ? `/uploads/${photoUrl.replace(/^\/?uploads\//, "")}`
-                    : "/default.jpg"
-                }
+                src={presignedPhotoUrl || "/default.jpg"}
                 alt="Photo de profil"
                 style={{
                   maxWidth: "90vw",
@@ -185,6 +200,12 @@ export default function Profil({ user, connectedUser }) {
                   boxShadow: "0 8px 32px 0 #0008"
                 }}
               />
+              <div style={{color:'#fff',background:'#111',padding:'8px',fontSize:12,wordBreak:'break-all'}}>
+  <strong>Presigned URL :</strong>
+  <br />
+  {presignedPhotoUrl}
+</div>
+
             </SimpleModal>
           </div>
           <div className="profil-name-like">

@@ -458,7 +458,16 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const handleDelete = async (messageId) => {
     try {
       const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
-      if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== messageId));
+     if (res.ok) {
+  mutate((currentData) => {
+    if (!currentData) return currentData;
+    return {
+      ...currentData,
+      messages: currentData.messages.filter((m) => m.id !== messageId),
+    };
+  }, false); // false = ne pas refetch immédiatement
+}
+
     } catch (err) {
       console.error("Erreur suppression message :", err);
     }

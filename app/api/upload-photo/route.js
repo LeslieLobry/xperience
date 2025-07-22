@@ -76,7 +76,7 @@ export async function POST(req) {
     ContentType: file.type,
   }));
 
-  const photoUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+  const s3Key = filename; // 🟢 On stocke UNIQUEMENT la clé S3 !
 
   // 💾 Galerie privée
   if (galerieId && !isNaN(parseInt(galerieId))) {
@@ -95,7 +95,7 @@ export async function POST(req) {
 
     const photo = await prisma.photo.create({
       data: {
-        url: photoUrl,
+        url: s3Key,               // 🟢 SEULEMENT la clé S3
         utilisateurId: user.id,
         galeriePriveeId: galerie.id,
       }
@@ -108,7 +108,7 @@ export async function POST(req) {
   if (isPublic) {
     const photo = await prisma.photo.create({
       data: {
-        url: photoUrl,
+        url: s3Key,               // 🟢 SEULEMENT la clé S3
         utilisateurId: user.id,
         galeriePriveeId: null,
       }
@@ -119,8 +119,8 @@ export async function POST(req) {
   // 💾 Photo de profil
   await prisma.utilisateur.update({
     where: { id: user.id },
-    data: { photoUrl }
+    data: { photoUrl: s3Key }     // 🟢 SEULEMENT la clé S3
   });
 
-  return NextResponse.json({ success: true, photoUrl });
+  return NextResponse.json({ success: true, photoUrl: s3Key });
 }

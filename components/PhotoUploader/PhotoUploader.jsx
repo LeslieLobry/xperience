@@ -4,12 +4,50 @@ import { useRef, useState, useEffect } from 'react';
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
+// Détecte si c'est une vidéo ou une image
 function isVideoFile(fileOrUrl) {
   if (!fileOrUrl) return false;
   if (typeof fileOrUrl === "string")
     return /\.(mp4|webm|ogg|mov)$/i.test(fileOrUrl);
   if (fileOrUrl.type) return fileOrUrl.type.startsWith("video/");
   return false;
+}
+
+// Custom hook : charge la presigned URL si besoin
+function usePresignedPreview(url) {
+  const [preview, setPreview] = useState(url);
+  const [previewType, setPreviewType] = useState(isVideoFile(url) ? "video" : "image");
+
+  useEffect(() => {
+    if (!url) {
+      setPreview("/default.jpg");
+      setPreviewType("image");
+      return;
+    }
+    if (typeof url === "string" && url.startsWith("http")) {
+      setPreview(url);
+      setPreviewType(isVideoFile(url) ? "video" : "image");
+      return;
+    }
+    // Si c'est une clé S3, on fetch la presigned URL
+    (async () => {
+      try {
+        const res = await fetch("/api/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: url }),
+        });
+        const data = await res.json();
+        setPreview(data.url || "/default.jpg");
+        setPreviewType(isVideoFile(url) ? "video" : "image");
+      } catch {
+        setPreview("/default.jpg");
+        setPreviewType("image");
+      }
+    })();
+  }, [url]);
+
+  return { preview, previewType, setPreview, setPreviewType };
 }
 
 export default function PhotoUploader({
@@ -21,20 +59,14 @@ export default function PhotoUploader({
   isOwnProfile = false
 }) {
   const fileInputRef = useRef(null);
-  const [preview, setPreview] = useState(currentUrl);
-  const [previewType, setPreviewType] = useState(isVideoFile(currentUrl) ? "video" : "image");
+  const { preview, previewType, setPreview, setPreviewType } = usePresignedPreview(currentUrl);
 
-  // 🔥 Synchronise preview à chaque changement de currentUrl (utile en modal !)
-  useEffect(() => {
-    setPreview(currentUrl);
-    setPreviewType(isVideoFile(currentUrl) ? "video" : "image");
-  }, [currentUrl]);
-
+  // Quand l'utilisateur choisit un fichier
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Détecte image ou vidéo côté preview local
+    // Preview locale instantanée
     if (isVideoFile(file)) {
       setPreviewType("video");
       setPreview(URL.createObjectURL(file));
@@ -46,10 +78,7 @@ export default function PhotoUploader({
     const formData = new FormData();
     formData.append('photo', file);
 
-    if (isGallery && isPublic) {
-      formData.append('isPublic', 'true');
-    }
-
+    if (isGallery && isPublic) formData.append('isPublic', 'true');
     if (isGallery && !isPublic) {
       if (!galerieId || isNaN(parseInt(galerieId))) {
         console.error("galerieId invalide pour galerie privée");
@@ -65,25 +94,38 @@ export default function PhotoUploader({
         credentials: 'include',
       });
 
-     if (!res.ok) {
-  let message = "Erreur lors de l'envoi du fichier.";
-  try {
-    const json = await res.json();
-    message = json.message || message;
-  } catch (err) {
-    console.error("Erreur lors de la lecture de la réponse JSON :", err);
-  }
-  console.error("Upload échoué :", message);
-  alert(message);
-  return;
-}
-
+      if (!res.ok) {
+        let message = "Erreur lors de l'envoi du fichier.";
+        try {
+          const json = await res.json();
+          message = json.message || message;
+        } catch (err) {
+          console.error("Erreur lors de la lecture de la réponse JSON :", err);
+        }
+        console.error("Upload échoué :", message);
+        alert(message);
+        return;
+      }
 
       const data = await res.json();
       const url = data.photoUrl;
 
-      setPreview(url);
-      setPreviewType(isVideoFile(file) ? "video" : "image");
+      // Après upload, on force la preview via presigned URL (pour le S3 privé)
+      if (typeof url === "string" && !url.startsWith("http")) {
+        // Nouvelle clé => on re-fetch la presigned
+        const r = await fetch("/api/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: url }),
+        });
+        const d = await r.json();
+        setPreview(d.url || "/default.jpg");
+        setPreviewType(isVideoFile(url) ? "video" : "image");
+      } else {
+        setPreview(url);
+        setPreviewType(isVideoFile(url) ? "video" : "image");
+      }
+
       if (onUpload) onUpload(isGallery ? data : url);
     } catch (err) {
       console.error("Erreur réseau :", err);
@@ -111,16 +153,15 @@ export default function PhotoUploader({
               style={{ maxWidth: "100%", maxHeight: "160px" }}
             />
           ) : (
-          <img
-  src={preview || "/default.jpg"}
-  alt="Photo de profil"
-  className="photo-preview"
-  onError={(e) => {
-    e.target.onerror = null;
-    e.target.src = '/default.jpg';
-  }}
-/>
-
+            <img
+              src={preview || "/default.jpg"}
+              alt="Photo de profil"
+              className="photo-preview"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/default.jpg';
+              }}
+            />
           )}
           {isOwnProfile && (
             <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">

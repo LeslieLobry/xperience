@@ -5,14 +5,46 @@ import PhotoUploader from '../PhotoUploader/PhotoUploader';
 import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import "./GaleriePubliquePhotos.css";
 
-function fixPhotoUrl(url) {
-  if (!url) return "/images/default-avatar.png";
-  if (url.startsWith("/uploads/")) return url;
-  if (url.startsWith("http")) return url;
-  return `/uploads/${url.replace(/^.*[\\/]/, '')}`;
+// HOOK pour charger toutes les presigned URLs S3 des photos de la galerie
+function usePresignedGalleryUrls(photoList) {
+  const [presignedUrls, setPresignedUrls] = useState({}); // { photoId: url }
+
+  useEffect(() => {
+    if (!Array.isArray(photoList)) return;
+    let unmounted = false;
+
+    const load = async () => {
+      const map = {};
+      await Promise.all(photoList.map(async (photo) => {
+        if (!photo?.url) {
+          map[photo.id] = "/default.jpg";
+        } else if (photo.url.startsWith("http")) {
+          map[photo.id] = photo.url;
+        } else {
+          // Va chercher la presigned S3
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: photo.url }),
+            });
+            const data = await res.json();
+            map[photo.id] = data.url || "/default.jpg";
+          } catch {
+            map[photo.id] = "/default.jpg";
+          }
+        }
+      }));
+      if (!unmounted) setPresignedUrls(map);
+    };
+    load();
+    return () => { unmounted = true; };
+  }, [photoList]);
+
+  return presignedUrls;
 }
 
-// Détection par extension OU par type dans l'URL S3
+// ---- reste inchangé sauf fixPhotoUrl ----
 function isVideo(url) {
   if (!url) return false;
   try {
@@ -20,7 +52,6 @@ function isVideo(url) {
     const path = u.pathname.toLowerCase();
     return /\.(mp4|webm|ogg|mov)$/i.test(path);
   } catch {
-    // fallback pour si URL n'est pas parsable
     return /\.(mp4|webm|ogg|mov)$/i.test(url.toLowerCase());
   }
 }
@@ -31,20 +62,16 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
   const [currentIndex, setCurrentIndex] = useState(null);
 
   useEffect(() => {
-    if (Array.isArray(photos)) {
-      setPhotoList(photos);
-    }
+    if (Array.isArray(photos)) setPhotoList(photos);
   }, [photos]);
 
-  const handleNewPhoto = (photo) => {
-    setPhotoList(prev => [...prev, photo]);
-  };
+  const presignedUrls = usePresignedGalleryUrls(photoList);
+
+  const handleNewPhoto = (photo) => setPhotoList(prev => [...prev, photo]);
 
   const handleDelete = async (id) => {
     const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setPhotoList(prev => prev.filter(p => p.id !== id));
-    }
+    if (res.ok) setPhotoList(prev => prev.filter(p => p.id !== id));
   };
 
   // Sécurise l'accès à l'index
@@ -81,9 +108,9 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
                 <Trash2 size={16} />
               </button>
             )}
-            {isVideo(photo.url) ? (
+            {isVideo(presignedUrls[photo.id]) ? (
               <video
-                src={fixPhotoUrl(photo.url)}
+                src={presignedUrls[photo.id] || "/default.jpg"}
                 controls
                 preload="metadata"
                 onClick={() => setCurrentIndex(index)}
@@ -91,7 +118,7 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
               />
             ) : (
               <img
-                src={fixPhotoUrl(photo.url)}
+                src={presignedUrls[photo.id] || "/default.jpg"}
                 alt={`Photo ${index + 1}`}
                 onClick={() => setCurrentIndex(index)}
                 style={{ cursor: 'zoom-in' }}
@@ -131,9 +158,9 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
               </button>
             )}
 
-            {isVideo(photoList[currentIndex].url) ? (
+            {isVideo(presignedUrls[photoList[currentIndex].id]) ? (
               <video
-                src={fixPhotoUrl(photoList[currentIndex].url)}
+                src={presignedUrls[photoList[currentIndex].id] || "/default.jpg"}
                 controls
                 autoPlay
                 preload="metadata"
@@ -141,7 +168,7 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
               />
             ) : (
               <img
-                src={fixPhotoUrl(photoList[currentIndex].url)}
+                src={presignedUrls[photoList[currentIndex].id] || "/default.jpg"}
                 alt="Agrandissement"
                 style={{ maxWidth: "100%", maxHeight: "80vh" }}
               />

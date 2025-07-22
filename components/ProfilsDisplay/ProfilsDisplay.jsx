@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import './ProfilsDisplay.css';
 
@@ -17,9 +17,60 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   // ---- Filtre distance dynamique
   const [filtrerProches, setFiltrerProches] = useState(false);
-  const [distance, setDistance] = useState(20); // Valeur initiale (20km)
+  const [distance, setDistance] = useState(20);
 
-  // Quand on coche/décoche "Près de moi" ou modifie la distance
+  // Nouveau : stockage des presigned URLs par userId
+  const [photoUrls, setPhotoUrls] = useState({});
+
+  // Quand la liste à afficher change, on (re)charge les presigned urls
+  const profilsFiltres = useMemo(() => {
+    const base = filtrerEnLigne
+      ? profilsAffiches.filter((p) => p.statut === 'en_ligne')
+      : profilsAffiches;
+    return melangerProfils(base);
+  }, [filtrerEnLigne, profilsAffiches]);
+
+  useEffect(() => {
+    let canceled = false;
+    // On va chercher toutes les presigned urls en parallèle !
+    const loadAllUrls = async () => {
+      const newUrls = {};
+      await Promise.all(
+        profilsFiltres.map(async (user) => {
+          if (!user.photoUrl) {
+            newUrls[user.id] = "/default.jpg";
+            return;
+          }
+          // Pour éviter de spam si déjà présente
+          if (photoUrls[user.id]) {
+            newUrls[user.id] = photoUrls[user.id];
+            return;
+          }
+          if (user.photoUrl.startsWith("http")) {
+            newUrls[user.id] = user.photoUrl;
+            return;
+          }
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: user.photoUrl }),
+            });
+            const data = await res.json();
+            newUrls[user.id] = data.url || "/default.jpg";
+          } catch {
+            newUrls[user.id] = "/default.jpg";
+          }
+        })
+      );
+      if (!canceled) setPhotoUrls(newUrls);
+    };
+    loadAllUrls();
+    return () => { canceled = true; };
+    // eslint-disable-next-line
+  }, [JSON.stringify(profilsFiltres)]); // Forcer reload si la liste change
+
+  // ---- Reste inchangé ----
   const handleToggleProches = async (active, customDistance) => {
     setFiltrerProches(active);
     if (active) {
@@ -51,32 +102,21 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         }
       );
     } else {
-      setProfilsAffiches(profils); // Revenir à la liste initiale
+      setProfilsAffiches(profils);
     }
   };
 
-  // Quand l'utilisateur bouge le slider
   const handleDistanceChange = (e) => {
     const val = Number(e.target.value);
     setDistance(val);
     if (filtrerProches) {
-      handleToggleProches(true, val); // Rafraîchit la liste sur chaque changement
+      handleToggleProches(true, val);
     }
   };
-
-  // Filtrage et mélange
-  const profilsFiltres = useMemo(() => {
-    const base = filtrerEnLigne
-      ? profilsAffiches.filter((p) => p.statut === 'en_ligne')
-      : profilsAffiches;
-
-    return melangerProfils(base);
-  }, [filtrerEnLigne, profilsAffiches]);
 
   return (
     <div className="profil-list1">
       <h1 className="profil-list1-title">Profils</h1>
-
       <div className="profil-toggle-wrapper">
         <div className="toggle-box">
           <label className={`toggle-label ${filtrerEnLigne ? 'active' : ''}`}>
@@ -88,36 +128,33 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             <span className="slider"></span>
             En ligne
           </label>
-
-          {/* Nouveau: toggle + slider distance */}
-         <label className="toggle-label" style={{ alignItems: "center", gap: 8 }}>
-  <input
-    type="checkbox"
-    checked={filtrerProches}
-    onChange={(e) => handleToggleProches(e.target.checked)}
-  />
-  <span className="slider"></span>
-  Près de moi
-  <input
-    type="range"
-    min={5}
-    max={300}
-    step={1}
-    value={distance}
-    onChange={handleDistanceChange}
-    disabled={!filtrerProches}
-    className="profil-range"
-    style={{
-      margin: "0 10px",
-      width: 120,
-      verticalAlign: "middle",
-      opacity: filtrerProches ? 1 : 0.5,
-      pointerEvents: filtrerProches ? "auto" : "none"
-    }}
-  />
-  <span style={{ minWidth: 32, display: "inline-block" }}>{distance} km</span>
-</label>
-
+          <label className="toggle-label" style={{ alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={filtrerProches}
+              onChange={(e) => handleToggleProches(e.target.checked)}
+            />
+            <span className="slider"></span>
+            Près de moi
+            <input
+              type="range"
+              min={5}
+              max={300}
+              step={1}
+              value={distance}
+              onChange={handleDistanceChange}
+              disabled={!filtrerProches}
+              className="profil-range"
+              style={{
+                margin: "0 10px",
+                width: 120,
+                verticalAlign: "middle",
+                opacity: filtrerProches ? 1 : 0.5,
+                pointerEvents: filtrerProches ? "auto" : "none"
+              }}
+            />
+            <span style={{ minWidth: 32, display: "inline-block" }}>{distance} km</span>
+          </label>
         </div>
       </div>
 
@@ -139,25 +176,17 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     className={`statut-badge ${user.statut === 'en_ligne' ? 'en-ligne' : 'hors-ligne'}`}
                     title={user.statut === 'en_ligne' ? 'En ligne' : 'Hors ligne'}
                   />
-             <img
-  src={
-    user.photoUrl?.startsWith('http')
-      ? user.photoUrl
-      : user.photoUrl
-      ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '')}`
-      : '/default.jpg'
-  }
-  alt={user.pseudo}
-  className="profil-photo"
-  onError={(e) => {
-    e.target.onerror = null; // évite les boucles infinies
-    e.target.src = '/default.jpg';
-  }}
-/>
-
+                  <img
+                    src={photoUrls[user.id] || "/default.jpg"}
+                    alt={user.pseudo}
+                    className="profil-photo"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/default.jpg';
+                    }}
+                  />
                   <h2 className="profil-card-title">
-                    {user.pseudo.charAt(0).toUpperCase() +
-                      user.pseudo.slice(1).toLowerCase()}
+                    {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
                   </h2>
                   <p className="profil-card-details">
                     {user.age} ans - {user.localisation}
@@ -181,11 +210,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
       )}
 
       {afficherPlus && !filtrerProches && (
-  <Link href="/profils" className="afficher-plus">
-    Afficher plus
-  </Link>
-)}
-
+        <Link href="/profils" className="afficher-plus">
+          Afficher plus
+        </Link>
+      )}
     </div>
   );
 }
