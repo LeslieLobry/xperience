@@ -21,6 +21,8 @@ export default async function AdminDashboard() {
         <li><Link href="/admin/blog">📝 Gérer les articles de blog</Link></li>
         <li><Link href="/admin/newsletters">📧 Gérer les newsletters</Link></li>
         <li><Link href="/admin/partenaires">🤝 Gérer les partenaires</Link></li>
+        <li><Link href="/admin/email">📬 Envoyer un mail général</Link></li>
+
       </ul>
     </div>
   );
