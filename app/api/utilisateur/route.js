@@ -27,3 +27,4 @@ export async function GET(req) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
+ 
