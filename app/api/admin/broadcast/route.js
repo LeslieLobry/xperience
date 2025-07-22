@@ -14,11 +14,10 @@ export async function POST(req) {
     return Response.json({ error: "Champ manquant" }, { status: 400 });
   }
 
-  // Sélectionne tous les emails valides (modifie si tu veux les non confirmés)
-  const utilisateurs = await prisma.utilisateur.findMany({
-    where: { emailConfirme: true },
-    select: { email: true },
-  });
+ const utilisateurs = await prisma.utilisateur.findMany({
+  select: { email: true },
+});
+
 
   // Option 1: envoi séquentiel simple
   for (const u of utilisateurs) {
