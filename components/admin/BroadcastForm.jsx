@@ -17,7 +17,7 @@ const COLORS = {
   success: "#48eaa6",
 };
 
-const LOGO_URL = "https://x-periences.fr/logo-mail.png"; // Mets ici l'URL publique de ton logo
+const LOGO_URL = "https://x-periences.fr/logo.png"; 
 
 export default function BroadcastForm() {
   const [objet, setObjet] = useState("");
