@@ -36,16 +36,12 @@ export async function POST(req) {
 
     form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
-        console.error("❌ Erreur parsing fichier:", err);
         return resolve(
           NextResponse.json({ success: false, message: "Erreur parsing" }, { status: 500 })
         );
       }
 
       try {
-        console.log("📥 Champs reçus :", fields);
-        console.log("📷 Fichiers reçus :", files);
-
         const nom = String(fields.nom || "");
         const prenom = String(fields.prenom || "");
         const pseudo = String(fields.pseudo || "");
@@ -57,7 +53,6 @@ export async function POST(req) {
         const localisation = String(fields.localisation || "");
         const latitude = parseFloat(fields.latitude || "");
         const longitude = parseFloat(fields.longitude || "");
-
         const consent = fields.consent === "true";
         const captchaToken = String(fields.captchaToken || "");
 
@@ -79,7 +74,6 @@ export async function POST(req) {
 
         const captchaData = await captchaRes.json();
         if (!captchaData.success) {
-          console.warn("🛑 reCAPTCHA échoué :", captchaData);
           return resolve(NextResponse.json({ success: false, message: "Échec reCAPTCHA" }, { status: 400 }));
         }
 
@@ -88,23 +82,42 @@ export async function POST(req) {
         });
 
         if (exists) {
-          console.warn("🔁 Utilisateur déjà existant :", exists.email, exists.pseudo);
           return resolve(NextResponse.json({ success: false, message: "Email ou pseudo déjà utilisé" }, { status: 400 }));
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // ✅ Gestion de la photo
         let photoUrl = null;
         const photoFile = Array.isArray(files.photo) ? files.photo[0] : files.photo;
 
-        if (!photoFile) {
-          console.warn("❌ Aucun fichier photo reçu.");
-        } else if (!photoFile.filepath) {
-          console.warn("❌ Fichier photo reçu mais sans 'filepath'.", photoFile);
-        } else {
+        if (photoFile && photoFile.filepath) {
           try {
             const buffer = await fs.readFile(photoFile.filepath);
+
+            const moderationForm = new FormData();
+            moderationForm.append("media", new Blob([buffer], { type: photoFile.mimetype }), photoFile.originalFilename);
+            moderationForm.append("models", "face-attributes");
+            moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
+            moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
+
+            const moderationRes = await fetch("https://api.sightengine.com/1.0/check.json", {
+              method: "POST",
+              body: moderationForm,
+            });
+
+            const moderationData = await moderationRes.json();
+            if (moderationData?.faces?.length) {
+              const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8);
+              if (hasMinor) {
+                return resolve(
+                  NextResponse.json(
+                    { success: false, message: "Photo refusée : une personne semble avoir moins de 18 ans." },
+                    { status: 400 }
+                  )
+                );
+              }
+            }
+
             const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
             const bucket = process.env.AWS_S3_BUCKET;
 
@@ -117,14 +130,12 @@ export async function POST(req) {
               })
             );
 
-            photoUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
-            console.log("✅ Photo uploadée :", photoUrl);
+            photoUrl = filename;
           } catch (uploadErr) {
-            console.error("❌ Erreur lors de l'upload S3 :", uploadErr);
+            return resolve(NextResponse.json({ success: false, message: "Erreur upload photo" }, { status: 500 }));
           }
         }
 
-        // ✅ Création de l’utilisateur
         const newUser = await prisma.utilisateur.create({
           data: {
             nom,
@@ -173,7 +184,6 @@ export async function POST(req) {
 
         return resolve(NextResponse.json({ success: true, user: newUser, photoUrl }));
       } catch (e) {
-        console.error("❌ Erreur d'inscription :", e);
         return resolve(
           NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 })
         );
