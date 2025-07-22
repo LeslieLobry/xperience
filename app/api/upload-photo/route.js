@@ -48,17 +48,17 @@ export async function POST(req) {
     });
 
     const moderationData = await moderationRes.json();
-console.log("🧠 Sightengine response:", JSON.stringify(moderationData, null, 2));
+    console.log("🧠 Sightengine response:", JSON.stringify(moderationData, null, 2));
 
- if (moderationData?.faces?.length) {
-  const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.9); // ou 0.8 si tu veux être plus large
-  if (hasMinor) {
-    return NextResponse.json(
-      { success: false, message: "Photo refusée : visage mineur détecté (IA)." },
-      { status: 400 }
-    );
-  }
-}
+    if (moderationData?.faces?.length) {
+      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8); // 🔒 seuil ajusté
+      if (hasMinor) {
+        return NextResponse.json(
+          { success: false, message: "Photo refusée : une personne semble avoir moins de 18 ans." },
+          { status: 400 }
+        );
+      }
+    }
 
   } catch (error) {
     console.error("Erreur modération image :", error);
