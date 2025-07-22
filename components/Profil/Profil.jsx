@@ -200,12 +200,6 @@ export default function Profil({ user, connectedUser }) {
                   boxShadow: "0 8px 32px 0 #0008"
                 }}
               />
-              <div style={{color:'#fff',background:'#111',padding:'8px',fontSize:12,wordBreak:'break-all'}}>
-  <strong>Presigned URL :</strong>
-  <br />
-  {presignedPhotoUrl}
-</div>
-
             </SimpleModal>
           </div>
           <div className="profil-name-like">
