@@ -17,6 +17,8 @@ const COLORS = {
   success: "#48eaa6",
 };
 
+const LOGO_URL = "https://x-periences.fr/logo-mail.png"; // Mets ici l'URL publique de ton logo
+
 export default function BroadcastForm() {
   const [objet, setObjet] = useState("");
   const [message, setMessage] = useState("");
@@ -141,8 +143,16 @@ export default function BroadcastForm() {
           <h4 style={{ margin: "0 0 12px 0", color: COLORS.text, fontWeight: 700 }}>
             {objet || <span style={{ color: COLORS.muted }}>Objet du mail…</span>}
           </h4>
-          {/* Affiche le message en HTML */}
-          <div dangerouslySetInnerHTML={{ __html: message || "<i style='color:#a7adc8;'>(Votre message ici)</i>" }} />
+          {/* Affiche le message en HTML + le logo à la fin */}
+          <div
+            dangerouslySetInnerHTML={{
+              __html:
+                (message || "<i style='color:#a7adc8;'>(Votre message ici)</i>") +
+                `<div style='text-align:center;margin-top:32px;'>
+                  <img src="${LOGO_URL}" alt="Logo X-periences" style="height:48px;opacity:0.92;" />
+                </div>`,
+            }}
+          />
         </div>
       </div>
     </div>

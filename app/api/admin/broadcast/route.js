@@ -5,9 +5,10 @@ import { resend } from "../../../../lib/resend";
 
 export async function POST(req) {
   const user = await getUserFromToken();
-  if (!user?.isAdmin) {
-    return Response.json({ error: "Non autorisé" }, { status: 403 });
-  }
+  if (user?.role !== "ADMIN") {
+  return Response.json({ error: "Non autorisé" }, { status: 403 });
+}
+
   const { objet, message } = await req.json();
   if (!objet || !message) {
     return Response.json({ error: "Champ manquant" }, { status: 400 });
@@ -22,12 +23,20 @@ export async function POST(req) {
   // Option 1: envoi séquentiel simple
   for (const u of utilisateurs) {
     try {
-      await resend.emails.send({
-        to: u.email,
-        subject: objet,
-        html: message,
-        from: "noreply@xperience.fr",
-      });
+      const messageWithLogo = `
+  ${message}
+  <div style="margin-top:32px;text-align:center;">
+    <img src="https://x-periences.fr/logo.png" alt="Logo X-periences" style="height:42px;opacity:.92;" />
+  </div>
+`;
+
+await resend.emails.send({
+  to: u.email,
+  subject: objet,
+  html: messageWithLogo,
+  from: "noreply@xperience.fr",
+});
+
     } catch (e) {
       // Logguer mais ne bloque pas l'envoi aux autres
       console.error(`Erreur pour ${u.email}:`, e);
