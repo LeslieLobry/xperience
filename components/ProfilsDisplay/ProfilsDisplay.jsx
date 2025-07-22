@@ -139,17 +139,22 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     className={`statut-badge ${user.statut === 'en_ligne' ? 'en-ligne' : 'hors-ligne'}`}
                     title={user.statut === 'en_ligne' ? 'En ligne' : 'Hors ligne'}
                   />
-                  <img
-                    src={
-                      user.photoUrl?.startsWith('http')
-                        ? user.photoUrl
-                        : user.photoUrl
-                        ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '')}`
-                        : '/default.jpg'
-                    }
-                    alt={user.pseudo}
-                    className="profil-photo"
-                  />
+             <img
+  src={
+    user.photoUrl?.startsWith('http')
+      ? user.photoUrl
+      : user.photoUrl
+      ? `/uploads/${user.photoUrl.replace(/^\/?uploads\//, '')}`
+      : '/default.jpg'
+  }
+  alt={user.pseudo}
+  className="profil-photo"
+  onError={(e) => {
+    e.target.onerror = null; // évite les boucles infinies
+    e.target.src = '/default.jpg';
+  }}
+/>
+
                   <h2 className="profil-card-title">
                     {user.pseudo.charAt(0).toUpperCase() +
                       user.pseudo.slice(1).toLowerCase()}

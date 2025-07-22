@@ -111,11 +111,16 @@ export default function PhotoUploader({
               style={{ maxWidth: "100%", maxHeight: "160px" }}
             />
           ) : (
-            <img
-              src={preview || "/images/default-avatar.png"}
-              alt="Photo de profil"
-              className="photo-preview"
-            />
+          <img
+  src={preview || "/default.jpg"}
+  alt="Photo de profil"
+  className="photo-preview"
+  onError={(e) => {
+    e.target.onerror = null;
+    e.target.src = '/default.jpg';
+  }}
+/>
+
           )}
           {isOwnProfile && (
             <label htmlFor="photo-upload" className="camera-label" title="Changer la photo">
