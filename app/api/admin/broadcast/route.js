@@ -33,7 +33,7 @@ await resend.emails.send({
   to: u.email,
   subject: objet,
   html: messageWithLogo,
-  from: "noreply@xperience.fr",
+  from: 'no-reply@x-periences.fr'
 });
 
     } catch (e) {
