@@ -21,6 +21,7 @@ model DemandeAcces {
 
   @@unique([galeriePriveeId, demandeurId])
 }
+
 model Utilisateur {
   id                   Int             @id @default(autoincrement())
   nom                  String
@@ -49,13 +50,11 @@ model Utilisateur {
   origines             String?
   yeux                 String?
   cheveux              String?
-  reactions MessageReaction[]
-  profilComplet Boolean @default(false) @map("profil_complet")
-  reminderSent  Boolean @default(false) @map("reminder_sent")
-  
+  reactions            MessageReaction[]
+  profilComplet        Boolean         @default(false) @map("profil_complet")
+  reminderSent         Boolean         @default(false) @map("reminder_sent")
 
   // ✅ Champs supplémentaires pour les couples
-
   age2                 Int?
   dateNaissance2       DateTime?
   fumeur2              String?
@@ -66,7 +65,7 @@ model Utilisateur {
   cheveux2             String?
   description2         String?
   statut               String          @default("en_ligne")
-  statutAuto Boolean @default(true) 
+  statutAuto           Boolean         @default(true)
   consentCGU           Boolean         @default(false)
   consentCGUDate       DateTime?
   verificationDeadline DateTime?
@@ -92,12 +91,40 @@ model Utilisateur {
   photos               Photo[]
   recherches           Recherche[]
   evenements           Evenement[]     @relation("Participation")
-  visitesFaites     VisiteProfil[] @relation("Visiteur")
-  visitesRecues     VisiteProfil[] @relation("Visite")
-  prenomsCouple PrenomCoupleConversation[] 
+  visitesFaites        VisiteProfil[]  @relation("Visiteur")
+  visitesRecues        VisiteProfil[]  @relation("Visite")
+
+  verificationDetails  VerificationIdentite? @relation("UtilisateurVerification")
+
+  prenomsCouple        PrenomCoupleConversation[]
 
   @@map("Utilisateur")
 }
+
+model VerificationIdentite {
+  id              Int          @id @default(autoincrement())
+  utilisateurId   Int          @unique @map("utilisateurid")
+  utilisateur     Utilisateur  @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
+
+  type            String       // "SIMPLE" ou "COUPLE"
+  photoCI1Url     String       @map("photoci1url")
+  selfie1Url      String       @map("selfie1url")
+  sexe1           String       @map("sexe1")
+  age1            Int?         @map("age1")
+
+  photoCI2Url     String?      @map("photoci2url")
+  selfie2Url      String?      @map("selfie2url")
+  sexe2           String?      @map("sexe2")
+  age2            Int?         @map("age2")
+
+  statut          VerificationStatut @default(EN_ATTENTE)
+  commentaire     String?
+  createdAt       DateTime     @default(now()) @map("createdat")
+  updatedAt       DateTime     @updatedAt @map("updatedat")
+
+  @@map("VerificationIdentite")
+}
+
 
 model GaleriePrivee {
   id            Int            @id @default(autoincrement())
@@ -109,6 +136,7 @@ model GaleriePrivee {
   photos        Photo[]
   @@map("GaleriePrivee")
 }
+
 model Evenement {
   id           Int           @id @default(autoincrement())
   titre        String
@@ -126,7 +154,7 @@ model Evenement {
   latitude     Float?
   longitude    Float?
   lien         String?
-  pays        String? 
+  pays         String? 
   createurId   Int
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   participants Utilisateur[] @relation("Participation")
@@ -169,7 +197,7 @@ model Envie {
   label         String
   utilisateurId Int
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
-    @@map("Envie")
+  @@map("Envie")
 }
 
 model EmailVerificationToken {
@@ -178,7 +206,7 @@ model EmailVerificationToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
-    @@map("EmailVerificationToken")
+  @@map("EmailVerificationToken")
 }
 
 model PasswordResetToken {
@@ -187,7 +215,7 @@ model PasswordResetToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
-    @@map("PasswordResetToken")
+  @@map("PasswordResetToken")
 }
 
 model Avis {
@@ -198,7 +226,7 @@ model Avis {
   cibleId     Int
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
-    @@map("Avis")
+  @@map("Avis")
 
   @@unique([auteurId, cibleId])
 }
@@ -210,8 +238,8 @@ model Conversation {
   createdAt    DateTime      @default(now())
   messages     Message[]
   participants Participant[]
-   prenomsCouple PrenomCoupleConversation[] 
-    @@map("Conversation")
+  prenomsCouple PrenomCoupleConversation[]
+  @@map("Conversation")
 }
 
 model Participant {
@@ -219,12 +247,12 @@ model Participant {
   utilisateurId  Int
   conversationId Int
   lastReadAt     DateTime?
-  supprimé      Boolean      @default(false)
+  supprimé       Boolean      @default(false)
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
 
   @@unique([utilisateurId, conversationId])
-    @@map("Participant")
+  @@map("Participant")
 }
 
 model Message {
@@ -234,23 +262,23 @@ model Message {
   contenu        String?
   imageUrl       String?
   videoUrl       String?
-  audioUrl       String?       // 🔊 Ajout audio
-  duree          String?       // ⏱️ Ajout durée (ex: "0:21")
+  audioUrl       String?
+  duree          String?
   type           MessageType  @default(TEXTE)
   lu             Boolean      @default(false)
   createdAt      DateTime     @default(now())
-  openedAt     DateTime? @map("opened_at")
+  openedAt       DateTime?    @map("opened_at")
   auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id])
-  reactions MessageReaction[] 
+  reactions      MessageReaction[]
   envoyeur       String?
   prenomEnvoyeur String?
+  
   @@index([conversationId, id])
   @@index([conversationId, createdAt])
 
   @@map("Message")
 }
-
 
 model Photo {
   id              Int            @id @default(autoincrement())
@@ -260,7 +288,7 @@ model Photo {
   createdAt       DateTime       @default(now())
   galeriePrivee   GaleriePrivee? @relation(fields: [galeriePriveeId], references: [id])
   utilisateur     Utilisateur    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
-    @@map("Photo")
+  @@map("Photo")
 }
 
 model GlobalMessage {
@@ -269,7 +297,7 @@ model GlobalMessage {
   contenu   String
   createdAt DateTime    @default(now())
   auteur    Utilisateur @relation(fields: [auteurId], references: [id])
-    @@map("GlobalMessage")
+  @@map("GlobalMessage")
 }
 
 model GlobalChatRead {
@@ -277,19 +305,19 @@ model GlobalChatRead {
   userId   Int         @unique
   lastRead DateTime
   user     Utilisateur @relation(fields: [userId], references: [id])
-    @@map("GlobalChatRead")
+  @@map("GlobalChatRead")
 }
 
 model Blocage {
   id         Int         @id @default(autoincrement())
   bloqueurId Int
-  bloquéId  Int
+  bloquéId   Int
   createdAt  DateTime    @default(now())
   bloqueur   Utilisateur @relation("BlocagesFaits", fields: [bloqueurId], references: [id])
   bloque     Utilisateur @relation("BlocagesRecus", fields: [bloquéId], references: [id])
 
   @@unique([bloqueurId, bloquéId])
-    @@map("Blocage")
+  @@map("Blocage")
 }
 
 model Like {
@@ -301,7 +329,7 @@ model Like {
   cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
 
   @@unique([auteurId, cibleId])
-    @@map("Like")
+  @@map("Like")
 }
 
 model Notification {
@@ -312,14 +340,14 @@ model Notification {
   lu            Boolean     @default(false)
   createdAt     DateTime    @default(now())
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
-    @@map("Notification")
+  @@map("Notification")
 }
 
 model AbonneNewsletter {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   createdAt DateTime @default(now())
-    @@map("AbonneNewsletterRecherche")
+  @@map("AbonneNewsletterRecherche")
 }
 
 model Newsletter {
@@ -327,8 +355,9 @@ model Newsletter {
   titre     String
   contenu   String
   createdAt DateTime @default(now())
-    @@map("Newsletter")
+  @@map("Newsletter")
 }
+
 model VisiteProfil {
   id         Int         @id @default(autoincrement())
   visiteurId Int
@@ -341,6 +370,7 @@ model VisiteProfil {
   @@unique([visiteurId, visiteId, date])
   @@map("VisiteProfil")
 }
+
 model MessageReaction {
   id            Int         @id @default(autoincrement())
   emoji         String      // Exemple : "❤️" ou "😂"
@@ -353,37 +383,11 @@ model MessageReaction {
   @@unique([utilisateurId, messageId]) // un utilisateur ne peut réagir qu'une seule fois par message
   @@index([messageId])  
 }
-model VerificationIdentite {
-  id              Int          @id @default(autoincrement())
-  utilisateur     Utilisateur  @relation(fields: [utilisateurId], references: [id])
-  utilisateurId   Int
-
-  type            String       // "SIMPLE" ou "COUPLE"
-  photoCI1Url     String
-  selfie1Url      String
-  sexe1           String
-  age1            Int?
-
-  photoCI2Url     String?
-  selfie2Url      String?
-  sexe2           String?
-  age2            Int?
-
-  statut          VerificationStatut @default(EN_ATTENTE)
-  commentaire     String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  @@map("VerificationIdentite")
-}
-
 enum VerificationStatut {
   EN_ATTENTE
   ACCEPTEE
   REFUSEE
 }
-
-
 
 enum Role {
   USER
@@ -404,6 +408,7 @@ enum DemandeStatut {
   ACCEPTEE
   REFUSEE
 }
+
 model Partenaire {
   id        String   @id @default(dbgenerated()) @db.Uuid
   nom       String
@@ -414,10 +419,11 @@ model Partenaire {
 
   @@map("Partenaire")
 }
+
 model PrenomCoupleConversation {
   id             Int    @id @default(autoincrement())
-  conversationId Int    @map("conversationid")
-  utilisateurId  Int    @map("utilisateurid")
+  conversationId  Int    @map("conversationid")
+  utilisateurId   Int    @map("utilisateurid")
   prenom1        String
   prenom2        String
 
@@ -425,6 +431,5 @@ model PrenomCoupleConversation {
   utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
 
   @@unique([conversationId, utilisateurId])
-  @@map("PrenomCoupleConversation")  // 👈 important !
+  @@map("PrenomCoupleConversation")  // 👈 important !
 }
-

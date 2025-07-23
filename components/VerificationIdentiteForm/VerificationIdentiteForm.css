@@ -1,0 +1,72 @@
+.form-verif form {
+  background-color: #2a2a40; /* couleur de fond sombre */
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  margin: 20px auto;
+  color: #eee;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.form-verif form p {
+  font-weight: bold;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.form-verif form label {
+  display: block;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #ddd;
+}
+
+.form-verif form input[type="file"] {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: none;
+  background-color: #444;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.form-verif form input[type="file"]::file-selector-button {
+  background-color: #e0c084;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.form-verif form button {
+  margin-top: 25px;
+  background-color: #e0c084;
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  font-size: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 600;
+  width: 100%;
+}
+
+.form-verif form button:hover:not(:disabled) {
+  background-color: #e0c084;
+}
+.form-verif form button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.form-verif form div {
+  margin-bottom: 10px;
+}
