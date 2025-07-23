@@ -16,7 +16,7 @@ const s3 = new S3Client({
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
 
-// Helper upload S3
+// Helper upload S3 — retourne la clé S3, pas l’URL complète
 async function uploadToS3(file) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split('.').pop();
@@ -29,10 +29,11 @@ async function uploadToS3(file) {
     ContentType: file.type,
   }));
 
-  return `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  // ✅ On retourne la clé
+  return key;
 }
 
-// GET partenaires
+// GET partenaires (admin)
 export async function GET() {
   try {
     const user = await getUserFromToken();
@@ -70,7 +71,7 @@ export async function POST(req) {
 
       const file = formData.get("photo");
       if (file && file.size > 0) {
-        photoUrl = await uploadToS3(file);
+        photoUrl = await uploadToS3(file); // clé S3 uniquement !
       }
     } else {
       // fallback JSON (pour debug sans fichier)
@@ -78,7 +79,7 @@ export async function POST(req) {
       nom = body.nom;
       type = body.type;
       lien = body.lien;
-      photoUrl = body.photoUrl || null;
+      photoUrl = body.photoUrl || null; // doit être une clé
     }
 
     if (!nom || !type || !lien) {
@@ -91,7 +92,7 @@ export async function POST(req) {
         nom,
         type,
         lien,
-        photoUrl,
+        photoUrl, // clé S3 !
       },
     });
 
@@ -122,7 +123,7 @@ export async function PUT(req) {
 
       const file = formData.get("photo");
       if (file && file.size > 0) {
-        photoUrl = await uploadToS3(file);
+        photoUrl = await uploadToS3(file); // clé S3 uniquement !
       }
     } else {
       // fallback JSON
@@ -131,7 +132,7 @@ export async function PUT(req) {
       nom = body.nom;
       type = body.type;
       lien = body.lien;
-      photoUrl = body.photoUrl || null;
+      photoUrl = body.photoUrl || null; // doit être une clé
     }
 
     if (!id || !nom || !type || !lien) {

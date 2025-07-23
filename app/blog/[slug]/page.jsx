@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
 import ArticleWrapper from "./ArticleWrapper";
-import Image from "next/image";
+import ArticleImagesWithPresign from "./ArticleImagesWithPresign"; // <- à créer juste en dessous
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
@@ -15,7 +15,7 @@ export default async function ArticlePage({ params }) {
   if (!slug) return notFound();
 
   const user = await getUserFromToken();
-if (!user) return redirect("/connexion");
+  if (!user) return redirect("/connexion");
 
   const article = await prisma.article.findUnique({
     where: { slug },
@@ -32,29 +32,17 @@ if (!user) return redirect("/connexion");
       <ArticleWrapper articleId={article.id} />
       <h2 className="article-title">{article.titre}</h2>
       <p className="article-meta">
-        {new Date(article.createdAt).toLocaleDateString("fr-FR")} {" "}
-        {/* {article.vues} vues */}
+        {new Date(article.createdAt).toLocaleDateString("fr-FR")}{" "}
+        {article.vues} vues
       </p>
 
       {article.description && (
         <p className="article-description">{article.description}</p>
       )}
 
+      {/* Composant client pour les images */}
       {article.images?.length > 0 && (
-        <div className="article-images">
-          {article.images.map((image, index) => (
-            <Image
-    key={index}
-    src={image.url}
-    alt={`Illustration ${index + 1}`}
-    className="article-image"
-    style={{ maxWidth: "100%", margin: "10px 0" }}
-    width={350}     
-    height={350}    
-    sizes="100vw"   
-  />
-          ))}
-        </div>
+        <ArticleImagesWithPresign images={article.images} />
       )}
 
       <div

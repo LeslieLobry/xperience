@@ -36,8 +36,8 @@ export async function POST(req) {
       })
     );
 
-    const imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-    return NextResponse.json({ success: true, imageUrl });
+    // Retourne UNIQUEMENT la clé
+    return NextResponse.json({ success: true, path: fileName });
   } catch (error) {
     console.error("Erreur upload S3:", error);
     return NextResponse.json({ success: false, message: "Erreur S3." }, { status: 500 });

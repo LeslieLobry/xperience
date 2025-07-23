@@ -1,14 +1,14 @@
+// /app/api/upload-article-image/route.js
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '100mb',
+      sizeLimit: '20mb', // adapte si besoin
     }
   }
 };
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { prisma } from '../../../lib/prisma';
 import { getUserFromToken } from '../../../lib/auth';
 import { s3 } from '../../../lib/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
@@ -22,20 +22,15 @@ export async function POST(req) {
   }
 
   const formData = await req.formData();
-  const file = formData.get('photo');
+  const file = formData.get('image');
 
   if (!file || typeof file === 'string') {
     return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
   }
 
-  const galerieId = formData.get('galerieId');
-  const isPublic = formData.get('isPublic') === 'true';
-
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  // 🔎 MODÉRATION via Sightengine
+  // ---- MODÉRATION SIGHTENGINE ----
   try {
+    const buffer = Buffer.from(await file.arrayBuffer());
     const moderationForm = new FormData();
     moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
     moderationForm.append("models", "face-attributes");
@@ -48,25 +43,24 @@ export async function POST(req) {
     });
 
     const moderationData = await moderationRes.json();
-    console.log("🧠 Sightengine response:", JSON.stringify(moderationData, null, 2));
-
     if (moderationData?.faces?.length) {
-      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8); // 🔒 seuil ajusté
+      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8);
       if (hasMinor) {
         return NextResponse.json(
-          { success: false, message: "Photo refusée : une personne semble avoir moins de 18 ans." },
+          { success: false, message: "Image refusée : une personne semble avoir moins de 18 ans." },
           { status: 400 }
         );
       }
     }
-
-  } catch (error) {
-    console.error("Erreur modération image :", error);
+  } catch (err) {
+    console.error("Erreur Sightengine :", err);
     return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500 });
   }
 
-  // ✅ UPLOAD S3
-  const filename = `photo_${user.id}_${Date.now()}_${file.name}`;
+  // ---- UPLOAD S3 ----
+  const ext = file.name.split(".").pop();
+  const filename = `articles/article_${user.id}_${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
   const bucket = process.env.AWS_S3_BUCKET;
 
   await s3.send(new PutObjectCommand({
@@ -74,53 +68,9 @@ export async function POST(req) {
     Key: filename,
     Body: buffer,
     ContentType: file.type,
+    ACL: "public-read",
   }));
 
-  const s3Key = filename; // 🟢 On stocke UNIQUEMENT la clé S3 !
-
-  // 💾 Galerie privée
-  if (galerieId && !isNaN(parseInt(galerieId))) {
-    let galerie = await prisma.galeriePrivee.findUnique({
-      where: { id: parseInt(galerieId) },
-    });
-
-    if (!galerie) {
-      galerie = await prisma.galeriePrivee.create({
-        data: {
-          utilisateurId: user.id,
-          nom: `Galerie privée de ${user.pseudo || "Utilisateur"}`,
-        }
-      });
-    }
-
-    const photo = await prisma.photo.create({
-      data: {
-        url: s3Key,               // 🟢 SEULEMENT la clé S3
-        utilisateurId: user.id,
-        galeriePriveeId: galerie.id,
-      }
-    });
-
-    return NextResponse.json(photo);
-  }
-
-  // 💾 Galerie publique
-  if (isPublic) {
-    const photo = await prisma.photo.create({
-      data: {
-        url: s3Key,               // 🟢 SEULEMENT la clé S3
-        utilisateurId: user.id,
-        galeriePriveeId: null,
-      }
-    });
-    return NextResponse.json(photo);
-  }
-
-  // 💾 Photo de profil
-  await prisma.utilisateur.update({
-    where: { id: user.id },
-    data: { photoUrl: s3Key }     // 🟢 SEULEMENT la clé S3
-  });
-
-  return NextResponse.json({ success: true, photoUrl: s3Key });
+  // Tu retournes seulement la clé relative
+  return NextResponse.json({ success: true, path: filename });
 }

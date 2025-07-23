@@ -1,14 +1,12 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
 
 export async function GET() {
   const articles = await prisma.article.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      images: true,     // ✅ ajoute les images
-      auteur: true,     // ✅ ajoute les infos sur l’auteur
+      images: true,
+      auteur: true,
     },
   });
 

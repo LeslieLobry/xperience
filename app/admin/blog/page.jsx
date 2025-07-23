@@ -3,6 +3,50 @@
 import { useEffect, useState } from "react";
 import "./adminBlog.css";
 
+// Mini composant pour les miniatures privées S3
+function PresignedImage({ s3Key, alt, className = "", ...props }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    if (!s3Key) return setUrl("/default.jpg");
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: s3Key }),
+    })
+      .then(res => res.json())
+      .then(data => setUrl(data.url || "/default.jpg"))
+      .catch(() => setUrl("/default.jpg"));
+  }, [s3Key]);
+
+  if (!url)
+    return (
+      <div
+        className={className}
+        style={{
+          width: 80,
+          height: 80,
+          background: "#eee",
+          borderRadius: "6px"
+        }}
+      />
+    );
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      style={{
+        objectFit: "cover",
+        width: 80,
+        height: 80,
+        borderRadius: "6px"
+      }}
+      {...props}
+    />
+  );
+}
+
 export default function AdminBlogPage() {
   const [articles, setArticles] = useState([]);
   const [titre, setTitre] = useState("");
@@ -37,7 +81,8 @@ export default function AdminBlogPage() {
 
       if (res.ok) {
         const data = await res.json();
-        uploaded.push(data.imageUrl);
+        // On stocke la clé S3 (pas d’URL brute)
+        uploaded.push(data.imageUrl || data.path); // adapte selon ton retour API
       } else {
         alert("Erreur lors de l'upload d'une image.");
       }
@@ -120,6 +165,7 @@ export default function AdminBlogPage() {
         <div className="image-preview">
           {images.map((url, i) => (
             <div key={i} className="image-wrapper">
+              {/* Ici url est déjà presigned */}
               <img src={url} alt={`Aperçu ${i}`} />
               <button type="button" onClick={() => handleRemoveImage(url)}>
                 ❌
@@ -135,9 +181,10 @@ export default function AdminBlogPage() {
       <div className="admin-articles">
         {articles.map((article) => (
           <div className="article-card" key={article.id}>
-            {article.images?.[0] && (
-              <img
-                src={article.images[0].url}
+            {/* Utilise la clé S3 + composant presign */}
+            {article.images?.[0]?.url && (
+              <PresignedImage
+                s3Key={article.images[0].url}
                 alt={`Image de ${article.titre}`}
                 className="article-thumbnail"
               />

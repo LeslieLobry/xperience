@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import "./edit.css";
 
 export default function EditArticlePage() {
@@ -22,7 +21,8 @@ export default function EditArticlePage() {
         setTitre(article.titre);
         setDescription(article.description || "");
         setContenu(article.contenu);
-        setImages(article.images || []);
+        // 👉 extrait seulement la clé S3 si l'API renvoie des objets {url}
+        setImages(Array.isArray(article.images) ? article.images.map(img => typeof img === "string" ? img : img.url) : []);
       } else {
         alert("Article introuvable.");
         router.push("/admin/blog");
@@ -32,6 +32,7 @@ export default function EditArticlePage() {
     fetchArticle();
   }, [id, router]);
 
+  // Gestion de l'upload d'image : on push la clé S3 reçue (jamais une URL complète)
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     const uploaded = [];
@@ -47,32 +48,35 @@ export default function EditArticlePage() {
 
       if (res.ok) {
         const data = await res.json();
-        uploaded.push(data.imageUrl);
+        // on reçoit normalement { success: true, path: "articles/uuid.jpg" }
+        uploaded.push(data.path);
       } else {
-        alert("Erreur lors du téléchargement d&apos;une image.");
+        alert("Erreur lors du téléchargement d'une image.");
       }
     }
 
     setImages((prev) => [...prev, ...uploaded]);
   };
 
-  const handleRemoveImage = async (url) => {
+  // Suppression d'image (clé S3)
+  const handleRemoveImage = async (key) => {
     const confirmDelete = confirm("Supprimer cette image ?");
     if (!confirmDelete) return;
 
     const res = await fetch("/api/delete-article-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ key }),
     });
 
     if (res.ok) {
-      setImages((prev) => prev.filter((img) => img !== url));
+      setImages((prev) => prev.filter((img) => img !== key));
     } else {
       alert("Erreur lors de la suppression.");
     }
   };
 
+  // Envoi des infos au backend (tableau de clés S3 !)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -88,6 +92,39 @@ export default function EditArticlePage() {
       alert("Erreur lors de la mise à jour.");
     }
   };
+
+  // Pour l'aperçu, on peut faire la presign côté client comme pour partenaires (version rapide ci-dessous)
+  function ArticlePresignedImg({ s3Key, ...props }) {
+    const [url, setUrl] = useState(null);
+    useEffect(() => {
+      if (!s3Key) return setUrl("/default.jpg");
+      if (s3Key.startsWith("http")) return setUrl(s3Key);
+      fetch("/api/photos/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: s3Key }),
+      })
+        .then(res => res.json())
+        .then(data => setUrl(data.url || "/default.jpg"))
+        .catch(() => setUrl("/default.jpg"));
+    }, [s3Key]);
+    return (
+      <img
+        src={url || "/default.jpg"}
+        alt={props.alt || "aperçu"}
+        className="preview-image"
+        style={{
+          maxWidth: "200px",
+          maxHeight: "150px",
+          borderRadius: "8px",
+          objectFit: "cover",
+          ...props.style,
+        }}
+        width={200}
+        height={150}
+      />
+    );
+  }
 
   return (
     <div className="edit-container">
@@ -123,19 +160,13 @@ export default function EditArticlePage() {
         />
 
         <div className="image-preview">
-          {images.map((url, index) => (
-            <div key={index} className="image-wrapper">
-              <Image
-                src={url}
-                alt={`Image ${index}`}
-                width={200}
-                height={150}
-                className="preview-image"
-              />
+          {images.map((key, index) => (
+            <div key={key || index} className="image-wrapper">
+              <ArticlePresignedImg s3Key={key} alt={`Image ${index}`} />
               <button
                 type="button"
                 className="remove-image-btn"
-                onClick={() => handleRemoveImage(url)}
+                onClick={() => handleRemoveImage(key)}
               >
                 ❌
               </button>

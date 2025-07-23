@@ -1,10 +1,10 @@
-// components/DerniersArticles/DerniersArticles.jsx
 import Link from "next/link";
-import Image from "next/image";
+import PresignedArticleImage from "./PresignedArticleImage";
 import "./DerniersArticles.css";
 
 export default function DerniersArticles({ articles }) {
-  if (!articles?.length) return <p className="articles-empty">Aucun article trouvé.</p>;
+  if (!articles?.length)
+    return <p className="articles-empty">Aucun article trouvé.</p>;
 
   return (
     <section className="dernier-articles-section">
@@ -19,11 +19,9 @@ export default function DerniersArticles({ articles }) {
             <div className="dernier-article-card">
               <div className="dernier-article-image-wrapper">
                 {article.images?.[0]?.url ? (
-                  <Image
-                    src={article.images[0].url}
+                  <PresignedArticleImage
+                    s3Key={article.images[0].url}
                     alt={article.titre}
-                    fill
-                    className="dernier-article-image"
                   />
                 ) : (
                   <div className="dernier-article-noimage">Pas d'image</div>
