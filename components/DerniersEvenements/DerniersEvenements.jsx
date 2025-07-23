@@ -1,7 +1,36 @@
-// components/DerniersEvenements/DerniersEvenements.jsx
+"use client"
 import Link from "next/link";
-import Image from "next/image";
 import "./DerniersEvenements.css";
+import { useEffect, useState } from "react";
+
+// Composant interne pour charger l'image presignée depuis S3
+function PresignedEventImage({ s3Key, alt = "", width = 250, height = 150 }) {
+  const [src, setSrc] = useState("/default-event.jpg");
+
+  useEffect(() => {
+    if (!s3Key) return setSrc("/default-event.jpg");
+    if (s3Key.startsWith("http")) return setSrc(s3Key);
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: s3Key }),
+    })
+      .then((r) => r.json())
+      .then((data) => setSrc(data.url || "/default-event.jpg"))
+      .catch(() => setSrc("/default-event.jpg"));
+  }, [s3Key]);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      style={{ objectFit: "cover", width: width, height: height, borderRadius: 8 }}
+      loading="lazy"
+    />
+  );
+}
 
 export default function DerniersEvenements({ evenements }) {
   // Date du jour sans les heures
@@ -56,8 +85,8 @@ export default function DerniersEvenements({ evenements }) {
           >
             <div className="evenement-image-wrapper">
               {event.imageUrl ? (
-                <Image
-                  src={event.imageUrl}
+                <PresignedEventImage
+                  s3Key={event.imageUrl}
                   alt={event.titre}
                   width={250}
                   height={150}
@@ -72,11 +101,11 @@ export default function DerniersEvenements({ evenements }) {
                 {event.datesAVenir
                   .map((d) =>
                     new Date(d).toLocaleDateString("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric"
-})
-                 )
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric"
+                    })
+                  )
                   .join(", ")}
               </small>
               <div>{event.lieu}</div>

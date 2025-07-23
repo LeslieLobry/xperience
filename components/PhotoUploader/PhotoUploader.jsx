@@ -63,76 +63,75 @@ export default function PhotoUploader({
 
   // Quand l'utilisateur choisit un fichier
   const handleFileChange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
 
-  // Preview locale instantanée
-  if (isVideoFile(file)) {
-    setPreviewType("video");
-    setPreview(URL.createObjectURL(file));
-  } else {
-    setPreviewType("image");
-    setPreview(URL.createObjectURL(file));
-  }
-
-  const formData = new FormData();
-  formData.append('image', file);
-
-  if (isGallery && isPublic) formData.append('isPublic', 'true');
-  if (isGallery && !isPublic) {
-    if (!galerieId || isNaN(parseInt(galerieId))) {
-      console.error("galerieId invalide pour galerie privée");
-      return alert("Erreur : galerie privée introuvable.");
-    }
-    formData.append('galerieId', galerieId.toString());
-  }
-
-  try {
-    const res = await fetch('/api/upload-photo', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-
-    if (!res.ok) {
-      let message = "Erreur lors de l'envoi du fichier.";
-      try {
-        const json = await res.json();
-        message = json.message || message;
-      } catch (err) {
-        console.error("Erreur lors de la lecture de la réponse JSON :", err);
-      }
-      console.error("Upload échoué :", message);
-      alert(message);
-      return;
-    }
-
-    const data = await res.json();
-    // **Correction ici : utiliser data.path au lieu de data.photoUrl**
-    const url = data.path || data.photoUrl;
-
-    // Après upload, on force la preview via presigned URL (pour le S3 privé)
-    if (typeof url === "string" && !url.startsWith("http")) {
-      // Nouvelle clé => on re-fetch la presigned
-      const r = await fetch("/api/photos/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: url }),
-      });
-      const d = await r.json();
-      setPreview(d.url || "/default.jpg");
-      setPreviewType(isVideoFile(url) ? "video" : "image");
+    // Preview locale instantanée
+    if (isVideoFile(file)) {
+      setPreviewType("video");
+      setPreview(URL.createObjectURL(file));
     } else {
-      setPreview(url);
-      setPreviewType(isVideoFile(url) ? "video" : "image");
+      setPreviewType("image");
+      setPreview(URL.createObjectURL(file));
     }
 
-    if (onUpload) onUpload(isGallery ? data : url);
-  } catch (err) {
-    console.error("Erreur réseau :", err);
-    alert("Erreur réseau pendant l'upload.");
-  }
-};
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    if (isGallery && isPublic) formData.append('isPublic', 'true');
+    if (isGallery && !isPublic) {
+      if (!galerieId || isNaN(parseInt(galerieId))) {
+        console.error("galerieId invalide pour galerie privée");
+        return alert("Erreur : galerie privée introuvable.");
+      }
+      formData.append('galerieId', galerieId.toString());
+    }
+
+    try {
+      const res = await fetch('/api/upload-photo', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        let message = "Erreur lors de l'envoi du fichier.";
+        try {
+          const json = await res.json();
+          message = json.message || message;
+        } catch (err) {
+          console.error("Erreur lors de la lecture de la réponse JSON :", err);
+        }
+        console.error("Upload échoué :", message);
+        alert(message);
+        return;
+      }
+
+      const data = await res.json();
+      const url = data.photoUrl;
+
+      // Après upload, on force la preview via presigned URL (pour le S3 privé)
+      if (typeof url === "string" && !url.startsWith("http")) {
+        // Nouvelle clé => on re-fetch la presigned
+        const r = await fetch("/api/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: url }),
+        });
+        const d = await r.json();
+        setPreview(d.url || "/default.jpg");
+        setPreviewType(isVideoFile(url) ? "video" : "image");
+      } else {
+        setPreview(url);
+        setPreviewType(isVideoFile(url) ? "video" : "image");
+      }
+
+      if (onUpload) onUpload(isGallery ? data : url);
+    } catch (err) {
+      console.error("Erreur réseau :", err);
+      alert("Erreur réseau pendant l'upload.");
+    }
+  };
 
   return (
     <div className={`photo-upload-contenant ${isGallery ? 'gallery-mode' : ''}`}>
@@ -163,7 +162,7 @@ export default function PhotoUploader({
               className="camera-label"
               title="Changer la photo"
               style={{ cursor: "pointer" }}
-              onClick={e => e.stopPropagation()} // <- pour éviter toute propagation indésirable
+              onClick={e => e.stopPropagation()}
             >
               <Camera className="camera-icon" />
             </label>
@@ -172,7 +171,14 @@ export default function PhotoUploader({
       )}
 
       {isGallery && (
-        <div className="gallery-placeholder">
+        <div
+          className="gallery-placeholder"
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          style={{ cursor: "pointer" }}
+          tabIndex={0}
+          title="Ajouter une photo"
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") fileInputRef.current.click(); }}
+        >
           <Plus size={32} color="#ccc" />
         </div>
       )}
