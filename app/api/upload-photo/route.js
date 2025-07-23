@@ -1,11 +1,3 @@
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '2000mb', // adapte si besoin
-    }
-  }
-};
-
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getUserFromToken } from '../../../lib/auth';
@@ -15,7 +7,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 export async function POST(req) {
   console.log("Début traitement POST /upload-article-image");
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const user = await getUserFromToken(cookieStore);
   console.log("Utilisateur extrait du token :", user);
 
@@ -35,11 +27,11 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
   }
 
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
   // ---- MODÉRATION SIGHTENGINE ----
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    console.log("Buffer image créé, taille (bytes) :", buffer.length);
-
     const moderationForm = new FormData();
     moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
     moderationForm.append("models", "face-attributes");
@@ -74,10 +66,6 @@ export async function POST(req) {
   const ext = file.name.split(".").pop();
   const filename = `articles/article_${user.id}_${Date.now()}.${ext}`;
   console.log("Nom du fichier pour S3 :", filename);
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  console.log("Buffer pour upload S3, taille (bytes) :", buffer.length);
-
   const bucket = process.env.AWS_S3_BUCKET;
   console.log("Bucket cible :", bucket);
 
@@ -94,7 +82,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: "Erreur upload S3." }, { status: 500 });
   }
 
-  // Tu retournes seulement la clé relative
   console.log("Fin traitement avec succès, retourne la clé :", filename);
   return NextResponse.json({ success: true, path: filename });
 }
