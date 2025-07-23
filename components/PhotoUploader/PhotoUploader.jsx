@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
+import { toast } from 'react-toastify'; // 👈 Ajoute ceci
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
@@ -66,6 +67,13 @@ export default function PhotoUploader({
     const file = e.target.files[0];
     if (!file) return;
 
+    // 🚩 Vérification taille fichier AVANT upload
+    const MAX_SIZE_MB = 4;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error("Photo trop volumineuse !\nLa taille maximale autorisée est 4 Mo.");
+      return;
+    }
+
     // Preview locale instantanée
     if (isVideoFile(file)) {
       setPreviewType("video");
@@ -81,8 +89,8 @@ export default function PhotoUploader({
     if (isGallery && isPublic) formData.append('isPublic', 'true');
     if (isGallery && !isPublic) {
       if (!galerieId || isNaN(parseInt(galerieId))) {
-        console.error("galerieId invalide pour galerie privée");
-        return alert("Erreur : galerie privée introuvable.");
+        toast.error("Erreur : galerie privée introuvable."); // 👈 toast aussi ici
+        return;
       }
       formData.append('galerieId', galerieId.toString());
     }
@@ -103,7 +111,7 @@ export default function PhotoUploader({
           console.error("Erreur lors de la lecture de la réponse JSON :", err);
         }
         console.error("Upload échoué :", message);
-        alert(message);
+        toast.error(message);
         return;
       }
 
@@ -129,7 +137,7 @@ export default function PhotoUploader({
       if (onUpload) onUpload(isGallery ? data : url);
     } catch (err) {
       console.error("Erreur réseau :", err);
-      alert("Erreur réseau pendant l'upload.");
+      toast.error("Erreur réseau pendant l'upload.");
     }
   };
 

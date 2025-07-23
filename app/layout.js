@@ -7,6 +7,8 @@ import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 import { Analytics } from "@vercel/analytics/next"
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -31,8 +33,6 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-
-
   return (
     <html lang="fr" className={`${allura.variable} ${raleway.variable}`}>
       <body className="font-raleway">
@@ -45,8 +45,20 @@ export default function RootLayout({ children }) {
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
-         <Analytics /> 
+        {/* Place-le ici : */}
+        <ToastContainer
+          position="top-right"   // ou "bottom-right"
+          autoClose={4000}       // 4 secondes
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="dark"           // Ou "light", ou personnalisable !
+        />
+        <Analytics />
       </body>
     </html>
   );
 }
+
