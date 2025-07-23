@@ -353,6 +353,35 @@ model MessageReaction {
   @@unique([utilisateurId, messageId]) // un utilisateur ne peut réagir qu'une seule fois par message
   @@index([messageId])  
 }
+model VerificationIdentite {
+  id              Int          @id @default(autoincrement())
+  utilisateur     Utilisateur  @relation(fields: [utilisateurId], references: [id])
+  utilisateurId   Int
+
+  type            String       // "SIMPLE" ou "COUPLE"
+  photoCI1Url     String
+  selfie1Url      String
+  sexe1           String
+  age1            Int?
+
+  photoCI2Url     String?
+  selfie2Url      String?
+  sexe2           String?
+  age2            Int?
+
+  statut          VerificationStatut @default(EN_ATTENTE)
+  commentaire     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("VerificationIdentite")
+}
+
+enum VerificationStatut {
+  EN_ATTENTE
+  ACCEPTEE
+  REFUSEE
+}
 
 
 

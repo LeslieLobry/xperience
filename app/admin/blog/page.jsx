@@ -14,8 +14,8 @@ function PresignedImage({ s3Key, alt, className = "", ...props }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: s3Key }),
     })
-      .then(res => res.json())
-      .then(data => setUrl(data.url || "/default.jpg"))
+      .then((res) => res.json())
+      .then((data) => setUrl(data.url || "/default.jpg"))
       .catch(() => setUrl("/default.jpg"));
   }, [s3Key]);
 
@@ -27,7 +27,7 @@ function PresignedImage({ s3Key, alt, className = "", ...props }) {
           width: 80,
           height: 80,
           background: "#eee",
-          borderRadius: "6px"
+          borderRadius: "6px",
         }}
       />
     );
@@ -40,7 +40,7 @@ function PresignedImage({ s3Key, alt, className = "", ...props }) {
         objectFit: "cover",
         width: 80,
         height: 80,
-        borderRadius: "6px"
+        borderRadius: "6px",
       }}
       {...props}
     />
@@ -52,7 +52,7 @@ export default function AdminBlogPage() {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [contenu, setContenu] = useState("");
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState([]); // Contient les clés S3, pas les URLs signées
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
@@ -81,8 +81,8 @@ export default function AdminBlogPage() {
 
       if (res.ok) {
         const data = await res.json();
-        // On stocke la clé S3 (pas d’URL brute)
-        uploaded.push(data.imageUrl || data.path); // adapte selon ton retour API
+        // stocke ici la clé S3 (ex: "folder/monimage.jpg"), adapte selon ta réponse backend
+        uploaded.push(data.imageUrl || data.path);
       } else {
         alert("Erreur lors de l'upload d'une image.");
       }
@@ -91,8 +91,17 @@ export default function AdminBlogPage() {
     setImages((prev) => [...prev, ...uploaded]);
   };
 
-  const handleRemoveImage = (urlToDelete) => {
-    setImages((prev) => prev.filter((url) => url !== urlToDelete));
+  const handleRemoveImage = async (s3Key) => {
+    try {
+      await fetch("/api/delete-article-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: s3Key }), // clé S3
+      });
+    } catch (error) {
+      console.error("Erreur suppression image:", error);
+    }
+    setImages((prev) => prev.filter((key) => key !== s3Key));
   };
 
   const handleSubmit = async (e) => {
@@ -163,11 +172,10 @@ export default function AdminBlogPage() {
         />
 
         <div className="image-preview">
-          {images.map((url, i) => (
+          {images.map((key, i) => (
             <div key={i} className="image-wrapper">
-              {/* Ici url est déjà presigned */}
-              <img src={url} alt={`Aperçu ${i}`} />
-              <button type="button" onClick={() => handleRemoveImage(url)}>
+              <PresignedImage s3Key={key} alt={`Aperçu ${i}`} />
+              <button type="button" onClick={() => handleRemoveImage(key)}>
                 ❌
               </button>
             </div>
@@ -192,7 +200,12 @@ export default function AdminBlogPage() {
             <div className="article-info">
               <h3>{article.titre}</h3>
               <div className="admin-buttons">
-                <a href={`/admin/blog/editer/${article.id}`} className="edit-link">✏️ Éditer</a>
+                <a
+                  href={`/admin/blog/editer/${article.id}`}
+                  className="edit-link"
+                >
+                  ✏️ Éditer
+                </a>
                 <button onClick={() => handleDelete(article.id)}>🗑️ Supprimer</button>
               </div>
             </div>

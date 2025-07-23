@@ -1,19 +1,44 @@
 import { NextResponse } from "next/server";
+import { deleteFromS3 } from "../../../lib/s3";
+
+function extractS3Key(pathOrUrl) {
+  try {
+    const url = new URL(pathOrUrl);
+    return url.pathname.slice(1); // enlève le "/" initial
+  } catch {
+    return pathOrUrl; // ce n’est pas une URL complète, on retourne tel quel
+  }
+}
 
 export async function POST(req) {
-  const body = await req.json();
-  const { url } = body;
+  let body;
+  try {
+    body = await req.json();
+  } catch (e) {
+    console.error("Erreur parse JSON body:", e);
+    return NextResponse.json({ success: false, message: "Corps JSON invalide" }, { status: 400 });
+  }
+  console.log("Body reçu:", body);
 
-  if (!url) {
+  // Accepte 'url' ou 'key' dans le body
+  const rawKey = body.url || body.key;
+  if (!rawKey) {
     return NextResponse.json(
-      { success: false, message: "URL manquante." },
+      { success: false, message: "Clé ou URL manquante." },
       { status: 400 }
     );
   }
 
-  // 👉 ICI : suppression réelle à implémenter si besoin (Cloudinary, S3, etc.)
-  console.log("🗑️ Suppression demandée pour :", url);
+  const key = extractS3Key(rawKey);
 
-  // On retourne une réponse de succès simulée
-  return NextResponse.json({ success: true });
+  try {
+    await deleteFromS3(key);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Erreur suppression S3 :", error);
+    return NextResponse.json(
+      { success: false, message: "Erreur suppression S3" },
+      { status: 500 }
+    );
+  }
 }
