@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "../../../lib/prisma";
-import jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken"; // ✅
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { randomUUID } from "crypto";
@@ -32,7 +32,7 @@ async function getUserFromCookie() {
   }
 }
 
-// 📥 POST — Créer un événement (PRODUCTION S3)
+// 📥 POST — Créer un événement (S3 privé : imageUrl = clé S3 !)
 export async function POST(req) {
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
@@ -59,15 +59,12 @@ export async function POST(req) {
   // 🔥 Prise en charge 1 ou plusieurs dates
   let dates = formData.getAll("dates");
   if (!dates.length && formData.get("date")) dates = [formData.get("date")];
-  dates = dates.filter((d) => !!d); // filtre les vides
-dates = dates.flatMap(d =>
-  typeof d === "string" && d.includes(",")
-    ? d.split(",").map(s => s.trim())
-    : [d]
-);
-
-  // Log pour debug
-  console.log("dates reçues via formData :", dates);
+  dates = dates.filter((d) => !!d);
+  dates = dates.flatMap(d =>
+    typeof d === "string" && d.includes(",")
+      ? d.split(",").map(s => s.trim())
+      : [d]
+  );
 
   if (!titre || !description || !lieu || !type || !acces || !dates.length) {
     return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
@@ -85,8 +82,8 @@ dates = dates.flatMap(d =>
     return NextResponse.json({ error: "Aucune date valide transmise" }, { status: 400 });
   }
 
-  // Image upload sur S3 (ou null)
-  let imageUrl = null;
+  // Image upload sur S3 (clé S3 stockée en BDD)
+  let imageKey = null;
   const image = formData.get("image");
   if (image && image.name) {
     if (!image.type.startsWith("image/")) {
@@ -95,7 +92,6 @@ dates = dates.flatMap(d =>
 
     try {
       const buffer = Buffer.from(await image.arrayBuffer());
-      // Compression webp
       const webpBuffer = await sharp(buffer)
         .resize(800)
         .webp({ quality: 80 })
@@ -112,7 +108,7 @@ dates = dates.flatMap(d =>
         })
       );
 
-      imageUrl = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${fileName}`;
+      imageKey = fileName; // 🟢 ON STOCKE LA CLÉ S3 (pas d’URL publique)
     } catch (err) {
       console.error("Erreur upload S3 :", err);
       return NextResponse.json({ error: "Erreur lors du traitement de l’image" }, { status: 500 });
@@ -124,7 +120,7 @@ dates = dates.flatMap(d =>
       data: {
         titre,
         description,
-        dates: parsedDates, // tableau de dates validées !
+        dates: parsedDates,
         lieu,
         type,
         acces,
@@ -133,7 +129,7 @@ dates = dates.flatMap(d =>
         tarifCouple,
         tarifFemme,
         tarifHomme,
-        imageUrl,
+        imageUrl: imageKey, // 🔑 clé S3
         latitude,
         longitude,
         lien,
@@ -148,6 +144,7 @@ dates = dates.flatMap(d =>
   }
 }
 
+// 📤 GET — Récupérer les événements (sans modif, imageUrl = clé S3)
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
 
@@ -194,7 +191,7 @@ export async function GET(req) {
       );
     }
 
-    // 🌍 Filtrage géographique (inchangé)
+    // 🌍 Filtrage géographique
     if (!isNaN(latitude) && !isNaN(longitude)) {
       const toRad = (deg) => (deg * Math.PI) / 180;
       const R = 6371; // km

@@ -54,7 +54,7 @@ color:#ccc
    border: 1px solid #e0c084;
   padding: 8px;
   border-radius: 16px;
-  width: 50%;
+  width: 65%;
 }
 
 .event-details-description {
@@ -70,7 +70,7 @@ color: #e0c084;
 
 .event-grid{
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
 }
 
 .description-contenant {

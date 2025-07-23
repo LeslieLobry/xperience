@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import sharp from "sharp";
 import { randomUUID } from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -13,6 +14,8 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+const BUCKET = process.env.AWS_S3_BUCKET;
+const REGION = process.env.AWS_REGION;
 
 async function getUserFromCookie() {
   const cookieStore = await cookies();
@@ -57,13 +60,12 @@ export async function PUT(req, { params }) {
   }
 
   const formData = await req.formData();
- const data = {};
-for (const key of formData.keys()) {
-  if (!key.endsWith("[]") && key !== "dates") {
-    data[key] = formData.get(key);
+  const data = {};
+  for (const key of formData.keys()) {
+    if (!key.endsWith("[]") && key !== "dates") {
+      data[key] = formData.get(key);
+    }
   }
-}
-
 
   // ✅ Gère les dates (tableau)
   let dates = formData.getAll("dates[]");
@@ -97,31 +99,34 @@ for (const key of formData.keys()) {
   delete data.createurId;
   delete data.image;
 
-  // Gestion image
+  // Gestion image (toujours stocker la clé S3 !)
   const image = formData.get("image");
   if (image && typeof image.name === "string" && image.size > 0) {
     try {
-      const extension = image.name.split(".").pop();
-      const filename = `evenements/${Date.now()}_${randomUUID()}.${extension}`;
       const buffer = Buffer.from(await image.arrayBuffer());
+      const webpBuffer = await sharp(buffer)
+        .resize(800)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      const filename = `evenements/${Date.now()}_${randomUUID()}.webp`;
 
       await s3.send(
         new PutObjectCommand({
-          Bucket: process.env.AWS_S3_BUCKET,
+          Bucket: BUCKET,
           Key: filename,
-          Body: buffer,
-          ContentType: image.type,
+          Body: webpBuffer,
+          ContentType: "image/webp",
         })
       );
 
-      data.imageUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+      data.imageUrl = filename; // clé S3
     } catch (err) {
       console.error("Erreur S3 PUT événement :", err);
       return NextResponse.json({ error: "Erreur lors de l’upload image" }, { status: 500 });
     }
   } else {
-    // 🟢 Si PAS de nouvelle image, NE TOUCHE PAS à imageUrl
-    if ("imageUrl" in data) delete data.imageUrl;
+    if ("imageUrl" in data) delete data.imageUrl; // n'efface pas si rien de nouveau
   }
 
   try {

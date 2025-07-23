@@ -14,6 +14,7 @@ export default function PageEvenement() {
   const [evenement, setEvenement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState("");
+  const [imageUrl, setImageUrl] = useState(null); // Ajouté pour gérer la presigned URL
   const isAdmin = user?.role === "ADMIN";
 
   // Redirige si pas connecté
@@ -34,8 +35,25 @@ export default function PageEvenement() {
           ...data,
           participants: data.participants || [],
         });
+
+        // -- gestion de l'image S3 (clé ou url publique) --
+        if (data.imageUrl) {
+          if (data.imageUrl.startsWith("http")) setImageUrl(data.imageUrl);
+          else {
+            const presignRes = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: data.imageUrl }),
+            });
+            const result = await presignRes.json();
+            setImageUrl(result.url || "/default.jpg");
+          }
+        } else {
+          setImageUrl(null);
+        }
       } catch (err) {
         setEvenement(null);
+        setImageUrl(null);
       } finally {
         setLoading(false);
       }
@@ -95,11 +113,10 @@ export default function PageEvenement() {
 
   // ⚡️ Gestion multi-dates
   const datesAffichees = Array.isArray(evenement.dates)
-  ? evenement.dates.map((d) =>
-      new Date(d).toLocaleDateString("fr-FR")
-    )
-  : [];
-
+    ? evenement.dates.map((d) =>
+        new Date(d).toLocaleDateString("fr-FR")
+      )
+    : [];
 
   return (
     <div className="evenement-container">
@@ -110,59 +127,59 @@ export default function PageEvenement() {
         className="retour"
       >Retour</button>
       <div className="event-grid">
-  <div className="img-title">
-      <h1 className="titre-event">{evenement.titre}</h1>
+        <div className="img-title">
+          <h1 className="titre-event">{evenement.titre}</h1>
 
-      {evenement.imageUrl && (
-        <img
-          src={evenement.imageUrl}
-          alt="Affiche de l'événement"
-          className="evenement-image"
-        />
-      )}
+          {/** ------------------ IMAGE ------------------ */}
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="Affiche de l'événement"
+              className="evenement-image"
+            />
+          )}
+        </div>
+        <div className="description-contenant">
+          <h2>Description</h2>
+          <p>{evenement.description}</p>
+        </div>
       </div>
-      <div className="description-contenant">
-      <h2>Description</h2>
-      <p>{evenement.description}</p>
-</div>
-</div>
-<div className="event-details-description">
-      <div className="evenement-details">
-        <h2 className="event-details-title">Infos</h2>
-        <p>
-          <strong>Date{datesAffichees.length > 1 ? "s" : ""} :</strong>{" "}
-          {datesAffichees.length
-            ? datesAffichees.join(", ")
-            : "?"}
-        </p>
-        <p>
-          {/* <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin} */}
-        </p>
-        <p>
-          <strong>Lieu :</strong> {evenement.lieu}
-        </p>
-        {/* <p>
-          <strong>Type :</strong> {evenement.type}
-        </p> */}
-        {/* <p>
-          <strong>Accès :</strong> {evenement.acces}
-        </p> */}
-
-        {evenement.lien && (
+      <div className="event-details-description">
+        <div className="evenement-details">
+          <h2 className="event-details-title">Infos</h2>
           <p>
-            <strong>Lien :</strong>{" "}
-            <a
-              href={evenement.lien.startsWith("http") ? evenement.lien : `https://${evenement.lien}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {evenement.lien}
-            </a>
+            <strong>Date{datesAffichees.length > 1 ? "s" : ""} :</strong>{" "}
+            {datesAffichees.length
+              ? datesAffichees.join(", ")
+              : "?"}
           </p>
-        )}
-      </div>
+          <p>
+            {/* <strong>Heure :</strong> {evenement.heureDebut} - {evenement.heureFin} */}
+          </p>
+          <p>
+            <strong>Lieu :</strong> {evenement.lieu}
+          </p>
+          {/* <p>
+            <strong>Type :</strong> {evenement.type}
+          </p> */}
+          {/* <p>
+            <strong>Accès :</strong> {evenement.acces}
+          </p> */}
 
-</div>
+          {evenement.lien && (
+            <p>
+              <strong>Lien :</strong>{" "}
+              <a
+                href={evenement.lien.startsWith("http") ? evenement.lien : `https://${evenement.lien}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {evenement.lien}
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
       {/* <h2>Tarifs</h2>
       <ul>
         <li>Couples : {evenement.tarifCouple ?? "?"} €</li>
@@ -180,14 +197,13 @@ export default function PageEvenement() {
       {confirmation && <p className="confirmation-message">{confirmation}</p>}
 
       {user && (
-     <button
-  onClick={dejaInscrit ? seDesinscrire : participer}
-  className="retour"
-    title={dejaInscrit ? "Se désinscrire" : "Participer"} // ← ça c'est l'infobulle au survol, tu peux garder si tu veux
->
-  {dejaInscrit ? "Se désinscrire" : "Participer"}
-</button>
-
+        <button
+          onClick={dejaInscrit ? seDesinscrire : participer}
+          className="retour"
+          title={dejaInscrit ? "Se désinscrire" : "Participer"} // ← ça c'est l'infobulle au survol, tu peux garder si tu veux
+        >
+          {dejaInscrit ? "Se désinscrire" : "Participer"}
+        </button>
       )}
 
       {isAdmin && (

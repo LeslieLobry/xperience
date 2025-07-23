@@ -51,8 +51,8 @@ export async function POST(req) {
       })
     );
 
-    const imageUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-    return NextResponse.json({ success: true, imageUrl });
+    // On retourne UNIQUEMENT la clé S3 (pour presign privé)
+    return NextResponse.json({ success: true, key: fileName });
 
   } catch (err) {
     console.error("Erreur upload S3 :", err);
