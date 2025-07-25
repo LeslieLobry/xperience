@@ -3,6 +3,7 @@
   border-radius: 8px;
   padding: 1rem;
   border: 1px solid #e0c084; 
+  color: #f5ece0;
 }
 
 .recherche-sidebar h2 {
@@ -14,7 +15,9 @@
   background-color: transparent;
   border: 1px solid #e0c084;
 }
-
+.recherche-sidebar h4{
+  color: #8c6a5d;
+}
 .recherche-sidebar form {
   display: flex;
   flex-direction: column;
@@ -61,7 +64,6 @@
   border-radius: 4px;
   border: 1px solid #ccc;
   color: #e0c084;
-  font-size: 24px;
   background-color: transparent;
 }
 
