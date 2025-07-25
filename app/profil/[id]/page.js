@@ -14,13 +14,13 @@ export default async function ProfilPage({ params }) {
   if (!connectedUser) return redirect("/connexion");
 
   // Redirection si identité non vérifiée + délai dépassé
-  if (
-    !connectedUser.verificationIdentite &&
-    connectedUser.verificationDeadline &&
-    new Date() > new Date(connectedUser.verificationDeadline)
-  ) {
-    return redirect("/verif-identite-obligatoire");
-  }
+  // if (
+  //   !connectedUser.verificationIdentite &&
+  //   connectedUser.verificationDeadline &&
+  //   new Date() > new Date(connectedUser.verificationDeadline)
+  // ) {
+  //   return redirect("/verif-identite-obligatoire");
+  // }
 
   try {
     const user = await prisma.utilisateur.findUnique({

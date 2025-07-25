@@ -23,13 +23,13 @@ export default async function AccueilPage() {
     return redirect("/connexion");
   }
 
-  if (
-    !user.verificationIdentite &&
-    user.verificationDeadline &&
-    new Date() > new Date(user.verificationDeadline)
-  ) {
-    return redirect("/verif-identite-obligatoire");
-  }
+  // if (
+  //   !user.verificationIdentite &&
+  //   user.verificationDeadline &&
+  //   new Date() > new Date(user.verificationDeadline)
+  // ) {
+  //   return redirect("/verif-identite-obligatoire");
+  // }
 
   // Préchargement côté serveur
   const exclusPromise = getIdsUtilisateursExclus(user.id);
