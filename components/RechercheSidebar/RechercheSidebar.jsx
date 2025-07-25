@@ -142,8 +142,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
 
   return (
     <aside className="recherche-sidebar">
-      <h2>🔎 Recherche</h2>
-
       <div style={{ marginBottom: 24 }}>
         <ReconnaissanceVocale
           onResult={texte => {
@@ -155,9 +153,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
         />
         {resumeVocal && (
           <div style={{
-            margin: "12px 0 20px", padding: "12px 20px",
+            margin: "12px 0 20px", padding: "6px",
             borderRadius: 8, background: "#fffbe7", color: "#c4903a",
-            fontWeight: "bold", fontSize: 17, boxShadow: "0 2px 10px #e0c08444", maxWidth: 700
+            fontWeight: "bold", boxShadow: "0 2px 10px #e0c08444", maxWidth: 700
           }}>
             <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
           </div>
