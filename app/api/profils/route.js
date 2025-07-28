@@ -20,6 +20,7 @@ export async function GET(req) {
       localisation: true,
       statut: true,
       type: true,
+      verificationIdentiteStatut: true
     },
   });
 

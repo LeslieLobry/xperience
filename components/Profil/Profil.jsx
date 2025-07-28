@@ -213,9 +213,17 @@ export default function Profil({ user, connectedUser }) {
             </SimpleModal>
           </div>
           <div className="profil-name-like">
-            <h1 className="profil-name">
-              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
-            </h1>
+          <h1 className="profil-name">
+  {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+  {user.verificationIdentiteStatut && (
+    <img
+      src="/Profilverif.png"
+      alt="Profil vérifié"
+      className="badge-verifie-img"
+    />
+  )}
+</h1>
+
             {!isOwnProfile && (
               <>
                 <button className="btn-envoyer-message" onClick={handleStartConversation}>

@@ -28,6 +28,7 @@ export async function POST(req) {
         statut: true,
         latitude: true,
         longitude: true,
+        verificationIdentiteStatut: true,
       },
     });
 

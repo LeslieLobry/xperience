@@ -23,14 +23,6 @@ export default async function AccueilPage() {
     return redirect("/connexion");
   }
 
-  // if (
-  //   !user.verificationIdentite &&
-  //   user.verificationDeadline &&
-  //   new Date() > new Date(user.verificationDeadline)
-  // ) {
-  //   return redirect("/verif-identite-obligatoire");
-  // }
-
   // Préchargement côté serveur
   const exclusPromise = getIdsUtilisateursExclus(user.id);
 
@@ -80,12 +72,10 @@ console.log("verifDeadline:", user.verificationDeadline);
 
   return (
     <div className="accueil-page">
-      {!user.verificationIdentite && user.verificationDeadline && (
-        <RappelVerification deadline={user.verificationDeadline} />
-      )}
-
+     {user.verificationIdentiteStatut !== true && (
+  <RappelVerification />
+)}
       <LoaderAnnonce />
-
       <div className="grid-accueil">
         <RechercheWrapper />
 

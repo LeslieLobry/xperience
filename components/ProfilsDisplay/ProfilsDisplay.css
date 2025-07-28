@@ -312,3 +312,15 @@ input[type="range"].profil-range {
     padding-right: 5px;
   }
 }
+.profil-photo-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.badge-verifie-overlay {
+  position: absolute;
+  top: -20px;
+  left: -7px;
+  height: 22px;
+  padding: 2px;
+}
