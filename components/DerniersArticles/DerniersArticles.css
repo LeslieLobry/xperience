@@ -64,13 +64,13 @@
 
 .dernier-article-titre {
   margin: 0 0 0.2rem;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .dernier-article-date {
   color: #a08e7a;
-  font-size: 0.9rem;
+  font-size: 10px;
 }
 
 .afficher-plus-articles{

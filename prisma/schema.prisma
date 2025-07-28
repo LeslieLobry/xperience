@@ -21,6 +21,22 @@ model DemandeAcces {
 
   @@unique([galeriePriveeId, demandeurId])
 }
+model VerificationIdentite {
+  id             Int                  @id @default(autoincrement())
+  utilisateurId  Int                  @unique
+  utilisateur    Utilisateur          @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
+
+  type           String               // "SIMPLE" ou "COUPLE"
+  photoCI1Url    String
+  selfie1Url     String
+  photoCI2Url    String?
+  selfie2Url     String?
+
+  statut         VerificationStatut   @default(EN_ATTENTE)
+  commentaire    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
 
 model Utilisateur {
   id                   Int             @id @default(autoincrement())
@@ -69,8 +85,7 @@ model Utilisateur {
   consentCGU           Boolean         @default(false)
   consentCGUDate       DateTime?
   verificationDeadline DateTime?
-  verificationIdentite Boolean         @default(false)
-
+  verificationIdentiteStatut Boolean         @default(false)
   articles             Article[]
   avisLaisses          Avis[]          @relation("AvisAuteur")
   avisRecus            Avis[]          @relation("AvisCible")
@@ -93,38 +108,11 @@ model Utilisateur {
   evenements           Evenement[]     @relation("Participation")
   visitesFaites        VisiteProfil[]  @relation("Visiteur")
   visitesRecues        VisiteProfil[]  @relation("Visite")
-
-  verificationDetails  VerificationIdentite? @relation("UtilisateurVerification")
-
   prenomsCouple        PrenomCoupleConversation[]
+  verificationIdentite VerificationIdentite?    @relation("UtilisateurVerification")
 
   @@map("Utilisateur")
 }
-
-model VerificationIdentite {
-  id              Int          @id @default(autoincrement())
-  utilisateurId   Int          @unique @map("utilisateurid")
-  utilisateur     Utilisateur  @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
-
-  type            String       // "SIMPLE" ou "COUPLE"
-  photoCI1Url     String       @map("photoci1url")
-  selfie1Url      String       @map("selfie1url")
-  sexe1           String       @map("sexe1")
-  age1            Int?         @map("age1")
-
-  photoCI2Url     String?      @map("photoci2url")
-  selfie2Url      String?      @map("selfie2url")
-  sexe2           String?      @map("sexe2")
-  age2            Int?         @map("age2")
-
-  statut          VerificationStatut @default(EN_ATTENTE)
-  commentaire     String?
-  createdAt       DateTime     @default(now()) @map("createdat")
-  updatedAt       DateTime     @updatedAt @map("updatedat")
-
-  @@map("VerificationIdentite")
-}
-
 
 model GaleriePrivee {
   id            Int            @id @default(autoincrement())

@@ -1,3 +1,4 @@
+// app/api/verification-identite/route.js
 export const config = {
   api: {
     bodyParser: {
@@ -16,141 +17,92 @@ import { prisma } from "../../../lib/prisma";
 
 export async function POST(req) {
   try {
+    // 1) Auth
     const cookieStore = cookies();
     const utilisateur = await getUserFromToken(cookieStore);
-    console.log("Utilisateur récupéré :", utilisateur?.id ?? "null");
-
-    if (!utilisateur || !utilisateur.id) {
-      console.log("Erreur : utilisateur non authentifié");
+    if (!utilisateur?.id) {
       return NextResponse.json(
         { success: false, message: "Non autorisé" },
         { status: 401 }
       );
     }
 
+    // 2) Lecture du form-data
     const formData = await req.formData();
-    const type = formData.get("type") || "SIMPLE";
-    console.log("Type de vérification :", type);
-
+    const type     = formData.get("type") || "SIMPLE";
     const photoCI1 = formData.get("photoCI1");
-    const selfie1 = formData.get("selfie1");
+    const selfie1  = formData.get("selfie1");
     let photoCI2, selfie2;
-
     if (type === "COUPLE") {
       photoCI2 = formData.get("photoCI2");
-      selfie2 = formData.get("selfie2");
+      selfie2  = formData.get("selfie2");
     }
 
-    console.log("photoCI1:", photoCI1?.name ?? "absent");
-    console.log("selfie1:", selfie1?.name ?? "absent");
-    if (type === "COUPLE") {
-      console.log("photoCI2:", photoCI2?.name ?? "absent");
-      console.log("selfie2:", selfie2?.name ?? "absent");
-    }
-
-    function isValidImage(file) {
-      return file && typeof file !== "string" && file.type.startsWith("image/");
-    }
-
+    // 3) Vérification basique des fichiers
+    const isImage = file =>
+      file && typeof file !== "string" && file.type.startsWith("image/");
     if (
-      !isValidImage(photoCI1) ||
-      !isValidImage(selfie1) ||
-      (type === "COUPLE" && (!isValidImage(photoCI2) || !isValidImage(selfie2)))
+      !isImage(photoCI1) ||
+      !isImage(selfie1) ||
+      (type === "COUPLE" && (!isImage(photoCI2) || !isImage(selfie2)))
     ) {
-      console.log("Erreur : fichiers invalides ou non images");
       return NextResponse.json(
         { success: false, message: "Fichiers invalides ou non images." },
         { status: 400 }
       );
     }
 
+    // 4) Upload helper
     async function upload(file, prefix) {
-      const arrayBuffer = await file.arrayBuffer();
-      const ext = file.name.split(".").pop();
-      const key = `${prefix}/${utilisateur.id}_${Date.now()}.${ext}`;
-      console.log(`Upload vers S3 : ${key}`);
-
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const ext    = file.name.split(".").pop();
+      const key    = `${prefix}/${utilisateur.id}_${Date.now()}.${ext}`;
       await s3.send(
         new PutObjectCommand({
           Bucket: process.env.AWS_S3_BUCKET,
           Key: key,
-          Body: Buffer.from(arrayBuffer),
+          Body: buffer,
           ContentType: file.type,
         })
       );
-
-      // retourne uniquement la clé (pas l'URL complète)
       return key;
     }
 
-    console.log("Analyse selfie 1 en cours...");
-    const analyseSelfie1 = await analyzeImageWithSightengineFromFile(selfie1);
-    let analyseSelfie2 = null;
+    // 5) Analyse adulte
+    const analyse1 = await analyzeImageWithSightengineFromFile(selfie1);
+    let analyse2 = null;
     if (type === "COUPLE") {
-      console.log("Analyse selfie 2 en cours...");
-      analyseSelfie2 = await analyzeImageWithSightengineFromFile(selfie2);
-      console.log("Données brutes analyse selfie 2 :", JSON.stringify(analyseSelfie2?.raw, null, 2));
-      console.log("Âge estimé selfie 2 :", analyseSelfie2?.age);
+      analyse2 = await analyzeImageWithSightengineFromFile(selfie2);
     }
 
-    let refuseReason = null;
-    if (!analyseSelfie1.isAdult) refuseReason = "1er selfie non adulte.";
-    if (type === "COUPLE" && !analyseSelfie2?.isAdult)
-      refuseReason = "2e selfie non adulte.";
-
-    const expectedSexe =
-      utilisateur.type === "homme"
-        ? "male"
-        : utilisateur.type === "femme"
-        ? "female"
-        : null;
-
-    if (expectedSexe && analyseSelfie1.gender !== expectedSexe)
-      refuseReason = "Genre selfie 1 non conforme.";
-
-    if (
-      type === "COUPLE" &&
-      expectedSexe &&
-      analyseSelfie2?.gender !== expectedSexe
-    )
-      refuseReason = "Genre selfie 2 non conforme.";
-
-    if (refuseReason) {
-      console.log("Refus automatique:", refuseReason);
+    if (!analyse1.isAdult || (type === "COUPLE" && !analyse2?.isAdult)) {
       return NextResponse.json(
-        { success: false, message: refuseReason },
+        { success: false, message: "Selfie non adulte détecté." },
         { status: 400 }
       );
     }
 
+    // 6) Upload sur S3
     const photoCI1Key = await upload(photoCI1, "verification-ci");
-    const selfie1Key = await upload(selfie1, "verification-selfie");
-    let photoCI2Key = null;
-    let selfie2Key = null;
+    const selfie1Key  = await upload(selfie1,  "verification-selfie");
+    const photoCI2Key = type === "COUPLE" ? await upload(photoCI2, "verification-ci")        : null;
+    const selfie2Key  = type === "COUPLE" ? await upload(selfie2,  "verification-selfie")     : null;
 
-    if (type === "COUPLE") {
-      photoCI2Key = await upload(photoCI2, "verification-ci");
-      selfie2Key = await upload(selfie2, "verification-selfie");
-    }
-
-    console.log("Enregistrement en base Prisma...");
+    // 7) Enregistrement en base Prisma
     const demande = await prisma.verificationIdentite.create({
       data: {
-        utilisateur: { connect: { id: utilisateur.id } },
+        utilisateur:  { connect: { id: utilisateur.id } },
         type,
-        photoCI1Url: photoCI1Key,
-        selfie1Url: selfie1Key,
-        photoCI2Url: photoCI2Key,
-        selfie2Url: selfie2Key,
-        statut: "EN_ATTENTE",
+        photoCI1Url:  photoCI1Key,
+        selfie1Url:   selfie1Key,
+        photoCI2Url:  photoCI2Key,
+        selfie2Url:   selfie2Key,
+        statut:       "EN_ATTENTE",
       },
     });
 
-    console.log("Demande créée, id:", demande.id);
-
     return NextResponse.json({
       success: true,
-      statut: "EN_ATTENTE",
       demande,
     });
   } catch (err) {

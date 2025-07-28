@@ -48,7 +48,7 @@ export async function GET() {
           age: true,
           localisation: true,
           verificationDeadline: true,
-          verificationIdentite: true,
+          verificationIdentiteStatut: true,
         },
       }),
       prisma.conversation.findMany({

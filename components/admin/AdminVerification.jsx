@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import "./AdminVerification.css";
 
 export default function AdminVerification() {
   const [demandes, setDemandes] = useState([]);
@@ -55,15 +56,15 @@ export default function AdminVerification() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div>
+    <div className="admin-verif-container">
       <h2>Demandes de vérification d'identité</h2>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="error">{error}</p>}
       {loading && <p>Chargement...</p>}
 
       {!loading && demandes.length === 0 && <p>Aucune demande.</p>}
 
-      <table border="1" cellPadding={6} cellSpacing={0} style={{ width: "100%", marginTop: 20 }}>
+      <table className="admin-verif-table">
         <thead>
           <tr>
             <th>Utilisateur</th>
@@ -73,6 +74,7 @@ export default function AdminVerification() {
             <th>Photo CI 2</th>
             <th>Selfie 2</th>
             <th>Statut</th>
+            <th>Date d'envoi</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -110,13 +112,13 @@ export default function AdminVerification() {
                 )}
               </td>
               <td>{d.statut}</td>
-              <td>{d.commentaire || "-"}</td>
+              <td>{new Date(d.createdAt).toLocaleString()}</td>
               <td>
                 {d.statut !== "ACCEPTEE" && (
                   <button
                     onClick={() => handleUpdate(d.id, "ACCEPTEE")}
                     disabled={updatingId === d.id}
-                    style={{ marginRight: 8 }}
+                    className="btn-accept"
                   >
                     Accepter
                   </button>
@@ -125,6 +127,7 @@ export default function AdminVerification() {
                   <button
                     onClick={() => handleUpdate(d.id, "REFUSEE")}
                     disabled={updatingId === d.id}
+                    className="btn-refuse"
                   >
                     Refuser
                   </button>
@@ -135,11 +138,11 @@ export default function AdminVerification() {
         </tbody>
       </table>
 
-      <div style={{ marginTop: 20 }}>
+      <div className="pagination">
         <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
           ← Précédent
         </button>
-        <span style={{ margin: "0 10px" }}>
+        <span>
           Page {page} / {totalPages}
         </span>
         <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
