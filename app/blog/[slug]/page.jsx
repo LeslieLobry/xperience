@@ -1,16 +1,16 @@
+// ❌ Ne pas mettre "use client" ici
+
 import { prisma } from "../../../lib/prisma";
 import { getUserFromToken } from "../../../lib/auth";
 import { notFound, redirect } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
 import ArticleWrapper from "./ArticleWrapper";
-import ArticleImagesWithPresign from "./ArticleImagesWithPresign"; // <- à créer juste en dessous
-
-const secret = process.env.JWT_SECRET;
-if (!secret) throw new Error("JWT_SECRET non défini");
+import ArticleImagesWithPresign from "./ArticleImagesWithPresign";
 
 export default async function ArticlePage({ params }) {
-  const slug = params.slug;
+  // ✅ Ajout d'une sécurité avec optional chaining
+  const slug = params?.slug;
 
   if (!slug) return notFound();
 
@@ -29,7 +29,9 @@ export default async function ArticlePage({ params }) {
 
   return (
     <div className="article-container">
+      {/* Composant client pour compter la vue */}
       <ArticleWrapper articleId={article.id} />
+
       <h2 className="article-title">{article.titre}</h2>
       <p className="article-meta">
         {new Date(article.createdAt).toLocaleDateString("fr-FR")}{" "}
@@ -40,7 +42,6 @@ export default async function ArticlePage({ params }) {
         <p className="article-description">{article.description}</p>
       )}
 
-      {/* Composant client pour les images */}
       {article.images?.length > 0 && (
         <ArticleImagesWithPresign images={article.images} />
       )}
