@@ -201,6 +201,7 @@ export async function GET(req) {
         cheveux:      true,
         latitude:     true,
         longitude:    true,
+        verificationIdentiteStatut: true
       },
     });
 

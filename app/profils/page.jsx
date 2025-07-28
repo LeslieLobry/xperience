@@ -36,6 +36,7 @@ export default async function PageTousLesProfils() {
       localisation: true,
       statut: true, 
       type: true,
+      verificationIdentiteStatut: true, 
     },
     orderBy: {
       createdAt: "desc",
@@ -44,7 +45,8 @@ export default async function PageTousLesProfils() {
 
   return (
     <div className="accueil-page">
-      <ProfilsDisplay profils={utilisateurs} />
+      <ProfilsDisplay profils={utilisateurs} context="recherche" />
+
     </div>
   );
 }
