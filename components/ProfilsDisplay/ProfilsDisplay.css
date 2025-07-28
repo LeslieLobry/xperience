@@ -116,18 +116,19 @@
 }
 
 .profil-card-title {
-    font-size: 17px;
+    font-size: 15px;
   color: #e0c084;
 
 }
 
 .profil-card-details {
-  font-size: 13px;
+  font-size: 12px;
   color: #fff;
 }
 
 .profil-card-details-type{
   color:#e0c084;
+  font-size: 12px;
 }
 
 .statut-badge {

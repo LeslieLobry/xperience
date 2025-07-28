@@ -89,9 +89,14 @@ export async function PATCH(req) {
     }
 
     // Mise à jour du statut de vérification
-    const updated = await prisma.verificationIdentite.update({
+    await prisma.verificationIdentite.update({
       where: { id: numericId },
       data: { statut },
+    });
+
+    // Récupère l'entrée mise à jour avec utilisateur
+    const updated = await prisma.verificationIdentite.findUnique({
+      where: { id: numericId },
       include: { utilisateur: true },
     });
 

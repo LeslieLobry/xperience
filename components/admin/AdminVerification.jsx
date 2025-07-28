@@ -34,24 +34,27 @@ export default function AdminVerification() {
   useEffect(() => {
     fetchDemandes();
   }, [page]);
+async function handleUpdate(id, statut) {
+  setUpdatingId(id);
+  try {
+    const res = await fetch("/api/admin/verification-identite", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, statut }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "Erreur mise à jour");
 
-  async function handleUpdate(id, statut) {
-    setUpdatingId(id);
-    try {
-      const res = await fetch("/api/admin/verification-identite", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, statut }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Erreur mise à jour");
-      fetchDemandes(); // refresh list
-    } catch (err) {
-      alert("Erreur: " + err.message);
-    } finally {
-      setUpdatingId(null);
-    }
+    // ✅ Retirer la ligne localement au lieu de refetch
+    setDemandes((prev) => prev.filter((d) => d.id !== id));
+    setTotal((prev) => prev - 1);
+  } catch (err) {
+    alert("Erreur: " + err.message);
+  } finally {
+    setUpdatingId(null);
   }
+}
+
 
   const totalPages = Math.ceil(total / pageSize);
 

@@ -22,21 +22,23 @@ model DemandeAcces {
   @@unique([galeriePriveeId, demandeurId])
 }
 model VerificationIdentite {
-  id             Int                  @id @default(autoincrement())
-  utilisateurId  Int                  @unique
-  utilisateur    Utilisateur          @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
+  id            Int         @id @default(autoincrement())
+  utilisateurId Int         @unique @map("utilisateurid")
+  utilisateur   Utilisateur @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
 
-  type           String               // "SIMPLE" ou "COUPLE"
-  photoCI1Url    String
-  selfie1Url     String
-  photoCI2Url    String?
-  selfie2Url     String?
+  type          String
 
-  statut         VerificationStatut   @default(EN_ATTENTE)
-  commentaire    String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  photoCI1Url   String      @map("photoci1url")
+  selfie1Url    String      @map("selfie1url")
+  photoCI2Url   String?     @map("photoci2url")
+  selfie2Url    String?     @map("selfie2url")
+
+  statut        VerificationStatut @default(EN_ATTENTE)
+  commentaire   String?
+  createdAt     DateTime    @default(now()) @map("createdat")
+  updatedAt     DateTime    @updatedAt      @map("updatedat")
 }
+
 
 model Utilisateur {
   id                   Int             @id @default(autoincrement())
