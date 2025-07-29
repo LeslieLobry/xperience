@@ -2,14 +2,14 @@ import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(req, { params }) {
-  const articleId = params.id;
+  const articleId = parseInt(params.id, 10);
 
-  console.log("🟡 Route appelée pour ID :", articleId);
-
-  if (!articleId || typeof articleId !== "string") {
-    console.warn("❌ ID invalide :", articleId);
+  if (isNaN(articleId)) {
+    console.warn("❌ ID invalide :", params.id);
     return NextResponse.json({ error: "ID invalide" }, { status: 400 });
   }
+
+  console.log("🟡 Route appelée pour ID :", articleId);
 
   try {
     const updated = await prisma.article.update({
@@ -29,4 +29,3 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
   }
 }
-
