@@ -36,7 +36,8 @@ return () => { canceled = true; };
 return photoUrls;
 }
 
-export default function RechercheResultats() {
+export default function RechercheResultats({ className = "" }) {
+
 const searchParams = useSearchParams();
 const router = useRouter();
 const [utilisateurs, setUtilisateurs] = useState([]);
@@ -64,7 +65,8 @@ if (!hasSearched) return null;
 if (loading) return <p>Chargement...</p>;
 
 return (
-<div className="profil-list1">
+  <div className={`profil-list1 ${className}`}>
+
   <h1 className="profil-list1-title">Résultats de recherche</h1>
 
   <div className="grid-profil-search">

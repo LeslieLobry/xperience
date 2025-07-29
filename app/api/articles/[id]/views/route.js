@@ -2,10 +2,10 @@ import { prisma } from "../../../../../lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(req, { params }) {
-  const articleId = parseInt(params.id, 10);
+  const articleId = params.id;
 
-  if (isNaN(articleId)) {
-    console.warn("❌ ID invalide :", params.id);
+  if (!articleId || typeof articleId !== "string") {
+    console.warn("❌ ID invalide :", articleId);
     return NextResponse.json({ error: "ID invalide" }, { status: 400 });
   }
 
@@ -13,7 +13,7 @@ export async function POST(req, { params }) {
 
   try {
     const updated = await prisma.article.update({
-      where: { id: articleId },
+      where: { id: articleId }, // ✅ ici, pas besoin de parseInt
       data: {
         vues: {
           increment: 1,

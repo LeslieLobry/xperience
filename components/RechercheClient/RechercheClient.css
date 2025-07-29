@@ -1,0 +1,22 @@
+.page-recherche {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+/* Sur mobile : on empile verticalement */
+@media (max-width: 768px) {
+  .page-recherche {
+    flex-direction: column;
+  }
+
+  .page-recherche > .RechercheSidebar {
+    order: 2;
+    width: 100%;
+  }
+
+  .page-recherche > .RechercheResultats {
+    order: 1; /* Afficher en haut */
+  }
+}

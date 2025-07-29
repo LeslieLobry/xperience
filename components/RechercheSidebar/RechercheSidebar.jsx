@@ -34,7 +34,7 @@ function cleanFormFilters(formIn) {
 
 const DEFAULT_RAYON = 20;
 
-const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref) {
+const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, className }, ref) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -141,7 +141,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch }, ref)
   };
 
   return (
-    <aside className="recherche-sidebar">
+  <aside className={`recherche-sidebar ${className || ""}`}>
+
       <div style={{ marginBottom: 24 }}>
         <ReconnaissanceVocale
           onResult={texte => {
