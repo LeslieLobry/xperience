@@ -7,6 +7,8 @@ import { getUserFromToken } from "../../../../lib/auth";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3 } from "../../../../lib/s3";
+import { resend } from "../../../../lib/resend";
+
 
 // Vérifie que l'utilisateur est admin
 async function checkAdmin() {
@@ -47,7 +49,16 @@ export async function GET(req) {
       prisma.verificationIdentite.count({ where }),
       prisma.verificationIdentite.findMany({
         where,
-        include: { utilisateur: true },
+        include: {
+  utilisateur: {
+    select: {
+      pseudo: true,
+      nom: true,
+      prenom: true,
+    },
+  },
+},
+
         orderBy: { createdAt: "desc" },
         skip,
         take: pageSize,
@@ -107,6 +118,31 @@ export async function PATCH(req) {
         verificationIdentiteStatut: statut === "ACCEPTEE",
       },
     });
+
+    // ✅ Envoi d’un email de confirmation à l’utilisateur
+    if (updated.utilisateur?.email) {
+      const objet =
+        statut === "ACCEPTEE"
+          ? "✅ Votre vérification d'identité a été validée"
+          : "❌ Votre vérification d'identité a été refusée";
+
+      const message =
+        statut === "ACCEPTEE"
+          ? `Bonjour ${updated.utilisateur.prenom || updated.utilisateur.pseudo},\n\nVotre vérification d'identité a bien été acceptée.\nVous bénéficiez désormais du badge "profil vérifié" sur votre profil.\n\nMerci de votre confiance,\n\nL'équipe Xperience`
+          : `Bonjour ${updated.utilisateur.prenom || updated.utilisateur.pseudo},\n\nVotre vérification d'identité a malheureusement été refusée.\nVeuillez vérifier que vos documents sont bien lisibles et conformes, puis réessayez.\n\nL'équipe Xperience`;
+
+      try {
+        await resend.emails.send({
+  from: process.env.EMAIL_FROM, 
+  to: updated.utilisateur.email,
+  subject: objet,
+  text: message,
+});
+
+      } catch (e) {
+        console.error("❌ Erreur lors de l’envoi de l’email :", e);
+      }
+    }
 
     return NextResponse.json({ success: true, updated });
   } catch (error) {

@@ -1,47 +1,56 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "./VerificationIdentiteForm.css";
 
 export default function VerificationIdentiteForm() {
-  const [type, setType] = useState("SIMPLE"); // SIMPLE ou COUPLE
+  const [type, setType] = useState("SIMPLE");
   const [loadingUser, setLoadingUser] = useState(true);
   const [photoCI1, setPhotoCI1] = useState(null);
   const [selfie1, setSelfie1] = useState(null);
   const [photoCI2, setPhotoCI2] = useState(null);
   const [selfie2, setSelfie2] = useState(null);
-  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [acceptConditions, setAcceptConditions] = useState(false);
+  const [aDejaDemande, setADejaDemande] = useState(false);
 
   useEffect(() => {
-    async function fetchUser() {
+    async function fetchInfos() {
       try {
-        const res = await fetch("/api/me");
-        if (res.ok) {
-          const data = await res.json();
+        // Récupération du type utilisateur
+        const resUser = await fetch("/api/me");
+        if (resUser.ok) {
+          const data = await resUser.json();
           const userType = data.user?.type?.toLowerCase();
           setType(userType === "couple" ? "COUPLE" : "SIMPLE");
-        } else {
-          console.error("Erreur récupération utilisateur");
+        }
+
+        // Vérifie si une demande est déjà faite
+        const resStatut = await fetch("/api/verification-identite/statut");
+        const dataStatut = await resStatut.json();
+        if (dataStatut?.aDejaDemande) {
+          setADejaDemande(true);
         }
       } catch (e) {
-        console.error("Erreur fetch utilisateur", e);
+        console.error("Erreur lors du chargement des infos :", e);
       } finally {
         setLoadingUser(false);
       }
     }
-    fetchUser();
+
+    fetchInfos();
   }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!acceptConditions) {
-      setResult({ error: "Vous devez accepter les conditions avant d’envoyer." });
+      toast.error("❌ Vous devez accepter les conditions avant d’envoyer.");
       return;
     }
+
     setLoading(true);
-    setResult(null);
 
     const form = new FormData();
     form.append("type", type);
@@ -57,20 +66,35 @@ export default function VerificationIdentiteForm() {
         method: "POST",
         body: form,
       });
+
       const data = await res.json();
 
       if (!data.success) {
-        setResult({ error: data.message || "Erreur inconnue" });
-      } else {
-        setResult({ success: "Votre demande a bien été envoyée." });
+        toast.error(data.message || "❌ Une erreur est survenue.");
+        setLoading(false);
+        return;
       }
+
+      toast.success("✅ Votre demande a bien été envoyée. Elle est en cours de traitement.");
+      setADejaDemande(true);
     } catch (error) {
-      setResult({ error: "Erreur lors de l'envoi" });
+      toast.error("❌ Erreur lors de l'envoi.");
     }
+
     setLoading(false);
   }
 
   if (loadingUser) return <p>Chargement du profil...</p>;
+
+  if (aDejaDemande) {
+    return (
+      <div className="form-verif">
+        <p style={{ color: "green", fontWeight: "bold" }}>
+          ✅ Vous avez déjà une demande de vérification en cours.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="form-verif">
@@ -118,13 +142,6 @@ export default function VerificationIdentiteForm() {
         <button type="submit" disabled={loading}>
           {loading ? "Envoi..." : "Envoyer"}
         </button>
-
-        {result && (
-          <div style={{ marginTop: 10 }}>
-            {result.error && <span style={{ color: "red" }}>{result.error}</span>}
-            {result.success && <span style={{ color: "green" }}>{result.success}</span>}
-          </div>
-        )}
       </form>
     </div>
   );

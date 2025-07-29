@@ -1,6 +1,5 @@
 .admin-verif-container {
   padding: 1rem;
-  background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin: 1rem 0;
@@ -97,4 +96,25 @@
 .error {
   color: #dc3545;
   font-weight: bold;
+}
+/* Responsive : scroll horizontal du tableau sur petits écrans */
+@media (max-width: 768px) {
+  .admin-verif-container {
+    padding: 0.5rem;
+  }
+
+  .admin-verif-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .admin-verif-table thead {
+    background-color: #f5f5f5;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }

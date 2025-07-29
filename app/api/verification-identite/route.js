@@ -26,6 +26,21 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+const existing = await prisma.verificationIdentite.findFirst({
+  where: {
+    utilisateurId: utilisateur.id,
+    statut: {
+      in: ["EN_ATTENTE", "ACCEPTEE"],
+    },
+  },
+});
+
+if (existing) {
+  return NextResponse.json(
+    { success: false, message: "Vous avez déjà une demande en cours ou acceptée." },
+    { status: 400 }
+  );
+}
 
     // 2) Lecture du form-data
     const formData = await req.formData();

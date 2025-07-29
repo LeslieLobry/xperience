@@ -18,7 +18,7 @@ export default function AdminVerification() {
     try {
       const res = await fetch(
         `/api/admin/verification-identite?` +
-          new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() })
+          new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString(), statut: "EN_ATTENTE", })
       );
       const data = await res.json();
       if (!data.success) throw new Error(data.message || "Erreur chargement");
@@ -34,27 +34,27 @@ export default function AdminVerification() {
   useEffect(() => {
     fetchDemandes();
   }, [page]);
-async function handleUpdate(id, statut) {
-  setUpdatingId(id);
-  try {
-    const res = await fetch("/api/admin/verification-identite", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, statut }),
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || "Erreur mise à jour");
 
-    // ✅ Retirer la ligne localement au lieu de refetch
-    setDemandes((prev) => prev.filter((d) => d.id !== id));
-    setTotal((prev) => prev - 1);
-  } catch (err) {
-    alert("Erreur: " + err.message);
-  } finally {
-    setUpdatingId(null);
+  async function handleUpdate(id, statut) {
+    setUpdatingId(id);
+    try {
+      const res = await fetch("/api/admin/verification-identite", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, statut }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || "Erreur mise à jour");
+
+      // ✅ Corrigé : cast en Number pour être sûr
+      setDemandes((prev) => prev.filter((d) => Number(d.id) !== Number(id)));
+      setTotal((prev) => prev - 1);
+    } catch (err) {
+      alert("Erreur: " + err.message);
+    } finally {
+      setUpdatingId(null);
+    }
   }
-}
-
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -64,7 +64,6 @@ async function handleUpdate(id, statut) {
 
       {error && <p className="error">{error}</p>}
       {loading && <p>Chargement...</p>}
-
       {!loading && demandes.length === 0 && <p>Aucune demande.</p>}
 
       <table className="admin-verif-table">
@@ -84,35 +83,27 @@ async function handleUpdate(id, statut) {
         <tbody>
           {demandes.map((d) => (
             <tr key={d.id}>
-              <td>{d.utilisateur?.pseudo || "Inconnu"}</td>
+              <td>
+                {d.utilisateur
+                  ? `${d.utilisateur.prenom ?? ""} ${d.utilisateur.nom?.toUpperCase() ?? ""} (${d.utilisateur.pseudo})`
+                  : "Inconnu"}
+              </td>
               <td>{d.type}</td>
               <td>
-                <a href={d.photoCI1Url} target="_blank" rel="noreferrer">
-                  Voir
-                </a>
+                <a href={d.photoCI1Url} target="_blank" rel="noreferrer">Voir</a>
               </td>
               <td>
-                <a href={d.selfie1Url} target="_blank" rel="noreferrer">
-                  Voir
-                </a>
+                <a href={d.selfie1Url} target="_blank" rel="noreferrer">Voir</a>
               </td>
               <td>
                 {d.photoCI2Url ? (
-                  <a href={d.photoCI2Url} target="_blank" rel="noreferrer">
-                    Voir
-                  </a>
-                ) : (
-                  "-"
-                )}
+                  <a href={d.photoCI2Url} target="_blank" rel="noreferrer">Voir</a>
+                ) : "-"}
               </td>
               <td>
                 {d.selfie2Url ? (
-                  <a href={d.selfie2Url} target="_blank" rel="noreferrer">
-                    Voir
-                  </a>
-                ) : (
-                  "-"
-                )}
+                  <a href={d.selfie2Url} target="_blank" rel="noreferrer">Voir</a>
+                ) : "-"}
               </td>
               <td>{d.statut}</td>
               <td>{new Date(d.createdAt).toLocaleString()}</td>
@@ -142,15 +133,9 @@ async function handleUpdate(id, statut) {
       </table>
 
       <div className="pagination">
-        <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          ← Précédent
-        </button>
-        <span>
-          Page {page} / {totalPages}
-        </span>
-        <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-          Suivant →
-        </button>
+        <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← Précédent</button>
+        <span>Page {page} / {totalPages}</span>
+        <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Suivant →</button>
       </div>
     </div>
   );
