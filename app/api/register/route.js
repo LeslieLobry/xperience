@@ -36,12 +36,14 @@ export async function POST(req) {
 
     form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
-        return resolve(
-          NextResponse.json({ success: false, message: "Erreur parsing" }, { status: 500 })
-        );
+        console.error("❌ Erreur parsing formulaire :", err);
+        return resolve(NextResponse.json({ success: false, message: "Erreur parsing" }, { status: 500 }));
       }
 
       try {
+        console.log("📩 Champs reçus :", fields);
+        console.log("🖼️ Fichiers reçus :", files);
+
         const nom = String(fields.nom || "");
         const prenom = String(fields.prenom || "");
         const pseudo = String(fields.pseudo || "");
@@ -63,9 +65,11 @@ export async function POST(req) {
           : [];
 
         if (!captchaToken) {
+          console.warn("⚠️ Captcha manquant");
           return resolve(NextResponse.json({ success: false, message: "Captcha manquant" }, { status: 400 }));
         }
 
+        console.log("🔐 Vérification reCAPTCHA...");
         const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -73,18 +77,22 @@ export async function POST(req) {
         });
 
         const captchaData = await captchaRes.json();
+        console.log("✅ Résultat reCAPTCHA :", captchaData);
         if (!captchaData.success) {
           return resolve(NextResponse.json({ success: false, message: "Échec reCAPTCHA" }, { status: 400 }));
         }
 
+        console.log("🔍 Vérification utilisateur existant...");
         const exists = await prisma.utilisateur.findFirst({
           where: { OR: [{ email }, { pseudo }] },
         });
 
         if (exists) {
+          console.warn("❌ Utilisateur déjà existant :", { email, pseudo });
           return resolve(NextResponse.json({ success: false, message: "Email ou pseudo déjà utilisé" }, { status: 400 }));
         }
 
+        console.log("🔒 Hash du mot de passe...");
         const hashedPassword = await bcrypt.hash(password, 10);
 
         let photoUrl = null;
@@ -92,8 +100,10 @@ export async function POST(req) {
 
         if (photoFile && photoFile.filepath) {
           try {
+            console.log("📂 Lecture du fichier image...");
             const buffer = await fs.readFile(photoFile.filepath);
 
+            console.log("🔎 Modération de la photo avec Sightengine...");
             const moderationForm = new FormData();
             moderationForm.append("media", new Blob([buffer], { type: photoFile.mimetype }), photoFile.originalFilename);
             moderationForm.append("models", "face-attributes");
@@ -106,9 +116,12 @@ export async function POST(req) {
             });
 
             const moderationData = await moderationRes.json();
+            console.log("📄 Résultat Sightengine :", moderationData);
+
             if (moderationData?.faces?.length) {
               const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8);
               if (hasMinor) {
+                console.warn("🚫 Visage potentiellement mineur détecté");
                 return resolve(
                   NextResponse.json(
                     { success: false, message: "Photo refusée : une personne semble avoir moins de 18 ans." },
@@ -121,6 +134,7 @@ export async function POST(req) {
             const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
             const bucket = process.env.AWS_S3_BUCKET;
 
+            console.log("☁️ Envoi vers S3 :", filename);
             await s3.send(
               new PutObjectCommand({
                 Bucket: bucket,
@@ -131,11 +145,16 @@ export async function POST(req) {
             );
 
             photoUrl = filename;
+            console.log("✅ Upload S3 réussi :", photoUrl);
           } catch (uploadErr) {
+            console.error("💥 Erreur upload photo :", uploadErr);
             return resolve(NextResponse.json({ success: false, message: "Erreur upload photo" }, { status: 500 }));
           }
+        } else {
+          console.warn("⚠️ Aucun fichier photo reçu");
         }
 
+        console.log("👤 Création de l'utilisateur...");
         const newUser = await prisma.utilisateur.create({
           data: {
             nom,
@@ -162,6 +181,7 @@ export async function POST(req) {
         });
 
         const token = uuidv4();
+        console.log("✉️ Envoi de l'email de confirmation...");
         await prisma.emailVerificationToken.create({
           data: {
             email,
@@ -182,8 +202,10 @@ export async function POST(req) {
           `,
         });
 
+        console.log("✅ Utilisateur créé avec succès :", newUser.id);
         return resolve(NextResponse.json({ success: true, user: newUser, photoUrl }));
       } catch (e) {
+        console.error("💥 ERREUR SERVEUR GÉNÉRALE :", e);
         return resolve(
           NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 })
         );
