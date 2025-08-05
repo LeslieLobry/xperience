@@ -172,7 +172,6 @@ export async function POST(req) {
             consentCGU: consent,
             consentCGUDate: new Date(),
             photoUrl,
-            verificationIdentite: false,
             verificationDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000),
             recherches: {
               create: recherche.map((label) => ({ label })),
