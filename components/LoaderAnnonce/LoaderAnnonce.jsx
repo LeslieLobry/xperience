@@ -47,7 +47,7 @@ export default function LoaderAnnonce() {
     <div className="loader-annonce">
       <div className="loader-contenu" ref={contenuRef}>
         <p className="fade-in">
-          🎉 Jusqu'au <strong>16/08</strong>, l'accès au site est <strong>totalement gratuit</strong> !
+          🎉 Jusqu'au <strong>16/09</strong>, l'accès au site est <strong>totalement gratuit</strong> !
         </p>
       </div>
     </div>
