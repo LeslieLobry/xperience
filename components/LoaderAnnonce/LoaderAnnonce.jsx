@@ -23,7 +23,7 @@ export default function LoaderAnnonce() {
       const timer = setTimeout(() => {
         setVisible(false);
         localStorage.setItem("xp_loader_annonce_last_seen", Date.now().toString());
-      }, 3000);
+      }, 6000);
 
       // Clic dehors = fermeture
       const handleClick = (e) => {
