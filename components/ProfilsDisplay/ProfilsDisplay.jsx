@@ -67,10 +67,9 @@ if (!canceled) setPhotoUrls(newUrls);
 };
 loadAllUrls();
 return () => { canceled = true; };
-// eslint-disable-next-line
-}, [JSON.stringify(profilsFiltres)]); // Forcer reload si la liste change
 
-// ---- Reste inchangé ----
+}, [JSON.stringify(profilsFiltres)]);
+
 const handleToggleProches = async (active, customDistance) => {
 setFiltrerProches(active);
 if (active) {

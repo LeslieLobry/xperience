@@ -23,6 +23,7 @@ export async function POST(req) {
         id: true,
         pseudo: true,
         photoUrl: true,
+        type:true,
         age: true,
         localisation: true,
         statut: true,
@@ -40,8 +41,6 @@ export async function POST(req) {
       })
       .filter((u) => u.distance <= rayon);
 
-    console.log("📍 Position utilisateur :", latitude, longitude, "Rayon:", rayon, "km");
-    console.log("👥 Nombre total :", utilisateurs.length);
     proches.forEach((u) =>
       console.log(`🧭 ${u.pseudo} → ${u.distance.toFixed(2)} km`)
     );
