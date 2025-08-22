@@ -9,7 +9,7 @@ const secret = process.env.JWT_SECRET;
 export async function POST(req) {
   const body = await req.json();
 
-  const cookieStore = await cookies(); // ✅ ATTENTION : await ici
+  const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
 
   if (!token) {
@@ -52,6 +52,7 @@ export async function POST(req) {
   }
 
   try {
+    // 1️⃣ Création de l'avis
     const avis = await prisma.avis.create({
       data: {
         auteurId,
@@ -60,13 +61,22 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json({ success: true, avis }); // ✅ Succès ici
+    // 2️⃣ Ajout au digest au lieu d’une notif immédiate
+    await prisma.digestNotification.create({
+      data: {
+        type: "AVIS",
+        auteurId,
+        destinataireId: parseInt(cibleId),
+        avisId: avis.id,
+      },
+    });
 
+    return NextResponse.json({ success: true, avis });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Erreur création avis :", error);
     return NextResponse.json({
       error: "Erreur lors de l'enregistrement.",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
     }, { status: 500 });
   }
 }

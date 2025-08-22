@@ -112,7 +112,7 @@ model Utilisateur {
   visitesRecues        VisiteProfil[]  @relation("Visite")
   prenomsCouple        PrenomCoupleConversation[]
   verificationIdentite VerificationIdentite?    @relation("UtilisateurVerification")
-
+  digestNotifications DigestNotification[] @relation("DigestToUtilisateur")
   @@map("Utilisateur")
 }
 
@@ -229,6 +229,7 @@ model Conversation {
   messages     Message[]
   participants Participant[]
   prenomsCouple PrenomCoupleConversation[]
+  digestNotifications DigestNotification[] @relation("DigestToConversation")
   @@map("Conversation")
 }
 
@@ -263,7 +264,7 @@ model Message {
   reactions      MessageReaction[]
   envoyeur       String?
   prenomEnvoyeur String?
-  
+  digestNotifications DigestNotification[] @relation("DigestToMessage")
   @@index([conversationId, id])
   @@index([conversationId, createdAt])
 
@@ -317,7 +318,7 @@ model Like {
   createdAt DateTime    @default(now())
   auteur    Utilisateur @relation("LikesEnvoyes", fields: [auteurId], references: [id])
   cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
-
+ digests   DigestNotification[] @relation("DigestToLike")
   @@unique([auteurId, cibleId])
   @@map("Like")
 }
@@ -356,6 +357,7 @@ model VisiteProfil {
 
   visiteur   Utilisateur @relation("Visiteur", fields: [visiteurId], references: [id])
   visite     Utilisateur @relation("Visite", fields: [visiteId], references: [id])
+  digests     DigestNotification[] @relation("DigestToVisite")
 
   @@unique([visiteurId, visiteId, date])
   @@map("VisiteProfil")
@@ -422,4 +424,40 @@ model PrenomCoupleConversation {
 
   @@unique([conversationId, utilisateurId])
   @@map("PrenomCoupleConversation")  // 👈 important !
+}
+enum DigestEventType {
+  MESSAGE
+  VISITE
+  LIKE
+  AVIS
+}
+model DigestNotification {
+  id              Int              @id @default(autoincrement())
+  destinataireId  Int
+  conversationId  Int?
+  messageId       Int?
+  visiteId        Int?
+  likeId          Int?
+  avisId          Int?             // ✅ nouveau champ
+  eventType       DigestEventType  @default(MESSAGE)
+  createdAt       DateTime         @default(now())
+  processingAt    DateTime?
+  sentAt          DateTime?
+
+  destinataire    Utilisateur      @relation("DigestToUtilisateur",  fields: [destinataireId], references: [id], onDelete: Cascade)
+  conversation    Conversation?    @relation("DigestToConversation", fields: [conversationId], references: [id], onDelete: Cascade)
+  message         Message?         @relation("DigestToMessage",      fields: [messageId],       references: [id], onDelete: Cascade)
+  visite          VisiteProfil?    @relation("DigestToVisite",       fields: [visiteId],        references: [id], onDelete: Cascade)
+  like            Like?            @relation("DigestToLike",         fields: [likeId],          references: [id], onDelete: Cascade)
+  avis            Avis?            @relation("DigestToAvis",         fields: [avisId],          references: [id], onDelete: Cascade) // ✅
+
+  @@unique([destinataireId, messageId], map: "digest_dest_message_uniq")
+  @@unique([destinataireId, visiteId],  map: "digest_dest_visite_uniq")
+  @@unique([destinataireId, likeId],    map: "digest_dest_like_uniq")
+  @@unique([destinataireId, avisId],    map: "digest_dest_avis_uniq") // ✅
+  @@index([destinataireId, sentAt],     map: "digest_dest_sent_idx")
+  @@index([createdAt],                  map: "digest_created_idx")
+  @@index([sentAt, processingAt],       map: "digest_sent_processing_idx")
+
+  @@map("DigestNotification")
 }

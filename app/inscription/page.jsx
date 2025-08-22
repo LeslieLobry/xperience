@@ -50,6 +50,32 @@ export default function RegisterForm() {
     if (value.length >= 2) {
       debounceTimeout.current = setTimeout(async () => {
         try {
+          // --- Cas FRANCE : API officielle (en français) ---
+          // IMPORTANT: on demande explicitement les champs utiles (centre, departement, codeDepartement)
+          const resFr = await fetch(
+            `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
+              value
+            )}&limit=5&boost=population&fields=nom,centre,departement,codeDepartement`
+          );
+          const dataFr = await resFr.json();
+
+          if (Array.isArray(dataFr) && dataFr.length > 0) {
+            setSuggestions(
+              dataFr.map((v) => ({
+                label: `${v.nom} (${v.codeDepartement})`, // Ex: Lille (59)
+                value: v.nom,
+                city: v.nom,
+                country: "France",
+                region: v?.departement?.nom,
+                deptCode: v?.codeDepartement || null,
+                latitude: v?.centre?.coordinates?.[1],
+                longitude: v?.centre?.coordinates?.[0],
+              }))
+            );
+            return; // ✅ On sort, pas besoin de GeoDB si on a trouvé en FR
+          }
+
+          // --- Sinon fallback mondial via GeoDB ---
           const res = await fetch(
             `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${encodeURIComponent(
               value
@@ -62,9 +88,8 @@ export default function RegisterForm() {
             }
           );
           const data = await res.json();
-          // On enregistre la ville complète + ID si besoin (pour la récupération de coords)
           setSuggestions(
-            data.data.map((v) => ({
+            (data?.data || []).map((v) => ({
               label: `${v.city}${v.region ? " (" + v.region + ")" : ""}, ${v.country}`,
               value: v.city,
               city: v.city,
@@ -75,7 +100,7 @@ export default function RegisterForm() {
             }))
           );
         } catch (err) {
-          console.error("Erreur GeoDB :", err);
+          console.error("Erreur API localisation :", err);
           setSuggestions([]);
         }
       }, 400);
@@ -86,13 +111,23 @@ export default function RegisterForm() {
 
   // Quand une ville est choisie (on prend la suggestion complète, pas juste le nom)
   const handleVilleSelect = (villeObj) => {
+    // Si c'est une ville FR, on affiche "Ville (XX)" ; sinon, on garde le label brut ("City, Country")
+    const isFrance = villeObj.country === "France";
+    const labelAffichee = isFrance
+      ? `${villeObj.city}${villeObj.deptCode ? ` (${villeObj.deptCode})` : ""}`
+      : villeObj.label;
+
     setForm((prev) => ({
       ...prev,
-      localisation: villeObj.label, // On stocke la string "ville, pays"
+      localisation: labelAffichee, // On stocke la string à afficher
       latitude: villeObj.latitude,
       longitude: villeObj.longitude,
+      // On conserve aussi des infos utiles si FR
+      country: villeObj.country || null,
+      deptCode: villeObj.deptCode || null,
+      region: villeObj.region || null,
     }));
-    setLocalisationInput(villeObj.label);
+    setLocalisationInput(labelAffichee);
     setSuggestions([]);
   };
 

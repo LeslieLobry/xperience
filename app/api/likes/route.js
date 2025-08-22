@@ -36,13 +36,12 @@ export async function POST(req) {
       },
     });
 
-    // Création de la notification liée au like
-    await prisma.notification.create({
+    // ✅ Ajout dans le digest (au lieu de notification immédiate)
+    await prisma.digestNotification.create({
       data: {
-        utilisateurId: Number(cibleId), // destinataire de la notif = cible du like
-        message: `${user.pseudo} veut vivre une x-periences avec vous  `,
-        lien: `/profil/${user.id}`, // lien vers le profil de celui qui like
-        lu: false,
+        destinataireId: Number(cibleId), // celui qui reçoit le like
+        auteurId: user.id,               // celui qui like
+        likeId: like.id,
       },
     });
 
@@ -51,7 +50,7 @@ export async function POST(req) {
     if (err.code === "P2002") {
       return NextResponse.json({ error: "Like déjà existant" }, { status: 400 });
     }
-    console.error("Erreur création like ou notif :", err);
+    console.error("Erreur création like ou digest :", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -71,16 +70,8 @@ export async function DELETE(req) {
     },
   });
 
-  // Suppression éventuelle de la notification liée au like
-  await prisma.notification.deleteMany({
-    where: {
-      utilisateurId: Number(cibleId),
-      message: {
-        contains: `${user.pseudo} a aimé`,
-      },
-      // Optionnel : tu peux ajouter un filtre sur le lien ou date si tu veux plus de précision
-    },
-  });
+  // ❌ On ne supprime pas le digest (il sera envoyé même si le like est retiré)
+  // Mais tu pourrais ajouter une logique pour nettoyer si tu préfères
 
   return NextResponse.json({ success: true });
 }

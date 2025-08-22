@@ -1,98 +1,151 @@
-import { prisma } from '../../../../lib/prisma';
-import { resend } from '../../../../lib/resend'; 
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
+import { resend } from "../../../../lib/resend";
+import crypto from "crypto";
 
+export const dynamic = "force-dynamic";
 
+// ----- utils -----
+function safeEqual(a = "", b = "") {
+  const A = Buffer.from(a);
+  const B = Buffer.from(b);
+  if (A.length !== B.length) return false;
+  return crypto.timingSafeEqual(A, B);
+}
 
-export async function GET() {
-  // 1. Cherche les users à relancer
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+function htmlEscape(s = "") {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 
-  const users = await prisma.utilisateur.findMany({
+// ----- handler -----
+export async function POST(req) {
+  // Auth Bearer
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token || !safeEqual(token, process.env.CRON_SECRET || "")) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
+  const FROM = `"Xpérience" <${process.env.EMAIL_FROM || "no-reply@x-periences.fr"}>`;
+  const now = Date.now();
+  const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+
+  // On limite le lot pour éviter un envoi massif en cas de backlog
+  const BATCH = 500;
+
+  // 1) Sélectionne les users à relancer
+  const candidates = await prisma.utilisateur.findMany({
     where: {
       createdAt: { lte: twentyFourHoursAgo },
       profilComplet: false,
       reminderSent: false,
+      email: { not: null },
     },
     select: { id: true, email: true, pseudo: true },
+    take: BATCH,
+  });
+
+  if (!candidates.length) {
+    return NextResponse.json({ ok: true, sent: 0 });
+  }
+
+  // 2) Lock optimiste : on marque reminderSent=true avant envoi (évite double cron)
+  const ids = candidates.map(u => u.id);
+  await prisma.utilisateur.updateMany({
+    where: { id: { in: ids }, reminderSent: false },
+    data: { reminderSent: true },
   });
 
   let sent = 0;
+  const actuallySent = [];
 
-  // 2. Envoie l’email à chacun puis met à jour le champ reminderSent
-  for (const user of users) {
+  for (const user of candidates) {
     try {
-    await resend.emails.send({
-  from: 'no-reply@x-periences.fr',
-  to: user.email,
-  subject: "Il ne vous reste qu'une étape pour vivre de vraies Xperiences...",
-  html: `
-    <div style="font-family: Raleway, Arial, sans-serif; color: #1a1a1a; font-size: 16px; line-height: 1.6; background: #f7f8fa; padding: 32px 24px;">
-      <h2 style="font-weight:700; color:#1a1a1a; margin-bottom: 0.7em;">Bonjour ${user.pseudo || ''},</h2>
-      <p>Vous êtes inscrit sur <b>Xperiences</b>, mais votre profil n’est pas encore complété...</p>
-      <p style="margin-top:1em;">
-        ✨ Pour commencer à échanger, découvrir et vivre des rencontres libertines élégantes et raffinées, votre profil doit refléter qui vous êtes et ce que vous recherchez.
-      </p>
-      <p>
-        👉 <b>Complétez votre profil dès maintenant</b> pour rejoindre la communauté Xperiences dans les meilleures conditions.
-      </p>
-      <p>
-        🔐 Une photo, une description, vos préférences... Il ne vous reste qu’un petit pas à faire pour plonger dans l’univers du désir, de l’élégance et de la liberté.
-      </p>
-      <div style="margin:2em 0;">
-        <a href="https://x-periences.fr/accueil-page"
-          style="display:inline-block;background:#1a1a1a;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:18px;letter-spacing:1px;">
-          ➡️ Compléter mon profil maintenant
-        </a>
-      </div>
-      <p style="margin-top:1.5em;">🎁 <b>Petit bonus</b> : Les profils complets sont mis en avant automatiquement dans les recherches !</p>
-      <p style="margin-top:2.5em;">
-        À très vite sur <a href="https://x-periences.fr" style="color:#0070f3;text-decoration:underline;">x-periences.fr</a><br>
-        <b>L’équipe Xperiences</b><br>
-        <i>Où l’élégance rencontre le désir.</i>
-      </p>
-      <div style="text-align:center; margin-bottom: 2em;">
-  <img src="https://x-periences.fr/logo.png" alt="Xperiences" style="height:60px;"/>
-</div>
+      const pseudo = user.pseudo || "";
+      const html = `
+        <div style="font-family: Raleway, Arial, sans-serif; color: #1a1a1a; font-size: 16px; line-height: 1.6; background: #f7f8fa; padding: 32px 24px;">
+          <div style="text-align:center; margin-bottom: 18px;">
+            <img src="${origin}/logo.png" alt="Xpérience" style="height:60px;"/>
+          </div>
+          <h2 style="font-weight:700; color:#1a1a1a; margin-bottom: 0.7em;">Bonjour ${htmlEscape(pseudo)},</h2>
+          <p>Vous êtes inscrit sur <b>Xpérience</b>, mais votre profil n’est pas encore complété…</p>
+          <p style="margin-top:1em;">
+            ✨ Pour commencer à échanger et vivre des rencontres élégantes, complétez votre profil pour être bien visible.
+          </p>
+          <div style="margin:2em 0;">
+            <a href="${origin}/accueil-page"
+              style="display:inline-block;background:#1a1a1a;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:18px;letter-spacing:1px;">
+              ➡️ Compléter mon profil maintenant
+            </a>
+          </div>
+          <p style="margin-top:1.5em;">🎁 <b>Bonus</b> : les profils complets sont mis en avant automatiquement dans les recherches !</p>
+          <p style="margin-top:2.5em;">
+            À très vite sur <a href="${origin}" style="color:#0070f3;text-decoration:underline;">x-periences.fr</a><br>
+            <b>L’équipe Xpérience</b>
+          </p>
+        </div>
+      `;
 
-    </div>
-  `,
-});
+      await resend.emails.send({
+        from: FROM,
+        to: user.email,
+        subject: "Il ne vous reste qu’une étape pour vivre de vraies Xpériences…",
+        html,
+        text:
+`Bonjour ${pseudo},
 
+Vous êtes inscrit sur Xpérience, mais votre profil n’est pas encore complété.
+Complétez votre profil pour être bien visible et commencer à échanger.
 
-      await prisma.utilisateur.update({
-        where: { id: user.id },
-        data: { reminderSent: true },
+→ ${origin}/accueil-page
+
+— L’équipe Xpérience`,
+        headers: {
+          "List-Unsubscribe": `<${origin}/parametres/notifications>`,
+        },
       });
 
       sent++;
+      actuallySent.push(user);
     } catch (e) {
-      console.error('Erreur envoi email:', e);
+      console.error("Erreur envoi email reminder:", e);
+      // rollback du lock pour ce user (pour qu'il soit retenté au prochain passage)
+      await prisma.utilisateur.update({
+        where: { id: user.id },
+        data: { reminderSent: false },
+      });
     }
   }
-if (sent > 0) {
-  // Récupère les emails relancés pour récap
-  const relances = users
-    .filter((u, i) => i < sent) // Sélectionne seulement ceux vraiment relancés (normalement = users.length)
-    .map(u => `- ${u.pseudo || u.email} (${u.email})`)
-    .join('<br>');
 
-  await resend.emails.send({
-    from: 'no-reply@x-periences.fr',
-    to: 'contact@x-periences.fr',
-    subject: `Récap Cron : ${sent} relances profil envoyées`,
-    html: `
-      <div style="font-family:Arial,sans-serif">
-        <h2>Cron Xperiences – Récap des relances envoyées</h2>
-        <p><b>${sent}</b> mail(s) de rappel profil ont été envoyés ce passage :</p>
-        <div style="margin-top:1.5em">
-          ${relances}
-        </div>
-        <p style="margin-top:2em;font-size:13px;color:#888">--<br>Ceci est un email automatique généré par la cron Xperiences.</p>
-      </div>
-    `
-  });
+  // 3) Récap interne si au moins 1 envoi
+  if (sent > 0) {
+    const lines = actuallySent
+      .map(u => `- ${u.pseudo || u.email} (${u.email})`)
+      .join("<br>");
+    try {
+      await resend.emails.send({
+        from: FROM,
+        to: process.env.CONTACT_EMAIL || "contact@x-periences.fr",
+        subject: `Récap Cron: ${sent} relance(s) profil envoyée(s)`,
+        html: `
+          <div style="font-family:Arial,sans-serif">
+            <h2>Cron Xpérience – Récap des relances</h2>
+            <p><b>${sent}</b> mail(s) de rappel profil envoyés :</p>
+            <div style="margin-top:1.5em">${lines}</div>
+            <p style="margin-top:2em;font-size:13px;color:#888">--<br>Email automatique de la cron.</p>
+          </div>
+        `,
+      });
+    } catch (e) {
+      console.error("Erreur envoi recap:", e);
+    }
+  }
+
+  return NextResponse.json({ ok: true, sent });
 }
 
-  return NextResponse.json({ sent });
+// Optionnel: GET -> petite page santé
+export async function GET() {
+  return NextResponse.json({ ok: true, hint: "Use POST with Bearer CRON_SECRET" });
 }

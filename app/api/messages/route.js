@@ -1,11 +1,11 @@
 import { prisma } from "../../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 import { getUserFromToken } from "../../../lib/auth";
-import { resend } from "../../../lib/resend";
 import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
+
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
 // Config S3
@@ -22,7 +22,9 @@ export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
   console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
   let debugBody = "";
-  try { debugBody = await req.clone().text(); } catch {}
+  try {
+    debugBody = await req.clone().text();
+  } catch {}
 
   try {
     const contentType = req.headers.get("content-type") || "";
@@ -47,7 +49,7 @@ export async function POST(req) {
         optimisticKey: formData.get("optimisticKey") || null,
       };
 
-      // Sélectionne le fichier selon le type et présence dans formData
+      // Sélection du fichier selon le type et présence dans formData
       if ((body.type === "IMAGE" || body.type === "EPHEMERE") && formData.get("image")) {
         file = formData.get("image");
       } else if ((body.type === "AUDIO" || body.type === "EPHEMERE") && formData.get("audio")) {
@@ -68,7 +70,8 @@ export async function POST(req) {
       } else {
         fileName = `msg_${uuidv4()}.${ext}`;
       }
-      // Détection automatique de visage de mineur (Sightengine) si IMAGE ou EPHEMERE
+
+      // Détection mineur (Sightengine) si IMAGE ou EPHEMERE
       if (
         (body.type === "IMAGE" || body.type === "EPHEMERE") &&
         file.type.startsWith("image/")
@@ -115,16 +118,17 @@ export async function POST(req) {
 
       // STOCKE UNIQUEMENT LA CLÉ S3 (et non l’URL complète)
       if (file.type.startsWith("audio/")) {
-        body.audioUrl = fileName;    // Ex: msg_12djfksd.mp3 ou ephemere/snap_x.mp3
+        body.audioUrl = fileName; // Ex: msg_*.mp3 ou ephemere/snap_*.mp3
       } else {
-        body.imageUrl = fileName;    // Ex: msg_12djfksd.jpg ou ephemere/snap_x.jpg
+        body.imageUrl = fileName; // Ex: msg_*.jpg ou ephemere/snap_*.jpg
       }
     }
 
     const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } = body;
     const user = await getUserFromToken();
-    if (!user)
+    if (!user) {
       return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
+    }
 
     const auteurId = user.id;
 
@@ -143,6 +147,7 @@ export async function POST(req) {
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
+
     let prenomEnvoyeur = body.prenomEnvoyeur || null;
 
     const message = await prisma.message.create({
@@ -178,7 +183,7 @@ export async function POST(req) {
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
-    // Publish Ably avec optimisticKey (toujours présent sur le front)
+    // Publish Ably avec optimisticKey
     await ably.channels.get(`conversation-${conversationId}`).publish("message", messageWithOptimisticKey);
 
     await prisma.conversation.update({
@@ -199,40 +204,18 @@ export async function POST(req) {
       )
     );
 
-    // Envoi email si destinataire hors ligne
-    (async () => {
-      try {
-        const participantsWithUser = await prisma.participant.findMany({
-          where: { conversationId },
-          include: { utilisateur: true },
-        });
-        const destinataire = participantsWithUser
-          .map((p) => p.utilisateur)
-          .find((u) => u.id !== auteurId);
-
-        if (!destinataire || destinataire.statut === "en_ligne" || !destinataire.email) return;
-
-        const extrait = (contenu || "")
-          .substring(0, 100)
-          .replace(/\n/g, "<br>")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-
-        await resend.emails.send({
-          from: `"Xperiences" <${process.env.EMAIL_FROM}>`,
-          to: destinataire.email,
-          subject: `[Xperiences] Nouveau message de ${message.auteur.pseudo}`,
-          html: `
-            <p>Bonjour ${destinataire.pseudo},</p>
-            <p>Vous avez reçu un nouveau message :</p>
-            <blockquote>${extrait}…</blockquote>
-            <p><a href="${process.env.NEXT_PUBLIC_URL}/messagerie?conversationId=${conversationId}">Voir le message</a></p>
-          `,
-        });
-      } catch (err) {
-        console.error("Erreur lors de l'envoi du mail :", err);
-      }
-    })();
+    // ⬇️⬇️⬇️ DIGEST QUOTIDIEN : on empile pour envoi plus tard
+    if (autresParticipants.length > 0) {
+      await prisma.digestNotification.createMany({
+        data: autresParticipants.map((destId) => ({
+          destinataireId: destId,
+          conversationId,
+          messageId: message.id,
+        })),
+        skipDuplicates: true, // évite doublons si retry réseau
+      });
+    }
+    // ⬆️⬆️⬆️ Fin digest — plus d'email immédiat ici
 
     // ✅ Réponse API avec optimisticKey inclus
     return NextResponse.json({ success: true, message: messageWithOptimisticKey }, { status: 200 });
@@ -261,12 +244,14 @@ export async function GET(req) {
       select: {
         utilisateurId: true,
         lastReadAt: true,
-        utilisateur: { select: { id: true, pseudo: true, photoUrl: true, type: true } }
-      }
+        utilisateur: { select: { id: true, pseudo: true, photoUrl: true, type: true } },
+      },
     });
+
     const autresParticipants = allParticipants
       .map((p) => p.utilisateurId)
       .filter((id) => id !== auteurId);
+
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });

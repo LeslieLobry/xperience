@@ -16,6 +16,7 @@ export async function POST(req) {
       return NextResponse.json({ message: "Auto-visite ignorée" }, { status: 200 });
     }
 
+    // Vérifie si déjà visité aujourd'hui
     const dejaVu = await prisma.visiteProfil.findFirst({
       where: {
         visiteurId: user.id,
@@ -30,6 +31,7 @@ export async function POST(req) {
       return NextResponse.json({ message: "Déjà visité aujourd'hui" }, { status: 200 });
     }
 
+    // Création de la visite
     const created = await prisma.visiteProfil.create({
       data: {
         visiteurId: user.id,
@@ -39,12 +41,12 @@ export async function POST(req) {
 
     console.log("✅ Visite enregistrée :", created);
 
-    // ✅ Ajout de la notification pour l'utilisateur visité
-    await prisma.notification.create({
+    // ✅ Ajout dans le digest (au lieu de notification immédiate)
+    await prisma.digestNotification.create({
       data: {
-        utilisateurId: visiteId,
-        message: `${user.pseudo} a visité votre profil.`,
-        lien: `/profil/${user.id}`,
+        destinataireId: visiteId, // celui qui a été visité
+        auteurId: user.id,        // celui qui visite
+        visiteId: created.id,
       },
     });
 
