@@ -214,12 +214,16 @@ model Avis {
   createdAt   DateTime    @default(now())
   auteurId    Int
   cibleId     Int
+
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
-  @@map("Avis")
 
+  digests     DigestNotification[] @relation("DigestToAvis") // 👈 manquait ici
+
+  @@map("Avis")
   @@unique([auteurId, cibleId])
 }
+
 
 model Conversation {
   id           Int           @id @default(autoincrement())
