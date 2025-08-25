@@ -47,7 +47,7 @@ export default async function AccueilPage() {
         id: true,
         titre: true,
         imageUrl: true,
-        dates: true,  // tableau !
+        dates: true,
         lieu: true,
       },
     }),
@@ -60,7 +60,6 @@ export default async function AccueilPage() {
       Array.isArray(evt.dates) && evt.dates.some(d => new Date(d) >= now)
     )
     .sort((a, b) => {
-      // On prend la première date future la plus proche
       const nextDateA = (a.dates || []).find(d => new Date(d) >= now) || a.dates[0];
       const nextDateB = (b.dates || []).find(d => new Date(d) >= now) || b.dates[0];
       return new Date(nextDateA) - new Date(nextDateB);
