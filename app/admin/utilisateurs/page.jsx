@@ -54,16 +54,17 @@ export default function AdminUtilisateurs() {
       <table>
         <thead>
           <tr>
-            <th>ID</th>
             <th>Pseudo</th>
             <th>Email</th>
             <th>Rôle</th>
           </tr>
         </thead>
        <tbody className="body-util">
+         <td colSpan="4" style={{ textAlign: "right", fontWeight: "bold" }}>
+      Total utilisateurs : {utilisateurs.length}
+    </td>
   {utilisateurs.map((u) => (
     <tr key={u.id}>
-      <td data-label="ID">{u.id}</td>
       <td data-label="Pseudo">{u.pseudo}</td>
       <td data-label="Email">
         <a href={`mailto:${u.email}`}>{u.email}</a>
