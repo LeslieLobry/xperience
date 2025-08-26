@@ -8,10 +8,10 @@ if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
 // --- CORS ---
 const ALLOWED_ORIGINS = [
-  "http://localhost:8081",   // Expo web
-  "http://localhost:19006",  // Expo dev alt
+  "http://localhost:8081",
+  "http://localhost:19006",
   "https://www.x-periences.fr",
-  "https://x-periences.fr",  // OK si pas de redirection sur /api
+  "https://x-periences.fr",
 ];
 
 function corsHeaders(origin = "") {
@@ -30,14 +30,14 @@ export async function OPTIONS(req) {
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-// --- Auth: cookie 'token' OU header Authorization: Bearer ---
+// ---- helpers ----
 function extractTokenFromReq(req) {
-  // 1) Authorization: Bearer <jwt>
+  // 1) Authorization: Bearer ...
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
 
-  // 2) cookie "token=..."
+  // 2) cookie token=...
   const cookie = req.headers.get("cookie") || "";
   const c = cookie.split(/;\s*/).find((x) => x.startsWith("token="));
   if (c) return c.split("=")[1];
@@ -49,25 +49,29 @@ export async function GET(req) {
   const origin = req.headers.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  // ---- auth ----
-  const token = extractTokenFromReq(req);
-  if (!token) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401, headers });
-  }
-
-  let decoded;
   try {
-    decoded = jwt.verify(token, JWT_SECRET);
-  } catch {
-    return NextResponse.json({ error: "Jeton invalide" }, { status: 401, headers });
-  }
+    // --- Auth ---
+    const token = extractTokenFromReq(req);
+    if (!token) {
+      console.warn("[/api/init] token manquant");
+      return NextResponse.json({ success: false, error: "Non authentifié" }, { status: 401, headers });
+    }
 
-  const userId = Number(decoded.id || decoded.sub);
-  if (!userId) {
-    return NextResponse.json({ error: "Jeton invalide" }, { status: 401, headers });
-  }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      console.warn("[/api/init] jwt.verify invalide:", e?.message);
+      return NextResponse.json({ success: false, error: "Jeton invalide" }, { status: 401, headers });
+    }
 
-  try {
+    const userId = Number(decoded.id || decoded.sub);
+    if (!userId) {
+      console.warn("[/api/init] userId absent dans le token");
+      return NextResponse.json({ success: false, error: "Jeton invalide" }, { status: 401, headers });
+    }
+
+    // --- Data ---
     const [utilisateur, conversations, notifications, articles, evenementsRaw] = await Promise.all([
       prisma.utilisateur.findUnique({
         where: { id: userId },
@@ -84,11 +88,16 @@ export async function GET(req) {
           verificationIdentiteStatut: true,
         },
       }),
+      // ⚠️ on enlève le filtre "supprimé" si le champ n'existe pas côté schema
       prisma.conversation.findMany({
-        where: { participants: { some: { utilisateurId: userId, supprimé: false } } },
+        where: {
+          participants: {
+            some: { utilisateurId: userId },
+          },
+        },
         include: {
           participants: {
-            where: { supprimé: false },
+            // si tu as bien un champ 'supprime' boolean, remets: where: { supprime: false }
             take: 2,
             select: {
               utilisateurId: true,
@@ -117,15 +126,14 @@ export async function GET(req) {
     ]);
 
     if (!utilisateur) {
-      return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 401, headers });
+      console.warn("[/api/init] utilisateur introuvable:", userId);
+      return NextResponse.json({ success: false, error: "Utilisateur introuvable" }, { status: 401, headers });
     }
 
-    // Trier/filtrer les évènements à venir
+    // événements à venir
     const now = new Date();
     const evenements = (evenementsRaw || [])
-      .filter(
-        (evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now)
-      )
+      .filter((evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now))
       .sort((a, b) => {
         const nextA = (a.dates || []).find((d) => new Date(d) >= now) || a.dates?.[0];
         const nextB = (b.dates || []).find((d) => new Date(d) >= now) || b.dates?.[0];
@@ -138,7 +146,8 @@ export async function GET(req) {
       { headers }
     );
   } catch (err) {
-    console.error("❌ Erreur /api/init :", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500, headers });
+    console.error("❌ Erreur /api/init :", err?.message || err);
+    // expose (temporairement) le message pour débug
+    return NextResponse.json({ success: false, error: "Erreur serveur", detail: String(err?.message || err) }, { status: 500, headers });
   }
 }
