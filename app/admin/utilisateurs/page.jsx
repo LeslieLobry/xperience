@@ -56,7 +56,7 @@ export default function AdminUtilisateurs() {
           <tr>
             <th>Pseudo</th>
             <th>Email</th>
-            <th>Rôle</th>
+            <th>dernieres connexion</th>
           </tr>
         </thead>
        <tbody className="body-util">
@@ -69,8 +69,12 @@ export default function AdminUtilisateurs() {
       <td data-label="Email">
         <a href={`mailto:${u.email}`}>{u.email}</a>
       </td>
-      <td data-label="Rôle">{u.role || "utilisateur"}</td>
+      <td data-label="Dernière connexion">
+  {u.lastLogin ? new Date(u.lastLogin).toLocaleString("fr-FR") : "Jamais connecté"}
+</td>
     </tr>
+    
+
   ))}
 </tbody>
         <tfoot>

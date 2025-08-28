@@ -437,28 +437,28 @@ enum DigestEventType {
 }
 model DigestNotification {
   id              Int              @id @default(autoincrement())
-  destinataireId  Int
-  conversationId  Int?
-  messageId       Int?
-  visiteId        Int?
-  likeId          Int?
-  avisId          Int?             // ✅ nouveau champ
-  eventType       DigestEventType  @default(MESSAGE)
-  createdAt       DateTime         @default(now())
-  processingAt    DateTime?
-  sentAt          DateTime?
+  destinataireId  Int              @map("destinataireid")
+  conversationId  Int?             @map("conversationid")
+  messageId       Int?             @map("messageid")
+  visiteId        Int?             @map("visiteid")
+  likeId          Int?             @map("likeid")
+  avisId          Int?             @map("avisid")
+  eventType       DigestEventType  @default(MESSAGE) @map("eventtype")
+  createdAt       DateTime         @default(now())   @map("createdat")
+  processingAt    DateTime?                         @map("processingat")
+  sentAt          DateTime?                         @map("sentat")
 
   destinataire    Utilisateur      @relation("DigestToUtilisateur",  fields: [destinataireId], references: [id], onDelete: Cascade)
   conversation    Conversation?    @relation("DigestToConversation", fields: [conversationId], references: [id], onDelete: Cascade)
   message         Message?         @relation("DigestToMessage",      fields: [messageId],       references: [id], onDelete: Cascade)
   visite          VisiteProfil?    @relation("DigestToVisite",       fields: [visiteId],        references: [id], onDelete: Cascade)
   like            Like?            @relation("DigestToLike",         fields: [likeId],          references: [id], onDelete: Cascade)
-  avis            Avis?            @relation("DigestToAvis",         fields: [avisId],          references: [id], onDelete: Cascade) // ✅
+  avis            Avis?            @relation("DigestToAvis",         fields: [avisId],          references: [id], onDelete: Cascade)
 
   @@unique([destinataireId, messageId], map: "digest_dest_message_uniq")
   @@unique([destinataireId, visiteId],  map: "digest_dest_visite_uniq")
   @@unique([destinataireId, likeId],    map: "digest_dest_like_uniq")
-  @@unique([destinataireId, avisId],    map: "digest_dest_avis_uniq") // ✅
+  @@unique([destinataireId, avisId],    map: "digest_dest_avis_uniq")
   @@index([destinataireId, sentAt],     map: "digest_dest_sent_idx")
   @@index([createdAt],                  map: "digest_created_idx")
   @@index([sentAt, processingAt],       map: "digest_sent_processing_idx")
