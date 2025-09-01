@@ -4,6 +4,7 @@ import { resend } from "../../../../lib/resend";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs"; // impératif pour les env & le SDK
 
 // ----- utils -----
 function safeEqual(a = "", b = "") {
@@ -13,21 +14,41 @@ function safeEqual(a = "", b = "") {
   return crypto.timingSafeEqual(A, B);
 }
 
+function hasValidAuth(req) {
+  const secret = process.env.CRON_SECRET || "";
+  if (!secret) return false;
+
+  // 1) Bearer (curl/cron externe)
+  const auth = req.headers.get("authorization") || "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+
+  // 2) Query token (Vercel Scheduled Functions)
+  const url = new URL(req.url);
+  const q = url.searchParams.get("token") || url.searchParams.get("secret") || "";
+
+  // 3) Indicateur Vercel (facultatif)
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
+
+  return safeEqual(bearer, secret) || safeEqual(q, secret) || (isVercelCron && safeEqual(q, secret));
+}
+
 function htmlEscape(s = "") {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // ----- handler -----
 export async function POST(req) {
-  // Auth Bearer
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!token || !safeEqual(token, process.env.CRON_SECRET || "")) {
+  if (!hasValidAuth(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
-  const FROM = `"Xpérience" <${process.env.EMAIL_FROM || "no-reply@x-periences.fr"}>`;
+
+  // ⚠️ EMAIL_FROM doit être une simple adresse (ex: no-reply@x-periences.fr)
+  const RAW_FROM = process.env.EMAIL_FROM || "no-reply@x-periences.fr";
+  // Si EMAIL_FROM est déjà "Nom <mail>", on le garde tel quel ; sinon on ajoute le nom :
+  const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `Xperience <${RAW_FROM}>`;
+
   const now = Date.now();
   const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
 
@@ -47,11 +68,11 @@ export async function POST(req) {
   });
 
   if (!candidates.length) {
-    return NextResponse.json({ ok: true, sent: 0 });
+    return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
   }
 
   // 2) Lock optimiste : on marque reminderSent=true avant envoi (évite double cron)
-  const ids = candidates.map(u => u.id);
+  const ids = candidates.map((u) => u.id);
   await prisma.utilisateur.updateMany({
     where: { id: { in: ids }, reminderSent: false },
     data: { reminderSent: true },
@@ -92,8 +113,7 @@ export async function POST(req) {
         to: user.email,
         subject: "Il ne vous reste qu’une étape pour vivre de vraies Xpériences…",
         html,
-        text:
-`Bonjour ${pseudo},
+        text: `Bonjour ${pseudo},
 
 Vous êtes inscrit sur Xpérience, mais votre profil n’est pas encore complété.
 Complétez votre profil pour être bien visible et commencer à échanger.
@@ -109,7 +129,7 @@ Complétez votre profil pour être bien visible et commencer à échanger.
       sent++;
       actuallySent.push(user);
     } catch (e) {
-      console.error("Erreur envoi email reminder:", e);
+      console.error("Erreur envoi email reminder:", user.email, e);
       // rollback du lock pour ce user (pour qu'il soit retenté au prochain passage)
       await prisma.utilisateur.update({
         where: { id: user.id },
@@ -120,9 +140,7 @@ Complétez votre profil pour être bien visible et commencer à échanger.
 
   // 3) Récap interne si au moins 1 envoi
   if (sent > 0) {
-    const lines = actuallySent
-      .map(u => `- ${u.pseudo || u.email} (${u.email})`)
-      .join("<br>");
+    const lines = actuallySent.map((u) => `- ${u.pseudo || u.email} (${u.email})`).join("<br>");
     try {
       await resend.emails.send({
         from: FROM,
@@ -145,7 +163,23 @@ Complétez votre profil pour être bien visible et commencer à échanger.
   return NextResponse.json({ ok: true, sent });
 }
 
-// Optionnel: GET -> petite page santé
-export async function GET() {
-  return NextResponse.json({ ok: true, hint: "Use POST with Bearer CRON_SECRET" });
+// GET -> santé + dry-run
+export async function GET(req) {
+  const url = new URL(req.url);
+  if (url.searchParams.get("dry") === "1") {
+    const now = Date.now();
+    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const sample = await prisma.utilisateur.findMany({
+      where: {
+        createdAt: { lte: twentyFourHoursAgo },
+        profilComplet: false,
+        reminderSent: false,
+        email: { not: null },
+      },
+      select: { id: true, email: true, pseudo: true, createdAt: true },
+      take: 20,
+    });
+    return NextResponse.json({ ok: true, dry: true, count: sample.length, sample });
+  }
+  return NextResponse.json({ ok: true, hint: "POST with ?token=CRON_SECRET or Bearer CRON_SECRET" });
 }
