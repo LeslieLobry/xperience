@@ -1,6 +1,6 @@
 // app/api/articles/route.js
 import { prisma } from "../../../lib/prisma";
-import { okJSON, errorJSON, preflight } from "../../lib/cors";
+import { okJSON, errorJSON, preflight } from "../../../lib/cors";
 
 // Réponse au préflight CORS
 export async function OPTIONS(req) {

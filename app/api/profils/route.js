@@ -1,5 +1,5 @@
 import { prisma } from "../../../lib/prisma";
-import { okJSON, errorJSON, preflight } from "../../lib/cors";
+import { okJSON, errorJSON, preflight } from "../../../lib/cors";
 
 export async function OPTIONS(req) {
   return preflight(req);

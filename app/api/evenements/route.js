@@ -8,7 +8,7 @@ import sharp from "sharp";
 import { randomUUID } from "crypto";
 
 // 🔹 CORS helpers
-import { okJSON, errorJSON, preflight } from "../../lib/cors";
+import { okJSON, errorJSON, preflight } from "../../../lib/cors";
 
 // (optionnel) éviter le cache de route
 export const dynamic = "force-dynamic";
