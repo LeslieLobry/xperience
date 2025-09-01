@@ -1,12 +1,19 @@
+// app/api/evenements/route.js
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "../../../lib/prisma";
-import jwt from "jsonwebtoken"; // ✅
+import jwt from "jsonwebtoken";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { randomUUID } from "crypto";
 
-// Config AWS S3
+// 🔹 CORS helpers
+import { okJSON, errorJSON, preflight } from "../../lib/cors";
+
+// (optionnel) éviter le cache de route
+export const dynamic = "force-dynamic";
+
+// ─── AWS S3 ───────────────────────────────────────────────────────────────────
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -15,16 +22,14 @@ const s3 = new S3Client({
   },
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
-const REGION = process.env.AWS_REGION;
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// ✅ Récupérer l'utilisateur via le cookie JWT
+// ─── Auth depuis cookie JWT ───────────────────────────────────────────────────
 async function getUserFromCookie() {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   if (!token || !JWT_SECRET) return null;
-
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch {
@@ -32,16 +37,20 @@ async function getUserFromCookie() {
   }
 }
 
-// 📥 POST — Créer un événement (S3 privé : imageUrl = clé S3 !)
+// ─── OPTIONS (préflight CORS) ────────────────────────────────────────────────
+export async function OPTIONS(req) {
+  return preflight(req);
+}
+
+// ─── POST: créer un événement ────────────────────────────────────────────────
 export async function POST(req) {
   const user = await getUserFromCookie();
   if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
+    return errorJSON(req, { error: "Accès interdit" }, 403);
   }
 
   const formData = await req.formData();
 
-  // Champs texte
   const titre = formData.get("titre");
   const description = formData.get("description");
   const lieu = formData.get("lieu");
@@ -56,46 +65,38 @@ export async function POST(req) {
   const heureFin = formData.get("heureFin") || null;
   const lien = formData.get("lien") || null;
 
-  // 🔥 Prise en charge 1 ou plusieurs dates
+  // Dates (1..n)
   let dates = formData.getAll("dates");
   if (!dates.length && formData.get("date")) dates = [formData.get("date")];
-  dates = dates.filter((d) => !!d);
-  dates = dates.flatMap(d =>
-    typeof d === "string" && d.includes(",")
-      ? d.split(",").map(s => s.trim())
-      : [d]
-  );
+  dates = dates
+    .filter(Boolean)
+    .flatMap((d) => (typeof d === "string" && d.includes(",") ? d.split(",").map((s) => s.trim()) : [d]));
 
   if (!titre || !description || !lieu || !type || !acces || !dates.length) {
-    return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
+    return errorJSON(req, { error: "Champs obligatoires manquants" }, 400);
   }
 
-  // Conversion et vérification des dates
   const parsedDates = dates
     .map((d) => {
-      const dateObj = new Date(d);
-      return isNaN(dateObj) ? null : dateObj;
+      const dt = new Date(d);
+      return isNaN(dt) ? null : dt;
     })
     .filter(Boolean);
 
   if (!parsedDates.length) {
-    return NextResponse.json({ error: "Aucune date valide transmise" }, { status: 400 });
+    return errorJSON(req, { error: "Aucune date valide transmise" }, 400);
   }
 
-  // Image upload sur S3 (clé S3 stockée en BDD)
+  // Image → S3 (clé stockée en BDD)
   let imageKey = null;
   const image = formData.get("image");
   if (image && image.name) {
-    if (!image.type.startsWith("image/")) {
-      return NextResponse.json({ error: "Format d’image invalide" }, { status: 400 });
+    if (!image.type?.startsWith?.("image/")) {
+      return errorJSON(req, { error: "Format d’image invalide" }, 400);
     }
-
     try {
       const buffer = Buffer.from(await image.arrayBuffer());
-      const webpBuffer = await sharp(buffer)
-        .resize(800)
-        .webp({ quality: 80 })
-        .toBuffer();
+      const webpBuffer = await sharp(buffer).resize(800).webp({ quality: 80 }).toBuffer();
 
       const fileName = `evenements/${randomUUID()}.webp`;
 
@@ -108,10 +109,10 @@ export async function POST(req) {
         })
       );
 
-      imageKey = fileName; // 🟢 ON STOCKE LA CLÉ S3 (pas d’URL publique)
+      imageKey = fileName; // on stocke la clé S3
     } catch (err) {
       console.error("Erreur upload S3 :", err);
-      return NextResponse.json({ error: "Erreur lors du traitement de l’image" }, { status: 500 });
+      return errorJSON(req, { error: "Erreur lors du traitement de l’image" }, 500);
     }
   }
 
@@ -129,7 +130,7 @@ export async function POST(req) {
         tarifCouple,
         tarifFemme,
         tarifHomme,
-        imageUrl: imageKey, // 🔑 clé S3
+        imageUrl: imageKey,
         latitude,
         longitude,
         lien,
@@ -137,14 +138,14 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return okJSON(req, { success: true });
   } catch (err) {
     console.error("❌ Erreur création événement :", err);
-    return NextResponse.json({ error: "Erreur serveur", details: err.message }, { status: 500 });
+    return errorJSON(req, { error: "Erreur serveur", details: err.message }, 500);
   }
 }
 
-// 📤 GET — Récupérer les événements (sans modif, imageUrl = clé S3)
+// ─── GET: lister les événements ──────────────────────────────────────────────
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
 
@@ -163,23 +164,16 @@ export async function GET(req) {
 
   try {
     let evenements = await prisma.evenement.findMany({
-      where: {
-        acces: acces.length ? { in: acces } : undefined,
-      },
-      include: {
-        participants: {
-          select: { id: true },
-        },
-      },
+      where: { acces: acces.length ? { in: acces } : undefined },
+      include: { participants: { select: { id: true } } },
     });
-    const now = new Date();
 
-    evenements = evenements.filter((evt) =>
-      Array.isArray(evt.dates) &&
-      evt.dates.some((d) => new Date(d) >= now)
+    const now = new Date();
+    evenements = evenements.filter(
+      (evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now)
     );
 
-    // 👉 Filtrage sur dates (array)
+    // Filtre par plage de dates
     if (dateDebut || dateFin) {
       evenements = evenements.filter((evt) =>
         evt.dates.some((d) => {
@@ -191,43 +185,32 @@ export async function GET(req) {
       );
     }
 
-    // 🌍 Filtrage géographique
+    // Filtre géographique (Haversine)
     if (!isNaN(latitude) && !isNaN(longitude)) {
       const toRad = (deg) => (deg * Math.PI) / 180;
       const R = 6371; // km
-
       evenements = evenements.filter((e) => {
         if (e.latitude == null || e.longitude == null) return false;
         const dLat = toRad(e.latitude - latitude);
         const dLon = toRad(e.longitude - longitude);
         const a =
           Math.sin(dLat / 2) ** 2 +
-          Math.cos(toRad(latitude)) *
-            Math.cos(toRad(e.latitude)) *
-            Math.sin(dLon / 2) ** 2;
+          Math.cos(toRad(latitude)) * Math.cos(toRad(e.latitude)) * Math.sin(dLon / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         const distance = R * c;
         return distance <= rayon;
       });
     }
 
-    // 👉 Tri par date la plus proche (première du tableau)
-    evenements.sort(
-      (a, b) =>
-        new Date(a.dates[0] || 0) - new Date(b.dates[0] || 0)
-    );
+    // Tri par date la plus proche
+    evenements.sort((a, b) => new Date(a.dates[0] || 0) - new Date(b.dates[0] || 0));
 
     const total = evenements.length;
     const paginated = evenements.slice(skip, skip + perPage);
 
-    return NextResponse.json({
-      events: paginated,
-      total,
-      page,
-      perPage,
-    });
+    return okJSON(req, { events: paginated, total, page, perPage });
   } catch (err) {
     console.error("❌ Erreur GET /api/evenements :", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return errorJSON(req, { error: "Erreur serveur" }, 500);
   }
 }
