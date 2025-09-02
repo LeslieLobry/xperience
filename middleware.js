@@ -4,58 +4,50 @@ import { NextResponse } from "next/server";
 const ALLOWED_ORIGINS = [
   "https://www.x-periences.fr",
   "https://x-periences.fr",
-  "http://localhost:8081",   // Expo web
-  "http://localhost:19006",  // Expo dev
-  // "http://192.168.1.15:8081", // ← remets ton IP LAN exacte si besoin
+  "http://localhost:8081",
+  "http://localhost:19006",
+  // "http://192.168.1.15:8081",
 ];
 
-function makeHeaders(origin, { allowCreds = false } = {}) {
+function makeHeaders(origin, { allowCreds = true } = {}) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Vary": "Origin",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-
-    // Ajoute TOUT ce que tu envoies côté client (mets les deux variantes au besoin)
-    "Access-Control-Allow-Headers": [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-      "Origin",
-      "X-Platform", "x-platform",
-      "X-Action",   "x-action",
-      "X-Client",   "x-client",
-    ].join(", "),
-
-    "Access-Control-Allow-Credentials": allowCreds ? "true" : "false",
-    "Access-Control-Expose-Headers": "Content-Length, Content-Type",
-  };
+  const h = new Headers();
+  h.set("Access-Control-Allow-Origin", allowOrigin);
+  h.set("Vary", "Origin");
+  h.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  h.set("Access-Control-Allow-Headers",
+    [
+      "Content-Type","Authorization","X-Requested-With","Accept","Origin",
+      "X-Platform","x-platform","X-Action","x-action","X-Client","x-client"
+    ].join(", ")
+  );
+  if (allowCreds) h.set("Access-Control-Allow-Credentials", "true");
+  h.set("Access-Control-Max-Age", "86400");
+  return h;
 }
 
 export function middleware(req) {
-  const { pathname } = new URL(req.url);
   const origin = req.headers.get("origin") || "";
+  const url = new URL(req.url);
+  const pathname = url.pathname;
 
-  // On ne touche qu'aux routes API
-  if (!pathname.startsWith("/api/")) return NextResponse.next();
+  // si tu veux exclure certains chemins, fais-le ici
 
-  // Endpoints qui utilisent des cookies → credentials true
-  const needsCreds = pathname.startsWith("/api/login") || pathname.startsWith("/api/me");
-
+  // Répondre immédiatement aux préflights
   if (req.method === "OPTIONS") {
-    return new NextResponse(null, {
-      status: 204,
-      headers: makeHeaders(origin, { allowCreds: needsCreds }),
-    });
+    return new NextResponse(null, { status: 204, headers: makeHeaders(origin) });
   }
 
+  // Ajouter les en-têtes CORS aux autres réponses
   const res = NextResponse.next();
-  const headers = makeHeaders(origin, { allowCreds: needsCreds });
-  Object.entries(headers).forEach(([k, v]) => res.headers.set(k, v));
+  const h = makeHeaders(origin);
+  h.forEach((v, k) => res.headers.set(k, v));
   return res;
 }
 
+// Appliquer partout sauf assets/statics
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|map)).*)",
+  ],
 };
