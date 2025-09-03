@@ -1,24 +1,51 @@
 // middleware.js
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = [
+const PROD_ORIGINS = [
   "https://www.x-periences.fr",
   "https://x-periences.fr",
-  "http://localhost:8081",
-  "http://localhost:19006",
-  // "http://192.168.1.15:8081",
 ];
 
+const DEV_WHITELIST_PREFIXES = [
+  "http://localhost:",
+  "http://127.0.0.1:",
+  "http://192.168.",   // Expo LAN
+];
+
+function pickAllowOrigin(origin) {
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!origin) {
+    // Pas d'Origin -> requêtes non-CORS (ex: React Native natif) : on met le site
+    return PROD_ORIGINS[0];
+  }
+
+  if (isProd) {
+    // Prod: seulement la liste blanche stricte
+    if (PROD_ORIGINS.includes(origin)) return origin;
+    return PROD_ORIGINS[0];
+  }
+
+  // Dev: accepte localhost / LAN (Expo web/LAN)
+  if (DEV_WHITELIST_PREFIXES.some((p) => origin.startsWith(p))) {
+    return origin;
+  }
+
+  // Sinon, retombe sur le premier domaine prod (évite *)
+  return PROD_ORIGINS[0];
+}
+
 function makeHeaders(origin, { allowCreds = true } = {}) {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowOrigin = pickAllowOrigin(origin);
   const h = new Headers();
   h.set("Access-Control-Allow-Origin", allowOrigin);
   h.set("Vary", "Origin");
   h.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  h.set("Access-Control-Allow-Headers",
+  h.set(
+    "Access-Control-Allow-Headers",
     [
-      "Content-Type","Authorization","X-Requested-With","Accept","Origin",
-      "X-Platform","x-platform","X-Action","x-action","X-Client","x-client"
+      "Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin",
+      "X-Platform", "x-platform", "X-Action", "x-action", "X-Client", "x-client",
     ].join(", ")
   );
   if (allowCreds) h.set("Access-Control-Allow-Credentials", "true");
@@ -28,26 +55,20 @@ function makeHeaders(origin, { allowCreds = true } = {}) {
 
 export function middleware(req) {
   const origin = req.headers.get("origin") || "";
-  const url = new URL(req.url);
-  const pathname = url.pathname;
 
-  // si tu veux exclure certains chemins, fais-le ici
-
-  // Répondre immédiatement aux préflights
+  // Préflight
   if (req.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: makeHeaders(origin) });
   }
 
-  // Ajouter les en-têtes CORS aux autres réponses
+  // Réponses normales
   const res = NextResponse.next();
   const h = makeHeaders(origin);
   h.forEach((v, k) => res.headers.set(k, v));
   return res;
 }
 
-// Appliquer partout sauf assets/statics
+// N'applique qu'aux routes API
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|map)).*)",
-  ],
+  matcher: ["/api/:path*"],
 };
