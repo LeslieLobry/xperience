@@ -4,7 +4,7 @@ import Ably from "ably";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const ABLY_API_KEY = process.env.ABLY_API_KEY;
+const ABLY_API_KEY = process.env.ABLY_API_KEY_SERVER;
 
 if (!JWT_SECRET) throw new Error("JWT_SECRET manquant");
 if (!ABLY_API_KEY) throw new Error("ABLY_API_KEY manquant");
