@@ -49,7 +49,7 @@ export async function GET(req, { params }) {
         statut: true,
         type: true,
         verificationIdentiteStatut: true,
-        // ajoute ici d'autres champs de détail si tu veux
+       description:true
       },
     });
 
