@@ -7,86 +7,98 @@ import { prisma } from "../../../lib/prisma";
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
-const ALLOWED_ORIGINS = [
-  "http://localhost:8081",
-  "http://localhost:19006",
-  "https://www.x-periences.fr",
-  "https://x-periences.fr",
-];
-
-function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    // ajoute tes headers custom en minuscules et majuscules (les navigateurs sont case-insensitive, mais soyons larges)
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform, x-platform, X-Requested-With, Accept, Origin",
-    "Access-Control-Allow-Credentials": "true", // ✅ important pour le cookie
-    "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
-  };
-}
-
-export async function OPTIONS(req) {
-  const origin = req.headers.get("origin") || "";
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
-}
+// NOTE: CORS est géré par middleware.js → pas d'OPTIONS ici
 
 export async function POST(req) {
-  const origin = req.headers.get("origin") || "";
-  const headers = corsHeaders(origin);
-
   try {
     const url = new URL(req.url);
     const isMobile =
       req.headers.get("x-platform") === "mobile" || url.searchParams.get("mobile") === "1";
 
     const { email, password } = await req.json();
-    const normEmail = (email || "").toLowerCase().trim();
+    const normEmail = String(email || "").toLowerCase().trim();
+    if (!normEmail || !password) {
+      return NextResponse.json(
+        { success: false, message: "Email et mot de passe requis" },
+        { status: 400 }
+      );
+    }
 
     const user = await prisma.utilisateur.findUnique({
       where: { email: normEmail },
       select: {
-        id: true, email: true, pseudo: true, password: true,
-        role: true, photoUrl: true, type: true
+        id: true,
+        email: true,
+        pseudo: true,
+        password: true,       // hash seulement pour comparaison
+        role: true,
+        photoUrl: true,
+        type: true,
       },
     });
 
-    if (!user)
-      return NextResponse.json({ success: false, message: "Utilisateur introuvable" }, { status: 401, headers });
-
-    if (!user.password)
-      return NextResponse.json({ success: false, message: "Mot de passe non défini" }, { status: 400, headers });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: "Utilisateur introuvable" },
+        { status: 401 }
+      );
+    }
+    if (!user.password) {
+      return NextResponse.json(
+        { success: false, message: "Mot de passe non défini" },
+        { status: 400 }
+      );
+    }
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid)
-      return NextResponse.json({ success: false, message: "Mot de passe incorrect" }, { status: 401, headers });
+    if (!valid) {
+      return NextResponse.json(
+        { success: false, message: "Mot de passe incorrect" },
+        { status: 401 }
+      );
+    }
 
-    // async/low priority
+    // Update lastLogin en tâche de fond
     setTimeout(() => {
       prisma.utilisateur.update({
         where: { id: user.id },
         data: { lastLogin: new Date() },
-        select: { id: true }
-      }).catch(console.error);
+        select: { id: true },
+      }).catch(() => {});
     }, 0);
 
+    // ⚠️ Pour l’instant on garde ton JWT "long" (7j) pour compat.
+    // On passera en access court + refresh à l’étape suivante.
     const token = jwt.sign(
       { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role, photoUrl: user.photoUrl, type: user.type },
       secret,
-      { expiresIn: "7d" }
+      { expiresIn: "7d", algorithm: "HS256" }
     );
 
+    // Corps de réponse: identique à ton implémentation pour éviter les régressions
     const body = isMobile
-      ? { success: true, token, user: { id: user.id, email: user.email, pseudo: user.pseudo, photoUrl: user.photoUrl, type: user.type, role: user.role } }
+      ? {
+          success: true,
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            pseudo: user.pseudo,
+            photoUrl: user.photoUrl,
+            type: user.type,
+            role: user.role,
+          },
+        }
       : { success: true };
 
-    const res = NextResponse.json(body, { headers });
-    // ✅ cookie (credentials côté client requis)
+    const res = NextResponse.json(body);
+
+    // Cookie web (HTTP-only). Domaine partagé www + apex.
     res.cookies.set("token", token, {
       httpOnly: true,
       secure: true,
-      sameSite: "none",
+      sameSite: "lax",           // ← plus sûr que "none" si pas de cross-site
+      domain: ".x-periences.fr", // ← couvre x-periences.fr + www.x-periences.fr
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
@@ -95,7 +107,7 @@ export async function POST(req) {
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Erreur serveur : " + (error?.message || "inconnue") },
-      { status: 500, headers }
+      { status: 500 }
     );
   }
 }
