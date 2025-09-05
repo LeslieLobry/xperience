@@ -1,39 +1,46 @@
 // app/api/logout/route.js
 import { NextResponse } from "next/server";
 
-// Le CORS est déjà géré par middleware.js → pas d'OPTIONS ici
-export async function POST() {
-  const res = NextResponse.json({ success: true });
+const ALLOWED_ORIGINS = [
+  "http://localhost:8081",
+  "http://localhost:19006",
+  "https://www.x-periences.fr",
+  "https://x-periences.fr",
+];
 
-  // 🧹 On supprime le cookie 'token' dans tous les cas possibles
-  // 1) Cookie posé avec domaine .x-periences.fr (nouveau comportement recommandé)
-  res.cookies.set("token", "", {
+function corsHeaders(origin = "") {
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform, x-platform",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
+export async function OPTIONS(req) {
+  const origin = req.headers.get("origin") || "";
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+}
+
+export async function POST(req) {
+  const origin = req.headers.get("origin") || "";
+  const headers = corsHeaders(origin);
+
+  const response = NextResponse.json({ success: true }, { headers });
+
+  // ✅ supprime le cookie JWT
+  response.cookies.set("token", "", {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    domain: ".x-periences.fr",
     path: "/",
     maxAge: 0,
   });
 
-  // 2) Cookie éventuellement posé SANS domaine par le passé
-  res.cookies.set("token", "", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-
-  // 3) Ancien cookie éventuel en SameSite=None (historique)
-  res.cookies.set("token", "", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-    domain: ".x-periences.fr",
-    path: "/",
-    maxAge: 0,
-  });
-
-  return res;
+  return response;
 }
