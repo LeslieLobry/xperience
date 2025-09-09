@@ -1,11 +1,16 @@
 // app/api/me/route.js
 import { NextResponse } from "next/server";
+import { headers as getHeaders, cookies as getCookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
+// --- CORS ---
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -18,22 +23,34 @@ function corsHeaders(origin = "") {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform",
+    "Access-Control-Allow-Credentials": "true",            // ✅ indispensable pour cookies
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
 }
-export async function OPTIONS(req) {
-  const origin = req.headers.get("origin") || "";
+export async function OPTIONS() {
+  const origin = (await getHeaders()).get("origin") || "";
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-function extractTokenFromReq(req) {
-  const auth = req.headers.get("authorization") || "";
+// --- helpers ---
+function extractToken(reqHeaders) {
+  // 1) Authorization: Bearer ...
+  const auth = reqHeaders.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
-  const cookie = req.headers.get("cookie") || "";
-  const c = cookie.split(/;\s*/).find((x) => x.startsWith("token="));
-  if (c) return c.split("=")[1];
+
+  // 2) Cookie HttpOnly via next/headers
+  try {
+    const c = getCookies().get("token")?.value;
+    if (c) return c;
+  } catch {}
+
+  // 3) Cookie header brut (fallback)
+  const cookie = reqHeaders.get("cookie") || "";
+  const pair = cookie.split(/;\s*/).find((x) => x.startsWith("token="));
+  if (pair) return decodeURIComponent(pair.split("=")[1]);
+
   return null;
 }
 
@@ -41,11 +58,13 @@ const ADMIN_ROLES = ["admin", "superadmin", "owner", "root"];
 const normalizeRole = (r) => String(r ?? "").trim().toLowerCase();
 const isAdminRole = (r) => ADMIN_ROLES.includes(normalizeRole(r));
 
-export async function GET(req) {
-  const origin = req.headers.get("origin") || "";
+export async function GET() {
+  const reqHeaders = await getHeaders();
+  const origin = reqHeaders.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  const token = extractTokenFromReq(req);
+  // 1) Auth
+  const token = extractToken(reqHeaders);
   if (!token) {
     return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401, headers });
   }
@@ -56,41 +75,39 @@ export async function GET(req) {
   } catch {
     return NextResponse.json({ success: false, message: "Token invalide." }, { status: 401, headers });
   }
+
   const userId = Number(decoded.id || decoded.sub);
   if (!userId) {
     return NextResponse.json({ success: false, message: "Token invalide." }, { status: 401, headers });
   }
 
+  // 2) DB — select minimal FIABLE (pas de champs exotiques qui cassent)
   try {
     const u = await prisma.utilisateur.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        type: true,
-        role: true,
         pseudo: true,
+        role: true,
+        type: true,
         photoUrl: true,
-        age: true,
-        description: true,
         localisation: true,
         experience: true,
         rechercheType: true,
+        age: true,
         fumeur: true,
         silhouette: true,
         taille: true,
         origines: true,
         yeux: true,
-        avis:true,
         cheveux: true,
+        description: true,
         createdAt: true,
         lastLogin: true,
-        verificationDeadline: true,
-        verificationIdentiteStatut: true,
-        orientation: true,
-        // ⬇️⬇️ ajoute les relations attendues par ton composant
-        recherches: { select: { label: true } },
-        envies: { select: { label: true } },
+        // Relations courtes (mets id+label, c’est safe)
+        recherches: { select: { id: true, label: true } },
+        envies: { select: { id: true, label: true } },
       },
     });
 
@@ -106,7 +123,7 @@ export async function GET(req) {
       { headers }
     );
   } catch (err) {
-    console.error("❌ Erreur API /me :", err?.message || err);
+    console.error("❌ /api/me error:", err?.message || err);
     return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500, headers });
   }
 }
