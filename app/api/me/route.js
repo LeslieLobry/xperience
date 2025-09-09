@@ -6,7 +6,6 @@ import { prisma } from "../../../lib/prisma";
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
-// ---- CORS ----
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -28,7 +27,6 @@ export async function OPTIONS(req) {
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-// ---- Helpers ----
 function extractTokenFromReq(req) {
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
@@ -38,6 +36,7 @@ function extractTokenFromReq(req) {
   if (c) return c.split("=")[1];
   return null;
 }
+
 const ADMIN_ROLES = ["admin", "superadmin", "owner", "root"];
 const normalizeRole = (r) => String(r ?? "").trim().toLowerCase();
 const isAdminRole = (r) => ADMIN_ROLES.includes(normalizeRole(r));
@@ -46,11 +45,11 @@ export async function GET(req) {
   const origin = req.headers.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  // 1) Auth
   const token = extractTokenFromReq(req);
   if (!token) {
     return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401, headers });
   }
+
   let decoded;
   try {
     decoded = jwt.verify(token, JWT_SECRET);
@@ -63,7 +62,6 @@ export async function GET(req) {
   }
 
   try {
-    // 2) Chargement user — ⚠️ sans "sexe" et sans "verificationIdentite"
     const u = await prisma.utilisateur.findUnique({
       where: { id: userId },
       select: {
@@ -87,8 +85,11 @@ export async function GET(req) {
         createdAt: true,
         lastLogin: true,
         verificationDeadline: true,
-        verificationIdentiteStatut: true, // ✅ bon champ
-        orientation: true,                // ✅ si tu veux ce champ
+        verificationIdentiteStatut: true,
+        orientation: true,
+        // ⬇️⬇️ ajoute les relations attendues par ton composant
+        recherches: { select: { label: true } },
+        envies: { select: { label: true } },
       },
     });
 
@@ -105,9 +106,6 @@ export async function GET(req) {
     );
   } catch (err) {
     console.error("❌ Erreur API /me :", err?.message || err);
-    return NextResponse.json(
-      { success: false, message: "Erreur serveur." },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500, headers });
   }
 }
