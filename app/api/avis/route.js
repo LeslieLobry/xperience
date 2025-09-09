@@ -4,79 +4,89 @@ import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
-const secret = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("JWT_SECRET manquant");
+
+const ALLOWED_ORIGINS = [
+  "http://localhost:8081",
+  "http://localhost:19006",
+  "http://localhost:3000",
+  "https://www.x-periences.fr",
+  "https://x-periences.fr",
+];
+
+function corsHeaders(origin = "") {
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
+export async function OPTIONS(req) {
+  const origin = req.headers.get("origin") || "";
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+}
 
 export async function POST(req) {
-  const body = await req.json();
+  const origin = req.headers.get("origin") || "";
+  const headers = corsHeaders(origin);
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-
-  if (!token) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
-
-  let payload;
   try {
-    payload = jwt.verify(token, secret);
-    if (!payload || typeof payload !== "object" || !payload.id) {
-      throw new Error("Token invalide");
+    const body = await req.json();
+
+    // --- Auth: cookie OU Bearer ---
+    const cookieStore = await cookies();
+    let token = cookieStore.get("token")?.value;
+    const auth = req.headers.get("authorization") || "";
+    if (!token && auth.startsWith("Bearer ")) token = auth.slice(7);
+
+    if (!token) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401, headers });
     }
-  } catch (err) {
-    return NextResponse.json({ error: "Token invalide" }, { status: 403 });
-  }
 
-  const auteurId = parseInt(payload.id);
-  const { cibleId, commentaire } = body;
+    let payload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch {
+      return NextResponse.json({ error: "Token invalide" }, { status: 403, headers });
+    }
 
-  if (!cibleId || !commentaire) {
-    return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
-  }
+    const auteurId = parseInt(payload.id);
+    const { cibleId, commentaire } = body || {};
 
-  if (auteurId === parseInt(cibleId)) {
-    return NextResponse.json({ error: "Vous ne pouvez pas laisser un avis sur vous-même." }, { status: 400 });
-  }
+    if (!cibleId || !commentaire) {
+      return NextResponse.json({ error: "Champs requis manquants" }, { status: 400, headers });
+    }
+    if (auteurId === parseInt(cibleId)) {
+      return NextResponse.json({ error: "Vous ne pouvez pas laisser un avis sur vous-même." }, { status: 400, headers });
+    }
 
-  // Vérifie si un avis existe déjà pour ce couple
-  const existing = await prisma.avis.findUnique({
-    where: {
-      auteurId_cibleId: {
-        auteurId,
-        cibleId: parseInt(cibleId),
-      },
-    },
-  });
+    const existing = await prisma.avis.findUnique({
+      where: { auteurId_cibleId: { auteurId, cibleId: parseInt(cibleId) } },
+    });
+    if (existing) {
+      return NextResponse.json({ error: "Vous avez déjà laissé un avis." }, { status: 400, headers });
+    }
 
-  if (existing) {
-    return NextResponse.json({ error: "Vous avez déjà laissé un avis." }, { status: 400 });
-  }
-
-  try {
-    // 1️⃣ Création de l'avis
     const avis = await prisma.avis.create({
-      data: {
-        auteurId,
-        cibleId: parseInt(cibleId),
-        commentaire,
-      },
+      data: { auteurId, cibleId: parseInt(cibleId), commentaire },
     });
 
-    // 2️⃣ Ajout au digest au lieu d’une notif immédiate
     await prisma.digestNotification.create({
-      data: {
-        type: "AVIS",
-        auteurId,
-        destinataireId: parseInt(cibleId),
-        avisId: avis.id,
-      },
+      data: { type: "AVIS", auteurId, destinataireId: parseInt(cibleId), avisId: avis.id },
     });
 
-    return NextResponse.json({ success: true, avis });
+    return NextResponse.json({ success: true, avis }, { headers });
   } catch (error) {
     console.error("❌ Erreur création avis :", error);
-    return NextResponse.json({
-      error: "Erreur lors de l'enregistrement.",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined,
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur lors de l'enregistrement." },
+      { status: 500, headers }
+    );
   }
 }
