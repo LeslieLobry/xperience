@@ -81,6 +81,7 @@ export async function GET(req) {
         taille: true,
         origines: true,
         yeux: true,
+        avis:true,
         cheveux: true,
         createdAt: true,
         lastLogin: true,
