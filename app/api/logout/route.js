@@ -1,6 +1,9 @@
 // app/api/logout/route.js
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -31,16 +34,31 @@ export async function POST(req) {
   const origin = req.headers.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  const response = NextResponse.json({ success: true }, { headers });
+  const res = NextResponse.json({ success: true }, { headers });
 
-  // ✅ supprime le cookie JWT
-  response.cookies.set("token", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  // ⬇️ Cookies à adapter selon ton app (ajoute 'refresh' si tu en as un)
+  const cookieNames = ["token", "xp_token"];
 
-  return response;
+  // Efface les cookies pour le sous-domaine ET le domaine parent
+  for (const name of cookieNames) {
+    // Sans domain (s’applique à l’host courant, ex: www.x-periences.fr)
+    res.cookies.set(name, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    // Avec domaine parent (couvre x-periences.fr et www.x-periences.fr)
+    res.cookies.set(name, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+      domain: ".x-periences.fr",
+    });
+  }
+
+  return res;
 }
