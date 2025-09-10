@@ -1,12 +1,11 @@
 // app/api/photos/presign/route.js
 import { NextResponse } from "next/server";
 import { getPresignedUrl } from "../../../../lib/s3";
-
 export const dynamic = "force-dynamic";
 
 const ALLOWED_ORIGINS = [
-  "http://localhost:8081",   // Expo Go
-  "http://localhost:19006",  // Expo web
+  "http://localhost:8081",
+  "http://localhost:19006",
   "https://www.x-periences.fr",
   "https://x-periences.fr",
 ];
@@ -24,7 +23,6 @@ function corsHeaders(origin = "") {
   };
 }
 
-// Réponse au preflight CORS
 export async function OPTIONS(req) {
   const origin = req.headers.get("origin") || "";
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
@@ -33,9 +31,9 @@ export async function OPTIONS(req) {
 export async function POST(req) {
   const origin = req.headers.get("origin") || "";
   try {
-    const { key, operation = "get" } = await req.json();
-
-    if (!key) {
+    const body = await req.json().catch(() => ({}));
+    let { key, operation = "get" } = body || {};
+    if (!key || !String(key).trim()) {
       return NextResponse.json(
         { error: "Paramètre 'key' manquant" },
         { status: 400, headers: corsHeaders(origin) }
@@ -43,8 +41,14 @@ export async function POST(req) {
     }
 
     const cleanKey = String(key).trim().replace(/^\/+/, "");
+    const url = await getPresignedUrl(cleanKey, { operation: operation === "put" ? "put" : "get" });
+    if (!url) {
+      return NextResponse.json(
+        { error: "Échec de signature" },
+        { status: 500, headers: corsHeaders(origin) }
+      );
+    }
 
-    const url = await getPresignedUrl(cleanKey, { operation });
     return NextResponse.json({ url }, { status: 200, headers: corsHeaders(origin) });
   } catch (e) {
     console.error("Presign error:", e);
