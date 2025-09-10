@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-// Prisma singleton en dev (évite les multiples instances)
+// Prisma singleton
 let prisma;
 if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient();
@@ -10,7 +10,7 @@ if (process.env.NODE_ENV === "production") {
   prisma = global.prisma;
 }
 
-// --- CORS ---
+/* ---------------- CORS ---------------- */
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -31,7 +31,7 @@ function corsHeaders(origin = "") {
   };
 }
 
-// --- JSON safe (BigInt -> string) ---
+/* -------- BigInt-safe JSON -------- */
 function safeJson(data) {
   return JSON.parse(
     JSON.stringify(data, (_, v) => (typeof v === "bigint" ? v.toString() : v))
@@ -44,7 +44,10 @@ export async function OPTIONS(req) {
 }
 
 /**
- * GET /api/avis/utilisateur/[id]?take=10&beforeId=123
+ * GET /api/avis/utilisateur/[id]?take=10&beforeDate=2025-09-10T12:00:00.000Z
+ * - id: requis
+ * - take: 1..50 (10 par défaut)
+ * - beforeDate: ISO optionnel (pagination par date)
  */
 export async function GET(req, { params }) {
   const origin = req.headers.get("origin") || "";
@@ -52,11 +55,11 @@ export async function GET(req, { params }) {
 
   try {
     const { searchParams } = new URL(req.url);
+
     const idRaw = params?.id;
     if (!idRaw) {
       return NextResponse.json({ error: "ID requis" }, { status: 400, headers });
     }
-
     const cibleId = parseInt(String(idRaw), 10);
     if (Number.isNaN(cibleId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400, headers });
@@ -65,39 +68,56 @@ export async function GET(req, { params }) {
     let take = parseInt(String(searchParams.get("take") ?? "10"), 10);
     if (Number.isNaN(take) || take < 1 || take > 50) take = 10;
 
+    const beforeDateRaw = searchParams.get("beforeDate");
     const where = { cibleId };
-    const beforeIdRaw = searchParams.get("beforeId");
-    if (beforeIdRaw != null && String(beforeIdRaw).length) {
-      const b = parseInt(String(beforeIdRaw), 10);
-      if (!Number.isNaN(b)) where.id = { lt: b };
+    if (beforeDateRaw) {
+      const d = new Date(beforeDateRaw);
+      if (!isNaN(d.getTime())) {
+        where.createdAt = { lt: d };
+      }
     }
 
-    const avis = await prisma.avis.findMany({
+    const rows = await prisma.avis.findMany({
       where,
       take,
-      orderBy: { id: "desc" }, // keyset pagination
+      orderBy: { createdAt: "desc" },
       include: {
-        auteur: {
-          select: {
-            id: true,
-            pseudo: true,
-            // ⚠️ si tu as un champ avatar/photo, ajoute-le ici explicitement.
-            // avatarUrl: true, // ex.
-          },
-        },
+        // Inclure tout l'auteur pour éviter les erreurs de champs inconnus
+        auteur: true,
       },
     });
 
-    const nextCursor = avis.length ? avis[avis.length - 1].id : null;
+    // Normalisation avatar : on expose un seul champ "avatarUrl"
+    const items = rows.map((a) => {
+      const { auteur, ...rest } = a;
+      const avatarUrl =
+        auteur?.avatarUrl ??
+        auteur?.photoUrl ??
+        auteur?.avatar ??
+        null;
+      return {
+        ...rest,
+        auteur: {
+          id: auteur?.id ?? null,
+          pseudo: auteur?.pseudo ?? "",
+          avatarUrl, // <- unique champ côté client
+        },
+      };
+    });
 
-    // Log utile
-    console.log(`GET avis utilisateur ${cibleId} → ${avis.length} items`);
+    const nextCursorDate = items.length ? items[items.length - 1].createdAt : null;
 
-    return NextResponse.json(safeJson({ items: avis, nextCursor }), { headers });
-  } catch (error) {
-    console.error("❌ Erreur GET /api/avis/utilisateur/[id]:", error);
+    console.log(`GET /api/avis/utilisateur/${cibleId} → ${items.length} avis`);
+
     return NextResponse.json(
-      { error: "Erreur serveur lors de la récupération des avis." },
+      safeJson({ items, nextCursorDate }),
+      { headers }
+    );
+  } catch (error) {
+    console.error("❌ Erreur GET /api/avis/utilisateur/[id]:", error?.message);
+    // Retourner le message aussi en prod temporairement pour debug
+    return NextResponse.json(
+      { error: "Erreur serveur", message: String(error?.message || "") },
       { status: 500, headers }
     );
   }
