@@ -2,25 +2,32 @@
 import { NextResponse } from "next/server";
 import { getPresignedUrl } from "../../../../lib/s3";
 
+// Évite tout cache en edge qui flinguerait la signature
+export const dynamic = "force-dynamic";
+
 const ALLOWED_ORIGINS = [
-  "http://localhost:8081",   // Expo Go
+  "http://localhost:8081",   // Expo Go (Android)
   "http://localhost:19006",  // Expo web
   "https://www.x-periences.fr",
   "https://x-periences.fr",
 ];
 
 function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  // Sur mobile natif, Origin peut être vide -> on tolère "*"
+  const allowOrigin = origin
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr")
+    : "*";
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform",
     "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
+    "Vary": "Origin",
   };
 }
 
-// ✅ Répond au preflight (évite le 405 côté RN/Expo)
+// ✅ Répond au preflight CORS (sinon 405 coté web/Expo web)
 export async function OPTIONS(req) {
   const origin = req.headers.get("origin") || "";
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
@@ -47,12 +54,11 @@ export async function POST(req) {
       );
     }
 
-    // Nettoyage: retire les / initiaux, espaces, etc.
     key = key.trim().replace(/^\/+/, "");
 
-    // (Optionnel mais recommandé) vérifier ici les droits d’accès à la ressource
+    // (Optionnel) Vérifier droits d'accès à la ressource ici
 
-    const url = await getPresignedUrl(key, { operation }); // ton util peut ignorer 'operation' si non géré
+    const url = await getPresignedUrl(key, { operation }); // ton util peut ignorer 'operation'
     if (!url) {
       return NextResponse.json(
         { error: "Échec de signature" },
