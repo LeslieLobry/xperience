@@ -1,7 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-// Prisma singleton
+/** ✅ Force Node.js runtime (obligatoire pour Prisma sur Vercel) */
+export const runtime = "nodejs";
+/** (optionnel) évite le cache RSC sur cette route */
+export const dynamic = "force-dynamic";
+
+/* ---------- Prisma singleton ---------- */
 let prisma;
 if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient();
@@ -10,7 +15,7 @@ if (process.env.NODE_ENV === "production") {
   prisma = global.prisma;
 }
 
-/* ---------------- CORS ---------------- */
+/* ---------- CORS ---------- */
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -31,7 +36,7 @@ function corsHeaders(origin = "") {
   };
 }
 
-/* -------- BigInt-safe JSON -------- */
+/* ---------- BigInt-safe JSON ---------- */
 function safeJson(data) {
   return JSON.parse(
     JSON.stringify(data, (_, v) => (typeof v === "bigint" ? v.toString() : v))
@@ -44,10 +49,8 @@ export async function OPTIONS(req) {
 }
 
 /**
- * GET /api/avis/utilisateur/[id]?take=10&beforeDate=2025-09-10T12:00:00.000Z
- * - id: requis
- * - take: 1..50 (10 par défaut)
- * - beforeDate: ISO optionnel (pagination par date)
+ * GET /api/avis/utilisateur/[id]?take=10&beforeId=123
+ * - tri par id (champ sûr) pour éviter l’erreur si createdAt n’existe pas
  */
 export async function GET(req, { params }) {
   const origin = req.headers.get("origin") || "";
@@ -68,26 +71,24 @@ export async function GET(req, { params }) {
     let take = parseInt(String(searchParams.get("take") ?? "10"), 10);
     if (Number.isNaN(take) || take < 1 || take > 50) take = 10;
 
-    const beforeDateRaw = searchParams.get("beforeDate");
     const where = { cibleId };
-    if (beforeDateRaw) {
-      const d = new Date(beforeDateRaw);
-      if (!isNaN(d.getTime())) {
-        where.createdAt = { lt: d };
-      }
+    const beforeIdRaw = searchParams.get("beforeId");
+    if (beforeIdRaw != null && String(beforeIdRaw).length) {
+      const b = parseInt(String(beforeIdRaw), 10);
+      if (!Number.isNaN(b)) where.id = { lt: b };
     }
 
     const rows = await prisma.avis.findMany({
       where,
       take,
-      orderBy: { createdAt: "desc" },
+      orderBy: { id: "desc" }, // ✅ champ toujours présent
       include: {
-        // Inclure tout l'auteur pour éviter les erreurs de champs inconnus
+        // ✅ on inclut tout l'auteur pour éviter les 'Unknown arg ... in select'
         auteur: true,
       },
     });
 
-    // Normalisation avatar : on expose un seul champ "avatarUrl"
+    // Normalisation de l’avatar → un seul champ "avatarUrl" côté client
     const items = rows.map((a) => {
       const { auteur, ...rest } = a;
       const avatarUrl =
@@ -100,25 +101,23 @@ export async function GET(req, { params }) {
         auteur: {
           id: auteur?.id ?? null,
           pseudo: auteur?.pseudo ?? "",
-          avatarUrl, // <- unique champ côté client
+          avatarUrl,
         },
       };
     });
 
-    const nextCursorDate = items.length ? items[items.length - 1].createdAt : null;
+    const nextCursor = items.length ? items[items.length - 1].id : null;
 
-    console.log(`GET /api/avis/utilisateur/${cibleId} → ${items.length} avis`);
-
-    return NextResponse.json(
-      safeJson({ items, nextCursorDate }),
-      { headers }
-    );
+    return NextResponse.json(safeJson({ items, nextCursor }), { headers });
   } catch (error) {
-    console.error("❌ Erreur GET /api/avis/utilisateur/[id]:", error?.message);
-    // Retourner le message aussi en prod temporairement pour debug
-    return NextResponse.json(
-      { error: "Erreur serveur", message: String(error?.message || "") },
-      { status: 500, headers }
-    );
+    // On renvoie explicitement le message pour débogage
+    const payload = {
+      error: "Erreur serveur",
+      message: String(error?.message || ""),
+      // décommente temporairement si besoin
+      // stack: String(error?.stack || ""),
+    };
+    console.error("❌ GET /api/avis/utilisateur/[id] :", payload);
+    return NextResponse.json(payload, { status: 500, headers });
   }
 }
