@@ -46,11 +46,27 @@ export async function POST(req) {
       );
     }
 
-    const cleanKey = String(key).trim().replace(/^\/+/, "");
+    const raw = String(key).trim();
 
-    // (Optionnel) vérifier ici que l'utilisateur peut accéder à cette ressource
+    // 1) Déjà une URL http(s) -> renvoyer tel quel (aucun risque, pas de presign inutile)
+    if (/^https?:\/\//i.test(raw)) {
+      return NextResponse.json({ url: raw }, { status: 200, headers: corsHeaders(origin) });
+    }
 
-    const url = await getPresignedUrl(cleanKey); // GET presign
+    // 2) Chemin local /uploads/* -> fabriquer une URL absolue pour l'app
+    if (raw.startsWith("/uploads/") || raw.startsWith("uploads/")) {
+      const rel = raw.startsWith("/") ? raw : `/${raw}`;
+      const BASE =
+        process.env.NEXT_PUBLIC_BASE_URL ||
+        process.env.BASE_URL ||
+        ""; // ex: "https://www.x-periences.fr"
+      const abs = BASE ? `${BASE}${rel}` : rel; // fallback relatif si BASE vide (OK côté site)
+      return NextResponse.json({ url: abs }, { status: 200, headers: corsHeaders(origin) });
+    }
+
+    // 3) Clé S3 (ex: "galeries/u42/xxx.jpg") -> presign S3
+    const cleanKey = raw.replace(/^\/+/, "");
+    const url = await getPresignedUrl(cleanKey);
     if (!url) {
       return NextResponse.json(
         { error: "Échec de signature" },
