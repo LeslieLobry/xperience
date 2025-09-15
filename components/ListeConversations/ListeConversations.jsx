@@ -167,15 +167,20 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       })}
 
       {showModal && (
-        <CreateConversationModal
-          currentUserId={userId}
-          onClose={() => setShowModal(false)}
-          onCreated={() => {
-            mutate();
-            setShowModal(false);
-          }}
-        />
-      )}
+  <CreateConversationModal
+    currentUserId={userId}
+    onClose={() => setShowModal(false)}
+    onCreated={async (newConvId) => {
+      await mutate();
+      if (newConvId) {
+        setSelectedId(newConvId);
+        onSelectConversation?.(newConvId);
+      }
+      setShowModal(false);
+    }}
+  />
+)}
+
     </aside>
   );
 }

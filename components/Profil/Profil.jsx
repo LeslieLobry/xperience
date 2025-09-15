@@ -78,15 +78,28 @@ export default function Profil({ user, connectedUser }) {
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Pour chaque modal d’édition
+  // États modals d’édition
   const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
   const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
 
-  // Pour uploader une photo de profil
+  // Uploader photo de profil
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
   const [uploaderKey, setUploaderKey] = useState(Date.now());
 
+  // Anti double-clic & UX bouton message
+  const [startingConv, setStartingConv] = useState(false);
+
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
+
+  // Parse JSON “safe” (gère HTML/texte en cas de redirection côté API)
+  async function parseJsonSafe(res) {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { __raw: text };
+    }
+  }
 
   // 💡 Charge la presigned URL dès que photoUrl change
   useEffect(() => {
@@ -100,51 +113,41 @@ export default function Profil({ user, connectedUser }) {
     }
     fetch("/api/photos/presign", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: photoUrl }),
     })
-      .then(res => res.json())
-      .then(data => setPresignedPhotoUrl(data.url || "/default.jpg"))
+      .then(async (res) => {
+        if (!res.ok) throw new Error("presign failed");
+        const data = await res.json();
+        setPresignedPhotoUrl(data.url || "/default.jpg");
+      })
       .catch(() => setPresignedPhotoUrl("/default.jpg"));
   }, [photoUrl]);
 
+  // Enregistre la visite si on consulte le profil de quelqu’un d’autre
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
       fetch("/api/visites", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visiteId: parseInt(user.id) }),
-      });
+      }).catch(() => {});
     }
   }, [connectedUser?.id, user.id]);
 
-  const handleStartConversation = async () => {
-    try {
-      const response = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          participantIds: [parseInt(connectedUser.id), parseInt(user.id)],
-        }),
-      });
-      const data = await response.json();
-      if (data.conversation?.id) {
-        router.push(`/messagerie?conversationId=${data.conversation.id}`);
-      } else {
-        console.error("Impossible de démarrer la conversation", data);
-      }
-    } catch (err) {
-      console.error("Erreur lors de la création de conversation :", err);
-    }
-  };
-
+  // Rafraîchit le statut auto pour son propre profil
   useEffect(() => {
     if (!isOwnProfile) return;
     const interval = setInterval(async () => {
-      const res = await fetch("/api/utilisateur/statut");
-      const data = await res.json();
-      setStatut(data.utilisateur.statut);
-      setStatutAuto(data.utilisateur.statutAuto);
+      try {
+        const res = await fetch("/api/utilisateur/statut", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setStatut(data.utilisateur.statut);
+        setStatutAuto(data.utilisateur.statutAuto);
+      } catch {}
     }, 30000);
     return () => clearInterval(interval);
   }, [isOwnProfile]);
@@ -164,8 +167,63 @@ export default function Profil({ user, connectedUser }) {
       setUploaderKey(Date.now()); // Force un composant neuf à chaque ouverture
       setOpenPhotoUploader(true);
     }
-    // Ajoute ici d’autres modals si besoin
   }
+
+  const handleStartConversation = async () => {
+    if (startingConv) return;
+    setStartingConv(true);
+    try {
+      const meId = Number(connectedUser?.id);
+      const otherId = Number(user?.id);
+      if (!meId || !otherId || Number.isNaN(meId) || Number.isNaN(otherId)) {
+        throw new Error("IDs invalides pour la conversation");
+      }
+
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        credentials: "include", // garantit l’envoi du cookie JWT même cross-origin si besoin
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantIds: [meId, otherId] }),
+      });
+
+      // Non-auth / redirections traitées proprement
+      if (res.status === 401 || res.status === 403) {
+        router.push(`/connexion?next=${encodeURIComponent(`/messagerie`)}`);
+        return;
+      }
+      if (res.redirected) {
+        router.push(res.url);
+        return;
+      }
+
+      const data = await parseJsonSafe(res);
+
+      // Compatibilité avec plusieurs formats de payload
+      const convId =
+        data?.conversation?.id ??
+        data?.existingConversation?.id ??
+        data?.conversationId ??
+        data?.id ??
+        null;
+
+      if (!res.ok || !convId) {
+        const msg =
+          data?.error ||
+          data?.message ||
+          (typeof data?.__raw === "string" ? data.__raw.slice(0, 200) : "") ||
+          `HTTP ${res.status}`;
+        throw new Error(`Création/lookup conversation échouée: ${msg}`);
+      }
+
+      // Conserve le routing d’origine (query string)
+      router.push(`/messagerie?conversationId=${convId}`);
+    } catch (err) {
+      console.error("handleStartConversation error:", err);
+      alert("Impossible de démarrer la conversation. " + (err?.message || ""));
+    } finally {
+      setStartingConv(false);
+    }
+  };
 
   return (
     <div className="profil-page">
@@ -194,7 +252,7 @@ export default function Profil({ user, connectedUser }) {
                 isOwnProfile={isOwnProfile}
                 onUpload={(url) => {
                   setPhotoUrl(url);
-                  setUploaderKey(Date.now()); // Pour éviter un bug si tu changes direct après
+                  setUploaderKey(Date.now()); // évite un bug si on change direct après
                 }}
               />
             </div>
@@ -212,24 +270,33 @@ export default function Profil({ user, connectedUser }) {
               />
             </SimpleModal>
           </div>
+
           <div className="profil-name-like">
-          <h1 className="profil-name">
-  {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
-  {user.verificationIdentiteStatut && (
-    <img
-      src="/Profilverif.png"
-      alt="Profil vérifié"
-      className="badge-verifie-img"
-    />
-  )}
-</h1>
+            <h1 className="profil-name">
+              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+              {user.verificationIdentiteStatut && (
+                <img
+                  src="/Profilverif.png"
+                  alt="Profil vérifié"
+                  className="badge-verifie-img"
+                />
+              )}
+            </h1>
 
             {!isOwnProfile && (
               <>
-                <button className="btn-envoyer-message" onClick={handleStartConversation}>
+                <button
+                  className="btn-envoyer-message"
+                  onClick={handleStartConversation}
+                  disabled={startingConv}
+                  aria-busy={startingConv ? "true" : "false"}
+                  title="Envoyer un message"
+                >
                   <div className="tooltip-container">
                     <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
-                    <span className="tooltip">Envoyer un message</span>
+                    <span className="tooltip">
+                      {startingConv ? "Ouverture…" : "Envoyer un message"}
+                    </span>
                   </div>
                 </button>
                 <BoutonLike cibleId={user.id} />
@@ -237,6 +304,7 @@ export default function Profil({ user, connectedUser }) {
               </>
             )}
           </div>
+
           <div>
             <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
             <div className="profil-badge">{user.type} {user.orientation}</div>
@@ -259,17 +327,30 @@ export default function Profil({ user, connectedUser }) {
           isModalOpen={openDescriptionModal}
           setIsModalOpen={setOpenDescriptionModal}
         />
-        <GalerieTabs publicPhotos={user.photos} galeriePrivee={user.galeriePrivee} editable={isOwnProfile} utilisateurId={user.id} visiteurId={connectedUser.id} />
+
+        <GalerieTabs
+          publicPhotos={user.photos}
+          galeriePrivee={user.galeriePrivee}
+          editable={isOwnProfile}
+          utilisateurId={user.id}
+          visiteurId={connectedUser.id}
+        />
+
         {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
+
         <PreferencesSummary editable={isOwnProfile} user={user} />
+
         <ProfilDetailsSummary
           editable={isOwnProfile}
           user={user}
           isModalOpen={openProfilDetailsModal}
           setIsModalOpen={setOpenProfilDetailsModal}
         />
+
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
+
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
+
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
     </div>
