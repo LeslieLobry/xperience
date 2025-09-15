@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";         // 👈
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
@@ -9,7 +9,6 @@ import CreateConversationModal from "../CreateConversationModal/CreateConversati
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
-// fetcher avec cookies
 const safeFetcher = async (url) => {
   const res = await fetch(url, { credentials: "include" });
   const txt = await res.text();
@@ -19,7 +18,8 @@ const safeFetcher = async (url) => {
 };
 
 export default function ListeConversations({ userId, onSelectConversation }) {
-  const router = useRouter();                         // 👈
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [renamingId, setRenamingId] = useState(null);
@@ -37,6 +37,23 @@ export default function ListeConversations({ userId, onSelectConversation }) {
     [rawConversations]
   );
 
+  // 🔁 Sync de l'URL → state (on met en surbrillance la conv de l'URL)
+  useEffect(() => {
+    const id = Number(searchParams?.get("conversationId") || 0) || null;
+    setSelectedId(id);
+    if (id) onSelectConversation?.(id);
+  }, [searchParams, onSelectConversation]);
+
+  // 🧠 Auto-sélection du 1er fil s'il n'y a pas d'ID dans l'URL
+  useEffect(() => {
+    const current = searchParams?.get("conversationId");
+    if (!current && conversations.length > 0) {
+      const firstId = conversations[0].id;
+      router.replace(`/messagerie?conversationId=${firstId}`);
+    }
+  }, [conversations, router, searchParams]);
+
+  // Ably → refresh liste
   useEffect(() => {
     if (!userId) return;
     const channel = ably.channels.get(`notification-${userId}`);
@@ -53,10 +70,9 @@ export default function ListeConversations({ userId, onSelectConversation }) {
     if (!confirm("Supprimer cette conversation ?")) return;
     await fetch(`/api/conversations/${id}`, { method: "DELETE", credentials: "include" }).catch(()=>{});
     await mutate();
-    if (selectedId === id) {
-      setSelectedId(null);
-      onSelectConversation?.(null);
-      router.replace("/messagerie");                 // 👈 plus d’ID dans l’URL
+    const current = Number(searchParams?.get("conversationId") || 0);
+    if (current === Number(id)) {
+      router.replace("/messagerie"); // on nettoie l'URL si on supprime la conv affichée
     }
   };
 
@@ -77,11 +93,9 @@ export default function ListeConversations({ userId, onSelectConversation }) {
     }
   };
 
-  // 👉 IMPORTANT : on pousse l'ID dans l'URL, car la vue centrale lit ?conversationId
+  // 👉 Clique dans la liste → met l'ID dans l'URL (source de vérité)
   const handleSelect = async (id) => {
-    setSelectedId(id);
-    onSelectConversation?.(id);
-    router.replace(`/messagerie?conversationId=${id}`); // 👈
+    router.replace(`/messagerie?conversationId=${id}`);
     await fetch(`/api/conversations/${id}/mark-as-read`, {
       method: "POST",
       credentials: "include",
@@ -102,7 +116,7 @@ export default function ListeConversations({ userId, onSelectConversation }) {
         <button onClick={() => setShowModal(true)} className="new-conv-button">➕ Nouvelle</button>
       </div>
 
-      {conversations.length === 0 && !selectedId && (
+      {conversations.length === 0 && (
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
           <a href="/recherche" className="start-search-link">Trouver des profils à contacter</a>
@@ -111,14 +125,14 @@ export default function ListeConversations({ userId, onSelectConversation }) {
 
       {conversations.map((conv) => {
         const autres = (conv.participants || [])
-          .filter(p => Number(p.utilisateurId) !== Number(userId)) // 👈 compare en Number
+          .filter(p => Number(p.utilisateurId) !== Number(userId))
           .map(p => p.utilisateur)
           .filter(Boolean);
         const pseudo = autres.length === 1 ? autres[0].pseudo : autres.map(u => u.pseudo).join(", ");
         const unreadCount = conv.unreadCount || 0;
 
         return (
-          <div key={conv.id} className={`conversation-item ${selectedId === conv.id ? "active" : ""}`}>
+          <div key={conv.id} className={`conversation-item ${Number(selectedId) === Number(conv.id) ? "active" : ""}`}>
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-info">
                 <div className="conv-pseudo">
@@ -158,11 +172,10 @@ export default function ListeConversations({ userId, onSelectConversation }) {
           currentUserId={userId}
           onClose={() => setShowModal(false)}
           onCreated={async (newConvId) => {
+            // on force un refresh et on met l'ID dans l'URL
             await mutate();
             if (newConvId) {
-              setSelectedId(newConvId);
-              onSelectConversation?.(newConvId);
-              router.replace(`/messagerie?conversationId=${newConvId}`); // 👈
+              router.replace(`/messagerie?conversationId=${newConvId}`);
             }
             setShowModal(false);
           }}
