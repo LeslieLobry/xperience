@@ -56,7 +56,7 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    // 1. Soft delete pour ce participant
+    // 1. Soft delete pour ce participant 
     const participant = await prisma.participant.findFirst({
       where: {
         conversationId,

@@ -31,6 +31,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "ffmpeg-static": "^5.2.0",
     "formidable": "^3.5.2",
     "framer-motion": "^12.5.0",
     "jsonwebtoken": "^9.0.2",
