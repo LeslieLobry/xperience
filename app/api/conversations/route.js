@@ -10,62 +10,65 @@ export async function POST(req) {
     if (!currentUser)
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const { participantIds } = await req.json();
-    if (!Array.isArray(participantIds) || participantIds.length < 2)
+    // 1) Normalisation des IDs (nombres + dédoublonnage)
+    const body = await req.json();
+    let ids = Array.isArray(body?.participantIds) ? body.participantIds : [];
+    ids = [...new Set(ids.map((x) => Number(x)).filter(Number.isFinite))];
+
+    if (ids.length < 2)
       return NextResponse.json({ error: "Participants invalides" }, { status: 400 });
 
-    if (!participantIds.includes(currentUser.id))
+    if (!ids.includes(currentUser.id))
       return NextResponse.json({ error: "Tu dois faire partie des participants." }, { status: 403 });
 
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
-    const autres = participantIds.filter((id) => id !== currentUser.id);
-
+    const autres = ids.filter((id) => id !== currentUser.id);
     if (autres.some((id) => exclus.includes(id)))
       return NextResponse.json(
         { error: "Impossible de créer une conversation avec un utilisateur bloqué." },
         { status: 403 }
       );
 
-    // Vérifie existence (même set d'ids)
+    // 2) EXISTING: match EXACT du set de participants
     const existingConv = await prisma.conversation.findFirst({
       where: {
-        participants: {
-          every: { utilisateurId: { in: participantIds } },
-        },
         AND: [
-          { participants: { every: { utilisateurId: { in: participantIds } } } },
-          { participants: { none: { utilisateurId: { notIn: participantIds } } } }
-        ]
+          // aucun participant en dehors de 'ids'
+          { participants: { every: { utilisateurId: { in: ids } } } },
+          // chaque id demandé doit être présent
+          ...ids.map((id) => ({ participants: { some: { utilisateurId: id } } })),
+        ],
       },
       include: {
         participants: { include: { utilisateur: true } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }
-      }
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
     });
 
     if (existingConv) {
-      // Restaure s'il a été supprimé
+      // Restaure si ce user avait "supprimé" la conv
       const myParticipant = existingConv.participants.find(p => p.utilisateurId === currentUser.id);
-      if (myParticipant && myParticipant.supprimé) {
+      if (myParticipant?.supprimé) {
         await prisma.participant.update({
           where: { id: myParticipant.id },
-          data: { supprimé: false }
+          data: { supprimé: false },
         });
       }
       return NextResponse.json({ conversation: existingConv, existed: true });
     }
 
-    // Sinon, création !
+    // 3) CRÉATION
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
-          create: participantIds.map((id) => ({ utilisateurId: id }))
-        }
+          // ids déjà dédoublonnés → pas de doublons
+          create: ids.map((id) => ({ utilisateurId: id })),
+        },
       },
       include: {
         participants: { include: { utilisateur: { select: { id: true, pseudo: true, photoUrl: true } } } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }
-      }
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
     });
 
     return NextResponse.json({ conversation, created: true });
@@ -74,6 +77,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
+
 
 // ----------- LISTE / UNREADS (GET) -----------
 export async function GET() {
