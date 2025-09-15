@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Select from "react-select";
 import "./CreateConversationModal.css";
 
 export default function CreateConversationModal({ currentUserId, onClose, onCreated }) {
+  const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [selection, setSelection] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,19 +19,23 @@ export default function CreateConversationModal({ currentUserId, onClose, onCrea
     try { return JSON.parse(text); } catch { return { __raw: text }; }
   }
 
-  // ✅ utiliser useEffect (pas React.useEffect)
+  // Charge la liste d'utilisateurs (avec cookies)
   useEffect(() => {
     (async () => {
+      console.log("[CreateConv] mount, me=", me);
       try {
         const res = await fetch("/api/utilisateur", { credentials: "include" });
         const data = await parseJsonSafe(res);
+        console.log("[CreateConv] GET /api/utilisateur ->", res.status, data);
+
         if (!res.ok) {
           setErreur(data?.error || data?.message || `HTTP ${res.status}`);
           return;
         }
         const list = Array.isArray(data?.utilisateurs) ? data.utilisateurs : [];
         setUtilisateurs(list.filter((u) => Number(u.id) !== me));
-      } catch {
+      } catch (e) {
+        console.error("[CreateConv] users error:", e);
         setErreur("Erreur lors du chargement des utilisateurs");
       }
     })();
@@ -40,36 +46,43 @@ export default function CreateConversationModal({ currentUserId, onClose, onCrea
     if (!me) { setErreur("Utilisateur courant introuvable."); return; }
 
     const autres = selection.map((s) => Number(s.value)).filter(Boolean);
-    if (autres.length === 0) { setErreur("Choisis au moins une personne"); return; }
+    if (autres.length === 0) { setErreur("Choisis au moins une personne."); return; }
 
     setLoading(true);
     try {
-      // 1) essaie moi + autres
+      const firstPayload = { participantIds: Array.from(new Set([me, ...autres])) };
+      console.log("[CreateConv] POST 1 payload =", firstPayload);
+
       let res = await fetch("/api/conversations", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantIds: Array.from(new Set([me, ...autres])) }),
+        body: JSON.stringify(firstPayload),
       });
+      let data = await parseJsonSafe(res);
+      console.log("[CreateConv] POST 1 ->", res.status, data);
 
-      // 2) si le back déduit "me" via JWT, retente avec seulement "autres"
+      // si le back déduit "me" via JWT, retente avec seulement "autres"
       if (!res.ok && (res.status === 400 || res.status === 422)) {
+        const secondPayload = { participantIds: autres };
+        console.log("[CreateConv] POST 2 payload =", secondPayload);
+
         res = await fetch("/api/conversations", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ participantIds: autres }),
+          body: JSON.stringify(secondPayload),
         });
+        data = await parseJsonSafe(res);
+        console.log("[CreateConv] POST 2 ->", res.status, data);
       }
-
-      const data = await parseJsonSafe(res);
 
       if (res.status === 401 || res.status === 403) {
         setErreur("Non authentifié. Connecte-toi puis réessaie.");
         return;
       }
       if (!res.ok) {
-        setErreur(data?.error || data?.message || (typeof data?.__raw === "string" ? data.__raw.slice(0,200) : "Erreur"));
+        setErreur(data?.error || data?.message || (typeof data?.__raw === "string" ? data.__raw.slice(0, 200) : "Erreur"));
         return;
       }
 
@@ -79,20 +92,21 @@ export default function CreateConversationModal({ currentUserId, onClose, onCrea
         data?.conversationId ??
         data?.id ?? null;
 
+      console.log("[CreateConv] convId =", convId);
+
       if (!convId) {
         setErreur("Conversation créée mais ID introuvable.");
         return;
       }
 
-      // Préviens le parent + ferme la modale
-      onCreated?.(convId);
-      onClose?.();
+      // Notifie le parent + ferme la modale
+      try { onCreated?.(convId); } catch {}
+      try { onClose?.(); } catch {}
 
-      // Optionnel : forcer l’URL si ta vue centrale lit ?conversationId
-      if (typeof window !== "undefined") {
-        window.location.assign(`/messagerie?conversationId=${convId}`);
-      }
+      // Force la navigation avec l'ID (la vue centrale lit ?conversationId)
+      router.replace(`/messagerie?conversationId=${convId}`);
     } catch (e) {
+      console.error("[CreateConv] create error:", e);
       setErreur(e?.message || "Erreur inconnue.");
     } finally {
       setLoading(false);
