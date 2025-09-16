@@ -1,101 +1,83 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma"; // ⬅️ réutilise le singleton
 
-const prisma = new PrismaClient();
-
-// ✅ GET : récupérer l'article pour l'édition
-export async function GET(req, { params }) {
-  const { id } = params;
+// ✅ GET : récupérer un article par ID (numérique)
+export async function GET(_req, { params }) {
+  const articleId = Number(params.id);
+  if (!Number.isFinite(articleId)) {
+    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
+  }
 
   try {
     const article = await prisma.article.findUnique({
-      where: { id },
+      where: { id: articleId },
       include: { images: true, auteur: true },
     });
 
     if (!article) {
-      return NextResponse.json(
-        { success: false, message: "Article introuvable." },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "Article introuvable" }, { status: 404 });
     }
 
-    return NextResponse.json(article);
+    return NextResponse.json({ ok: true, article });
   } catch (error) {
-    console.error("Erreur GET article:", error);
-    return NextResponse.json(
-      { success: false, message: "Erreur serveur." },
-      { status: 500 }
-    );
+    console.error("Erreur GET /api/articles/[id]:", error);
+    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
   }
 }
 
+// ✅ PUT : mettre à jour un article + ses images (transaction)
 export async function PUT(req, { params }) {
-  const { id } = params;
-  const body = await req.json();
-  const { titre, description, contenu, images } = body;
+  const articleId = Number(params.id);
+  if (!Number.isFinite(articleId)) {
+    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
+  }
 
+  const { titre, description, contenu, images } = await req.json();
   if (!titre || !contenu) {
-    return NextResponse.json(
-      { success: false, message: "Champs manquants." },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: "Champs manquants" }, { status: 400 });
   }
 
   try {
-    const updatedArticle = await prisma.article.update({
-      where: { id },
-      data: {
-        titre,
-        description,
-        contenu,
-        updatedAt: new Date(),
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.article.update({
+        where: { id: articleId },
+        data: { titre, description, contenu, updatedAt: new Date() },
+      });
+
+      if (Array.isArray(images)) {
+        await tx.imageArticle.deleteMany({ where: { articleId } });
+        const data = images.map((img) => ({
+          url: typeof img === "string" ? img : img?.url,
+          articleId,
+        })).filter((i) => i.url);
+        if (data.length) await tx.imageArticle.createMany({ data });
+      }
+
+      return updated;
     });
 
-
-    if (Array.isArray(images)) {
-      await prisma.imageArticle.deleteMany({ where: { articleId: id } });
-      const data = images.map((img) => ({
-        url: typeof img === "string" ? img : img.url,
-        articleId: id,
-      }));
-
-      if (data.length > 0) {
-        await prisma.imageArticle.createMany({ data });
-      }
-    }
-    // Sinon : ne rien toucher, les images restent inchangées
-
-    return NextResponse.json({ success: true, article: updatedArticle });
+    return NextResponse.json({ ok: true, article: result });
   } catch (error) {
-    console.error("Erreur mise à jour article :", error);
-    return NextResponse.json(
-      { success: false, message: "Erreur serveur." },
-      { status: 500 }
-    );
+    console.error("Erreur PUT /api/articles/[id]:", error);
+    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
   }
 }
 
-// ✅ DELETE : supprimer un article + ses images
-export async function DELETE(req, { params }) {
-  const { id } = params;
+// ✅ DELETE : supprimer un article + ses images (transaction)
+export async function DELETE(_req, { params }) {
+  const articleId = Number(params.id);
+  if (!Number.isFinite(articleId)) {
+    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
+  }
 
   try {
-    await prisma.imageArticle.deleteMany({
-      where: { articleId: id },
+    await prisma.$transaction(async (tx) => {
+      await tx.imageArticle.deleteMany({ where: { articleId } });
+      await tx.article.delete({ where: { id: articleId } });
     });
-
-    await prisma.article.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Erreur suppression article:", error);
-    return NextResponse.json(
-      { success: false, message: "Erreur serveur." },
-      { status: 500 }
-    );
+    console.error("Erreur DELETE /api/articles/[id]:", error);
+    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
   }
 }
