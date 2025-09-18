@@ -1,4 +1,3 @@
-// app/api/likes/route.ts (ou route.js)
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
@@ -12,7 +11,7 @@ const ALLOWED_ORIGINS = [
   "https://www.x-periences.fr",
 ];
 
-function corsHeaders(req: Request) {
+function corsHeaders(req) {
   const origin = req.headers.get("origin") || "";
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : "";
   const h = new Headers();
@@ -26,14 +25,14 @@ function corsHeaders(req: Request) {
   return h;
 }
 
-export async function OPTIONS(req: Request) {
+export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
 /* ---------- Auth (cookie 'token' OU Authorization: Bearer) ---------- */
 const JWT_SECRET = process.env.JWT_SECRET || "";
 
-async function getUserFromRequest(req: Request) {
+async function getUserFromRequest(req) {
   // Authorization header (Bearer)
   const auth = req.headers.get("authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
@@ -54,7 +53,7 @@ async function getUserFromRequest(req: Request) {
 }
 
 /* ---------- POST = LIKE ---------- */
-export async function POST(req: Request) {
+export async function POST(req) {
   const headers = corsHeaders(req);
 
   try {
@@ -83,7 +82,7 @@ export async function POST(req: Request) {
       },
     });
 
-    // Ajout au digest (notification différée)
+    // Ajout au digest
     await prisma.digestNotification.create({
       data: {
         destinataireId: Number(cibleId),
@@ -93,7 +92,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(like, { headers });
-  } catch (err: any) {
+  } catch (err) {
     if (err.code === "P2002") {
       return NextResponse.json(
         { error: "Like déjà existant" },
@@ -109,7 +108,7 @@ export async function POST(req: Request) {
 }
 
 /* ---------- DELETE = UNLIKE ---------- */
-export async function DELETE(req: Request) {
+export async function DELETE(req) {
   const headers = corsHeaders(req);
 
   try {
@@ -130,15 +129,12 @@ export async function DELETE(req: Request) {
       );
     }
 
-    // Suppression du like
     await prisma.like.deleteMany({
       where: {
         auteurId: Number(user.id),
         cibleId: Number(cibleId),
       },
     });
-
-    // (Optionnel) suppression du digest lié
 
     return NextResponse.json({ success: true }, { headers });
   } catch (err) {
