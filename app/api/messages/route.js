@@ -26,6 +26,11 @@ export async function POST(req) {
     debugBody = await req.clone().text();
   } catch {}
 
+  // [LOG] corps (string) pour debug rapide en cas d'erreur de parsing
+  if (debugBody) {
+    console.log("[LOG][POST /api/messages] raw body (truncated 800):", debugBody.slice(0, 800));
+  }
+
   try {
     const contentType = req.headers.get("content-type") || "";
     let body = {};
@@ -33,6 +38,13 @@ export async function POST(req) {
 
     if (contentType.includes("application/json")) {
       body = await req.json();
+      console.log("[LOG][POST] body(JSON):", {
+        conversationId: body?.conversationId,
+        type: body?.type,
+        hasContenu: !!body?.contenu,
+        imageUrl: body?.imageUrl,
+        audioUrl: body?.audioUrl,
+      });
     } else if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
       body = {
@@ -55,7 +67,18 @@ export async function POST(req) {
       } else if ((body.type === "AUDIO" || body.type === "EPHEMERE") && formData.get("audio")) {
         file = formData.get("audio");
       }
+
+      console.log("[LOG][POST] body(form-data):", {
+        conversationId: body.conversationId,
+        type: body.type,
+        hasContenu: !!body.contenu,
+        hasFile: !!file,
+        fileName: file?.name,
+        fileType: file?.type,
+        fileSize: file?.size,
+      });
     } else {
+      console.warn("[LOG][POST] Type non supporté:", contentType);
       return NextResponse.json({ error: "Type non supporté" }, { status: 400 });
     }
 
@@ -70,6 +93,13 @@ export async function POST(req) {
       } else {
         fileName = `msg_${uuidv4()}.${ext}`;
       }
+
+      console.log("[LOG][POST] prêt upload S3:", {
+        bucket: BUCKET,
+        key: fileName,
+        contentType: file.type,
+        size: buffer.length,
+      });
 
       // Détection mineur (Sightengine) si IMAGE ou EPHEMERE
       if (
@@ -95,6 +125,7 @@ export async function POST(req) {
           if (moderationData?.faces?.length) {
             const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.9);
             if (hasMinor) {
+              console.warn("[LOG][POST] Image rejetée (mineur détecté)");
               return NextResponse.json(
                 { success: false, message: "Image refusée : visage mineur détecté (IA)." },
                 { status: 400 }
@@ -122,21 +153,31 @@ export async function POST(req) {
       } else {
         body.imageUrl = fileName; // Ex: msg_*.jpg ou ephemere/snap_*.jpg
       }
+
+      console.log("[LOG][POST] upload S3 OK, champs mis à jour:", {
+        imageUrl: body.imageUrl,
+        audioUrl: body.audioUrl,
+      });
+    } else {
+      console.log("[LOG][POST] aucun fichier à uploader ou size=0");
     }
 
     const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } = body;
     const user = await getUserFromToken();
     if (!user) {
+      console.warn("[LOG][POST] getUserFromToken => null");
       return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
 
     const auteurId = user.id;
+    console.log("[LOG][POST] auteurId:", auteurId, "conversationId:", conversationId, "type:", type, "imageUrl:", imageUrl, "audioUrl:", audioUrl);
 
     // Participants de la conversation
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
+    console.log("[LOG][POST] participants:", participants?.map(p => p.utilisateurId));
 
     const autresParticipants = participants
       .map((p) => p.utilisateurId)
@@ -145,11 +186,13 @@ export async function POST(req) {
     // Vérifie si certains participants sont bloqués
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
+      console.warn("[LOG][POST] utilisateur bloqué détecté");
       return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
     }
 
     let prenomEnvoyeur = body.prenomEnvoyeur || null;
 
+    console.log("[LOG][POST] création message…");
     const message = await prisma.message.create({
       data: {
         conversationId,
@@ -178,13 +221,28 @@ export async function POST(req) {
         },
       },
     });
+    console.log("[LOG][POST] message créé:", {
+      id: message.id,
+      type: message.type,
+      imageUrl: message.imageUrl,
+      audioUrl: message.audioUrl,
+      createdAt: message.createdAt,
+    });
 
     // PATCH: Ajoute optimisticKey pour le front
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
     // Publish Ably avec optimisticKey
+    console.log("[LOG][POST] publish Ably payload (avant):", {
+      id: messageWithOptimisticKey.id,
+      type: messageWithOptimisticKey.type,
+      imageUrl: messageWithOptimisticKey.imageUrl,
+      audioUrl: messageWithOptimisticKey.audioUrl,
+      optimisticKey,
+    });
     await ably.channels.get(`conversation-${conversationId}`).publish("message", messageWithOptimisticKey);
+    console.log("[LOG][POST] publish Ably: OK");
 
     await prisma.conversation.update({
       where: { id: conversationId },
@@ -203,6 +261,7 @@ export async function POST(req) {
         })
       )
     );
+    console.log("[LOG][POST] notifications enregistrées pour:", autresParticipants);
 
     // ⬇️⬇️⬇️ DIGEST QUOTIDIEN : on empile pour envoi plus tard
     if (autresParticipants.length > 0) {
@@ -214,10 +273,18 @@ export async function POST(req) {
         })),
         skipDuplicates: true, // évite doublons si retry réseau
       });
+      console.log("[LOG][POST] digestNotification createMany OK (count≈):", autresParticipants.length);
     }
     // ⬆️⬆️⬆️ Fin digest — plus d'email immédiat ici
 
     // ✅ Réponse API avec optimisticKey inclus
+    console.log("[LOG][POST] réponse API:", {
+      id: messageWithOptimisticKey.id,
+      type: messageWithOptimisticKey.type,
+      imageUrl: messageWithOptimisticKey.imageUrl,
+      audioUrl: messageWithOptimisticKey.audioUrl,
+      optimisticKey,
+    });
     return NextResponse.json({ success: true, message: messageWithOptimisticKey }, { status: 200 });
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
@@ -232,8 +299,11 @@ export async function GET(req) {
     const beforeId = searchParams.get("beforeId");
     const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 50);
 
+    console.log("[LOG][GET] params:", { conversationId, beforeId, limit });
+
     const user = await getUserFromToken();
     if (!user) {
+      console.warn("[LOG][GET] getUserFromToken => null");
       return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
     const auteurId = user.id;
@@ -248,12 +318,17 @@ export async function GET(req) {
       },
     });
 
+    console.log("[LOG][GET] participants:", allParticipants.map(p => ({
+      utilisateurId: p.utilisateurId, lastReadAt: p.lastReadAt
+    })));
+
     const autresParticipants = allParticipants
       .map((p) => p.utilisateurId)
       .filter((id) => id !== auteurId);
 
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
+      console.warn("[LOG][GET] accès refusé (utilisateur bloqué)");
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
 
@@ -290,6 +365,12 @@ export async function GET(req) {
     });
     messages.reverse(); // Chronologique
 
+    // [LOG] petit échantillon
+    console.log("[LOG][GET] messages count:", messages.length);
+    console.log("[LOG][GET] tail sample:", messages.slice(-3).map(m => ({
+      id: m.id, type: m.type, imageUrl: m.imageUrl, audioUrl: m.audioUrl, createdAt: m.createdAt
+    })));
+
     // Recompose lastReads et participants d'après allParticipants
     const lastReads = allParticipants.map((p) => ({
       utilisateurId: p.utilisateurId,
@@ -314,6 +395,7 @@ export async function GET(req) {
       { status: 200 }
     );
   } catch (error) {
+    console.error("[LOG][GET] erreur:", error);
     return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
   }
 }
