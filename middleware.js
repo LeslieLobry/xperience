@@ -27,17 +27,16 @@ function isAllowedDevOrigin(origin) {
 }
 
 function pickAllowOrigin(origin) {
-  if (!origin) return null; // No-CORS/native fetch: pas besoin d'Allow-Origin
+  if (!origin) return null;               // no-cors/native: pas d'en-tête
   if (isAllowedDevOrigin(origin)) return origin;
   if (PROD_ORIGINS.includes(origin)) return origin;
-  return PROD_ORIGINS[0];
+  return null;                            // ❌ ne PAS renvoyer un autre domaine
 }
 
 function makeHeaders(req, { allowCreds = true } = {}) {
   const origin = req.headers.get("origin") || "";
   const allowOrigin = pickAllowOrigin(origin);
 
-  // Reflète les headers demandés en pré-vol (plus robuste que liste figée)
   const acrh = req.headers.get("access-control-request-headers");
   const requestedMethods = req.headers.get("access-control-request-method");
   const wantsPrivateNet = req.headers.get("access-control-request-private-network") === "true";
@@ -49,22 +48,28 @@ function makeHeaders(req, { allowCreds = true } = {}) {
     h.set("Vary", "Origin");
   }
   h.set("Access-Control-Allow-Methods", requestedMethods || "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD");
-  h.set("Access-Control-Allow-Headers", acrh || [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "X-Platform",
-    "x-platform",
-    "X-Action",
-    "x-action",
-    "X-Client",
-    "x-client",
-  ].join(", "));
+  h.set(
+    "Access-Control-Allow-Headers",
+    acrh ||
+      [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "X-Platform",
+        "x-platform",
+        "X-Action",
+        "x-action",
+        "X-Client",
+        "x-client",
+      ].join(", ")
+  );
   if (allowCreds && allowOrigin) h.set("Access-Control-Allow-Credentials", "true");
   if (wantsPrivateNet) h.set("Access-Control-Allow-Private-Network", "true");
   h.set("Access-Control-Max-Age", "86400");
+  // utile pour debug dans Network
+  h.set("Access-Control-Expose-Headers", "Content-Type, Content-Length");
   return h;
 }
 
@@ -72,6 +77,7 @@ export function middleware(req) {
   // Réponse immédiate aux pré-vols
   if (req.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: makeHeaders(req) });
+    // (Le matcher limite déjà à /api/*, donc pas d'impact sur les pages)
   }
 
   const res = NextResponse.next();
@@ -81,5 +87,5 @@ export function middleware(req) {
 }
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/api/:path*"], // on n'applique qu'aux routes API
 };
