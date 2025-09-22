@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
+import { sendPush } from "../../../lib/push"; // 🔔 NEW: helper push
 
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
@@ -18,6 +19,17 @@ const s3 = new S3Client({
 });
 const BUCKET = process.env.AWS_S3_BUCKET;
 
+// Petit helper pour le texte de la push
+function pushPreview(type, contenu) {
+  const c = (contenu || "").trim();
+  if (type === "TEXTE") return c ? c.slice(0, 80) : "Nouveau message";
+  if (type === "IMAGE") return "📷 Photo";
+  if (type === "AUDIO") return "🎤 Message vocal";
+  if (type === "VIDEO") return "🎥 Vidéo";
+  if (type === "EPHEMERE") return "⚡ Snap éphémère";
+  return "Nouveau message";
+}
+
 export async function POST(req) {
   console.log("⇒ POST /api/messages déclenché");
   console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
@@ -26,7 +38,6 @@ export async function POST(req) {
     debugBody = await req.clone().text();
   } catch {}
 
-  // [LOG] corps (string) pour debug rapide en cas d'erreur de parsing
   if (debugBody) {
     console.log("[LOG][POST /api/messages] raw body (truncated 800):", debugBody.slice(0, 800));
   }
@@ -61,7 +72,7 @@ export async function POST(req) {
         optimisticKey: formData.get("optimisticKey") || null,
       };
 
-      // Sélection du fichier selon le type et présence dans formData
+      // Sélection du fichier selon le type
       if ((body.type === "IMAGE" || body.type === "EPHEMERE") && formData.get("image")) {
         file = formData.get("image");
       } else if ((body.type === "AUDIO" || body.type === "EPHEMERE") && formData.get("audio")) {
@@ -101,7 +112,7 @@ export async function POST(req) {
         size: buffer.length,
       });
 
-      // Détection mineur (Sightengine) si IMAGE ou EPHEMERE
+      // Détection mineur (Sightengine) si IMAGE/EPHEMERE
       if (
         (body.type === "IMAGE" || body.type === "EPHEMERE") &&
         file.type.startsWith("image/")
@@ -119,7 +130,6 @@ export async function POST(req) {
           });
 
           const moderationData = await moderationRes.json();
-
           console.log("🧠 [CHAT] Sightengine:", JSON.stringify(moderationData, null, 2));
 
           if (moderationData?.faces?.length) {
@@ -147,11 +157,11 @@ export async function POST(req) {
         })
       );
 
-      // STOCKE UNIQUEMENT LA CLÉ S3 (et non l’URL complète)
+      // Stocke la clé S3
       if (file.type.startsWith("audio/")) {
-        body.audioUrl = fileName; // Ex: msg_*.mp3 ou ephemere/snap_*.mp3
+        body.audioUrl = fileName;
       } else {
-        body.imageUrl = fileName; // Ex: msg_*.jpg ou ephemere/snap_*.jpg
+        body.imageUrl = fileName;
       }
 
       console.log("[LOG][POST] upload S3 OK, champs mis à jour:", {
@@ -172,14 +182,14 @@ export async function POST(req) {
     const auteurId = user.id;
     console.log("[LOG][POST] auteurId:", auteurId, "conversationId:", conversationId, "type:", type, "imageUrl:", imageUrl, "audioUrl:", audioUrl);
 
-    // Participants de la conversation
+    // Participants (ids)
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
     console.log("[LOG][POST] participants:", participants?.map(p => p.utilisateurId));
 
-    const autresParticipants = participants
+    const autresParticipants = (participants || [])
       .map((p) => p.utilisateurId)
       .filter((id) => id !== auteurId);
 
@@ -229,11 +239,11 @@ export async function POST(req) {
       createdAt: message.createdAt,
     });
 
-    // PATCH: Ajoute optimisticKey pour le front
+    // PATCH: optimisticKey pour le front
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
-    // Publish Ably avec optimisticKey
+    // Publish Ably
     console.log("[LOG][POST] publish Ably payload (avant):", {
       id: messageWithOptimisticKey.id,
       type: messageWithOptimisticKey.type,
@@ -249,6 +259,7 @@ export async function POST(req) {
       data: { updatedAt: new Date() },
     });
 
+    // Notifications internes (DB)
     await Promise.all(
       autresParticipants.map((destId) =>
         prisma.notification.create({
@@ -263,7 +274,7 @@ export async function POST(req) {
     );
     console.log("[LOG][POST] notifications enregistrées pour:", autresParticipants);
 
-    // ⬇️⬇️⬇️ DIGEST QUOTIDIEN : on empile pour envoi plus tard
+    // DIGEST QUOTIDIEN : on empile pour envoi plus tard
     if (autresParticipants.length > 0) {
       await prisma.digestNotification.createMany({
         data: autresParticipants.map((destId) => ({
@@ -271,13 +282,39 @@ export async function POST(req) {
           conversationId,
           messageId: message.id,
         })),
-        skipDuplicates: true, // évite doublons si retry réseau
+        skipDuplicates: true,
       });
       console.log("[LOG][POST] digestNotification createMany OK (count≈):", autresParticipants.length);
     }
-    // ⬆️⬆️⬆️ Fin digest — plus d'email immédiat ici
 
-    // ✅ Réponse API avec optimisticKey inclus
+    // 🔔 PUSH EXPO : envoi aux autres participants de la conv
+    if (autresParticipants.length > 0) {
+      const dests = await prisma.utilisateur.findMany({
+        where: { id: { in: autresParticipants } },
+        select: { expoPushToken: true, pushEnabled: true },
+      });
+      const tokens = (dests || [])
+        .filter((u) => u.pushEnabled && u.expoPushToken)
+        .map((u) => u.expoPushToken);
+
+      if (tokens.length) {
+        const bodyText = pushPreview(message.type, message.contenu);
+        try {
+          await sendPush(tokens, {
+            title: "Nouveau message 💬",
+            body: bodyText,
+            data: { type: "MESSAGE", conversationId: Number(conversationId) },
+          });
+          console.log("[LOG][POST] push envoyées:", tokens.length);
+        } catch (e) {
+          console.warn("[LOG][POST] échec envoi push:", e?.message || e);
+        }
+      } else {
+        console.log("[LOG][POST] aucun token Expo à notifier");
+      }
+    }
+
+    // ✅ Réponse API avec optimisticKey
     console.log("[LOG][POST] réponse API:", {
       id: messageWithOptimisticKey.id,
       type: messageWithOptimisticKey.type,
@@ -308,7 +345,6 @@ export async function GET(req) {
     }
     const auteurId = user.id;
 
-    // Récupère TOUS les participants et leur info (header + lastReads d'un coup)
     const allParticipants = await prisma.participant.findMany({
       where: { conversationId },
       select: {
@@ -332,7 +368,6 @@ export async function GET(req) {
       return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
     }
 
-    // Fetch messages
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
@@ -365,23 +400,20 @@ export async function GET(req) {
     });
     messages.reverse(); // Chronologique
 
-    // [LOG] petit échantillon
     console.log("[LOG][GET] messages count:", messages.length);
     console.log("[LOG][GET] tail sample:", messages.slice(-3).map(m => ({
       id: m.id, type: m.type, imageUrl: m.imageUrl, audioUrl: m.audioUrl, createdAt: m.createdAt
     })));
 
-    // Recompose lastReads et participants d'après allParticipants
     const lastReads = allParticipants.map((p) => ({
       utilisateurId: p.utilisateurId,
       lastReadAt: p.lastReadAt,
     }));
-    const participants = allParticipants.map((p) => p.utilisateur);
+    const participantsInfos = allParticipants.map((p) => p.utilisateur);
 
-    // Si vraiment besoin du destinataire DM :
     let destinataire = null;
-    if (autresParticipants.length === 1) {
-      destinataire = participants.find((u) => u.id === autresParticipants[0]);
+    if (participantsInfos.length === 2) {
+      destinataire = participantsInfos.find((u) => u.id !== auteurId) || null;
     }
 
     return NextResponse.json(
@@ -389,7 +421,7 @@ export async function GET(req) {
         success: true,
         messages,
         destinataire,
-        participants,
+        participants: participantsInfos,
         lastReads,
       },
       { status: 200 }

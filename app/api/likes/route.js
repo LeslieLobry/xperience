@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { sendPush } from "../../../lib/push"; // 🔔 PUSH EXPO
 
 /* ---------- CORS ---------- */
 const ALLOWED_ORIGINS = [
@@ -74,26 +75,64 @@ export async function POST(req) {
       );
     }
 
+    const auteurId = Number(user.id);
+    const cibleIdNum = Number(cibleId);
+    if (auteurId === cibleIdNum) {
+      return NextResponse.json({ message: "Auto-like ignoré" }, { status: 200, headers });
+    }
+
     // Création du like
     const like = await prisma.like.create({
       data: {
-        auteurId: Number(user.id),
-        cibleId: Number(cibleId),
+        auteurId,
+        cibleId: cibleIdNum,
       },
     });
 
-    // Ajout au digest
+    // Notification interne (DB)
+    await prisma.notification.create({
+      data: {
+        utilisateurId: cibleIdNum,
+        message: "Tu as reçu un nouveau like ❤️",
+        lien: `/profil/${auteurId}`,
+        lu: false,
+      },
+    });
+
+    // Push Expo immédiate
+    const cible = await prisma.utilisateur.findUnique({
+      where: { id: cibleIdNum },
+      select: { expoPushToken: true, pushEnabled: true },
+    });
+    const auteur = await prisma.utilisateur.findUnique({
+      where: { id: auteurId },
+      select: { pseudo: true },
+    });
+
+    if (cible?.pushEnabled && cible.expoPushToken) {
+      try {
+        await sendPush(cible.expoPushToken, {
+          title: "Nouveau like ❤️",
+          body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
+          data: { type: "LIKE", auteurId }, // deep-link côté app
+        });
+      } catch (e) {
+        console.warn("⚠️ Échec push LIKE:", e?.message || e);
+      }
+    }
+
+    // Ajout au digest (⚠️ ton modèle n’a PAS de auteurId)
     await prisma.digestNotification.create({
       data: {
-        destinataireId: Number(cibleId),
-        auteurId: Number(user.id),
+        destinataireId: cibleIdNum,
         likeId: like.id,
+        eventType: "LIKE",
       },
     });
 
     return NextResponse.json(like, { headers });
   } catch (err) {
-    if (err.code === "P2002") {
+    if (err?.code === "P2002") {
       return NextResponse.json(
         { error: "Like déjà existant" },
         { status: 400, headers }

@@ -71,7 +71,8 @@ model Utilisateur {
   reactions            MessageReaction[]
   profilComplet        Boolean         @default(false) @map("profil_complet")
   reminderSent         Boolean         @default(false) @map("reminder_sent")
-
+  expoPushToken  String?  @db.VarChar(255)
+  pushEnabled    Boolean  @default(true)
   // ✅ Champs supplémentaires pour les couples
   age2                 Int?
   dateNaissance2       DateTime?
