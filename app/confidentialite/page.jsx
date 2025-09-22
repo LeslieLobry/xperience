@@ -68,6 +68,10 @@ export default function ConfidentialitePage() {
       <p>
         Le site met en place des mesures techniques (HTTPS, cryptage, contrôle d&rsquo;accès) et organisationnelles (modération, permissions) pour protéger vos données.
       </p>
+      <p>
+        De plus, afin de protéger les utilisateurs et de respecter la législation, toutes les photos téléchargées sont automatiquement analysées par une <strong>intelligence artificielle de détection de visages</strong>.  
+        Cette analyse permet d&rsquo;empêcher la mise en ligne de contenus contenant des mineurs (<18 ans), garantissant un environnement sûr et conforme.
+      </p>
 
       <h2>8. Cookies</h2>
       <p>
