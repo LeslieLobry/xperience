@@ -70,7 +70,7 @@ export default function ConfidentialitePage() {
       </p>
       <p>
         De plus, afin de protéger les utilisateurs et de respecter la législation, toutes les photos téléchargées sont automatiquement analysées par une <strong>intelligence artificielle de détection de visages</strong>.  
-        Cette analyse permet d&rsquo;empêcher la mise en ligne de contenus contenant des mineurs (<18 ans), garantissant un environnement sûr et conforme.
+        Cette analyse permet d&rsquo;empêcher la mise en ligne de contenus contenant des mineurs (moins de 18 ans), garantissant un environnement sûr et conforme.
       </p>
 
       <h2>8. Cookies</h2>
