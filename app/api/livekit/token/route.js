@@ -1,80 +1,93 @@
-// app/api/livekit/token/route.ts  (ou .js si tu n'utilises pas TS)
-
+// app/api/livekit/token/route.js
 import { NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken /*, VideoGrant (v1), or VideoGrants (v2)*/ } from "livekit-server-sdk";
 
-const API_KEY = process.env.LIVEKIT_API_KEY!;
-const API_SECRET = process.env.LIVEKIT_API_SECRET!;
-// ⚠️ Mets ici ton URL LiveKit Cloud ou serveur self-hosté (wss://…)
+// Important: cette route doit tourner en Node.js
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const LIVEKIT_URL = process.env.LIVEKIT_URL || process.env.LIVEKIT_WS_URL;
+const API_KEY = process.env.LIVEKIT_API_KEY || process.env.LIVEKIT_KEY;
+const API_SECRET = process.env.LIVEKIT_API_SECRET || process.env.LIVEKIT_SECRET;
 
-function buildToken(identity: string, room: string) {
+function buildToken(identity, room, ttl = "10m", opts = {}) {
+  // opts: { audioOnly?: boolean }
+  if (!API_KEY || !API_SECRET) {
+    throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
+  }
+
   const at = new AccessToken(API_KEY, API_SECRET, {
-    identity,     // ex: "user_123"
-    ttl: "10m",   // token valable 10 minutes
+    identity: String(identity || ""),
+    ttl,
   });
+
+  // Grants compatibles v1 et v2 (selon ta version du SDK)
+  // v1:
+  // at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
+
+  // v2 (si disponible) — on reste générique :
   at.addGrant({
     roomJoin: true,
-    room: String(room),
+    room: String(room || "room-xp"),
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
+    // si "audioOnly", on évite de donner la source caméra
+    // certaines versions utilisent canPublishSources: ["microphone"] etc.
   });
+
   return at.toJwt();
 }
 
-export async function GET(req: Request) {
+export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const identity = searchParams.get("identity") || "anon";
-    const room = searchParams.get("room") || searchParams.get("conversationId");
+    const identity = searchParams.get("identity") || "user-anon";
+    const room = searchParams.get("room") || "room-xp";
     const audioOnly = searchParams.get("audioOnly") === "1";
 
-    if (!room) {
-      return NextResponse.json({ error: "Missing room" }, { status: 400 });
-    }
     if (!LIVEKIT_URL) {
-      return NextResponse.json({ error: "LIVEKIT_URL not configured" }, { status: 500 });
+      throw new Error("LIVEKIT_URL manquante (wss://…)");
     }
 
-    const token = await buildToken(`user_${identity}`, room);
-    return NextResponse.json({
-      token,
-      url: LIVEKIT_URL,
-      room,
-      audioOnly,
-      identity: `user_${identity}`,
-    });
-  } catch (err) {
-    console.error("❌ LiveKit token GET:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const token = buildToken(identity, room, "10m", { audioOnly });
+
+    return NextResponse.json(
+      { success: true, token, wsUrl: LIVEKIT_URL },
+      { status: 200 }
+    );
+  } catch (e) {
+    console.error("[livekit/token][GET] error:", e);
+    return NextResponse.json(
+      { success: false, error: e?.message || "Token build failed" },
+      { status: 500 }
+    );
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req) {
   try {
-    const body = await req.json();
-    const identity = body?.identity || "anon";
-    const room = body?.room || body?.conversationId;
-    const audioOnly = !!body?.audioOnly;
+    const body = await req.json().catch(() => ({}));
+    const identity = body.identity || "user-anon";
+    const room = body.room || "room-xp";
+    const audioOnly = !!body.audioOnly;
 
-    if (!room) {
-      return NextResponse.json({ error: "Missing room" }, { status: 400 });
-    }
     if (!LIVEKIT_URL) {
-      return NextResponse.json({ error: "LIVEKIT_URL not configured" }, { status: 500 });
+      throw new Error("LIVEKIT_URL manquante (wss://…)");
     }
 
-    const token = await buildToken(`user_${identity}`, room);
-    return NextResponse.json({
-      token,
-      url: LIVEKIT_URL,
-      room,
-      audioOnly,
-      identity: `user_${identity}`,
-    });
-  } catch (err) {
-    console.error("❌ LiveKit token POST:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const token = buildToken(identity, room, "10m", { audioOnly });
+
+    return NextResponse.json(
+      { success: true, token, wsUrl: LIVEKIT_URL },
+      { status: 200 }
+    );
+  } catch (e) {
+    console.error("[livekit/token][POST] error:", e);
+    return NextResponse.json(
+      { success: false, error: e?.message || "Token build failed" },
+      { status: 500 }
+    );
   }
 }
