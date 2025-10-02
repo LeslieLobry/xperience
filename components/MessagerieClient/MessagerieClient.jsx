@@ -81,30 +81,32 @@ export default function MessagerieClient({ user }) {
     );
   }
 
-  // --- MOBILE VIEW ---
-  if (isMobile) {
-    if (!conversationId) {
-      return (
-        <div className="messagerie-mobile-list">
-          <ListeConversations
-            userId={displayedUser.id}
-            onSelectConversation={handleSelectConversation}
-            selectedId={conversationId}
-          />
-        </div>
-      );
-    } else {
-      return (
-        <div className="messagerie-mobile-chat">
-          <ChatBox
-            conversationId={conversationId}
-            utilisateur={displayedUser}
-            onBack={handleBack} // <-- important sur mobile
-          />
-        </div>
-      );
-    }
+// --- MOBILE VIEW ---
+if (isMobile) {
+  if (!conversationId) {
+    return (
+      <div className="messagerie-mobile-list">
+        <ListeConversations
+          userId={displayedUser.id}
+          onSelectConversation={handleSelectConversation}
+          selectedId={conversationId}
+          autoSelectFirst={false}   // ⬅️ AJOUTE ÇA
+        />
+      </div>
+    );
+  } else {
+    return (
+      <div className="messagerie-mobile-chat">
+        <ChatBox
+          conversationId={conversationId}
+          utilisateur={displayedUser}
+          onBack={handleBack}
+        />
+      </div>
+    );
   }
+}
+
 
   // --- DESKTOP VIEW ---
   return (
