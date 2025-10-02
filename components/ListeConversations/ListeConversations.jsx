@@ -12,14 +12,25 @@ const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 const safeFetcher = async (url) => {
   const res = await fetch(url, { credentials: "include" });
   const txt = await res.text();
-  let data; try { data = JSON.parse(txt); } catch { data = { __raw: txt }; }
+  let data;
+  try {
+    data = JSON.parse(txt);
+  } catch {
+    data = { __raw: txt };
+  }
   if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
   return data;
 };
 
-export default function ListeConversations({ userId, onSelectConversation }) {
+export default function ListeConversations({
+  userId,
+  onSelectConversation,
+  autoSelectFirst = true, // <- NEW: contrôle l’auto-ouverture
+  className,
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [renamingId, setRenamingId] = useState(null);
@@ -33,25 +44,28 @@ export default function ListeConversations({ userId, onSelectConversation }) {
 
   const rawConversations = data?.conversations || [];
   const conversations = useMemo(
-    () => rawConversations.filter((c, i, arr) => arr.findIndex(cc => cc.id === c.id) === i),
+    () =>
+      rawConversations.filter((c, i, arr) => arr.findIndex((cc) => cc.id === c.id) === i),
     [rawConversations]
   );
 
-  // 🔁 Sync de l'URL → state (on met en surbrillance la conv de l'URL)
+  // 🔁 URL -> state (ne déclenche pas d'ouverture depuis ici)
   useEffect(() => {
-    const id = Number(searchParams?.get("conversationId") || 0) || null;
-    setSelectedId(id);
-    if (id) onSelectConversation?.(id);
-  }, [searchParams, onSelectConversation]);
+    const idParam = searchParams?.get("conversationId");
+    const id = idParam ? Number(idParam) : null;
+    setSelectedId(id || null);
+  }, [searchParams]);
 
-  // 🧠 Auto-sélection du 1er fil s'il n'y a pas d'ID dans l'URL
+  // 🧠 Auto-sélection 1er fil SEULEMENT si autorisé
   useEffect(() => {
-    const current = searchParams?.get("conversationId");
-    if (!current && conversations.length > 0) {
+    const hasParam = !!searchParams?.get("conversationId");
+    if (!autoSelectFirst) return;
+    if (hasParam) return;
+    if (conversations.length > 0) {
       const firstId = conversations[0].id;
       router.replace(`/messagerie?conversationId=${firstId}`);
     }
-  }, [conversations, router, searchParams]);
+  }, [autoSelectFirst, conversations, router, searchParams]);
 
   // Ably → refresh liste
   useEffect(() => {
@@ -68,11 +82,13 @@ export default function ListeConversations({ userId, onSelectConversation }) {
 
   const handleDelete = async (id) => {
     if (!confirm("Supprimer cette conversation ?")) return;
-    await fetch(`/api/conversations/${id}`, { method: "DELETE", credentials: "include" }).catch(()=>{});
+    await fetch(`/api/conversations/${id}`, { method: "DELETE", credentials: "include" }).catch(
+      () => {}
+    );
     await mutate();
     const current = Number(searchParams?.get("conversationId") || 0);
     if (current === Number(id)) {
-      router.replace("/messagerie"); // on nettoie l'URL si on supprime la conv affichée
+      router.replace("/messagerie"); // nettoie l'URL si on supprime la conv affichée
     }
   };
 
@@ -84,16 +100,20 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       body: JSON.stringify({ nom: newName }),
     });
     if (res.ok) {
-      setRenamingId(null); setNewName("");
+      setRenamingId(null);
+      setNewName("");
       await mutate();
     } else {
       let msg = "Erreur lors du renommage";
-      try { const j = await res.json(); msg = j?.error || j?.message || msg; } catch {}
+      try {
+        const j = await res.json();
+        msg = j?.error || j?.message || msg;
+      } catch {}
       alert(msg);
     }
   };
 
-  // 👉 Clique dans la liste → met l'ID dans l'URL (source de vérité)
+  // 👉 Clic utilisateur : met l'ID dans l'URL (source de vérité) + marque lu
   const handleSelect = async (id) => {
     router.replace(`/messagerie?conversationId=${id}`);
     await fetch(`/api/conversations/${id}/mark-as-read`, {
@@ -101,38 +121,53 @@ export default function ListeConversations({ userId, onSelectConversation }) {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
-    }).catch(()=>{});
+    }).catch(() => {});
+    onSelectConversation?.(id);
     mutate();
   };
 
   if (error) {
-    return <aside className="liste-conversations">Erreur de chargement des conversations.</aside>;
+    return (
+      <aside className={className || "liste-conversations"}>
+        Erreur de chargement des conversations.
+      </aside>
+    );
   }
 
   return (
-    <aside className="liste-conversations">
+    <aside className={className || "liste-conversations"}>
       <div className="conversation-header">
         <h3>Conversations</h3>
-        <button onClick={() => setShowModal(true)} className="new-conv-button">➕ Nouvelle</button>
+        <button onClick={() => setShowModal(true)} className="new-conv-button">
+          ➕ Nouvelle
+        </button>
       </div>
 
       {conversations.length === 0 && (
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
-          <a href="/recherche" className="start-search-link">Trouver des profils à contacter</a>
+          <a href="/recherche" className="start-search-link">
+            Trouver des profils à contacter
+          </a>
         </div>
       )}
 
       {conversations.map((conv) => {
         const autres = (conv.participants || [])
-          .filter(p => Number(p.utilisateurId) !== Number(userId))
-          .map(p => p.utilisateur)
+          .filter((p) => Number(p.utilisateurId) !== Number(userId))
+          .map((p) => p.utilisateur)
           .filter(Boolean);
-        const pseudo = autres.length === 1 ? autres[0].pseudo : autres.map(u => u.pseudo).join(", ");
+        const pseudo =
+          autres.length === 1 ? autres[0].pseudo : autres.map((u) => u.pseudo).join(", ");
         const unreadCount = conv.unreadCount || 0;
 
         return (
-          <div key={conv.id} className={`conversation-item ${Number(selectedId) === Number(conv.id) ? "active" : ""}`}>
+          <div
+            key={conv.id}
+            className={`conversation-item ${
+              Number(selectedId) === Number(conv.id) ? "active" : ""
+            }`}
+          >
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-info">
                 <div className="conv-pseudo">
@@ -140,29 +175,58 @@ export default function ListeConversations({ userId, onSelectConversation }) {
                     <>
                       <input
                         value={newName}
-                        onChange={(e)=>setNewName(e.target.value)}
-                        onKeyDown={(e)=>{ if (e.key==="Enter") handleRename(conv.id); }}
-                        autoFocus style={{ width:120, marginRight:6 }} maxLength={40}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRename(conv.id);
+                        }}
+                        autoFocus
+                        style={{ width: 120, marginRight: 6 }}
+                        maxLength={40}
                       />
-                      <button onClick={()=>handleRename(conv.id)}>OK</button>
-                      <button onClick={()=>{ setRenamingId(null); setNewName(""); }}>Annuler</button>
+                      <button onClick={() => handleRename(conv.id)}>OK</button>
+                      <button
+                        onClick={() => {
+                          setRenamingId(null);
+                          setNewName("");
+                        }}
+                      >
+                        Annuler
+                      </button>
                     </>
                   ) : (
                     <>
                       {conv.nom || pseudo}
                       <button
                         className="rename-conv-button"
-                        onClick={(e)=>{ e.stopPropagation(); setRenamingId(conv.id); setNewName(conv.nom || ""); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenamingId(conv.id);
+                          setNewName(conv.nom || "");
+                        }}
                         title="Renommer cette conversation"
-                        style={{ marginLeft:8, fontSize:14, background:"none", border:"none", cursor:"pointer" }}
-                      >✏️</button>
+                        style={{
+                          marginLeft: 8,
+                          fontSize: 14,
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✏️
+                      </button>
                     </>
                   )}
                 </div>
                 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
               </div>
             </div>
-            <button className="delete-conv-button" onClick={()=>handleDelete(conv.id)} title="Supprimer cette conversation">🗑️</button>
+            <button
+              className="delete-conv-button"
+              onClick={() => handleDelete(conv.id)}
+              title="Supprimer cette conversation"
+            >
+              🗑️
+            </button>
           </div>
         );
       })}
@@ -172,7 +236,6 @@ export default function ListeConversations({ userId, onSelectConversation }) {
           currentUserId={userId}
           onClose={() => setShowModal(false)}
           onCreated={async (newConvId) => {
-            // on force un refresh et on met l'ID dans l'URL
             await mutate();
             if (newConvId) {
               router.replace(`/messagerie?conversationId=${newConvId}`);

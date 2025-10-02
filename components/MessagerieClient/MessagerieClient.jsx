@@ -109,12 +109,14 @@ export default function MessagerieClient({ user }) {
   // --- DESKTOP VIEW ---
   return (
     <div className="messagerie-page">
-      <ListeConversations
-        userId={displayedUser.id}
-        onSelectConversation={handleSelectConversation}
-        selectedId={conversationId}
-        className="liste-conversations"
-      />
+    <ListeConversations
+  userId={displayedUser.id}
+  onSelectConversation={handleSelectConversation}
+  selectedId={conversationId}
+  className="liste-conversations"
+  autoSelectFirst={false}   // << important
+/>
+
       <div className="chat-section">
         {conversationId ? (
           <ChatBox
