@@ -1,21 +1,38 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback, forwardRef } from "react";
 import MessageBubble from "./ChatBox/MessageBubble";
 import { format, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
 
-export default function MessagesList({
-  messages,
-  utilisateur,
-  onReact,
-  typingPseudo,
-  lastReads,
-  hasMore,
-  onLoadMore,
-  onDelete,
-  prenomsCouple = null,
-}) {
-  const containerRef = useRef();
-  const endRef = useRef();
+const MessagesList = forwardRef(function MessagesList(
+  {
+    messages,
+    utilisateur,
+    onReact,
+    typingPseudo,
+    lastReads,
+    hasMore,
+    onLoadMore,
+    onDelete,
+    prenomsCouple = null,
+  },
+  ref // ← ref venant du parent (ChatBox)
+) {
+  // Ref interne pour manipuler le conteneur
+  const containerRef = useRef(null);
+  const endRef = useRef(null);
+
+  // Merge du ref parent et du ref interne
+  const setMergedRef = useCallback(
+    (node) => {
+      containerRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref && "current" in ref) {
+        ref.current = node;
+      }
+    },
+    [ref]
+  );
 
   // → Fonction utilitaire pour avoir les prénoms au bon format string
   const getPrenomsCoupleString = (msg) => {
@@ -49,28 +66,29 @@ export default function MessagesList({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
     const handleScroll = () => {
       if (container.scrollTop < 50 && hasMore) {
         onLoadMore();
       }
     };
+
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
 
-  // Scroll toujours en bas (dernier message)
-  useEffect(() => {
-    if (endRef.current) {
-      endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [messages]);
+  // ❌ On supprime l’auto-scroll "toujours en bas" ici.
+  // Le parent (ChatBox) est maintenant responsable du scroll bas
+  // via skipNextAutoScrollRef + lastMsgIdRef.
 
   let lastDate = null;
 
   return (
-    <div ref={containerRef} className="chat-messages">
+    <div ref={setMergedRef} className="chat-messages">
       {typingPseudo && (
-        <div className="typing-indicator">{typingPseudo} est en train d’écrire...</div>
+        <div className="typing-indicator">
+          {typingPseudo} est en train d’écrire...
+        </div>
       )}
 
       {messages.map((msg, index) => {
@@ -80,6 +98,7 @@ export default function MessagesList({
           showDate = true;
           lastDate = msgDate;
         }
+
         let label = format(msgDate, "dd/MM/yyyy", { locale: fr });
         const now = new Date();
         if (isSameDay(msgDate, now)) label = "Aujourd'hui";
@@ -92,14 +111,17 @@ export default function MessagesList({
         return (
           <div key={msg.id} className="message-class">
             {showDate && (
-              <div className="day-separator" style={{
-                textAlign: "center",
-                margin: "18px 0 8px",
-                color: "#a98e5d",
-                fontWeight: "bold",
-                opacity: 0.7,
-                fontSize: "1.1em"
-              }}>
+              <div
+                className="day-separator"
+                style={{
+                  textAlign: "center",
+                  margin: "18px 0 8px",
+                  color: "#a98e5d",
+                  fontWeight: "bold",
+                  opacity: 0.7,
+                  fontSize: "1.1em",
+                }}
+              >
                 {label}
               </div>
             )}
@@ -115,9 +137,12 @@ export default function MessagesList({
           </div>
         );
       })}
+
+      {/* Laisse ce "end" si tu veux une ancre, mais c'est le parent qui scrollera */}
       <div ref={endRef} style={{ height: 1 }} />
       <div style={{ height: 20 }} />
     </div>
   );
-}
-   
+});
+
+export default MessagesList;
