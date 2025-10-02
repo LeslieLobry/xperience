@@ -51,7 +51,17 @@ export default function ChatHeader({
       <div className="chat-participants">
         {onBack && (
           <button
-            onClick={onBack}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onBack?.();
+            }}
+            onMouseDown={(e) => {
+              // évite le focus/flicker pouvant déclencher des scroll handlers
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             className="chat-back-btn"
             aria-label="Retour"
             style={{
@@ -81,7 +91,7 @@ export default function ChatHeader({
                 src={photoUrls[p.id] || "/default.jpg"}
                 alt={p.pseudo}
                 className="participant-avatar"
-                onError={e => { e.target.onerror = null; e.target.src = "/default.jpg"; }}
+                onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = "/default.jpg"; }}
               />
               <span className="participant-name">{p.pseudo}</span>
             </Link>
@@ -91,22 +101,42 @@ export default function ChatHeader({
 
       <div className="chat-actions">
         {!inCall && onAddParticipant && (
-          <button onClick={onAddParticipant} title="Ajouter un membre">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddParticipant?.(); }}
+            title="Ajouter un membre"
+            aria-label="Ajouter un membre"
+          >
             <Plus />
           </button>
         )}
         {!inCall && (
           <>
-            <button onClick={() => onCallAudio()} title="Appel audio">
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCallAudio?.(); }}
+              title="Appel audio"
+              aria-label="Appel audio"
+            >
               <Phone />
             </button>
-            <button onClick={() => onCallVideo()} title="Appel vidéo">
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCallVideo?.(); }}
+              title="Appel vidéo"
+              aria-label="Appel vidéo"
+            >
               <Video />
             </button>
           </>
         )}
         {inCall && (
-          <button onClick={onClose} title="Raccrocher">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose?.(); }}
+            title="Raccrocher"
+            aria-label="Raccrocher"
+          >
             <X />
           </button>
         )}
