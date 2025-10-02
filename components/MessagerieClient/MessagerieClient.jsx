@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ListeConversations from "../ListeConversations/ListeConversations";
 import dynamic from "next/dynamic";
@@ -28,7 +28,9 @@ function useIsMobile(breakpoint = 900) {
 
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
+
   const [conversationId, setConversationId] = useState(null);
 
   const { user: currentUser, refreshUser, loading } = useAuth();
@@ -37,33 +39,46 @@ export default function MessagerieClient({ user }) {
     refreshUser();
   }, [refreshUser]);
 
-  const param = useMemo(() => searchParams.get("conversationId"), [searchParams]);
+  // Source de vérité = URL
   useEffect(() => {
-    if (param && !isNaN(param)) {
-      setConversationId(parseInt(param));
+    const id = searchParams.get("conversationId");
+    if (id && !isNaN(Number(id))) {
+      setConversationId(Number(id));
     } else {
       setConversationId(null);
     }
-  }, [param]);
+  }, [searchParams]);
+
+  // Si on est exactement sur /messagerie, on force l'ID à null
+  useEffect(() => {
+    if (pathname === "/messagerie") {
+      setConversationId(null);
+    }
+  }, [pathname]);
 
   // --- MOBILE/RESPONSIVE LOGIC ---
   const isMobile = useIsMobile(900);
 
   // Navigation = met à jour l'URL et le state
   const handleSelectConversation = (id) => {
-    router.replace(`/messagerie?conversationId=${id}`, { scroll: false });
+    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
     setConversationId(id);
   };
 
   const handleBack = () => {
-    router.replace(`/messagerie`, { scroll: false });
+    // Revient explicitement à la LISTE (pas back())
+    router.push(`/messagerie`, { scroll: false });
     setConversationId(null);
   };
 
   const displayedUser = currentUser ?? user;
 
   if (loading || !displayedUser?.id) {
-    return <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>Chargement messagerie...</div>;
+    return (
+      <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
+        Chargement messagerie...
+      </div>
+    );
   }
 
   // --- MOBILE VIEW ---
@@ -81,11 +96,10 @@ export default function MessagerieClient({ user }) {
     } else {
       return (
         <div className="messagerie-mobile-chat">
-          {/* Plus de bouton absolu ici ! */}
           <ChatBox
             conversationId={conversationId}
             utilisateur={displayedUser}
-            onBack={handleBack} // <-- on passe onBack pour affichage dans ChatHeader
+            onBack={handleBack} // <-- important sur mobile
           />
         </div>
       );
@@ -103,7 +117,11 @@ export default function MessagerieClient({ user }) {
       />
       <div className="chat-section">
         {conversationId ? (
-          <ChatBox conversationId={conversationId} utilisateur={displayedUser} />
+          <ChatBox
+            conversationId={conversationId}
+            utilisateur={displayedUser}
+            onBack={handleBack} // <-- passe onBack aussi sur desktop
+          />
         ) : (
           <div className="no-conversation">
             <p>Sélectionne une conversation</p>

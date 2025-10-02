@@ -49,14 +49,28 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const messagesContainerRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
-  const audioDataRef = useRef({
-    buffer: [],
-    length: 0,
-  });
+  const audioDataRef = useRef({ buffer: [], length: 0 });
 
-  // NEW: refs pour auto-scroll maîtrisé
+  // Auto-scroll maîtrisé
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
+
+  // Helpers scroll
+  const SCROLL_TOLERANCE_PX = 120;
+  const isNearBottom = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return true;
+    const diff = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return diff < SCROLL_TOLERANCE_PX;
+  };
+  const scrollToBottom = (smooth = true) => {
+    const el = messagesContainerRef.current;
+    if (el && typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
+    }
+  };
 
   const {
     messages,
@@ -82,7 +96,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       if (data.from?.id === utilisateur.id) return;
       if (appelEntrant || inCall) return;
       setAppelEntrant(data);
-
       if (sonnerieRef.current) {
         sonnerieRef.current.currentTime = 0;
         sonnerieRef.current.play().catch(() => {});
@@ -183,29 +196,43 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
 
-  // ✅ NOUVEL auto-scroll: uniquement quand un **nouveau** message arrive.
+  // Scroll initial (ou quand la conv change) : descends une fois
+  useEffect(() => {
+    if (messages?.length) {
+      scrollToBottom(false);
+      lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, loadingInitial]);
+
+  // Auto-scroll intelligent
   useEffect(() => {
     if (!messages?.length) return;
 
-    // si on vient d’appuyer sur "Retour", on saute UNE fois l’auto-scroll
     if (skipNextAutoScrollRef.current) {
       skipNextAutoScrollRef.current = false;
+      lastMsgIdRef.current = messages[messages.length - 1]?.id || lastMsgIdRef.current;
       return;
     }
 
-    const lastId = messages[messages.length - 1]?.id;
-    if (!lastId || lastMsgIdRef.current === lastId) return; // pas de nouveau message
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg) return;
 
-    lastMsgIdRef.current = lastId;
+    const isNew = lastMsgIdRef.current !== lastMsg.id;
+    lastMsgIdRef.current = lastMsg.id;
+    if (!isNew) return;
 
-    // Scroll propre sur le conteneur s'il est scrollable, sinon fallback sur sentinelle
-    const el = messagesContainerRef.current;
-    if (el && typeof el.scrollTo === "function") {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // si c'est toi qui viens d'envoyer → scroll
+    if (lastMsg.auteurId === utilisateur?.id) {
+      scrollToBottom(true);
+      return;
     }
-  }, [messages]);
+
+    // nouveau message entrant → scroll seulement si on est déjà près du bas
+    if (isNearBottom()) {
+      scrollToBottom(true);
+    }
+  }, [messages, utilisateur?.id]);
 
   // --------------------- TIMER APPEL ----------------------
 
@@ -479,7 +506,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
             ...currentData,
             messages: currentData.messages.filter((m) => m.id !== messageId),
           };
-        }, false); // false = ne pas refetch immédiatement
+        }, false);
       }
     } catch (err) {
       console.error("Erreur suppression message :", err);
@@ -531,7 +558,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}
         onAddParticipant={() => setShowAddParticipant(true)}
-        onBack={handleBackClick}  // << handler qui pose le flag
+        onBack={handleBackClick}
       />
 
       {inCall && (
@@ -658,8 +685,11 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
               ...old,
               messages: [...(old?.messages || []), optimisticMessage],
             }),
-            false // (false = pas de revalidation immédiate)
+            false
           );
+
+          // scroll immédiat après envoi (optimistic)
+          scrollToBottom(true);
 
           // ---- Envoi réel (API) ----
           try {
@@ -668,12 +698,12 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
               const res = await fetch("/api/messages", { method: "POST", body: contenu });
               result = await res.json();
               if (result?.message?.id) {
-                mutate(); // refetch pour synchroniser la liste avec le vrai message du serveur (remplace le tmp-)
+                mutate(); // resync liste
               }
             } else {
               const message = await envoyerMessage(contenu, type, membreParlant);
               if (message?.id) {
-                mutate(); // idem : resync
+                mutate(); // resync
               }
             }
           } catch (err) {
