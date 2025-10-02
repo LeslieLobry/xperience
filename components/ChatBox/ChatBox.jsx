@@ -54,6 +54,9 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     length: 0,
   });
 
+  // NEW: refs pour auto-scroll maîtrisé
+  const lastMsgIdRef = useRef(null);
+  const skipNextAutoScrollRef = useRef(false);
 
   const {
     messages,
@@ -63,7 +66,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     envoyerMessage,
     handleReaction,
     loadMoreMessages,
-     hasMore,
+    hasMore,
     mutate, // important pour la resynchro après envoi !
     isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
@@ -180,17 +183,29 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     if (messages.length) setLoadingInitial(false);
   }, [messages.length]);
 
+  // ✅ NOUVEL auto-scroll: uniquement quand un **nouveau** message arrive.
   useEffect(() => {
-  if (messagesEndRef.current) {
-    // Scrolle vers le dernier message mais ajuste pour ne pas cacher sous le footer
-    messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    setTimeout(() => {
-      // Décale un peu vers le haut pour ne pas être sous le footer (60px = à ajuster si besoin)
-      window.scrollBy(0, -6000);
-    }, 200);
-  }
-}, [messages]);
+    if (!messages?.length) return;
 
+    // si on vient d’appuyer sur "Retour", on saute UNE fois l’auto-scroll
+    if (skipNextAutoScrollRef.current) {
+      skipNextAutoScrollRef.current = false;
+      return;
+    }
+
+    const lastId = messages[messages.length - 1]?.id;
+    if (!lastId || lastMsgIdRef.current === lastId) return; // pas de nouveau message
+
+    lastMsgIdRef.current = lastId;
+
+    // Scroll propre sur le conteneur s'il est scrollable, sinon fallback sur sentinelle
+    const el = messagesContainerRef.current;
+    if (el && typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages]);
 
   // --------------------- TIMER APPEL ----------------------
 
@@ -302,7 +317,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     setInCall(true);
     startTimer();
   };
-
 
   const hangupCall = () => {
     if (room) {
@@ -458,16 +472,15 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const handleDelete = async (messageId) => {
     try {
       const res = await fetch(`/api/messages/${messageId}`, { method: "DELETE" });
-     if (res.ok) {
-  mutate((currentData) => {
-    if (!currentData) return currentData;
-    return {
-      ...currentData,
-      messages: currentData.messages.filter((m) => m.id !== messageId),
-    };
-  }, false); // false = ne pas refetch immédiatement
-}
-
+      if (res.ok) {
+        mutate((currentData) => {
+          if (!currentData) return currentData;
+          return {
+            ...currentData,
+            messages: currentData.messages.filter((m) => m.id !== messageId),
+          };
+        }, false); // false = ne pas refetch immédiatement
+      }
     } catch (err) {
       console.error("Erreur suppression message :", err);
     }
@@ -499,6 +512,14 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     }
   };
 
+  // --------------------- BACK HANDLER (désactive l'auto-scroll 1 fois) ----------------------
+  const handleBackClick = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    skipNextAutoScrollRef.current = true; // ne pas auto-scroller après retour
+    onBack?.();
+  };
+
   // --------------------- RENDER ----------------------
 
   return (
@@ -510,7 +531,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         onCallVideo={() => startCall(true)}
         onClose={hangupCall}
         onAddParticipant={() => setShowAddParticipant(true)}
-        onBack={onBack}
+        onBack={handleBackClick}  // << handler qui pose le flag
       />
 
       {inCall && (
@@ -558,18 +579,21 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         />
       )}
 
-   <MessagesList
-  ref={messagesContainerRef}
-  messages={messages}
-  utilisateur={utilisateur}
-  onReact={handleReaction}
-  lastReads={lastReads}
-  typingPseudo={isTyping ? typingPseudo : null}
-  hasMore={hasMore}
-  onLoadMore={loadMoreMessages}
-  onDelete={handleDelete}
-  prenomsCouple={prenomsCouple}
-/>
+      <MessagesList
+        ref={messagesContainerRef}
+        messages={messages}
+        utilisateur={utilisateur}
+        onReact={handleReaction}
+        lastReads={lastReads}
+        typingPseudo={isTyping ? typingPseudo : null}
+        hasMore={hasMore}
+        onLoadMore={loadMoreMessages}
+        onDelete={handleDelete}
+        prenomsCouple={prenomsCouple}
+      />
+
+      {/* sentinelle pour fallback scrollIntoView */}
+      <div ref={messagesEndRef} />
 
       {isTyping && typingPseudo && (
         <div
@@ -579,95 +603,94 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           {typingPseudo} est en train d&apos;écrire...
         </div>
       )}
-<ChatInput
-  utilisateur={utilisateur}
-  conversationId={conversationId}
-  texte={texte}
-  setTexte={setTexte}
-  showEmojiPicker={showEmojiPicker}
-  setShowEmojiPicker={setShowEmojiPicker}
-onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
-  const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
-  let optimisticMessage;
-  if (isImage && contenu instanceof FormData) {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type: contenu.get("type") || "IMAGE",
-      contenu: "[Image]",
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere: !!contenu.get("type") && contenu.get("type").toUpperCase() === "EPHEMERE",
-    };
-  } else if (type === "AUDIO") {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type,
-      contenu: "[Audio]",
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere: false,
-    };
-  } else {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type: type || "TEXTE",
-      contenu: typeof contenu === "string" ? contenu : contenu.contenu,
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere: type === "EPHEMERE",
-    };
-  }
 
-  // ---- Ajoute via mutate (optimistic update) ----
-  mutate(
-    old => ({
-      ...old,
-      messages: [...(old?.messages || []), optimisticMessage],
-    }),
-    false // (false = pas de revalidation immédiate)
-  );
+      <ChatInput
+        utilisateur={utilisateur}
+        conversationId={conversationId}
+        texte={texte}
+        setTexte={setTexte}
+        showEmojiPicker={showEmojiPicker}
+        setShowEmojiPicker={setShowEmojiPicker}
+        onMessageSent={async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+          const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+          let optimisticMessage;
+          if (isImage && contenu instanceof FormData) {
+            optimisticMessage = {
+              id: tmpId,
+              auteurId: utilisateur.id,
+              auteur: utilisateur,
+              pseudo: utilisateur.pseudo,
+              type: contenu.get("type") || "IMAGE",
+              contenu: "[Image]",
+              createdAt: new Date().toISOString(),
+              statut: "pending",
+              ephemere: !!contenu.get("type") && contenu.get("type").toUpperCase() === "EPHEMERE",
+            };
+          } else if (type === "AUDIO") {
+            optimisticMessage = {
+              id: tmpId,
+              auteurId: utilisateur.id,
+              auteur: utilisateur,
+              pseudo: utilisateur.pseudo,
+              type,
+              contenu: "[Audio]",
+              createdAt: new Date().toISOString(),
+              statut: "pending",
+              ephemere: false,
+            };
+          } else {
+            optimisticMessage = {
+              id: tmpId,
+              auteurId: utilisateur.id,
+              auteur: utilisateur,
+              pseudo: utilisateur.pseudo,
+              type: type || "TEXTE",
+              contenu: typeof contenu === "string" ? contenu : contenu.contenu,
+              createdAt: new Date().toISOString(),
+              statut: "pending",
+              ephemere: type === "EPHEMERE",
+            };
+          }
 
-  // ---- Envoi réel (API) ----
-  try {
-    let result;
-    if (isImage && contenu instanceof FormData) {
-      const res = await fetch("/api/messages", { method: "POST", body: contenu });
-      result = await res.json();
-      if (result?.message?.id) {
-        mutate(); // refetch pour synchroniser la liste avec le vrai message du serveur (remplace le tmp-)
-      }
-    } else {
-      const message = await envoyerMessage(contenu, type, membreParlant);
-      if (message?.id) {
-        mutate(); // idem : resync
-      }
-    }
-  } catch (err) {
-    // Set statut failed sur le message tmp en cas d’erreur
-    mutate(old => ({
-      ...old,
-      messages: (old?.messages || []).map((m) =>
-        m.id === tmpId ? { ...m, statut: "failed" } : m
-      ),
-    }), false);
-  }
-}}
+          // ---- Ajoute via mutate (optimistic update) ----
+          mutate(
+            old => ({
+              ...old,
+              messages: [...(old?.messages || []), optimisticMessage],
+            }),
+            false // (false = pas de revalidation immédiate)
+          );
 
-  onTyping={envoyerTyping}
-  startRecording={startRecording}
-  stopRecording={stopRecording}
-  recording={recording}
-/>
-
+          // ---- Envoi réel (API) ----
+          try {
+            let result;
+            if (isImage && contenu instanceof FormData) {
+              const res = await fetch("/api/messages", { method: "POST", body: contenu });
+              result = await res.json();
+              if (result?.message?.id) {
+                mutate(); // refetch pour synchroniser la liste avec le vrai message du serveur (remplace le tmp-)
+              }
+            } else {
+              const message = await envoyerMessage(contenu, type, membreParlant);
+              if (message?.id) {
+                mutate(); // idem : resync
+              }
+            }
+          } catch (err) {
+            // Set statut failed sur le message tmp en cas d’erreur
+            mutate(old => ({
+              ...old,
+              messages: (old?.messages || []).map((m) =>
+                m.id === tmpId ? { ...m, statut: "failed" } : m
+              ),
+            }), false);
+          }
+        }}
+        onTyping={envoyerTyping}
+        startRecording={startRecording}
+        stopRecording={stopRecording}
+        recording={recording}
+      />
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">
