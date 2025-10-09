@@ -1,83 +1,96 @@
+// app/api/articles/[idOrSlug]/route.js
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma"; // ⬅️ réutilise le singleton
+import { prisma } from "@/lib/prisma";
 
-// ✅ GET : récupérer un article par ID (numérique)
+const isNumericId = (s="") => /^\d+$/.test(String(s));
+const isCuidLike  = (s="") => /^c[a-z0-9]+$/i.test(String(s));
+
+function buildWhere(idOrSlug) {
+  if (isNumericId(idOrSlug)) return { id: Number(idOrSlug) }; // ancien schéma INT
+  if (isCuidLike(idOrSlug))  return { id: idOrSlug };         // nouveau schéma STRING cuid
+  return { slug: idOrSlug };                                  // fallback: slug
+}
+
 export async function GET(_req, { params }) {
-  const articleId = Number(params.id);
-  if (!Number.isFinite(articleId)) {
-    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
-  }
-
+  const idOrSlug = params?.idOrSlug;
+  if (!idOrSlug) return NextResponse.json({ error: "missing idOrSlug" }, { status: 400 });
   try {
     const article = await prisma.article.findUnique({
-      where: { id: articleId },
+      where: buildWhere(idOrSlug),
       include: { images: true, auteur: true },
     });
-
-    if (!article) {
-      return NextResponse.json({ ok: false, error: "Article introuvable" }, { status: 404 });
-    }
-
-    return NextResponse.json({ ok: true, article });
-  } catch (error) {
-    console.error("Erreur GET /api/articles/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
+    if (!article) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json(article);
+  } catch (e) {
+    console.error("GET /api/articles/[idOrSlug]", e);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
 
-// ✅ PUT : mettre à jour un article + ses images (transaction)
 export async function PUT(req, { params }) {
-  const articleId = Number(params.id);
-  if (!Number.isFinite(articleId)) {
-    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
+  const idOrSlug = params?.idOrSlug;
+  if (!idOrSlug) return NextResponse.json({ error: "missing idOrSlug" }, { status: 400 });
+
+  const body = await req.json();
+  const { titre, description, contenu, images } = body || {};
+  if (!titre || !contenu) {
+    return NextResponse.json({ error: "titre et contenu requis" }, { status: 400 });
   }
 
-  const { titre, description, contenu, images } = await req.json();
-  if (!titre || !contenu) {
-    return NextResponse.json({ ok: false, error: "Champs manquants" }, { status: 400 });
-  }
+  const where = buildWhere(idOrSlug);
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const updated = await tx.article.update({
-        where: { id: articleId },
-        data: { titre, description, contenu, updatedAt: new Date() },
+    const existing = await prisma.article.findUnique({ where, include: { images: true } });
+    if (!existing) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    // Harmonise les clés d'images (array de strings)
+    const newKeys = Array.isArray(images) ? images.map(i => (typeof i === "string" ? i : i?.key || i?.url)).filter(Boolean) : [];
+    const oldKeys = existing.images.map(img => img.key ?? img.url ?? img.path).filter(Boolean);
+
+    const toDelete = oldKeys.filter(k => !newKeys.includes(k));
+    const toCreate = newKeys.filter(k => !oldKeys.includes(k));
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const base = await tx.article.update({
+        where,
+        data: { titre, description: description ?? null, contenu, updatedAt: new Date() },
       });
 
-      if (Array.isArray(images)) {
-        await tx.imageArticle.deleteMany({ where: { articleId } });
-        const data = images.map((img) => ({
-          url: typeof img === "string" ? img : img?.url,
-          articleId,
-        })).filter((i) => i.url);
-        if (data.length) await tx.imageArticle.createMany({ data });
+      // ⚠️ Aligne le nom du modèle image : articleImage ou imageArticle
+      if (toDelete.length) {
+        await tx.articleImage.deleteMany({ where: { articleId: base.id, key: { in: toDelete } } });
+      }
+      if (toCreate.length) {
+        await tx.articleImage.createMany({ data: toCreate.map(key => ({ articleId: base.id, key })) });
       }
 
-      return updated;
+      return tx.article.findUnique({ where: { id: base.id }, include: { images: true, auteur: true } });
     });
 
-    return NextResponse.json({ ok: true, article: result });
-  } catch (error) {
-    console.error("Erreur PUT /api/articles/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(updated);
+  } catch (e) {
+    console.error("PUT /api/articles/[idOrSlug]", e);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
 
-// ✅ DELETE : supprimer un article + ses images (transaction)
 export async function DELETE(_req, { params }) {
-  const articleId = Number(params.id);
-  if (!Number.isFinite(articleId)) {
-    return NextResponse.json({ ok: false, error: "id invalide" }, { status: 400 });
-  }
+  const idOrSlug = params?.idOrSlug;
+  if (!idOrSlug) return NextResponse.json({ error: "missing idOrSlug" }, { status: 400 });
+  const where = buildWhere(idOrSlug);
 
   try {
+    const existing = await prisma.article.findUnique({ where });
+    if (!existing) return NextResponse.json({ error: "not found" }, { status: 404 });
+
     await prisma.$transaction(async (tx) => {
-      await tx.imageArticle.deleteMany({ where: { articleId } });
-      await tx.article.delete({ where: { id: articleId } });
+      await tx.articleImage.deleteMany({ where: { articleId: existing.id } });
+      await tx.article.delete({ where: { id: existing.id } });
     });
+
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Erreur DELETE /api/articles/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
+  } catch (e) {
+    console.error("DELETE /api/articles/[idOrSlug]", e);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
