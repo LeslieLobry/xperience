@@ -1,6 +1,6 @@
 // app/api/articles/[idOrSlug]/route.js
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 
 const isNumericId = (s="") => /^\d+$/.test(String(s));
 const isCuidLike  = (s="") => /^c[a-z0-9]+$/i.test(String(s));

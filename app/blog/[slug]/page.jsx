@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import "./edit.css";
+
 
 export default function EditArticlePage() {
   // 🔒 Récupération robuste de l'id (gère string | string[])
