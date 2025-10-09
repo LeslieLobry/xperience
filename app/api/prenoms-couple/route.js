@@ -1,18 +1,19 @@
-// /api/prenoms-couple/route.ts
+// /api/prenoms-couple/route.js
 import { prisma } from "../../../lib/prisma";
 import { getUserFromToken } from "../../../lib/auth";
 import { NextResponse } from "next/server";
 
-function bad(status: number, message: string) {
+function bad(status, message) {
   return NextResponse.json({ success: false, message }, { status });
 }
 
-async function parseBody(req: Request) {
+async function parseBody(req) {
   const ct = (req.headers.get("content-type") || "").toLowerCase();
+
   // JSON
   if (ct.includes("application/json")) return await req.json();
 
-  // multipart
+  // multipart/form-data
   if (ct.includes("multipart/form-data")) {
     const fd = await req.formData();
     return {
@@ -22,7 +23,7 @@ async function parseBody(req: Request) {
     };
   }
 
-  // x-www-form-urlencoded
+  // application/x-www-form-urlencoded
   if (ct.includes("application/x-www-form-urlencoded")) {
     const text = await req.text();
     const p = new URLSearchParams(text);
@@ -33,7 +34,7 @@ async function parseBody(req: Request) {
     };
   }
 
-  // fallbacks
+  // Fallbacks
   try { return await req.json(); } catch {}
   try {
     const fd = await req.formData();
@@ -46,7 +47,7 @@ async function parseBody(req: Request) {
   return {};
 }
 
-export async function GET(req: Request) {
+export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const conversationId = Number(searchParams.get("conversationId"));
@@ -65,24 +66,24 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json({ success: true, prenoms: record || null }, { status: 200 });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Erreur GET /api/prenoms-couple:", err?.message, err);
     return bad(500, "Erreur serveur");
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req) {
   try {
     const user = await getUserFromToken();
     if (!user) return bad(401, "Non autorisé.");
 
     const body = await parseBody(req);
-    const convId = Number((body as any).conversationId);
+    const convId = Number(body.conversationId);
     if (!Number.isFinite(convId)) return bad(422, "conversationId requis (number)");
 
     // Normalisation des entrées
-    const rawP1 = (typeof (body as any).prenom1 === "string" ? (body as any).prenom1 : "").trim();
-    const rawP2 = (typeof (body as any).prenom2 === "string" ? (body as any).prenom2 : "").trim();
+    const rawP1 = (typeof body.prenom1 === "string" ? body.prenom1 : "").trim();
+    const rawP2 = (typeof body.prenom2 === "string" ? body.prenom2 : "").trim();
     const hasP1 = rawP1.length > 0;
     const hasP2 = rawP2.length > 0;
 
@@ -136,7 +137,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true, prenoms: record }, { status: 200 });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Erreur POST /api/prenoms-couple:", err?.message, err);
     return bad(500, "Erreur serveur");
   }
