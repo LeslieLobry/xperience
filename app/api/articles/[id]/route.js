@@ -12,7 +12,7 @@ function buildWhere(idOrSlug) {
 
 // ✅ GET : récupérer un article
 export async function GET(_req, { params }) {
-  const idOrSlug = params?.idOrSlug;
+  const idOrSlug = params?.id; // <-- IMPORTANT : [id] => params.id
   if (!idOrSlug)
     return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
@@ -27,14 +27,14 @@ export async function GET(_req, { params }) {
 
     return NextResponse.json(article);
   } catch (err) {
-    console.error("[GET /api/articles/[idOrSlug]]", err);
+    console.error("[GET /api/articles/[id]]", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
 // ✅ PUT : mettre à jour un article
 export async function PUT(req, { params }) {
-  const idOrSlug = params?.idOrSlug;
+  const idOrSlug = params?.id; // <-- idem
   if (!idOrSlug)
     return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
@@ -54,12 +54,10 @@ export async function PUT(req, { params }) {
     if (!existing)
       return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
 
-    const newKeys = Array.isArray(images)
-      ? images.filter(Boolean)
-      : [];
-    const oldKeys = existing.images.map(
-      (img) => img.key ?? img.url ?? img.path
-    ).filter(Boolean);
+    const newKeys = Array.isArray(images) ? images.filter(Boolean) : [];
+    const oldKeys = existing.images
+      .map((img) => img.key ?? img.url ?? img.path)
+      .filter(Boolean);
 
     const toDelete = oldKeys.filter((k) => !newKeys.includes(k));
     const toCreate = newKeys.filter((k) => !oldKeys.includes(k));
@@ -88,7 +86,7 @@ export async function PUT(req, { params }) {
 
     return NextResponse.json(updated);
   } catch (err) {
-    console.error("[PUT /api/articles/[idOrSlug]]", err);
+    console.error("[PUT /api/articles/[id]]", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
