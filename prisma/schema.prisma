@@ -436,6 +436,7 @@ enum DigestEventType {
   LIKE
   AVIS
 }
+
 model DigestNotification {
   id              Int              @id @default(autoincrement())
   destinataireId  Int              @map("destinataireid")
@@ -465,4 +466,13 @@ model DigestNotification {
   @@index([sentAt, processingAt],       map: "digest_sent_processing_idx")
 
   @@map("DigestNotification")
+}
+model Annonce {
+  id        String   @id @default(cuid())
+  titre     String
+  message   String
+  actif     Boolean  @default(true)
+  expireAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
