@@ -468,14 +468,22 @@ model DigestNotification {
   @@map("DigestNotification")
 }
 model Annonce {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  titre     String
-  message   String
-  actif     Boolean  @default(true)
-  expireAt  DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titre          String
+  message        String
+  actif          Boolean  @default(true)
+  expireAt       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Choisis le bon nom de table selon ce que tu as en DB :
-  // @@map("Annonce")  // <-- si la table s'appelle "Annonce"
+  // 🎛️ Options de rendu
+  durationMs     Int?           // ms
+  textColor      String?        // "#e0c084"
+  bgColor        String?        // "#0b0f14" ou "white"
+  overlayColor   String?        // "rgba(0,0,0,.6)"
+  fontSizePx     Int?           // 36
+  borderRadiusPx Int?           // 16
+  maxWidthPx     Int?           // 520
+
+  @@map("Annonce")              // ⚠️ mets "annonces" si ta table s’appelle ainsi
 }

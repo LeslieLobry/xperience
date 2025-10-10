@@ -45,12 +45,21 @@ export default function AdminAnnoncesPage() {
 
   async function submitForm(e) {
     e.preventDefault();
-    const payload = {
-      titre: draft.titre.trim(),
-      message: draft.message.trim(),
-      actif: !!draft.actif,
-      expireAt: draft.expireAt ? `${draft.expireAt}T23:59:59` : null,
-    };
+ const payload = {
+  titre: draft.titre.trim(),
+  message: draft.message.trim(),
+  actif: !!draft.actif,
+  expireAt: draft.expireAt ? `${draft.expireAt}T23:59:59` : null,
+
+  durationMs: draft.durationMs ?? null,
+  textColor: draft.textColor || null,
+  bgColor: draft.bgColor || null,
+  overlayColor: draft.overlayColor || null,
+  fontSizePx: draft.fontSizePx ?? null,
+  borderRadiusPx: draft.borderRadiusPx ?? null,
+  maxWidthPx: draft.maxWidthPx ?? null,
+};
+
     if (!payload.titre || !payload.message) {
       alert("Titre et message requis");
       return;
@@ -122,52 +131,111 @@ export default function AdminAnnoncesPage() {
       )}
 
       {editingId && (
-        <form onSubmit={submitForm} style={{ marginBottom: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8 }}>
-          <div style={{ marginBottom: 8 }}>
-            <label>Titre</label>
-            <input
-              type="text"
-              value={draft.titre}
-              onChange={(e) => setDraft({ ...draft, titre: e.target.value })}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <label>Message</label>
-            <textarea
-              value={draft.message}
-              onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-              rows={3}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 8 }}>
-            <label>
-              <input
-                type="checkbox"
-                checked={draft.actif}
-                onChange={(e) => setDraft({ ...draft, actif: e.target.checked })}
-              />{" "}
-              Actif
-            </label>
+        <form className="annonce-form" onSubmit={submitForm}>
+  <div className="form-row">
+    <label htmlFor="titre">Titre</label>
+    <input id="titre" type="text" value={draft.titre}
+      onChange={(e) => setDraft({ ...draft, titre: e.target.value })}/>
+  </div>
 
-            <div>
-              <label>Expire le (optionnel)</label>
-              <input
-                type="date"
-                value={draft.expireAt}
-                onChange={(e) => setDraft({ ...draft, expireAt: e.target.value })}
-              />
-            </div>
-          </div>
+  <div className="form-row">
+    <label htmlFor="message">Message</label>
+    <textarea id="message" rows={3} value={draft.message}
+      onChange={(e) => setDraft({ ...draft, message: e.target.value })}/>
+  </div>
 
-          <div>
-            <button type="submit">💾 Enregistrer</button>
-            <button type="button" onClick={() => setEditingId(null)} style={{ marginLeft: 8 }}>
-              Annuler
-            </button>
-          </div>
-        </form>
+  <div className="form-row form-row--inline">
+    <label className="checkbox">
+      <input type="checkbox" checked={draft.actif}
+        onChange={(e) => setDraft({ ...draft, actif: e.target.checked })}/>
+      Actif
+    </label>
+
+    <div className="expire-field">
+      <label htmlFor="expireAt">Expire le (optionnel)</label>
+      <input id="expireAt" type="date" value={draft.expireAt}
+        onChange={(e) => setDraft({ ...draft, expireAt: e.target.value })}/>
+    </div>
+  </div>
+
+  {/* 🎛️ PERSONNALISATION */}
+  <div className="form-grid">
+    <div className="form-row">
+      <label>Durée (ms)</label>
+      <input type="number" min="1000" step="500"
+        value={draft.durationMs ?? ""}
+        placeholder="ex: 6000"
+        onChange={(e) => setDraft({ ...draft, durationMs: e.target.value ? parseInt(e.target.value,10) : null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Couleur texte</label>
+      <input type="text" placeholder="#e0c084"
+        value={draft.textColor ?? ""}
+        onChange={(e) => setDraft({ ...draft, textColor: e.target.value || null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Couleur fond (carte)</label>
+      <input type="text" placeholder="white"
+        value={draft.bgColor ?? ""}
+        onChange={(e) => setDraft({ ...draft, bgColor: e.target.value || null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Couleur overlay</label>
+      <input type="text" placeholder="rgba(0,0,0,.6)"
+        value={draft.overlayColor ?? ""}
+        onChange={(e) => setDraft({ ...draft, overlayColor: e.target.value || null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Taille police (px)</label>
+      <input type="number" min="12" max="72" step="1"
+        value={draft.fontSizePx ?? ""}
+        onChange={(e) => setDraft({ ...draft, fontSizePx: e.target.value ? parseInt(e.target.value,10) : null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Rayon des coins (px)</label>
+      <input type="number" min="0" max="48" step="1"
+        value={draft.borderRadiusPx ?? ""}
+        onChange={(e) => setDraft({ ...draft, borderRadiusPx: e.target.value ? parseInt(e.target.value,10) : null })}/>
+    </div>
+
+    <div className="form-row">
+      <label>Largeur max (px)</label>
+      <input type="number" min="240" max="900" step="10"
+        value={draft.maxWidthPx ?? ""}
+        onChange={(e) => setDraft({ ...draft, maxWidthPx: e.target.value ? parseInt(e.target.value,10) : null })}/>
+    </div>
+  </div>
+
+  {/* Aperçu live */}
+  <div className="preview">
+    <div className="loader-annonce" style={{ backgroundColor: draft.overlayColor || "rgba(0,0,0,.6)" }}>
+      <div className="loader-contenu" style={{
+        background: draft.bgColor || "white",
+        borderRadius: (draft.borderRadiusPx ?? 16) + "px",
+        maxWidth: (draft.maxWidthPx ?? 520) + "px"
+      }}>
+        <p className="fade-in" style={{
+          color: draft.textColor || "#e0c084",
+          fontSize: (draft.fontSizePx ?? 36) + "px"
+        }}>
+          <strong>{draft.titre || "Titre d’exemple"}</strong><br/>
+          {draft.message || "Message d’annonce d’exemple"}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div className="form-actions">
+    <button className="btn btn-primary" type="submit">💾 Enregistrer</button>
+    <button className="btn btn-secondary" type="button" onClick={() => setEditingId(null)}>Annuler</button>
+  </div>
+</form>
+
       )}
 
       {loading ? (

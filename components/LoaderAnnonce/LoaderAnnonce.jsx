@@ -1,4 +1,3 @@
-// components/LoaderAnnonce.jsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +14,7 @@ function markSeenNow() {
   localStorage.setItem(LS_LAST_SEEN_KEY, Date.now().toString());
 }
 
-export default function LoaderAnnonce({ autoHideMs = 6000 }) {
+export default function LoaderAnnonce() {
   const [annonces, setAnnonces] = useState([]);
   const [visible, setVisible] = useState(false);
   const contenuRef = useRef(null);
@@ -34,6 +33,7 @@ export default function LoaderAnnonce({ autoHideMs = 6000 }) {
     if (!annonce) return;
     if (hasOneDayPassed()) {
       setVisible(true);
+      const autoHideMs = annonce.durationMs ?? 6000;
       const t = setTimeout(() => {
         setVisible(false);
         markSeenNow();
@@ -51,17 +51,26 @@ export default function LoaderAnnonce({ autoHideMs = 6000 }) {
         window.removeEventListener("click", onClick);
       };
     }
-  }, [annonce, autoHideMs]);
+  }, [annonce]);
 
   if (!visible || !annonce) return null;
 
+  const overlayStyle = { backgroundColor: annonce.overlayColor || "rgba(0,0,0,.6)" };
+  const boxStyle = {
+    background: annonce.bgColor || "white",
+    borderRadius: (annonce.borderRadiusPx ?? 16) + "px",
+    maxWidth: (annonce.maxWidthPx ?? 520) + "px",
+  };
+  const pStyle = {
+    color: annonce.textColor || "#e0c084",
+    fontSize: (annonce.fontSizePx ?? 36) + "px",
+  };
+
   return (
-    <div className="loader-annonce">
-      <div className="loader-contenu fade-in" ref={contenuRef}>
-        <p>
-          <strong>{annonce.titre}</strong>
-          <br />
-          {annonce.message}
+    <div className="loader-annonce" style={overlayStyle}>
+      <div className="loader-contenu fade-in" style={boxStyle} ref={contenuRef}>
+        <p style={pStyle}>
+          <strong>{annonce.titre}</strong><br/>{annonce.message}
         </p>
       </div>
     </div>
