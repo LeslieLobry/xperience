@@ -468,11 +468,14 @@ model DigestNotification {
   @@map("DigestNotification")
 }
 model Annonce {
-  id        String   @id @default(cuid())
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   titre     String
   message   String
   actif     Boolean  @default(true)
   expireAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Choisis le bon nom de table selon ce que tu as en DB :
+  // @@map("Annonce")  // <-- si la table s'appelle "Annonce"
 }
