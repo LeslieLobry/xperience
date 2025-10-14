@@ -1,4 +1,3 @@
-
 import "../app/globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
@@ -6,8 +5,9 @@ import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 import { ToastContainer } from "react-toastify";
+import Script from "next/script"; // ✅ important
 import "react-toastify/dist/ReactToastify.css";
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
@@ -16,10 +16,11 @@ const raleway = Raleway({
   weight: ["400", "500", "700"],
   variable: "--font-raleway",
 });
+
 export const metadata = {
   title: "Xperiences",
   description: "Site échangiste, libertinage",
-   icons: {
+  icons: {
     icon: [
       { url: "/favicon.ico" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
@@ -40,25 +41,44 @@ export default function RootLayout({ children }) {
           <ClientWrapper>
             <ConditionalNavbar />
             {children}
-            {/* <ChatBubble /> */}
             <Footer />
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
-        {/* Place-le ici : */}
+
+        {/* ✅ Notifications toast */}
         <ToastContainer
-          position="top-right"   // ou "bottom-right"
-          autoClose={4000}       // 4 secondes
+          position="top-right"
+          autoClose={4000}
           hideProgressBar={false}
           newestOnTop={false}
           closeOnClick
           pauseOnHover
           draggable
-          theme="dark"           // Ou "light", ou personnalisable !
+          theme="dark"
         />
+
+        {/* ✅ Analytics Vercel */}
         <Analytics />
+
+        {/* ✅ Script Metricool (à garder en bas du body) */}
+        <Script id="metricool" strategy="afterInteractive">
+          {`
+            function loadScript(a){
+              var b=document.getElementsByTagName("head")[0],
+                  c=document.createElement("script");
+              c.type="text/javascript";
+              c.src="https://tracker.metricool.com/resources/be.js";
+              c.onreadystatechange=a;
+              c.onload=a;
+              b.appendChild(c);
+            }
+            loadScript(function(){
+              beTracker.t({hash:"615ebc6689a321638b55a16d8966e190"});
+            });
+          `}
+        </Script>
       </body>
     </html>
   );
 }
-
