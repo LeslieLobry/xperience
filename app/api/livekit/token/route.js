@@ -1,7 +1,6 @@
 // /api/livekit/token/route.js
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
-import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,12 +14,14 @@ const LIVEKIT_URL =
 const API_KEY = process.env.LIVEKIT_API_KEY || process.env.LIVEKIT_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET || process.env.LIVEKIT_SECRET;
 
+/* ---------- utils ---------- */
 function normalizeWs(url) {
   if (!url) return null;
   let u = String(url).trim();
   if (u.startsWith("http://")) u = u.replace("http://", "ws://");
   if (u.startsWith("https://")) u = u.replace("https://", "wss://");
-  if (!u.startsWith("ws://") && !u.startsWith("wss://")) u = "wss://" + u.replace(/^\/+/, "");
+  if (!u.startsWith("ws://") && !u.startsWith("wss://"))
+    u = "wss://" + u.replace(/^\/+/, "");
   return u;
 }
 
@@ -28,19 +29,20 @@ function sanitizeIdentity(id) {
   return String(id || "").trim().replace(/\s+/g, "_").slice(0, 128);
 }
 
-function makeUniqueIdentity(baseIdentity, deviceId) {
-  const base = sanitizeIdentity(baseIdentity || "user-anon");
-  const dev = sanitizeIdentity(deviceId) || randomUUID();
-  // si déjà suffixée, on garde (ex: "user-42:deviceA")
-  if (base.includes(":")) return base;
-  return `${base}:${dev}`;
+// ➜ identité STABLE, sans suffixe par device
+function makeIdentity(base) {
+  let s = String(base ?? "user-anon").trim();
+  // si l’app envoie juste un id numérique, préfixe-le
+  if (/^\d+$/.test(s)) s = `user-${s}`;
+  return sanitizeIdentity(s);
 }
 
 function buildJwt({ identity, room, ttlSec = 600, name }) {
-  if (!API_KEY || !API_SECRET) throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
+  if (!API_KEY || !API_SECRET)
+    throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
   const at = new AccessToken(API_KEY, API_SECRET, {
     identity: sanitizeIdentity(identity),
-    ttl: ttlSec, // ✅ nombre en secondes
+    ttl: ttlSec, // en secondes
     name: name ? String(name).slice(0, 128) : undefined,
   });
   at.addGrant({
@@ -53,6 +55,7 @@ function buildJwt({ identity, room, ttlSec = 600, name }) {
   return at.toJwt();
 }
 
+/* ---------- GET ---------- */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -70,27 +73,35 @@ export async function GET(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    const room =
-      searchParams.get("room") ||
-      searchParams.get("conversationId");
+    const room = searchParams.get("room") || searchParams.get("conversationId");
     if (!room) {
-      return NextResponse.json({ success: false, error: "room/conversationId requis" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "room/conversationId requis" },
+        { status: 400 }
+      );
     }
 
     const identityBase =
       searchParams.get("identity") ||
       searchParams.get("userId") ||
       "user-anon";
-    const identity = makeUniqueIdentity(identityBase);
+    const identity = makeIdentity(identityBase);
 
-    const token = await buildJwt({ identity, room, ttlSec: 600 });
-    return NextResponse.json({ success: true, token, wsUrl, identity, room: String(room) }, { status: 200 });
+    const token = buildJwt({ identity, room, ttlSec: 600 });
+    return NextResponse.json(
+      { success: true, token, wsUrl, identity, room: String(room) },
+      { status: 200 }
+    );
   } catch (e) {
     console.error("[livekit/token][GET]", e);
-    return NextResponse.json({ success: false, error: e?.message || "Token build failed" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: e?.message || "Token build failed" },
+      { status: 500 }
+    );
   }
 }
 
+/* ---------- POST ---------- */
 export async function POST(req) {
   try {
     const wsUrl = normalizeWs(LIVEKIT_URL);
@@ -111,19 +122,27 @@ export async function POST(req) {
 
     const room = body.room || body.conversationId;
     if (!room) {
-      return NextResponse.json({ success: false, error: "room/conversationId requis" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "room/conversationId requis" },
+        { status: 400 }
+      );
     }
 
-    const deviceId = req.headers.get("x-device-id") || undefined;
     const identityBase = body.identity || body.userId || "user-anon";
-    const identity = makeUniqueIdentity(identityBase, deviceId);
+    const identity = makeIdentity(identityBase);
 
     const name = body.name || undefined;
-    const token = await buildJwt({ identity, room, ttlSec: 600, name });
+    const token = buildJwt({ identity, room, ttlSec: 600, name });
 
-    return NextResponse.json({ success: true, token, wsUrl, identity, room: String(room) }, { status: 200 });
+    return NextResponse.json(
+      { success: true, token, wsUrl, identity, room: String(room) },
+      { status: 200 }
+    );
   } catch (e) {
     console.error("[livekit/token][POST]", e);
-    return NextResponse.json({ success: false, error: e?.message || "Token build failed" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: e?.message || "Token build failed" },
+      { status: 500 }
+    );
   }
 }
