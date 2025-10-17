@@ -29,10 +29,8 @@ function sanitizeIdentity(id) {
   return String(id || "").trim().replace(/\s+/g, "_").slice(0, 128);
 }
 
-// ➜ identité STABLE, sans suffixe par device
 function makeIdentity(base) {
   let s = String(base ?? "user-anon").trim();
-  // si l’app envoie juste un id numérique, préfixe-le
   if (/^\d+$/.test(s)) s = `user-${s}`;
   return sanitizeIdentity(s);
 }
@@ -42,7 +40,7 @@ function buildJwt({ identity, room, ttlSec = 600, name }) {
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
   const at = new AccessToken(API_KEY, API_SECRET, {
     identity: sanitizeIdentity(identity),
-    ttl: ttlSec, // en secondes
+    ttl: ttlSec,
     name: name ? String(name).slice(0, 128) : undefined,
   });
   at.addGrant({
@@ -73,7 +71,11 @@ export async function GET(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    const room = searchParams.get("room") || searchParams.get("conversationId");
+    const room =
+      searchParams.get("room") ||
+      searchParams.get("roomName") ||
+      searchParams.get("conversationId");
+
     if (!room) {
       return NextResponse.json(
         { success: false, error: "room/conversationId requis" },
@@ -107,20 +109,30 @@ export async function POST(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    const ct = req.headers.get("content-type") || "";
+    // Lecture TOLÉRANTE du body (même si le header Content-Type est absent)
+    let bodyText = "";
+    try { bodyText = await req.text(); } catch {}
     let body = {};
-    if (ct.includes("application/json")) {
-      body = await req.json().catch(() => ({}));
-    } else if (ct.includes("application/x-www-form-urlencoded")) {
-      const t = await req.text();
-      const p = new URLSearchParams(t);
+    try {
+      if (bodyText) body = JSON.parse(bodyText);
+    } catch {
+      // si ce n’est pas du JSON, essayer URL-encoded
+      const p = new URLSearchParams(bodyText);
       body = Object.fromEntries(p.entries());
-    } else if (ct.includes("multipart/form-data")) {
-      const fd = await req.formData();
-      body = Object.fromEntries(fd.entries());
     }
 
-    const room = body.room || body.conversationId;
+    // accepter plusieurs alias
+    const room =
+      body.room || body.roomName || body.conversationId || body.convId;
+    const identityBase = body.identity || body.userId || "user-anon";
+    const name = body.name || undefined;
+
+    console.log("[/api/livekit/token][POST] recv:", {
+      room,
+      identityBase,
+      hasBody: !!bodyText,
+    });
+
     if (!room) {
       return NextResponse.json(
         { success: false, error: "room/conversationId requis" },
@@ -128,10 +140,7 @@ export async function POST(req) {
       );
     }
 
-    const identityBase = body.identity || body.userId || "user-anon";
     const identity = makeIdentity(identityBase);
-
-    const name = body.name || undefined;
     const token = buildJwt({ identity, room, ttlSec: 600, name });
 
     return NextResponse.json(
