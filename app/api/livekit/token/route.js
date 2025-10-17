@@ -35,7 +35,8 @@ function makeIdentity(base) {
   return sanitizeIdentity(s);
 }
 
-function buildJwt({ identity, room, ttlSec = 600, name }) {
+// ⬇️⬇️⬇️  CHANGEMENT: async + await  ⬇️⬇️⬇️
+async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
   const at = new AccessToken(API_KEY, API_SECRET, {
@@ -50,7 +51,7 @@ function buildJwt({ identity, room, ttlSec = 600, name }) {
     canSubscribe: true,
     canPublishData: true,
   });
-  return at.toJwt();
+  return await at.toJwt(); // <- important
 }
 
 /* ---------- GET ---------- */
@@ -89,7 +90,7 @@ export async function GET(req) {
       "user-anon";
     const identity = makeIdentity(identityBase);
 
-    const token = buildJwt({ identity, room, ttlSec: 600 });
+    const token = await buildJwt({ identity, room, ttlSec: 600 }); // <- await
     return NextResponse.json(
       { success: true, token, wsUrl, identity, room: String(room) },
       { status: 200 }
@@ -109,29 +110,20 @@ export async function POST(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    // Lecture TOLÉRANTE du body (même si le header Content-Type est absent)
     let bodyText = "";
     try { bodyText = await req.text(); } catch {}
     let body = {};
     try {
       if (bodyText) body = JSON.parse(bodyText);
     } catch {
-      // si ce n’est pas du JSON, essayer URL-encoded
       const p = new URLSearchParams(bodyText);
       body = Object.fromEntries(p.entries());
     }
 
-    // accepter plusieurs alias
     const room =
       body.room || body.roomName || body.conversationId || body.convId;
     const identityBase = body.identity || body.userId || "user-anon";
     const name = body.name || undefined;
-
-    console.log("[/api/livekit/token][POST] recv:", {
-      room,
-      identityBase,
-      hasBody: !!bodyText,
-    });
 
     if (!room) {
       return NextResponse.json(
@@ -141,7 +133,7 @@ export async function POST(req) {
     }
 
     const identity = makeIdentity(identityBase);
-    const token = buildJwt({ identity, room, ttlSec: 600, name });
+    const token = await buildJwt({ identity, room, ttlSec: 600, name }); // <- await
 
     return NextResponse.json(
       { success: true, token, wsUrl, identity, room: String(room) },
