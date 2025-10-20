@@ -14,7 +14,9 @@ const LIVEKIT_URL =
 const API_KEY = process.env.LIVEKIT_API_KEY || process.env.LIVEKIT_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET || process.env.LIVEKIT_SECRET;
 
-/* ---------- utils ---------- */
+/* ============================================================
+ *  UTILS
+ * ============================================================ */
 function normalizeWs(url) {
   if (!url) return null;
   let u = String(url).trim();
@@ -35,7 +37,15 @@ function makeIdentity(base) {
   return sanitizeIdentity(s);
 }
 
-// ⬇️⬇️⬇️  CHANGEMENT: async + await  ⬇️⬇️⬇️
+// ✅ Nouvelle fonction : garantit un format stable pour la room
+function normalizeRoom(input) {
+  if (!input) return null;
+  const s = String(input).trim();
+  if (/^\d+$/.test(s)) return `conversation-${s}`;
+  if (/^conversation-/.test(s)) return s;
+  return s;
+}
+
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
@@ -51,10 +61,12 @@ async function buildJwt({ identity, room, ttlSec = 600, name }) {
     canSubscribe: true,
     canPublishData: true,
   });
-  return await at.toJwt(); // <- important
+  return await at.toJwt();
 }
 
-/* ---------- GET ---------- */
+/* ============================================================
+ *  GET
+ * ============================================================ */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -72,10 +84,11 @@ export async function GET(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    const room =
+    const rawRoom =
       searchParams.get("room") ||
       searchParams.get("roomName") ||
       searchParams.get("conversationId");
+    const room = normalizeRoom(rawRoom);
 
     if (!room) {
       return NextResponse.json(
@@ -90,9 +103,12 @@ export async function GET(req) {
       "user-anon";
     const identity = makeIdentity(identityBase);
 
-    const token = await buildJwt({ identity, room, ttlSec: 600 }); // <- await
+    const token = await buildJwt({ identity, room, ttlSec: 600 });
+
+    console.log("[LIVEKIT][GET]", { room, identity }); // debug simple
+
     return NextResponse.json(
-      { success: true, token, wsUrl, identity, room: String(room) },
+      { success: true, token, wsUrl, identity, room },
       { status: 200 }
     );
   } catch (e) {
@@ -104,14 +120,18 @@ export async function GET(req) {
   }
 }
 
-/* ---------- POST ---------- */
+/* ============================================================
+ *  POST
+ * ============================================================ */
 export async function POST(req) {
   try {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
     let bodyText = "";
-    try { bodyText = await req.text(); } catch {}
+    try {
+      bodyText = await req.text();
+    } catch {}
     let body = {};
     try {
       if (bodyText) body = JSON.parse(bodyText);
@@ -120,10 +140,9 @@ export async function POST(req) {
       body = Object.fromEntries(p.entries());
     }
 
-    const room =
+    const rawRoom =
       body.room || body.roomName || body.conversationId || body.convId;
-    const identityBase = body.identity || body.userId || "user-anon";
-    const name = body.name || undefined;
+    const room = normalizeRoom(rawRoom);
 
     if (!room) {
       return NextResponse.json(
@@ -132,11 +151,16 @@ export async function POST(req) {
       );
     }
 
+    const identityBase = body.identity || body.userId || "user-anon";
+    const name = body.name || undefined;
     const identity = makeIdentity(identityBase);
-    const token = await buildJwt({ identity, room, ttlSec: 600, name }); // <- await
+
+    const token = await buildJwt({ identity, room, ttlSec: 600, name });
+
+    console.log("[LIVEKIT][POST]", { room, identity }); // debug simple
 
     return NextResponse.json(
-      { success: true, token, wsUrl, identity, room: String(room) },
+      { success: true, token, wsUrl, identity, room },
       { status: 200 }
     );
   } catch (e) {
