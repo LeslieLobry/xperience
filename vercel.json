@@ -1,19 +1,5 @@
 {
-  "functions": {
-    "api/cron/**": {
-      "runtime": "nodejs20.x",
-      "regions": ["cdg1", "fra1", "arn1"]
-    },
-    "app/api/**/route.{js,ts}": {
-      "runtime": "edge",
-      "regions": ["cdg1", "fra1", "arn1"]
-    },
-    "api/**": {
-      "runtime": "nodejs20.x",
-      "regions": ["cdg1", "fra1", "arn1"]
-    }
-  },
-  "crons": [
+   "crons": [
     {
       "path": "/api/cron/reminder-profile?token=@CRON_SECRET",
       "schedule": "0 8 * * *"
