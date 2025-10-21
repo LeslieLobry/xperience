@@ -17,7 +17,7 @@
   }
 
   .page-recherche > .RechercheResultats {
-    order: 1; /* Afficher en haut */
+    order: 1; 
   }
 }
 .recherche-toolbar {
@@ -30,7 +30,7 @@
   justify-content: flex-end;
   padding: 10px 12px;
   border-bottom: 1px solid #e6e6e6;
-  background: #fff; /* ou ta couleur de fond */
+  background: #fff; 
 }
 
 .recherche-toolbar .btn-outlined {
@@ -43,10 +43,10 @@
 
 .recherche-toolbar .btn-primary {
   border: none;
-  background: #e0c084; /* ton gold */
+  background: #e0c084; 
   padding: 8px 14px;
   border-radius: 8px;
-  color: #0e1a2b;       /* ton dark */
+  color: #0e1a2b;      
   font-weight: 600;
   cursor: pointer;
 }

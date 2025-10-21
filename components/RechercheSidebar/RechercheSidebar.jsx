@@ -1,17 +1,24 @@
 "use client";
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  useRef,
+} from "react";
 import "./recherche-sidebar.css";
 import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ReconnaissanceVocale from "../ReconnaissanceVocale/ReconnaissanceVocale";
 
+/* -------------------------------- Utils -------------------------------- */
 function normalizeToDb(val) {
   return val.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
-  React.useEffect(() => {
+  useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < breakpoint);
     check();
     window.addEventListener("resize", check);
@@ -20,26 +27,117 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+/* --------------------------- Autocomplétion ville --------------------------- */
+function useCityAutocomplete() {
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+
+  const controllerRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    if (!query || query.trim().length < 2) {
+      setItems([]);
+      setOpen(false);
+      return;
+    }
+    setLoading(true);
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        controllerRef.current?.abort?.();
+        controllerRef.current = new AbortController();
+
+        const url =
+          `https://geo.api.gouv.fr/communes` +
+          `?nom=${encodeURIComponent(query)}` +
+          `&fields=nom,code,centre,departement,population` +
+          `&boost=population&limit=8`;
+
+        const res = await fetch(url, { signal: controllerRef.current.signal });
+        const data = await res.json();
+
+        const mapped = (Array.isArray(data) ? data : []).map((c) => ({
+          label: `${c.nom} (${c.departement?.code || "—"})`,
+          nom: c.nom,
+          code: c.code,
+          departement: c.departement?.code || "",
+          latitude: c.centre?.coordinates?.[1] ?? null,
+          longitude: c.centre?.coordinates?.[0] ?? null,
+          population: c.population ?? 0,
+        }));
+
+        setItems(mapped);
+        setOpen(mapped.length > 0);
+        setHighlight(mapped.length ? 0 : -1);
+      } catch {
+        // ignore abort/erreur réseau
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      clearTimeout(debounceRef.current);
+      controllerRef.current?.abort?.();
+    };
+  }, [query]);
+
+  return {
+    query,
+    setQuery,
+    items,
+    loading,
+    open,
+    setOpen,
+    highlight,
+    setHighlight,
+  };
+}
+
+/* ------------------------------ Clean filters ------------------------------ */
 function cleanFormFilters(formIn) {
-  let form = { ...formIn };
+  const form = { ...formIn };
+
+  // Si “autour de moi” : ignorer la ville texte (coords via geoloc)
   if (form.autourDeMoi) {
     form.localisation = "";
+    // latitude/longitude seront ajoutées plus tard par navigator.geolocation
+    delete form.latitude;
+    delete form.longitude;
   } else if (form.localisation) {
+    // Mode ville : s'assurer qu’on n’est pas en “autour de moi”
     form.autourDeMoi = false;
     if (!form.rayon) delete form.rayon;
+    // latitude/longitude peuvent être présentes si issues de l’autocomplétion
+  } else {
+    // Ni autour de moi, ni ville => pas de coords
+    delete form.latitude;
+    delete form.longitude;
+    delete form.rayon;
   }
+
   if (!form.autourDeMoi) delete form.autourDeMoi;
+
   return form;
 }
 
 const DEFAULT_RAYON = 20;
 
-const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, className }, ref) {
+/* ================================ Component ================================ */
+const RechercheSidebar = forwardRef(function RechercheSidebar(
+  { onSearch, className },
+  ref
+) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Clear any existing query parameters on first render
+  // Nettoie les query params à l’ouverture de la page /recherche
   useEffect(() => {
     if (Array.from(searchParams.keys()).length > 0) {
       router.replace(pathname, { scroll: false });
@@ -47,68 +145,131 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
   }, [router, pathname, searchParams]);
 
   const [form, setForm] = useState({
-    pseudo: "", type: [], orientation: [], rechercheType: [],
-    ageMin: "", ageMax: "", localisation: "",
-    photo: false, description: false, statut: "all",
-    experience: [], fumeur: [], silhouette: [],
-    taille: [], origines: [], yeux: [], cheveux: [],
-    recherches: [], envies: [], rayon: "", autourDeMoi: false
+    pseudo: "",
+    type: [],
+    orientation: [],
+    rechercheType: [],
+    ageMin: "",
+    ageMax: "",
+    localisation: "",
+    photo: false,
+    description: false,
+    statut: "all",
+    experience: [],
+    fumeur: [],
+    silhouette: [],
+    taille: [],
+    origines: [],
+    yeux: [],
+    cheveux: [],
+    recherches: [],
+    envies: [],
+    rayon: "",
+    autourDeMoi: false,
+    latitude: undefined,
+    longitude: undefined,
   });
+
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
 
   const [openSections, setOpenSections] = useState({
     identite: false,
-    criteres: false,
     envies: false,
     experience: false,
     autres: false,
   });
 
   const toggleSection = (key) => {
-    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleSearch = (formRaw) => {
-    const form = cleanFormFilters(formRaw);
-    const normalizeArray = arr => Array.isArray(arr) ? arr.map(normalizeToDb) : [];
-    form.orientation   = normalizeArray(form.orientation);
-    form.type          = normalizeArray(form.type);
-    form.rechercheType = normalizeArray(form.rechercheType);
-    form.recherches    = normalizeArray(form.recherches);
-    form.experience    = normalizeArray(form.experience);
-    form.fumeur        = normalizeArray(form.fumeur);
-    form.silhouette    = normalizeArray(form.silhouette);
-    form.taille        = normalizeArray(form.taille);
-    form.origines      = normalizeArray(form.origines);
-    form.yeux          = normalizeArray(form.yeux);
-    form.cheveux       = normalizeArray(form.cheveux);
-    form.envies        = normalizeArray(form.envies);
+  /* ----------------------------- Autocomplétion ----------------------------- */
+  const city = useCityAutocomplete();
+  const dropdownRef = useRef(null);
 
-    if (form.autourDeMoi) {
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target)) city.setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [city]);
+
+  function selectCity(item) {
+    setForm((prev) => ({
+      ...prev,
+      localisation: `${item.nom} (${item.departement || "—"})`,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      autourDeMoi: false,
+    }));
+    city.setQuery(item.nom);
+    city.setOpen(false);
+  }
+
+  function onCityKeyDown(e) {
+    if (!city.open || !city.items.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      city.setHighlight((i) => (i + 1) % city.items.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = city.items[city.highlight] || city.items[0];
+      if (item) selectCity(item);
+    } else if (e.key === "Escape") {
+      city.setOpen(false);
+    }
+  }
+
+  /* ------------------------------ Recherche push ------------------------------ */
+  const handleSearch = (formRaw) => {
+    const f = cleanFormFilters(formRaw);
+
+    const normalizeArray = (arr) =>
+      Array.isArray(arr) ? arr.map(normalizeToDb) : [];
+
+    f.orientation = normalizeArray(f.orientation);
+    f.type = normalizeArray(f.type);
+    f.rechercheType = normalizeArray(f.rechercheType);
+    f.recherches = normalizeArray(f.recherches);
+    f.experience = normalizeArray(f.experience);
+    f.fumeur = normalizeArray(f.fumeur);
+    f.silhouette = normalizeArray(f.silhouette);
+    f.taille = normalizeArray(f.taille);
+    f.origines = normalizeArray(f.origines);
+    f.yeux = normalizeArray(f.yeux);
+    f.cheveux = normalizeArray(f.cheveux);
+    f.envies = normalizeArray(f.envies);
+
+    if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const latitude = pos.coords.latitude;
           const longitude = pos.coords.longitude;
-          const rayon = form.rayon || DEFAULT_RAYON;
+          const rayon = f.rayon || DEFAULT_RAYON;
           setLoadingGeo(false);
-          onSearch?.({ ...form, latitude, longitude, rayon });
+          onSearch?.({ ...f, latitude, longitude, rayon });
         },
-        (err) => {
+        () => {
           setLoadingGeo(false);
           alert("Impossible de récupérer ta position");
-          onSearch?.(form);
+          onSearch?.(f);
         }
       );
     } else {
-      onSearch?.(form);
+      onSearch?.(f);
     }
   };
 
   useImperativeHandle(ref, () => ({
     handleVocalFiltres(filtres) {
-      setForm(prev => {
+      setForm((prev) => {
         const next = { ...prev };
         Object.entries(filtres).forEach(([k, v]) => {
           if (Array.isArray(next[k]) && Array.isArray(v)) {
@@ -120,7 +281,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
         handleSearch(next);
         return next;
       });
-    }
+    },
   }));
 
   const isMobile = useIsMobile(768);
@@ -135,30 +296,38 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
     );
   }
 
-  const handleSubmit = e => {
+  function handleSubmit(e) {
     e.preventDefault();
     handleSearch(form);
-  };
+  }
 
+  /* ---------------------------------- JSX ---------------------------------- */
   return (
-  <aside className={`recherche-sidebar ${className || ""}`}>
-
+    <aside className={`recherche-sidebar ${className || ""}`}>
       <div style={{ marginBottom: 24 }}>
         <ReconnaissanceVocale
-          onResult={texte => {
+          onResult={(texte) => {
             setResumeVocal(texte);
             const filtres = extraireFiltresVocal(texte);
-            setForm(prev => ({ ...prev, ...filtres }));
+            setForm((prev) => ({ ...prev, ...filtres }));
             handleSearch({ ...form, ...filtres });
           }}
         />
         {resumeVocal && (
-          <div style={{
-            margin: "12px 0 20px", padding: "6px",
-            borderRadius: 8, background: "#fffbe7", color: "#c4903a",
-            fontWeight: "bold", boxShadow: "0 2px 10px #e0c08444", maxWidth: 700
-          }}>
-            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
+          <div
+            style={{
+              margin: "12px 0 20px",
+              padding: "6px",
+              borderRadius: 8,
+              background: "#fffbe7",
+              color: "#c4903a",
+              fontWeight: "bold",
+              boxShadow: "0 2px 10px #e0c08444",
+              maxWidth: 700,
+            }}
+          >
+            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> «{" "}
+            {resumeVocal} »
           </div>
         )}
         {loadingGeo && (
@@ -178,61 +347,266 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
           onChange={handleChange}
         />
 
-        <Section title="Identité" open={openSections.identite} toggle={() => toggleSection("identite")}>
-          {renderCheckboxGroup("Type", "type", ["Homme", "Femme", "Couple", "Groupe"])}
-          {renderCheckboxGroup("Orientation", "orientation", ["Hétéro", "Bi", "Pan", "Ouvert", "Lesbienne"])}
+        <Section
+          title="Identité"
+          open={openSections.identite}
+          toggle={() => toggleSection("identite")}
+        >
+          {renderCheckboxGroup("Type", "type", [
+            "Homme",
+            "Femme",
+            "Couple",
+            "Groupe",
+          ])}
+          {renderCheckboxGroup("Orientation", "orientation", [
+            "Hétéro",
+            "Bi",
+            "Pan",
+            "Ouvert",
+            "Lesbienne",
+          ])}
           {renderCheckboxGroup("Type de recherche", "rechercheType", [
-            "Je le garde pour moi", "Virtuel uniquement", "Virtuel et peut-être plus",
-            "Réel seulement", "Réel & virtuel", "Je ne sais pas, c’est à voir",
-            "Aventure d’un soir", "Relation secrète", "Relation à long terme"
+            "Je le garde pour moi",
+            "Virtuel uniquement",
+            "Virtuel et peut-être plus",
+            "Réel seulement",
+            "Réel & virtuel",
+            "Je ne sais pas, c’est à voir",
+            "Aventure d’un soir",
+            "Relation secrète",
+            "Relation à long terme",
           ])}
         </Section>
 
-        {/* <Section title="Recherches" open={openSections.criteres} toggle={() => toggleSection("criteres")}>
-          {renderCheckboxGroup("Je recherche", "recherches", [
-            "Hommes hétéros", "Femmes hétéros", "Couples hétéros",
-            "Couples F Bi", "Couples H Bi", "Couples Bi",
-            "Hommes Bi", "Gays", "Femmes Bi", "Lesbiennes", "Travestis", "Transgenres"
-          ])}
-        </Section> */}
-
-        <Section title="Envies" open={openSections.envies} toggle={() => toggleSection("envies")}>
+        <Section
+          title="Envies"
+          open={openSections.envies}
+          toggle={() => toggleSection("envies")}
+        >
           {renderCheckboxGroup("Mes envies", "envies", [
-            "2+2", "BDSM", "Cam", "Candaulisme", "Chat", "Côte-à-côtisme", "Curieux",
-            "Duo", "Echangisme", "Exhibition", "Extreme", "Feeling", "Fétichisme",
-            "Gang bang", "Hard", "Mélangisme", "Papouilles", "Photos", "Pluralité",
-            "Scénario", "Soft", "Trio", "Vidéos", "Voyeurisme"
+            "2+2",
+            "BDSM",
+            "Cam",
+            "Candaulisme",
+            "Chat",
+            "Côte-à-côtisme",
+            "Curieux",
+            "Duo",
+            "Echangisme",
+            "Exhibition",
+            "Extreme",
+            "Feeling",
+            "Fétichisme",
+            "Gang bang",
+            "Hard",
+            "Mélangisme",
+            "Papouilles",
+            "Photos",
+            "Pluralité",
+            "Scénario",
+            "Soft",
+            "Trio",
+            "Vidéos",
+            "Voyeurisme",
           ])}
         </Section>
 
-        <Section title="Expérience" open={openSections.experience} toggle={() => toggleSection("experience")}>
+        <Section
+          title="Expérience"
+          open={openSections.experience}
+          toggle={() => toggleSection("experience")}
+        >
           {renderCheckboxGroup("Expérience", "experience", [
-            "A découvrir", "Débutant", "Occasionnel", "Expérimenté", "Je la garde pour moi"
+            "A découvrir",
+            "Débutant",
+            "Occasionnel",
+            "Expérimenté",
+            "Je la garde pour moi",
           ])}
         </Section>
 
-        <Section title="Autres critères" open={openSections.autres} toggle={() => toggleSection("autres")}>
+        <Section
+          title="Autres critères"
+          open={openSections.autres}
+          toggle={() => toggleSection("autres")}
+        >
           <div className="filters-group">
             <h4>Âge</h4>
-            <input type="number" name="ageMin" placeholder="Min" value={form.ageMin} onChange={handleChange} min={18} />
-            <input type="number" name="ageMax" placeholder="Max" value={form.ageMax} onChange={handleChange} min={18} />
+            <input
+              type="number"
+              name="ageMin"
+              placeholder="Min"
+              value={form.ageMin}
+              onChange={handleChange}
+              min={18}
+            />
+            <input
+              type="number"
+              name="ageMax"
+              placeholder="Max"
+              value={form.ageMax}
+              onChange={handleChange}
+              min={18}
+            />
           </div>
-          <input type="text" name="localisation" placeholder="Ville" value={form.localisation} onChange={handleChange} />
-          <input type="number" name="rayon" placeholder="Rayon (km)" value={form.rayon} min={1} max={200} onChange={handleChange} />
-          <label><input type="checkbox" name="autourDeMoi" checked={form.autourDeMoi} onChange={handleChange} />Autour de moi</label>
-          <label><input type="checkbox" name="photo" checked={form.photo} onChange={handleChange} />Avec photo</label>
-          <label><input type="checkbox" name="description" checked={form.description} onChange={handleChange} />Avec description</label>
+
+          {/* --- Autocomplétion Ville --- */}
+          <div className="filters-group" ref={dropdownRef} style={{ position: "relative" }}>
+            <h4>Ville</h4>
+            <input
+              type="text"
+              name="localisation"
+              className="input-recherche"
+              placeholder="Commune (ex: Lille)"
+              value={form.localisation}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                }));
+                city.setQuery(v);
+                if (v.trim().length >= 2) city.setOpen(true);
+                else city.setOpen(false);
+              }}
+              onKeyDown={onCityKeyDown}
+              autoComplete="off"
+            />
+            {city.loading && <div className="city-hint">Recherche…</div>}
+            {city.open && city.items.length > 0 && (
+              <ul className="city-dropdown">
+                {city.items.map((item, idx) => (
+                  <li
+                    key={`${item.code}-${idx}`}
+                    className={`city-option ${
+                      idx === city.highlight ? "is-active" : ""
+                    }`}
+                    onMouseEnter={() => city.setHighlight(idx)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectCity(item);
+                    }}
+                    title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
+                  >
+                    <span className="city-name">{item.label}</span>
+                    {item.latitude != null && item.longitude != null && (
+                      <span className="city-geo">
+                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <input
+            type="number"
+            name="rayon"
+            placeholder="Rayon (km)"
+            value={form.rayon}
+            min={1}
+            max={200}
+            onChange={handleChange}
+          />
+
+          <label>
+            <input
+              type="checkbox"
+              name="autourDeMoi"
+              checked={form.autourDeMoi}
+              onChange={handleChange}
+            />
+            Autour de moi
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="photo"
+              checked={form.photo}
+              onChange={handleChange}
+            />
+            Avec photo
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              name="description"
+              checked={form.description}
+              onChange={handleChange}
+            />
+            Avec description
+          </label>
 
           <h4>Statut</h4>
-          <label><input type="radio" name="statut" value="all" checked={form.statut === "all"} onChange={handleChange} />Tous</label>
-          <label><input type="radio" name="statut" value="en_ligne" checked={form.statut === "en_ligne"} onChange={handleChange} />En ligne</label>
+          <label>
+            <input
+              type="radio"
+              name="statut"
+              value="all"
+              checked={form.statut === "all"}
+              onChange={handleChange}
+            />
+            Tous
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="statut"
+              value="en_ligne"
+              checked={form.statut === "en_ligne"}
+              onChange={handleChange}
+            />
+            En ligne
+          </label>
 
-          {/* Physique (singulier uniquement) */}
-          {renderCheckboxGroup("Silhouette", "silhouette", ["Mince", "Moyenne", "Rond", "Ronde", "Athlétique", "Sportif", "Pulpeuse", "Normal"])}
-          {renderCheckboxGroup("Taille", "taille", ["Petite", "Petit", "Moyenne", "Grande", "Grand"])}
-          {renderCheckboxGroup("Origines", "origines", ["Européen", "Maghrébin", "Africain", "Asiatique", "Métisse", "Autre"])}
-          {renderCheckboxGroup("Yeux", "yeux", ["Bleu", "Vert", "Marron", "Noir", "Gris", "Noisette"])}
-          {renderCheckboxGroup("Cheveux", "cheveux", ["Blond", "Brun", "Noir", "Roux", "Châtain", "Gris", "Rasé", "Long", "Court"])}
+          {renderCheckboxGroup("Silhouette", "silhouette", [
+            "Mince",
+            "Moyenne",
+            "Rond",
+            "Ronde",
+            "Athlétique",
+            "Sportif",
+            "Pulpeuse",
+            "Normal",
+          ])}
+          {renderCheckboxGroup("Taille", "taille", [
+            "Petite",
+            "Petit",
+            "Moyenne",
+            "Grande",
+            "Grand",
+          ])}
+          {renderCheckboxGroup("Origines", "origines", [
+            "Européen",
+            "Maghrébin",
+            "Africain",
+            "Asiatique",
+            "Métisse",
+            "Autre",
+          ])}
+          {renderCheckboxGroup("Yeux", "yeux", [
+            "Bleu",
+            "Vert",
+            "Marron",
+            "Noir",
+            "Gris",
+            "Noisette",
+          ])}
+          {renderCheckboxGroup("Cheveux", "cheveux", [
+            "Blond",
+            "Brun",
+            "Noir",
+            "Roux",
+            "Châtain",
+            "Gris",
+            "Rasé",
+            "Long",
+            "Court",
+          ])}
         </Section>
 
         <button type="submit" className="recherche-button" disabled={loadingGeo}>
@@ -242,25 +616,40 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
     </aside>
   );
 
+  /* -------------------------------- Handlers -------------------------------- */
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
+
     if (name === "autourDeMoi") {
-      setForm(prev => ({ ...prev, autourDeMoi: checked, localisation: checked ? "" : prev.localisation }));
-      return;
-    }
-    if (name === "localisation" && value) {
-      setForm(prev => ({ ...prev, localisation: value, autourDeMoi: false }));
-      return;
-    }
-    if (type === "checkbox" && Array.isArray(form[name])) {
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
-        [name]: checked ? [...prev[name], value] : prev[name].filter(v => v !== value)
+        autourDeMoi: checked,
+        localisation: checked ? "" : prev.localisation,
+        latitude: checked ? undefined : prev.latitude,
+        longitude: checked ? undefined : prev.longitude,
+      }));
+      if (checked) {
+        city.setOpen(false);
+      }
+      return;
+    }
+
+    if (name === "localisation") {
+      // (géré dans onChange spécifique au-dessus)
+      return;
+    }
+
+    if (type === "checkbox" && Array.isArray(form[name])) {
+      setForm((prev) => ({
+        ...prev,
+        [name]: checked
+          ? [...prev[name], value]
+          : prev[name].filter((v) => v !== value),
       }));
     } else if (type === "checkbox") {
-      setForm(prev => ({ ...prev, [name]: checked }));
+      setForm((prev) => ({ ...prev, [name]: checked }));
     } else {
-      setForm(prev => ({ ...prev, [name]: value }));
+      setForm((prev) => ({ ...prev, [name]: value }));
     }
   }
 
@@ -268,9 +657,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
     return (
       <div className="filters-group">
         <h4>{title}</h4>
-        {options.map(opt => (
+        {options.map((opt) => (
           <label key={opt}>
-            <input type="checkbox" name={name} value={opt} checked={form[name]?.includes(opt)} onChange={handleChange} />
+            <input
+              type="checkbox"
+              name={name}
+              value={opt}
+              checked={form[name]?.includes(opt)}
+              onChange={handleChange}
+            />
             {opt}
           </label>
         ))}
