@@ -20,3 +20,38 @@
     order: 1; /* Afficher en haut */
   }
 }
+.recherche-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e6e6e6;
+  background: #fff; /* ou ta couleur de fond */
+}
+
+.recherche-toolbar .btn-outlined {
+  border: 1px solid #bbb;
+  background: transparent;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.recherche-toolbar .btn-primary {
+  border: none;
+  background: #e0c084; /* ton gold */
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: #0e1a2b;       /* ton dark */
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recherche-toolbar button:focus-visible {
+  outline: 2px solid #0e1a2b;
+  outline-offset: 2px;
+}

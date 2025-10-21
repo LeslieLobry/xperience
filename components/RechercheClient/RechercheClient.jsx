@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import RechercheSidebar from "../RechercheSidebar/RechercheSidebar";
 import RechercheResultats from "../RechercheResultats/RechercheResultats";
@@ -8,20 +8,20 @@ import "./RechercheClient.css"
 
 export default function RechercheClient() {
   const sidebarRef = useRef();
-  const [resumeVocal, setResumeVocal] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
 
   // Détection mobile
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    handleResize(); // initial
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Sait si une recherche est active (des paramètres dans l’URL)
+  const hasActiveSearch = useMemo(() => searchParams.toString().length > 0, [searchParams]);
 
   const pseudo         = searchParams.get("pseudo") || "";
   const type           = searchParams.getAll("type");
@@ -49,40 +49,60 @@ export default function RechercheClient() {
     Object.entries(filtres).forEach(([k, v]) => {
       if ((k === "rayon" || k === "ageMin" || k === "ageMax") && (v === "" || v == null)) return;
       if (Array.isArray(v)) v.forEach(x => params.append(k, x));
-      else if (typeof v === "boolean") {
-        if (v) params.set(k, "true");
-      }
-      else if (v !== "" && v !== undefined && v !== null) params.set(k, v);
+      else if (typeof v === "boolean") { if (v) params.set(k, "true"); }
+      else if (v !== "" && v !== undefined && v !== null) { params.set(k, v); }
     });
     router.push(`/recherche?${params.toString()}`);
   };
 
-  return (
-<div className="page-recherche">
-  <RechercheSidebar  className="RechercheSidebar" ref={sidebarRef} onSearch={handleSearch} />
-  <RechercheResultats className="RechercheResultats"
-    pseudo={pseudo}
-    type={type}
-    orientation={orientation}
-    rechercheType={rechercheType}
-    ageMin={ageMin}
-    ageMax={ageMax}
-    localisation={localisation}
-    photo={photo}
-    description={description}
-    statut={statut}
-    experience={experience}
-    fumeur={fumeur}
-    silhouette={silhouette}
-    taille={taille}
-    origines={origines}
-    yeux={yeux}
-    cheveux={cheveux}
-    recherches={recherches}
-    envies={envies}
-    rayon={rayon}
-  />
-</div>
+  // Actions barre d’outils
+  const handleResetSearch = () => router.push("/recherche"); // réinitialise (aucun param)
+  const handleGoHome = () => router.push("/accueil");        // adapte si ta home est "/"
 
+  return (
+    <div className="page-recherche">
+      {/* Barre d’actions visible seulement après une recherche */}
+      {hasActiveSearch && (
+        <div className="recherche-toolbar" role="region" aria-label="Actions de recherche">
+          <button className="btn-outlined" onClick={handleResetSearch}>
+            Nouvelle recherche
+          </button>
+          <button className="btn-primary" onClick={handleGoHome}>
+            Accueil
+          </button>
+        </div>
+      )}
+
+      <RechercheSidebar
+        className="RechercheSidebar"
+        ref={sidebarRef}
+        onSearch={handleSearch}
+        isMobile={isMobile}
+      />
+
+      <RechercheResultats
+        className="RechercheResultats"
+        pseudo={pseudo}
+        type={type}
+        orientation={orientation}
+        rechercheType={rechercheType}
+        ageMin={ageMin}
+        ageMax={ageMax}
+        localisation={localisation}
+        photo={photo}
+        description={description}
+        statut={statut}
+        experience={experience}
+        fumeur={fumeur}
+        silhouette={silhouette}
+        taille={taille}
+        origines={origines}
+        yeux={yeux}
+        cheveux={cheveux}
+        recherches={recherches}
+        envies={envies}
+        rayon={rayon}
+      />
+    </div>
   );
 }
