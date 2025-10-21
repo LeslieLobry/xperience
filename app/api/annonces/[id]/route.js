@@ -34,14 +34,25 @@ export async function PUT(req, { params }) {
     const body = await req.json();
     const { id } = params;
 
+    const data = {
+      ...(body.titre != null ? { titre: body.titre.trim() } : {}),
+      ...(body.message != null ? { message: body.message.trim() } : {}),
+      ...(body.actif != null ? { actif: !!body.actif } : {}),
+      ...(body.expireAt !== undefined ? { expireAt: body.expireAt ? new Date(body.expireAt) : null } : {}),
+
+      // 🎨 champs d’options supplémentaires
+      ...(body.durationMs !== undefined ? { durationMs: body.durationMs ?? null } : {}),
+      ...(body.textColor !== undefined ? { textColor: body.textColor || null } : {}),
+      ...(body.bgColor !== undefined ? { bgColor: body.bgColor || null } : {}),
+      ...(body.overlayColor !== undefined ? { overlayColor: body.overlayColor || null } : {}),
+      ...(body.fontSize !== undefined ? { fontSize: body.fontSize ?? null } : {}),
+      ...(body.borderRadiusPx !== undefined ? { borderRadiusPx: body.borderRadiusPx ?? null } : {}),
+      ...(body.maxWidthPx !== undefined ? { maxWidthPx: body.maxWidthPx ?? null } : {}),
+    };
+
     const updated = await prisma.annonce.update({
       where: { id },
-      data: {
-        ...(body.titre != null ? { titre: body.titre.trim() } : {}),
-        ...(body.message != null ? { message: body.message.trim() } : {}),
-        ...(body.actif != null ? { actif: !!body.actif } : {}),
-        ...(body.expireAt !== undefined ? { expireAt: body.expireAt ? new Date(body.expireAt) : null } : {}),
-      },
+      data,
     });
 
     return NextResponse.json({ success: true, data: updated });

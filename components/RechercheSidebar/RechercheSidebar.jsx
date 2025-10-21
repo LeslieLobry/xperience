@@ -106,7 +106,6 @@ function cleanFormFilters(formIn) {
   // Si “autour de moi” : ignorer la ville texte (coords via geoloc)
   if (form.autourDeMoi) {
     form.localisation = "";
-    // latitude/longitude seront ajoutées plus tard par navigator.geolocation
     delete form.latitude;
     delete form.longitude;
   } else if (form.localisation) {
@@ -217,6 +216,37 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
   }
 
+  /* --------------------------- Helper: géocodage --------------------------- */
+  async function geocodeCityByName(name) {
+    const q = String(name || "").trim();
+    if (!q) return null;
+
+    // Ex: "Lille (59)" -> "Lille"
+    const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
+
+    const url =
+      `https://geo.api.gouv.fr/communes` +
+      `?nom=${encodeURIComponent(plain)}` +
+      `&fields=nom,code,centre,departement,population` +
+      `&boost=population&limit=1`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const c = Array.isArray(data) && data[0];
+      if (!c) return null;
+      return {
+        nom: c.nom,
+        dep: c.departement?.code || "",
+        lat: c.centre?.coordinates?.[1] ?? null,
+        lng: c.centre?.coordinates?.[0] ?? null,
+        population: c.population ?? 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = (formRaw) => {
     const f = cleanFormFilters(formRaw);
@@ -297,11 +327,42 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     <aside className={`recherche-sidebar ${className || ""}`}>
       <div style={{ marginBottom: 24 }}>
         <ReconnaissanceVocale
-          onResult={(texte) => {
+          onResult={async (texte) => {
             setResumeVocal(texte);
-            const filtres = extraireFiltresVocal(texte);
-            setForm((prev) => ({ ...prev, ...filtres }));
-            handleSearch({ ...form, ...filtres });
+
+            // 1) Extraire les filtres depuis le texte
+            let filtres = {};
+            try {
+              filtres = extraireFiltresVocal(texte) || {};
+            } catch {}
+
+            // 2) Fusionner avec le form courant
+            let next = { ...form, ...filtres };
+
+            // 3) Si une ville est présente sans coords → géocoder
+            const villeVoix =
+              next.localisation || next.ville || next.city || next.commune;
+
+            if (
+              villeVoix &&
+              (next.latitude == null || next.longitude == null)
+            ) {
+              const geo = await geocodeCityByName(villeVoix);
+              if (geo && geo.lat != null && geo.lng != null) {
+                next = {
+                  ...next,
+                  localisation: `${geo.nom} (${geo.dep || "—"})`,
+                  latitude: geo.lat,
+                  longitude: geo.lng,
+                  autourDeMoi: false,
+                  rayon: next.rayon || DEFAULT_RAYON,
+                };
+              }
+            }
+
+            // 4) Appliquer & lancer la recherche
+            setForm(next);
+            handleSearch(next);
           }}
         />
         {resumeVocal && (
@@ -430,7 +491,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           </div>
 
           {/* --- Autocomplétion Ville --- */}
-          <div className="filters-group" ref={dropdownRef} style={{ position: "relative" }}>
+          <div
+            className="filters-group"
+            ref={dropdownRef}
+            style={{ position: "relative" }}
+            onMouseDownCapture={(e) => {
+              if (e.target.closest(".city-dropdown")) e.preventDefault();
+            }}
+          >
             <h4>Ville</h4>
             <input
               type="text"
@@ -438,6 +506,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               className="input-recherche"
               placeholder="Commune (ex: Lille)"
               value={form.localisation}
+              autoComplete="off"
+              autoCorrect="off"
+              onFocus={() => {
+                if (city.items.length) city.setOpen(true);
+              }}
               onChange={(e) => {
                 const v = e.target.value;
                 setForm((prev) => ({
@@ -446,15 +519,17 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                   autourDeMoi: false,
                 }));
                 city.setQuery(v);
-                if (v.trim().length >= 2) city.setOpen(true);
-                else city.setOpen(false);
+                city.setOpen(v.trim().length >= 2);
               }}
               onKeyDown={onCityKeyDown}
-              autoComplete="off"
             />
             {city.loading && <div className="city-hint">Recherche…</div>}
             {city.open && city.items.length > 0 && (
-              <ul className="city-dropdown">
+              <ul
+                className="city-dropdown"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}

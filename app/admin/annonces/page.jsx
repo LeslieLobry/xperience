@@ -19,7 +19,7 @@ export default function AdminAnnoncesPage() {
     textColor: "",
     bgColor: "",
     overlayColor: "",
-    fontSizePx: null,
+    fontSize: null,         // ✅ fontSize (plus de fontSizePx)
     borderRadiusPx: null,
     maxWidthPx: null,
   });
@@ -54,7 +54,7 @@ export default function AdminAnnoncesPage() {
       textColor: "",
       bgColor: "",
       overlayColor: "",
-      fontSizePx: null,
+      fontSize: null,       // ✅
       borderRadiusPx: null,
       maxWidthPx: null,
     });
@@ -63,17 +63,22 @@ export default function AdminAnnoncesPage() {
   function startEdit(id) {
     const a = list.find((x) => x.id === id);
     if (!a) return;
+    // sécurité: expireAt peut être Date ou string selon ton endpoint
+    const expireStr = a.expireAt
+      ? new Date(a.expireAt).toISOString().slice(0, 10)
+      : "";
+
     setEditingId(id);
     setDraft({
       titre: a.titre || "",
       message: a.message || "",
       actif: !!a.actif,
-      expireAt: a.expireAt ? a.expireAt.slice(0, 10) : "",
+      expireAt: expireStr,
       durationMs: a.durationMs ?? null,
       textColor: a.textColor ?? "",
       bgColor: a.bgColor ?? "",
       overlayColor: a.overlayColor ?? "",
-      fontSizePx: a.fontSizePx ?? null,
+      fontSize: a.fontSize ?? null,        // ✅
       borderRadiusPx: a.borderRadiusPx ?? null,
       maxWidthPx: a.maxWidthPx ?? null,
     });
@@ -92,7 +97,7 @@ export default function AdminAnnoncesPage() {
       textColor: draft.textColor || null,
       bgColor: draft.bgColor || null,
       overlayColor: draft.overlayColor || null,
-      fontSizePx: draft.fontSizePx ?? null,
+      fontSize: draft.fontSize ?? null,        // ✅
       borderRadiusPx: draft.borderRadiusPx ?? null,
       maxWidthPx: draft.maxWidthPx ?? null,
     };
@@ -261,11 +266,11 @@ export default function AdminAnnoncesPage() {
                 min="12"
                 max="72"
                 step="1"
-                value={draft.fontSizePx ?? ""}
+                value={draft.fontSize ?? ""}  // ✅
                 onChange={(e) =>
                   setDraft({
                     ...draft,
-                    fontSizePx: e.target.value ? parseInt(e.target.value, 10) : null,
+                    fontSize: e.target.value ? parseInt(e.target.value, 10) : null, // ✅
                   })
                 }
               />
@@ -324,7 +329,7 @@ export default function AdminAnnoncesPage() {
                   className="fade-in"
                   style={{
                     color: draft.textColor || "#e0c084",
-                    fontSize: (draft.fontSizePx ?? 36) + "px",
+                    fontSize: (draft.fontSize ?? 36) + "px",  // ✅
                     textAlign: "center",
                   }}
                 >
