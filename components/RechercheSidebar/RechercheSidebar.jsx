@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import "./recherche-sidebar.css";
 import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import ReconnaissanceVocale from "../ReconnaissanceVocale/ReconnaissanceVocale";
 
 /* -------------------------------- Utils -------------------------------- */
@@ -113,7 +113,7 @@ function cleanFormFilters(formIn) {
     // Mode ville : s'assurer qu’on n’est pas en “autour de moi”
     form.autourDeMoi = false;
     if (!form.rayon) delete form.rayon;
-    // latitude/longitude peuvent être présentes si issues de l’autocomplétion
+    // latitude/longitude peuvent rester si issues de l’autocomplétion
   } else {
     // Ni autour de moi, ni ville => pas de coords
     delete form.latitude;
@@ -133,16 +133,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   { onSearch, className },
   ref
 ) {
-  const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // Nettoie les query params à l’ouverture de la page /recherche
-  useEffect(() => {
-    if (Array.from(searchParams.keys()).length > 0) {
-      router.replace(pathname, { scroll: false });
-    }
-  }, [router, pathname, searchParams]);
 
   const [form, setForm] = useState({
     pseudo: "",
@@ -326,8 +317,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               maxWidth: 700,
             }}
           >
-            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> «{" "}
-            {resumeVocal} »
+            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
           </div>
         )}
         {loadingGeo && (
@@ -352,19 +342,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           open={openSections.identite}
           toggle={() => toggleSection("identite")}
         >
-          {renderCheckboxGroup("Type", "type", [
-            "Homme",
-            "Femme",
-            "Couple",
-            "Groupe",
-          ])}
-          {renderCheckboxGroup("Orientation", "orientation", [
-            "Hétéro",
-            "Bi",
-            "Pan",
-            "Ouvert",
-            "Lesbienne",
-          ])}
+          {renderCheckboxGroup("Type", "type", ["Homme", "Femme", "Couple", "Groupe"])}
+          {renderCheckboxGroup("Orientation", "orientation", ["Hétéro", "Bi", "Pan", "Ouvert", "Lesbienne"])}
           {renderCheckboxGroup("Type de recherche", "rechercheType", [
             "Je le garde pour moi",
             "Virtuel uniquement",
@@ -479,9 +458,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
-                    className={`city-option ${
-                      idx === city.highlight ? "is-active" : ""
-                    }`}
+                    className={`city-option ${idx === city.highlight ? "is-active" : ""}`}
                     onMouseEnter={() => city.setHighlight(idx)}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -635,7 +612,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
 
     if (name === "localisation") {
-      // (géré dans onChange spécifique au-dessus)
+      // (géré dans onChange spécifique)
       return;
     }
 

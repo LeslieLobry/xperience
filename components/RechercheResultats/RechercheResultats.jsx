@@ -15,13 +15,17 @@ function usePresignedPhotos(users) {
       const result = {};
       await Promise.all(
         users.map(async (user) => {
-          if (!user.photoUrl) { result[user.id] = "/default.jpg"; return; }
-          if (user.photoUrl.startsWith("http")) { result[user.id] = user.photoUrl; return; }
+          const key = user?.photoUrl;
+          if (!key) { result[user.id] = "/default.jpg"; return; }
+          if (typeof key === "string" && key.startsWith("http")) {
+            result[user.id] = key;
+            return;
+          }
           try {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ key: user.photoUrl }),
+              body: JSON.stringify({ key }),
             });
             const data = await res.json();
             result[user.id] = data.url || "/default.jpg";
@@ -32,8 +36,10 @@ function usePresignedPhotos(users) {
       );
       if (!canceled) setPhotoUrls(result);
     }
-    fetchAll();
+    if (Array.isArray(users) && users.length) fetchAll();
+    else setPhotoUrls({});
     return () => { canceled = true; };
+    // stringify pour déclencher quand la liste change réellement
   }, [JSON.stringify(users)]);
   return photoUrls;
 }
@@ -47,7 +53,11 @@ export default function RechercheResultats({ className = "" }) {
 
   const photoUrls = usePresignedPhotos(utilisateurs);
 
-  const hasParams = useMemo(() => searchParams.toString().length > 0, [searchParams]);
+  // ✅ plus robuste que toString() (gère le cas de params vides ou ordre différent)
+  const hasParams = useMemo(
+    () => Array.from(searchParams.keys()).length > 0,
+    [searchParams]
+  );
 
   useEffect(() => {
     const params = searchParams.toString();
@@ -57,7 +67,7 @@ export default function RechercheResultats({ className = "" }) {
     fetch(`/api/recherche?${params}`)
       .then((res) => res.json())
       .then((data) => {
-        setUtilisateurs(data.utilisateurs || []);
+        setUtilisateurs(Array.isArray(data.utilisateurs) ? data.utilisateurs : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -70,7 +80,7 @@ export default function RechercheResultats({ className = "" }) {
 
   return (
     <div className={`profil-list1 ${className}`}>
-      {/* Barre d’actions */}
+      {/* Barre d’actions (visible même en chargement) */}
       {hasParams && (
         <div className="recherche-toolbar" role="region" aria-label="Actions de recherche">
           <button className="btn-outlined" onClick={handleResetSearch}>
