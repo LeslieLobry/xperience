@@ -246,47 +246,117 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return null;
     }
   }
+// PATCH ▶ helper géocodage ville → lat/lng
+async function geocodeCityByName(name) {
+  const q = String(name || "").trim();
+  if (!q) return null;
+
+  // "Lille (59)" -> "Lille"
+  const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
+
+  const url =
+    `https://geo.api.gouv.fr/communes` +
+    `?nom=${encodeURIComponent(plain)}` +
+    `&fields=nom,code,centre,departement,population` +
+    `&boost=population&limit=1`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const c = Array.isArray(data) && data[0];
+    if (!c) return null;
+    return {
+      nom: c.nom,
+      dep: c.departement?.code || "",
+      lat: c.centre?.coordinates?.[1] ?? null,
+      lng: c.centre?.coordinates?.[0] ?? null,
+      population: c.population ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
 
   /* ------------------------------ Recherche push ------------------------------ */
-  const handleSearch = (formRaw) => {
-    const f = cleanFormFilters(formRaw);
+// PATCH ▶ handleSearch exclusif (ville XOR autour)
+const handleSearch = async (formRaw) => {
+  // --- 1) Exclusivité des modes ---
+  const raw = { ...formRaw };
+  if (raw.autourDeMoi) {
+    // On force le mode "autour de moi" : pas de ville
+    raw.localisation = "";
+    raw.latitude = undefined;
+    raw.longitude = undefined;
+  } else if (raw.localisation?.trim()) {
+    // On force le mode "ville" : pas "autour de moi"
+    raw.autourDeMoi = false;
+  } else {
+    // Aucun des deux → purge coords résiduelles
+    raw.latitude = undefined;
+    raw.longitude = undefined;
+  }
 
-    const normalizeArray = (arr) =>
-      Array.isArray(arr) ? arr.map(normalizeToDb) : [];
+  // --- 2) Nettoyage/normalisation existants ---
+  const f = cleanFormFilters(raw);
+  const normalizeArray = (arr) => Array.isArray(arr) ? arr.map(normalizeToDb) : [];
+  f.orientation   = normalizeArray(f.orientation);
+  f.type          = normalizeArray(f.type);
+  f.rechercheType = normalizeArray(f.rechercheType);
+  f.recherches    = normalizeArray(f.recherches);
+  f.experience    = normalizeArray(f.experience);
+  f.fumeur        = normalizeArray(f.fumeur);
+  f.silhouette    = normalizeArray(f.silhouette);
+  f.taille        = normalizeArray(f.taille);
+  f.origines      = normalizeArray(f.origines);
+  f.yeux          = normalizeArray(f.yeux);
+  f.cheveux       = normalizeArray(f.cheveux);
+  f.envies        = normalizeArray(f.envies);
 
-    f.orientation = normalizeArray(f.orientation);
-    f.type = normalizeArray(f.type);
-    f.rechercheType = normalizeArray(f.rechercheType);
-    f.recherches = normalizeArray(f.recherches);
-    f.experience = normalizeArray(f.experience);
-    f.fumeur = normalizeArray(f.fumeur);
-    f.silhouette = normalizeArray(f.silhouette);
-    f.taille = normalizeArray(f.taille);
-    f.origines = normalizeArray(f.origines);
-    f.yeux = normalizeArray(f.yeux);
-    f.cheveux = normalizeArray(f.cheveux);
-    f.envies = normalizeArray(f.envies);
+  // --- 3) Branche "Autour de moi" ---
+  if (f.autourDeMoi) {
+    setLoadingGeo(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLoadingGeo(false);
+        onSearch?.({
+          ...f,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          rayon: Number(f.rayon || DEFAULT_RAYON),
+          localisation: "", // ville ignorée dans ce mode
+        });
+      },
+      () => {
+        setLoadingGeo(false);
+        alert("Impossible de récupérer ta position");
+        onSearch?.(f);
+      }
+    );
+    return;
+  }
 
-    if (f.autourDeMoi) {
-      setLoadingGeo(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const latitude = pos.coords.latitude;
-          const longitude = pos.coords.longitude;
-          const rayon = f.rayon || DEFAULT_RAYON;
-          setLoadingGeo(false);
-          onSearch?.({ ...f, latitude, longitude, rayon });
-        },
-        () => {
-          setLoadingGeo(false);
-          alert("Impossible de récupérer ta position");
-          onSearch?.(f);
-        }
-      );
-    } else {
-      onSearch?.(f);
+  // --- 4) Branche "Ville" ---
+  if (f.localisation?.trim()) {
+    // Si l'autocomplétion n'a pas déjà fourni des coords, on géocode
+    if (f.latitude == null || f.longitude == null) {
+      const geo = await geocodeCityByName(f.localisation);
+      if (geo && geo.lat != null && geo.lng != null) {
+        f.localisation = `${geo.nom} (${geo.dep || "—"})`;
+        f.latitude  = geo.lat;
+        f.longitude = geo.lng;
+      }
     }
-  };
+    // Rayon par défaut si absent
+    f.rayon = Number(f.rayon || DEFAULT_RAYON);
+    f.autourDeMoi = false; // sécurité
+    onSearch?.(f);
+    return;
+  }
+
+  // --- 5) Aucun mode (ni ville ni autour) → recherche globale
+  onSearch?.(f);
+};
+
 
   useImperativeHandle(ref, () => ({
     handleVocalFiltres(filtres) {

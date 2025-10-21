@@ -8,6 +8,8 @@ import { cookies } from "next/headers";
 
 // === Helpers ===
 
+const DEFAULT_RAYON = 20;
+
 // Normalise une valeur (lowercase + sans accents)
 function normalizeToDb(val) {
   return val
@@ -23,11 +25,7 @@ function singularize(v) {
 
 // Applique normalization + singularisation + dédoublonnage
 function normalizeAndSingularizeArray(arr) {
-  const set = new Set(
-    arr
-      .map(normalizeToDb)
-      .map(singularize)
-  );
+  const set = new Set(arr.map(normalizeToDb).map(singularize));
   return [...set];
 }
 
@@ -51,9 +49,8 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -92,13 +89,26 @@ export async function GET(req) {
   const cheveux       = getAll("cheveux");
   const ageMin        = searchParams.get("ageMin") || null;
   const ageMax        = searchParams.get("ageMax") || null;
-  const localisation  = searchParams.get("localisation") || "";
+
+  // ⚠️ alias accepté: localisation OU ville
+  const localisation  =
+    searchParams.get("localisation") ||
+    searchParams.get("ville") ||
+    "";
+
   const photo         = searchParams.get("photo") === "true";
   const description   = searchParams.get("description") === "true";
   const statut        = searchParams.get("statut") || "all";
-  const rayon         = parseFloat(searchParams.get("rayon") || "0");
-  const latitude      = parseFloat(searchParams.get("latitude") || "NaN");
+
+  // Rayon/coords (peuvent être absents)
+  const rayonRaw      = searchParams.get("rayon");
+  const rayon         = Number.isFinite(parseFloat(rayonRaw))
+    ? parseFloat(rayonRaw)
+    : 0;
+
+  const latitude      = parseFloat(searchParams.get("latitude")  || "NaN");
   const longitude     = parseFloat(searchParams.get("longitude") || "NaN");
+
   const autourDeMoi   = searchParams.get("autourDeMoi") === "true";
 
   // --- Normalisation + singularisation ---
@@ -132,7 +142,7 @@ export async function GET(req) {
       pseudo: { contains: pseudo.trim(), mode: "insensitive" },
     }),
     ...(photo &&       { photoUrl:    { not: null } }),
-    ...(description && { description:  { not: null } }),
+    ...(description && { description: { not: null } }),
     ...(statut === "en_ligne" && { statut: "en_ligne" }),
     ...(ageMin && ageMax && {
       age: {
@@ -169,11 +179,11 @@ export async function GET(req) {
     ...(yeuxNorm.length && {
       yeux: { in: yeuxNorm, mode: "insensitive" },
     }),
-    // ---> Modif ici : on passe en "contains" via OR
+    // ---> on garde le contains pour cheveux
     ...(cheveuxNorm.length && {
-      OR: cheveuxNorm.map(c => ({
-        cheveux: { contains: c, mode: "insensitive" }
-      }))
+      OR: cheveuxNorm.map((c) => ({
+        cheveux: { contains: c, mode: "insensitive" },
+      })),
     }),
   };
 
@@ -201,37 +211,68 @@ export async function GET(req) {
         cheveux:      true,
         latitude:     true,
         longitude:    true,
-        verificationIdentiteStatut: true
+        verificationIdentiteStatut: true,
       },
     });
 
-    // --- Filtrage géographique (3 cas) ---
+    // --- Filtrage géographique (modes exclusifs) ---
     let logs = "\nRecherche distance : ";
+    const hasCoords = (lat, lon) => !isNaN(lat) && !isNaN(lon);
 
-    if (autourDeMoi && !isNaN(latitude) && !isNaN(longitude) && rayon) {
-      logs += `autour de moi rayon=${rayon}km coords=${latitude},${longitude}`;
-      utilisateurs = utilisateurs.filter(
-        (u) =>
-          u.latitude != null &&
-          u.longitude != null &&
-          distanceKm(latitude, longitude, u.latitude, u.longitude) <= rayon
-      );
-    } else if (localisation && rayon) {
-      const ref = await getCoordsFromVille(localisation);
-      logs += `autour de ville='${localisation}' rayon=${rayon}km`;
-      if (ref) {
+    // Tranche explicitement le mode (si les deux arrivent, on priorise NEAR_ME)
+    const mode = autourDeMoi ? "NEAR_ME" : (localisation ? "CITY" : "NONE");
+
+    if (mode === "NEAR_ME") {
+      // Mode AUTOUR DE MOI : on ignore la ville
+      const r = rayon || DEFAULT_RAYON;
+      logs += `mode=NEAR_ME rayon=${r}km coords=${latitude},${longitude}`;
+      if (hasCoords(latitude, longitude)) {
         utilisateurs = utilisateurs.filter(
           (u) =>
             u.latitude != null &&
             u.longitude != null &&
-            distanceKm(ref.lat, ref.lon, u.latitude, u.longitude) <= rayon
+            distanceKm(latitude, longitude, u.latitude, u.longitude) <= r
         );
+      } else {
+        logs += " (coords manquantes → pas de filtre distance)";
       }
-    } else if (localisation) {
-      logs += `ville exacte='${localisation}'`;
-      utilisateurs = utilisateurs.filter(
-        (u) => normalizeVille(u.localisation) === normalizeVille(localisation)
-      );
+
+    } else if (mode === "CITY") {
+      // Mode VILLE : on ignore autourDeMoi
+      const r = rayon || DEFAULT_RAYON;
+      logs += `mode=CITY ville='${localisation}' rayon=${r}km`;
+
+      // 1) Si coords déjà fournies par le front (autocomplétion / voix géocodée)
+      if (hasCoords(latitude, longitude)) {
+        utilisateurs = utilisateurs.filter(
+          (u) =>
+            u.latitude != null &&
+            u.longitude != null &&
+            distanceKm(latitude, longitude, u.latitude, u.longitude) <= r
+        );
+      } else {
+        // 2) Sinon, géocode côté serveur à partir de la ville
+        const ref = await getCoordsFromVille(localisation);
+        if (ref) {
+          utilisateurs = utilisateurs.filter(
+            (u) =>
+              u.latitude != null &&
+              u.longitude != null &&
+              distanceKm(ref.lat, ref.lon, u.latitude, u.longitude) <= r
+          );
+        } else {
+          // 3) Fallback: match texte exact (moins fiable)
+          logs += " (géocodage KO → fallback match texte exact)";
+          utilisateurs = utilisateurs.filter(
+            (u) =>
+              normalizeVille(u.localisation) === normalizeVille(localisation)
+          );
+        }
+      }
+
+    } else {
+      // Pas de ville, pas autour de moi → aucun filtre distance
+      logs += "mode=NONE (pas de filtre distance)";
     }
 
     console.log(logs);
