@@ -75,8 +75,8 @@ export default function RechercheResultats({ className = "" }) {
 
   if (!hasSearched) return null;
 
-  const handleResetSearch = () => router.push("/recherche"); // réinitialise les filtres
-  const handleGoHome = () => router.push("/accueil");        // change en "/" si besoin
+  const handleResetSearch = () => router.push("/recherche"); 
+  const handleGoHome = () => router.push("/accueil-page");        // change en "/" si besoin
 
   return (
     <div className={`profil-list1 ${className}`}>
