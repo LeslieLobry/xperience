@@ -27,7 +27,7 @@ export async function GET() {
       textColor: true,
       bgColor: true,
       overlayColor: true,
-      fontSize: true,           // ✅ renommé
+      fontSizePx: true,           // ✅ renommé
       borderRadiusPx: true,
       maxWidthPx: true,
       createdAt: true,
@@ -66,7 +66,7 @@ export async function POST(req) {
         textColor: body.textColor || null,
         bgColor: body.bgColor || null,
         overlayColor: body.overlayColor || null,
-        fontSize: num(body.fontSize),           // ✅ renommé
+        fontSizePx: num(body.fontSizePx),           // ✅ renommé
         borderRadiusPx: num(body.borderRadiusPx),
         maxWidthPx: num(body.maxWidthPx),
       },

@@ -484,7 +484,7 @@ model Annonce {
   textColor      String?        // "#e0c084"
   bgColor        String?        // "#0b0f14" ou "white"
   overlayColor   String?        // "rgba(0,0,0,.6)"
-    fontSize       Int?         // 36
+  fontSizePx     Int?           // 36
   borderRadiusPx Int?           // 16
   maxWidthPx     Int?           // 520
 

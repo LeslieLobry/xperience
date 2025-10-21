@@ -45,7 +45,7 @@ export async function PUT(req, { params }) {
       ...(body.textColor !== undefined ? { textColor: body.textColor || null } : {}),
       ...(body.bgColor !== undefined ? { bgColor: body.bgColor || null } : {}),
       ...(body.overlayColor !== undefined ? { overlayColor: body.overlayColor || null } : {}),
-      ...(body.fontSize !== undefined ? { fontSize: body.fontSize ?? null } : {}),
+      ...(body.fontSizePx!== undefined ? { fontSize: body.fontSizePx?? null } : {}),
       ...(body.borderRadiusPx !== undefined ? { borderRadiusPx: body.borderRadiusPx ?? null } : {}),
       ...(body.maxWidthPx !== undefined ? { maxWidthPx: body.maxWidthPx ?? null } : {}),
     };
