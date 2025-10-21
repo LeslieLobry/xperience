@@ -1,5 +1,5 @@
 {
-   "crons": [
+  "crons": [
     {
       "path": "/api/cron/reminder-profile?token=@CRON_SECRET",
       "schedule": "0 8 * * *"
@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/send-digests?token=@CRON_SECRET",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-online?token=@CRON_SECRET",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

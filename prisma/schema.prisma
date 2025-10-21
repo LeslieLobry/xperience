@@ -83,8 +83,9 @@ model Utilisateur {
   yeux2                String?
   cheveux2             String?
   description2         String?
-  statut               String          @default("en_ligne")
+  statut               String          @default("hors_ligne")
   statutAuto           Boolean         @default(true)
+  lastSeenAt           DateTime?
   consentCGU           Boolean         @default(false)
   consentCGUDate       DateTime?
   verificationDeadline DateTime?
@@ -115,6 +116,8 @@ model Utilisateur {
   verificationIdentite VerificationIdentite?    @relation("UtilisateurVerification")
   digestNotifications DigestNotification[] @relation("DigestToUtilisateur")
   @@map("Utilisateur")
+  @@index([lastSeenAt])                // ⬅️ utile pour les cron/lectures
+  @@index([statut, statutAuto])   
 }
 
 model GaleriePrivee {

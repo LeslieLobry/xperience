@@ -137,20 +137,28 @@ export default function Profil({ user, connectedUser }) {
     }
   }, [connectedUser?.id, user.id]);
 
-  // Rafraîchit le statut auto pour son propre profil
+  // 🔁 Rafraîchit le statut auto pour son propre profil (via /api/me)
   useEffect(() => {
     if (!isOwnProfile) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/utilisateur/statut", { credentials: "include" });
+        const res = await fetch("/api/me", { credentials: "include" });
         if (!res.ok) return;
         const data = await res.json();
-        setStatut(data.utilisateur.statut);
-        setStatutAuto(data.utilisateur.statutAuto);
+        if (data?.success && data?.user) {
+          setStatut(data.user.statut);
+          setStatutAuto(data.user.statutAuto);
+        }
       } catch {}
     }, 30000);
     return () => clearInterval(interval);
   }, [isOwnProfile]);
+
+  // 🧩 Synchronise si les props 'user' se mettent à jour
+  useEffect(() => {
+    setStatut(user.statut);
+    setStatutAuto(user.statutAuto);
+  }, [user.statut, user.statutAuto]);
 
   // Champs à éditer via ProfilDetailsForm
   const profilDetailsFields = [

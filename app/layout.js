@@ -9,6 +9,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { ToastContainer } from "react-toastify";
 import Script from "next/script"; // ✅ important
 import "react-toastify/dist/ReactToastify.css";
+import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ClientWrapper>
             <ConditionalNavbar />
+            <HeartbeatClient intervalMs={60_000} />
             {children}
             <Footer />
             <BandeauCookies />

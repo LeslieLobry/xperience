@@ -156,7 +156,7 @@ export default function LoaderAnnonce() {
     position: "relative",
   };
   const pStyle = {
-    color: current.textColor || "#e0c084",
+    color: current.textColor || "#040936ff",
     fontSize: (current.fontSizePx ?? 36) + "px",
     textAlign: "center",
   };

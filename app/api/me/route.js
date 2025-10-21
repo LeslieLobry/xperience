@@ -23,7 +23,7 @@ function corsHeaders(origin = "") {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform",
-    "Access-Control-Allow-Credentials": "true",            // ✅ indispensable pour cookies
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
@@ -81,7 +81,7 @@ export async function GET() {
     return NextResponse.json({ success: false, message: "Token invalide." }, { status: 401, headers });
   }
 
-  // 2) DB — select minimal FIABLE (pas de champs exotiques qui cassent)
+  // 2) DB — select minimal FIABLE + champs statut
   try {
     const u = await prisma.utilisateur.findUnique({
       where: { id: userId },
@@ -105,7 +105,13 @@ export async function GET() {
         description: true,
         createdAt: true,
         lastLogin: true,
-        // Relations courtes (mets id+label, c’est safe)
+
+        // 🟢 ajout pour présence:
+        statut: true,
+        statutAuto: true,
+        lastSeenAt: true,
+
+        // Relations courtes
         recherches: { select: { id: true, label: true } },
         envies: { select: { id: true, label: true } },
       },
@@ -115,11 +121,27 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Utilisateur introuvable." }, { status: 401, headers });
     }
 
+    // 🧠 Calcul léger du statut en ligne si mode auto
+    const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
+    const now = Date.now();
+    const seenTs = u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : 0;
+    const statutComputed =
+      u.statutAuto && seenTs && now - seenTs <= ONLINE_WINDOW_MS ? "en_ligne" : "hors_ligne";
+
     const roleNormalized = normalizeRole(u.role);
     const isAdmin = isAdminRole(u.role);
 
+    // On retourne le statut calculé sans casser la forme existante
     return NextResponse.json(
-      { success: true, user: { ...u, roleNormalized, isAdmin } },
+      {
+        success: true,
+        user: {
+          ...u,
+          statut: statutComputed, // ⬅️ remplace côté réponse (non destructif pour le reste)
+          roleNormalized,
+          isAdmin,
+        },
+      },
       { headers }
     );
   } catch (err) {
