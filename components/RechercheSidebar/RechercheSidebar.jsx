@@ -188,13 +188,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar({ onSearch, classN
           ])}
         </Section>
 
-        <Section title="Recherches" open={openSections.criteres} toggle={() => toggleSection("criteres")}>
+        {/* <Section title="Recherches" open={openSections.criteres} toggle={() => toggleSection("criteres")}>
           {renderCheckboxGroup("Je recherche", "recherches", [
             "Hommes hétéros", "Femmes hétéros", "Couples hétéros",
             "Couples F Bi", "Couples H Bi", "Couples Bi",
             "Hommes Bi", "Gays", "Femmes Bi", "Lesbiennes", "Travestis", "Transgenres"
           ])}
-        </Section>
+        </Section> */}
 
         <Section title="Envies" open={openSections.envies} toggle={() => toggleSection("envies")}>
           {renderCheckboxGroup("Mes envies", "envies", [
