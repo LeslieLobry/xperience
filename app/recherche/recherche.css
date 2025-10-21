@@ -1,19 +1,19 @@
-.page-recherche {
+.PageRecherche .page-recherche {
   display: flex;
   gap: 2rem;
   padding: 2rem;
 }
 
-.recherche-resultats {
+.PageRecherche .recherche-resultats {
   flex: 1;
 }
 
-.recherche-resultats ul {
+.PageRecherche .recherche-resultats ul {
   list-style: none;
   padding: 0;
 }
 
-.resultat-item {
+.PageRecherche .resultat-item {
   display: flex;
   gap: 1rem;
   margin-bottom: 1rem;
@@ -21,7 +21,7 @@
   padding-bottom: 1rem;
 }
 
-.resultat-photo {
+.PageRecherche .resultat-photo {
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -29,7 +29,7 @@
 }
 
 @media (width <= 700px) {
-  .page-recherche{
+  .PageRecherche .page-recherche {
     flex-direction: column;
   }
 }
