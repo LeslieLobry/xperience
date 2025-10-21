@@ -42,7 +42,7 @@
 
 .city-option:hover,
 .city-option.is-active {
-  background: #f5f5f5;
+  background: #252427;
 }
 
 .city-name {
@@ -115,7 +115,7 @@
 
 @media screen and (width <= 768px) {
   .recherche-sidebar {
-        padding: 1rem;
+    padding: 1rem;
     color: white;
     font-size: 26px;
     border: none;

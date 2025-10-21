@@ -127,6 +127,37 @@ function cleanFormFilters(formIn) {
 
 const DEFAULT_RAYON = 20;
 
+/* --------------------------- Helper: géocodage --------------------------- */
+async function geocodeCityByName(name) {
+  const q = String(name || "").trim();
+  if (!q) return null;
+
+  // "Lille (59)" -> "Lille"
+  const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
+
+  const url =
+    `https://geo.api.gouv.fr/communes` +
+    `?nom=${encodeURIComponent(plain)}` +
+    `&fields=nom,code,centre,departement,population` +
+    `&boost=population&limit=1`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const c = Array.isArray(data) && data[0];
+    if (!c) return null;
+    return {
+      nom: c.nom,
+      dep: c.departement?.code || "",
+      lat: c.centre?.coordinates?.[1] ?? null,
+      lng: c.centre?.coordinates?.[0] ?? null,
+      population: c.population ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ================================ Component ================================ */
 const RechercheSidebar = forwardRef(function RechercheSidebar(
   { onSearch, className },
@@ -177,6 +208,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   /* ----------------------------- Autocomplétion ----------------------------- */
   const city = useCityAutocomplete();
   const dropdownRef = useRef(null);
+  const cityInputRef = useRef(null);
 
   useEffect(() => {
     function onDocClick(e) {
@@ -197,6 +229,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }));
     city.setQuery(item.nom);
     city.setOpen(false);
+    // Re-focalise l'input après sélection
+    queueMicrotask(() => cityInputRef.current?.focus());
   }
 
   function onCityKeyDown(e) {
@@ -216,147 +250,80 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
   }
 
-  /* --------------------------- Helper: géocodage --------------------------- */
-  async function geocodeCityByName(name) {
-    const q = String(name || "").trim();
-    if (!q) return null;
-
-    // Ex: "Lille (59)" -> "Lille"
-    const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
-
-    const url =
-      `https://geo.api.gouv.fr/communes` +
-      `?nom=${encodeURIComponent(plain)}` +
-      `&fields=nom,code,centre,departement,population` +
-      `&boost=population&limit=1`;
-
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      const c = Array.isArray(data) && data[0];
-      if (!c) return null;
-      return {
-        nom: c.nom,
-        dep: c.departement?.code || "",
-        lat: c.centre?.coordinates?.[1] ?? null,
-        lng: c.centre?.coordinates?.[0] ?? null,
-        population: c.population ?? 0,
-      };
-    } catch {
-      return null;
-    }
-  }
-// PATCH ▶ helper géocodage ville → lat/lng
-async function geocodeCityByName(name) {
-  const q = String(name || "").trim();
-  if (!q) return null;
-
-  // "Lille (59)" -> "Lille"
-  const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
-
-  const url =
-    `https://geo.api.gouv.fr/communes` +
-    `?nom=${encodeURIComponent(plain)}` +
-    `&fields=nom,code,centre,departement,population` +
-    `&boost=population&limit=1`;
-
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    const c = Array.isArray(data) && data[0];
-    if (!c) return null;
-    return {
-      nom: c.nom,
-      dep: c.departement?.code || "",
-      lat: c.centre?.coordinates?.[1] ?? null,
-      lng: c.centre?.coordinates?.[0] ?? null,
-      population: c.population ?? 0,
-    };
-  } catch {
-    return null;
-  }
-}
-
   /* ------------------------------ Recherche push ------------------------------ */
-// PATCH ▶ handleSearch exclusif (ville XOR autour)
-const handleSearch = async (formRaw) => {
-  // --- 1) Exclusivité des modes ---
-  const raw = { ...formRaw };
-  if (raw.autourDeMoi) {
-    // On force le mode "autour de moi" : pas de ville
-    raw.localisation = "";
-    raw.latitude = undefined;
-    raw.longitude = undefined;
-  } else if (raw.localisation?.trim()) {
-    // On force le mode "ville" : pas "autour de moi"
-    raw.autourDeMoi = false;
-  } else {
-    // Aucun des deux → purge coords résiduelles
-    raw.latitude = undefined;
-    raw.longitude = undefined;
-  }
-
-  // --- 2) Nettoyage/normalisation existants ---
-  const f = cleanFormFilters(raw);
-  const normalizeArray = (arr) => Array.isArray(arr) ? arr.map(normalizeToDb) : [];
-  f.orientation   = normalizeArray(f.orientation);
-  f.type          = normalizeArray(f.type);
-  f.rechercheType = normalizeArray(f.rechercheType);
-  f.recherches    = normalizeArray(f.recherches);
-  f.experience    = normalizeArray(f.experience);
-  f.fumeur        = normalizeArray(f.fumeur);
-  f.silhouette    = normalizeArray(f.silhouette);
-  f.taille        = normalizeArray(f.taille);
-  f.origines      = normalizeArray(f.origines);
-  f.yeux          = normalizeArray(f.yeux);
-  f.cheveux       = normalizeArray(f.cheveux);
-  f.envies        = normalizeArray(f.envies);
-
-  // --- 3) Branche "Autour de moi" ---
-  if (f.autourDeMoi) {
-    setLoadingGeo(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLoadingGeo(false);
-        onSearch?.({
-          ...f,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          rayon: Number(f.rayon || DEFAULT_RAYON),
-          localisation: "", // ville ignorée dans ce mode
-        });
-      },
-      () => {
-        setLoadingGeo(false);
-        alert("Impossible de récupérer ta position");
-        onSearch?.(f);
-      }
-    );
-    return;
-  }
-
-  // --- 4) Branche "Ville" ---
-  if (f.localisation?.trim()) {
-    // Si l'autocomplétion n'a pas déjà fourni des coords, on géocode
-    if (f.latitude == null || f.longitude == null) {
-      const geo = await geocodeCityByName(f.localisation);
-      if (geo && geo.lat != null && geo.lng != null) {
-        f.localisation = `${geo.nom} (${geo.dep || "—"})`;
-        f.latitude  = geo.lat;
-        f.longitude = geo.lng;
-      }
+  const handleSearch = async (formRaw) => {
+    // --- 1) Exclusivité des modes ---
+    const raw = { ...formRaw };
+    if (raw.autourDeMoi) {
+      raw.localisation = "";
+      raw.latitude = undefined;
+      raw.longitude = undefined;
+    } else if (raw.localisation?.trim()) {
+      raw.autourDeMoi = false;
+    } else {
+      raw.latitude = undefined;
+      raw.longitude = undefined;
     }
-    // Rayon par défaut si absent
-    f.rayon = Number(f.rayon || DEFAULT_RAYON);
-    f.autourDeMoi = false; // sécurité
+
+    // --- 2) Nettoyage/normalisation existants ---
+    const f = cleanFormFilters(raw);
+    const normalizeArray = (arr) =>
+      Array.isArray(arr) ? arr.map(normalizeToDb) : [];
+    f.orientation = normalizeArray(f.orientation);
+    f.type = normalizeArray(f.type);
+    f.rechercheType = normalizeArray(f.rechercheType);
+    f.recherches = normalizeArray(f.recherches);
+    f.experience = normalizeArray(f.experience);
+    f.fumeur = normalizeArray(f.fumeur);
+    f.silhouette = normalizeArray(f.silhouette);
+    f.taille = normalizeArray(f.taille);
+    f.origines = normalizeArray(f.origines);
+    f.yeux = normalizeArray(f.yeux);
+    f.cheveux = normalizeArray(f.cheveux);
+    f.envies = normalizeArray(f.envies);
+
+    // --- 3) Branche "Autour de moi" ---
+    if (f.autourDeMoi) {
+      setLoadingGeo(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLoadingGeo(false);
+          onSearch?.({
+            ...f,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            rayon: Number(f.rayon || DEFAULT_RAYON),
+            localisation: "",
+          });
+        },
+        () => {
+          setLoadingGeo(false);
+          alert("Impossible de récupérer ta position");
+          onSearch?.(f);
+        }
+      );
+      return;
+    }
+
+    // --- 4) Branche "Ville" ---
+    if (f.localisation?.trim()) {
+      if (f.latitude == null || f.longitude == null) {
+        const geo = await geocodeCityByName(f.localisation);
+        if (geo && geo.lat != null && geo.lng != null) {
+          f.localisation = `${geo.nom} (${geo.dep || "—"})`;
+          f.latitude = geo.lat;
+          f.longitude = geo.lng;
+        }
+      }
+      f.rayon = Number(f.rayon || DEFAULT_RAYON);
+      f.autourDeMoi = false;
+      onSearch?.(f);
+      return;
+    }
+
+    // --- 5) Aucun mode (ni ville ni autour) → recherche globale
     onSearch?.(f);
-    return;
-  }
-
-  // --- 5) Aucun mode (ni ville ni autour) → recherche globale
-  onSearch?.(f);
-};
-
+  };
 
   useImperativeHandle(ref, () => ({
     handleVocalFiltres(filtres) {
@@ -413,10 +380,7 @@ const handleSearch = async (formRaw) => {
             const villeVoix =
               next.localisation || next.ville || next.city || next.commune;
 
-            if (
-              villeVoix &&
-              (next.latitude == null || next.longitude == null)
-            ) {
+            if (villeVoix && (next.latitude == null || next.longitude == null)) {
               const geo = await geocodeCityByName(villeVoix);
               if (geo && geo.lat != null && geo.lng != null) {
                 next = {
@@ -473,8 +437,19 @@ const handleSearch = async (formRaw) => {
           open={openSections.identite}
           toggle={() => toggleSection("identite")}
         >
-          {renderCheckboxGroup("Type", "type", ["Homme", "Femme", "Couple", "Groupe"])}
-          {renderCheckboxGroup("Orientation", "orientation", ["Hétéro", "Bi", "Pan", "Ouvert", "Lesbienne"])}
+          {renderCheckboxGroup("Type", "type", [
+            "Homme",
+            "Femme",
+            "Couple",
+            "Groupe",
+          ])}
+          {renderCheckboxGroup("Orientation", "orientation", [
+            "Hétéro",
+            "Bi",
+            "Pan",
+            "Ouvert",
+            "Lesbienne",
+          ])}
           {renderCheckboxGroup("Type de recherche", "rechercheType", [
             "Je le garde pour moi",
             "Virtuel uniquement",
@@ -565,9 +540,6 @@ const handleSearch = async (formRaw) => {
             className="filters-group"
             ref={dropdownRef}
             style={{ position: "relative" }}
-            onMouseDownCapture={(e) => {
-              if (e.target.closest(".city-dropdown")) e.preventDefault();
-            }}
           >
             <h4>Ville</h4>
             <input
@@ -578,6 +550,7 @@ const handleSearch = async (formRaw) => {
               value={form.localisation}
               autoComplete="off"
               autoCorrect="off"
+              ref={cityInputRef}
               onFocus={() => {
                 if (city.items.length) city.setOpen(true);
               }}
@@ -590,22 +563,23 @@ const handleSearch = async (formRaw) => {
                 }));
                 city.setQuery(v);
                 city.setOpen(v.trim().length >= 2);
+                // S'assure que le focus reste dans l'input après re-render
+                queueMicrotask(() => cityInputRef.current?.focus());
               }}
               onKeyDown={onCityKeyDown}
             />
             {city.loading && <div className="city-hint">Recherche…</div>}
             {city.open && city.items.length > 0 && (
-              <ul
-                className="city-dropdown"
-                tabIndex={-1}
-                onMouseDown={(e) => e.preventDefault()}
-              >
+              <ul className="city-dropdown" tabIndex={-1}>
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
-                    className={`city-option ${idx === city.highlight ? "is-active" : ""}`}
+                    className={`city-option ${
+                      idx === city.highlight ? "is-active" : ""
+                    }`}
                     onMouseEnter={() => city.setHighlight(idx)}
                     onMouseDown={(e) => {
+                      // on empêche juste le blur pendant le clic sur l’option
                       e.preventDefault();
                       selectCity(item);
                     }}
@@ -614,7 +588,8 @@ const handleSearch = async (formRaw) => {
                     <span className="city-name">{item.label}</span>
                     {item.latitude != null && item.longitude != null && (
                       <span className="city-geo">
-                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                        · {item.latitude.toFixed(3)},{" "}
+                        {item.longitude.toFixed(3)}
                       </span>
                     )}
                   </li>
@@ -757,7 +732,7 @@ const handleSearch = async (formRaw) => {
     }
 
     if (name === "localisation") {
-      // (géré dans onChange spécifique)
+      // (géré dans onChange spécifique de l'input)
       return;
     }
 
