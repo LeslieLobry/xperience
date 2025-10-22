@@ -74,8 +74,8 @@ function useCityAutocomplete() {
         setItems(mapped);
         setOpen(mapped.length > 0);
         setHighlight(mapped.length ? 0 : -1);
-      } catch {
-        // ignore abort/erreur réseau
+      } catch (err) {
+        // ignorer AbortError / erreurs réseau
       } finally {
         setLoading(false);
       }
@@ -191,6 +191,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
+  // 🔥 important : texte brut tapé par l’utilisateur (séparé de form.localisation)
+  const [cityText, setCityText] = useState("");
+  useEffect(() => {
+    // si form.localisation est changé via voix/sélection, on aligne l’input
+    setCityText(form.localisation || "");
+  }, [form.localisation]);
+
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
 
@@ -227,10 +234,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       longitude: item.longitude,
       autourDeMoi: false,
     }));
+    setCityText(`${item.nom} (${item.departement || "—"})`);
     city.setQuery(item.nom);
     city.setOpen(false);
-    // Re-focalise l'input après sélection
-    queueMicrotask(() => cityInputRef.current?.focus());
+    // garder le focus pour continuer à éditer si besoin
+    setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
@@ -305,14 +313,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    // --- 4) Branche "Ville" ---
-    if (f.localisation?.trim()) {
+    // --- 4) Branche "Ville" (accepte la saisie brute si pas de sélection)
+    const candidateCity = (f.localisation || cityText || "").trim();
+    if (candidateCity) {
       if (f.latitude == null || f.longitude == null) {
-        const geo = await geocodeCityByName(f.localisation);
+        const geo = await geocodeCityByName(candidateCity);
         if (geo && geo.lat != null && geo.lng != null) {
           f.localisation = `${geo.nom} (${geo.dep || "—"})`;
           f.latitude = geo.lat;
           f.longitude = geo.lng;
+          setCityText(f.localisation);
         }
       }
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
@@ -336,6 +346,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             next[k] = v;
           }
         });
+        // si la voix a mis une ville texte, aligner l'input
+        if (next.localisation) setCityText(next.localisation);
         handleSearch(next);
         return next;
       });
@@ -352,7 +364,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         </a>
       </aside>
     );
-  }
+    }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -396,6 +408,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
             // 4) Appliquer & lancer la recherche
             setForm(next);
+            if (next.localisation) setCityText(next.localisation);
             handleSearch(next);
           }}
         />
@@ -547,7 +560,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               name="localisation"
               className="input-recherche"
               placeholder="Commune (ex: Lille)"
-              value={form.localisation}
+              value={cityText}
               autoComplete="off"
               autoCorrect="off"
               ref={cityInputRef}
@@ -556,15 +569,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onChange={(e) => {
                 const v = e.target.value;
+                setCityText(v); // texte brut
                 setForm((prev) => ({
                   ...prev,
-                  localisation: v,
                   autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
                 }));
                 city.setQuery(v);
                 city.setOpen(v.trim().length >= 2);
-                // S'assure que le focus reste dans l'input après re-render
-                queueMicrotask(() => cityInputRef.current?.focus());
               }}
               onKeyDown={onCityKeyDown}
             />
@@ -579,8 +592,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
                     onMouseDown={(e) => {
-                      // on empêche juste le blur pendant le clic sur l’option
-                      e.preventDefault();
+                      e.preventDefault(); // éviter le blur
                       selectCity(item);
                     }}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
@@ -588,8 +600,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     <span className="city-name">{item.label}</span>
                     {item.latitude != null && item.longitude != null && (
                       <span className="city-geo">
-                        · {item.latitude.toFixed(3)},{" "}
-                        {item.longitude.toFixed(3)}
+                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
                       </span>
                     )}
                   </li>
@@ -727,12 +738,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }));
       if (checked) {
         city.setOpen(false);
+        setCityText(""); // vider aussi l’input texte
       }
       return;
     }
 
     if (name === "localisation") {
-      // (géré dans onChange spécifique de l'input)
+      // géré spécifiquement dans l’onChange de l’input ville
       return;
     }
 
