@@ -64,3 +64,176 @@
     padding:8px;
   }
 }
+/* =========================
+   BARRE D’ACTIONS RECHERCHE
+   ========================= */
+.recherche-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0 0 18px;
+  background: rgba(14, 26, 43, 0.85);
+  border: 1px solid rgba(224, 192, 132, 0.25);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* Alignement des boutons à gauche */
+.rt-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.rt-divider {
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.25), transparent);
+}
+
+.rt-count {
+  font-size: 13px;
+  opacity: 0.85;
+  color: #e0c084;
+  padding: 4px 10px;
+  border: 1px dashed rgba(224, 192, 132, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Liste des filtres actifs à droite */
+.rt-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  max-width: 60%;
+  justify-content: flex-end;
+}
+
+.rt-filters::-webkit-scrollbar {
+  height: 4px;
+}
+.rt-filters::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+/* ===================
+   BOUTONS ACTIONS
+   =================== */
+.btn-outlined,
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.btn-outlined svg,
+.btn-primary svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.btn-outlined {
+  background: transparent;
+  color: #f5f5f5;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-outlined:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.btn-primary {
+  background: #e0c084;
+  color: #0e1a2b;
+  border: 1px solid #e0c084;
+  box-shadow: 0 4px 10px rgba(224, 192, 132, 0.25);
+}
+
+.btn-primary:hover {
+  background: #eed6a8;
+  border-color: #eed6a8;
+  box-shadow: 0 6px 16px rgba(224, 192, 132, 0.35);
+}
+
+.btn-outlined:active,
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* ===================
+   PUCE FILTRE ACTIVE
+   =================== */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: 12px;
+  border-radius: 999px;
+  color: #f5f5f5;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.chip strong {
+  font-weight: 600;
+  color: #e0c084;
+}
+
+.chip-sep {
+  opacity: 0.5;
+}
+
+.chip-val {
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+/* ==============
+   RESPONSIVE
+   ============== */
+@media (max-width: 700px) {
+  .recherche-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+  .rt-left {
+    justify-content: space-between;
+  }
+  .rt-filters {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+  .rt-count {
+    display: none;
+  }
+}
