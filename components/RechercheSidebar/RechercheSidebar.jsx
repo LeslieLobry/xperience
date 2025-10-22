@@ -13,7 +13,10 @@ import ReconnaissanceVocale from "../ReconnaissanceVocale/ReconnaissanceVocale";
 
 /* -------------------------------- Utils -------------------------------- */
 function normalizeToDb(val) {
-  return val.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return String(val || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function useIsMobile(breakpoint = 768) {
@@ -28,11 +31,6 @@ function useIsMobile(breakpoint = 768) {
 }
 
 const DEFAULT_RAYON = 20;
-const mountRef = useRef(0);
-useEffect(() => {
-  mountRef.current += 1;
-  console.log("[Sidebar][mount count]", mountRef.current);
-}, []);
 
 /* --------------------------- Autocomplétion ville --------------------------- */
 function useCityAutocomplete() {
@@ -49,7 +47,7 @@ function useCityAutocomplete() {
   const composingRef = useRef(false);
 
   useEffect(() => {
-    if (composingRef.current) return; // ne pas requêter pendant la composition IME
+    if (composingRef.current) return;
 
     if (!query || query.trim().length < 2) {
       setItems([]);
@@ -114,7 +112,7 @@ function useCityAutocomplete() {
 }
 
 /* ------------------------------ Clean filters ------------------------------ */
-// ⚠️ Règle demandée : si une "localisation" (ville) existe → PAS de latitude/longitude.
+// ⚠️ Si une "localisation" (ville) existe → PAS de latitude/longitude.
 function cleanFormFilters(formIn) {
   const form = { ...formIn };
 
@@ -125,8 +123,8 @@ function cleanFormFilters(formIn) {
     if (!form.rayon) form.rayon = DEFAULT_RAYON;
   } else if (form.localisation && String(form.localisation).trim().length) {
     form.autourDeMoi = false;
-    delete form.latitude;   // 🔥 on retire systématiquement
-    delete form.longitude;  // 🔥 on retire systématiquement
+    delete form.latitude;
+    delete form.longitude;
     if (!form.rayon) delete form.rayon;
   } else {
     delete form.latitude;
@@ -135,37 +133,7 @@ function cleanFormFilters(formIn) {
   }
 
   if (!form.autourDeMoi) delete form.autourDeMoi;
-
   return form;
-}
-
-/* --------------------------- Helper: géocodage (optionnel) ---------------------------
-   Tu peux l'utiliser pour un usage interne (stats, suggestion, etc.).
-   Ici, on ne remontera JAMAIS lat/lng vers l'URL parent si une ville est présente. */
-async function geocodeCityByName(name) {
-  const q = String(name || "").trim();
-  if (!q) return null;
-  const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
-  const url =
-    `https://geo.api.gouv.fr/communes` +
-    `?nom=${encodeURIComponent(plain)}` +
-    `&fields=nom,code,centre,departement,population` +
-    `&boost=population&limit=1`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    const c = Array.isArray(data) && data[0];
-    if (!c) return null;
-    return {
-      nom: c.nom,
-      dep: c.departement?.code || "",
-      lat: c.centre?.coordinates?.[1] ?? null,
-      lng: c.centre?.coordinates?.[0] ?? null,
-      population: c.population ?? 0,
-    };
-  } catch {
-    return null;
-  }
 }
 
 /* ================================ Component ================================ */
@@ -204,16 +172,22 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   // Texte brut tapé pour la ville (séparé de form.localisation)
   const [cityText, setCityText] = useState("");
 
-  // FIX: on suit si l’utilisateur est en train d’écrire dans l’input ville
-  const cityEditingRef = useRef(false);               // FIX: flag édition
-  const cityEditingTimeoutRef = useRef(null);         // FIX: anti-rafale
+  // flag d’édition pour éviter d’écraser la frappe
+  const cityEditingRef = useRef(false);
+  const cityEditingTimeoutRef = useRef(null);
 
   useEffect(() => {
-if (cityEditingRef.current) return;
-  const next = form.localisation || "";
-  if (next !== cityText) setCityText(next);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [form.localisation]);
+    if (cityEditingRef.current) return;
+    const next = form.localisation || "";
+    if (next !== cityText) setCityText(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.localisation]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(cityEditingTimeoutRef.current);
+    };
+  }, []);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -243,25 +217,30 @@ if (cityEditingRef.current) return;
   }, [city]);
 
   function selectCity(item) {
-    // On remplit l’étiquette lisible
     const label = `${item.nom} (${item.departement || "—"})`;
     setForm((prev) => ({
       ...prev,
       localisation: label,
       autourDeMoi: false,
-      // On invalide volontairement les coords pour respecter la règle "ville seule"
       latitude: undefined,
       longitude: undefined,
     }));
     setCityText(label);
     city.setOpen(false);
-    // garder le focus pour continuer à taper si besoin
-    // FIX: on sort explicitement du mode édition (plus de blocage du useEffect)
-    cityEditingRef.current = false;                   // FIX
+    cityEditingRef.current = false;
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
+    // Bloque le submit implicite du form
+    if (e.key === "Enter" || e.key === "NumpadEnter") {
+      if (city.open && city.items.length) {
+        e.preventDefault();
+        const item = city.items[city.highlight] || city.items[0];
+        if (item) selectCity(item);
+        return;
+      }
+    }
     if (!city.open || !city.items.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -269,10 +248,6 @@ if (cityEditingRef.current) return;
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const item = city.items[city.highlight] || city.items[0];
-      if (item) selectCity(item);
     } else if (e.key === "Escape") {
       city.setOpen(false);
     }
@@ -280,7 +255,6 @@ if (cityEditingRef.current) return;
 
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = async (formRaw) => {
-    // 1) Exclusivité des modes
     const raw = { ...formRaw };
     if (raw.autourDeMoi) {
       raw.localisation = "";
@@ -288,7 +262,6 @@ if (cityEditingRef.current) return;
       raw.longitude = undefined;
     } else if (raw.localisation?.trim()) {
       raw.autourDeMoi = false;
-      // 🔥 ville seule => on purge coords ici aussi
       raw.latitude = undefined;
       raw.longitude = undefined;
     } else {
@@ -296,7 +269,6 @@ if (cityEditingRef.current) return;
       raw.longitude = undefined;
     }
 
-    // 2) Nettoyage/normalisation
     const f = cleanFormFilters(raw);
     const normalizeArray = (arr) =>
       Array.isArray(arr) ? arr.map(normalizeToDb) : [];
@@ -313,7 +285,6 @@ if (cityEditingRef.current) return;
     f.cheveux = normalizeArray(f.cheveux);
     f.envies = normalizeArray(f.envies);
 
-    // 3) Autour de moi : calcule coords via geoloc (sans les mettre dans l’URL)
     if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
@@ -321,7 +292,6 @@ if (cityEditingRef.current) return;
           setLoadingGeo(false);
           onSearch?.({
             ...f,
-            // on passe au parent pour la requête, mais il ne devra pas les garder en URL
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             rayon: Number(f.rayon || DEFAULT_RAYON),
@@ -337,7 +307,6 @@ if (cityEditingRef.current) return;
       return;
     }
 
-    // 4) Branche "Ville" — URL = ville (+ rayon), JAMAIS de coords
     const candidateCity = (f.localisation || cityText || "").trim();
     if (candidateCity) {
       f.localisation = candidateCity;
@@ -349,7 +318,6 @@ if (cityEditingRef.current) return;
       return;
     }
 
-    // 5) Global
     onSearch?.(f);
   };
 
@@ -365,7 +333,6 @@ if (cityEditingRef.current) return;
           }
         });
 
-        // Si la voix a mis une ville texte → on purge coords
         if (next.localisation) {
           delete next.latitude;
           delete next.longitude;
@@ -379,7 +346,6 @@ if (cityEditingRef.current) return;
 
   const isMobile = useIsMobile(768);
 
-  // Lien simplifié sur mobile en dehors de /recherche
   if (isMobile && pathname !== "/recherche") {
     return (
       <aside className="recherche-sidebar recherche-sidebar--mobile">
@@ -408,7 +374,6 @@ if (cityEditingRef.current) return;
             } catch {}
             let next = { ...form, ...filtres };
 
-            // Si la voix a saisi une ville → on enlève coords pour l’URL propre
             const villeVoix =
               next.localisation || next.ville || next.city || next.commune;
             if (villeVoix) {
@@ -578,48 +543,44 @@ if (cityEditingRef.current) return;
               autoCorrect="off"
               ref={cityInputRef}
               onFocus={() => {
-                 if (cityText.trim().length >= 2 && city.items.length) city.setOpen(true);
+                if (cityText.trim().length >= 2 && city.items.length) city.setOpen(true);
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
               }}
               onCompositionEnd={(e) => {
                 city.composingRef.current = false;
-                // Re-déclenche la recherche avec le texte finalisé
                 const v = e.currentTarget.value;
                 city.setQuery(v);
                 if (v.trim().length >= 2 && city.items.length) {
                   city.setOpen(true);
                 }
               }}
- onChange={(e) => {
-  const v = e.target.value;
+              onChange={(e) => {
+                const v = e.target.value;
 
-  cityEditingRef.current = true;
-  clearTimeout(cityEditingTimeoutRef.current);
-  cityEditingTimeoutRef.current = setTimeout(() => {
-    cityEditingRef.current = false;
-  }, 250);
+                cityEditingRef.current = true;
+                clearTimeout(cityEditingTimeoutRef.current);
+                cityEditingTimeoutRef.current = setTimeout(() => {
+                  cityEditingRef.current = false;
+                }, 250);
 
-  // 👉 Pendant la frappe : on ne touche qu’au texte & à l’autocomplétion
-  setCityText(v);
-  if (!city.composingRef.current) {
-    city.setQuery(v);
-    city.setOpen(v.trim().length >= 2);
-  }
-}}
-onBlur={(e) => {
-  const v = e.target.value.trim();
-  // 👉 À la sortie de champ : on “valide” dans le form (sans coords)
-  setForm((prev) => ({
-    ...prev,
-    localisation: v,
-    autourDeMoi: false,
-    latitude: undefined,
-    longitude: undefined,
-  }));
-}}
-
+                setCityText(v);
+                if (!city.composingRef.current) {
+                  city.setQuery(v);
+                  city.setOpen(v.trim().length >= 2);
+                }
+              }}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
+              }}
               onKeyDown={onCityKeyDown}
             />
             {city.loading && <div className="city-hint">Recherche…</div>}
@@ -627,15 +588,12 @@ onBlur={(e) => {
               <ul
                 className="city-dropdown"
                 tabIndex={-1}
-                // Empêche la perte de focus & clic hasardeux
                 onMouseDown={(e) => e.preventDefault()}
               >
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
-                    className={`city-option ${
-                      idx === city.highlight ? "is-active" : ""
-                    }`}
+                    className={`city-option ${idx === city.highlight ? "is-active" : ""}`}
                     onMouseEnter={() => city.setHighlight(idx)}
                     onClick={() => selectCity(item)}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
@@ -786,10 +744,7 @@ onBlur={(e) => {
       return;
     }
 
-    if (name === "localisation") {
-      // géré dans l’onChange de l’input ville ci-dessus
-      return;
-    }
+    if (name === "localisation") return; // géré par l’input ville
 
     if (type === "checkbox" && Array.isArray(form[name])) {
       setForm((prev) => ({

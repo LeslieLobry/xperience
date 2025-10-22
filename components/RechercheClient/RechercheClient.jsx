@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useTransition } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import RechercheSidebar from "../RechercheSidebar/RechercheSidebar";
 import RechercheResultats from "../RechercheResultats/RechercheResultats";
@@ -8,22 +8,14 @@ import "./RechercheClient.css"
 
 export default function RechercheClient() {
   const sidebarRef = useRef();
-  const [resumeVocal, setResumeVocal] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
 
-  // ✅ anti-rafale pour l’URL
+  // Anti-rafale pour l’URL
   const debounceRef = useRef(null);
 
-  // (Optionnel) détecte un remount du composant
-  const mountRef = useRef(0);
-  useEffect(() => {
-    mountRef.current += 1;
-    console.log("[PageRecherche][mount count]", mountRef.current);
-  }, []);
-
+  // Détection mobile
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     handleResize();
@@ -53,35 +45,37 @@ export default function RechercheClient() {
   const envies         = searchParams.getAll("envies");
   const rayon          = searchParams.get("rayon") || "";
 
-  // ✅ NEW: debounce + replace + scroll:false
+  // Debounce + replace (sans options) et on retire lat/lng de l’URL
   const handleSearch = (filtres) => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const params = new URLSearchParams();
-      Object.entries(filtres).forEach(([k, v]) => {
-        // on ne met pas de champs vides
-        if ((k === "rayon" || k === "ageMin" || k === "ageMax") && (v === "" || v == null)) return;
+    try {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const params = new URLSearchParams();
 
-        // ⚠️ règle: si localisation existe => PAS de lat/lng dans l’URL
-        if (k === "latitude" || k === "longitude") return;
+        Object.entries(filtres).forEach(([k, v]) => {
+          // jamais lat/lng dans l’URL
+          if (k === "latitude" || k === "longitude") return;
 
-        if (Array.isArray(v)) {
-          v.forEach(x => (x != null && x !== "") && params.append(k, x));
-        } else if (typeof v === "boolean") {
-          if (v) params.set(k, "true");
-        } else if (v !== "" && v !== undefined && v !== null) {
-          params.set(k, String(v));
-        }
-      });
+          // ignore valeurs vides pour numériques
+          if ((k === "rayon" || k === "ageMin" || k === "ageMax") && (v === "" || v == null)) return;
 
-      // 👇 replace (pas push) pour éviter une “vraie” nav + pile historique gonflée
-      startTransition(() => {
-        router.replace(`/recherche?${params.toString()}`, { scroll: false });
-      });
-    }, 400); // 300–500ms marche bien
+          if (Array.isArray(v)) {
+            v.forEach((x) => (x != null && x !== "") && params.append(k, String(x)));
+          } else if (typeof v === "boolean") {
+            if (v) params.set(k, "true");
+          } else if (v !== "" && v !== undefined && v !== null) {
+            params.set(k, String(v));
+          }
+        });
+
+        const url = `/recherche?${params.toString()}`;
+        router.replace(url);
+      }, 400);
+    } catch (e) {
+      console.error("[handleSearch][error]", e);
+    }
   };
 
-  // cleanup du debounce
   useEffect(() => {
     return () => clearTimeout(debounceRef.current);
   }, []);
