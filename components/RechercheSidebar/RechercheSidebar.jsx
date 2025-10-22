@@ -198,7 +198,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   // Texte brut tapé pour la ville (séparé de form.localisation)
   const [cityText, setCityText] = useState("");
+
+  // FIX: on suit si l’utilisateur est en train d’écrire dans l’input ville
+  const cityEditingRef = useRef(false);               // FIX: flag édition
+  const cityEditingTimeoutRef = useRef(null);         // FIX: anti-rafale
+
   useEffect(() => {
+    // FIX: n’écrase PAS la frappe si on est en cours d’édition
+    if (cityEditingRef.current) return;               // FIX
     setCityText(form.localisation || "");
   }, [form.localisation]);
 
@@ -244,6 +251,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     city.setQuery(item.nom);
     city.setOpen(false);
     // garder le focus pour continuer à taper si besoin
+    // FIX: on sort explicitement du mode édition (plus de blocage du useEffect)
+    cityEditingRef.current = false;                   // FIX
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
@@ -580,6 +589,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onChange={(e) => {
                 const v = e.target.value;
+
+                // FIX: on signale qu’on édite, pour empêcher le useEffect d’écraser la frappe
+                cityEditingRef.current = true;                     // FIX
+                clearTimeout(cityEditingTimeoutRef.current);        // FIX
+                cityEditingTimeoutRef.current = setTimeout(() => {  // FIX
+                  cityEditingRef.current = false;
+                }, 250);
+
                 setCityText(v); // texte affiché
                 setForm((prev) => ({
                   ...prev,
