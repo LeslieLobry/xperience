@@ -27,6 +27,8 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+const DEFAULT_RAYON = 20;
+
 /* --------------------------- Autocomplétion ville --------------------------- */
 function useCityAutocomplete() {
   const [query, setQuery] = useState("");
@@ -38,14 +40,20 @@ function useCityAutocomplete() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
+  // Pour éviter de lancer la recherche au milieu d’un accent (IME)
+  const composingRef = useRef(false);
+
   useEffect(() => {
+    if (composingRef.current) return; // ne pas requêter pendant la composition IME
+
     if (!query || query.trim().length < 2) {
       setItems([]);
       setOpen(false);
+      setHighlight(-1);
       return;
     }
-    setLoading(true);
 
+    setLoading(true);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
@@ -54,7 +62,7 @@ function useCityAutocomplete() {
 
         const url =
           `https://geo.api.gouv.fr/communes` +
-          `?nom=${encodeURIComponent(query)}` +
+          `?nom=${encodeURIComponent(query.trim())}` +
           `&fields=nom,code,centre,departement,population` +
           `&boost=population&limit=8`;
 
@@ -74,8 +82,8 @@ function useCityAutocomplete() {
         setItems(mapped);
         setOpen(mapped.length > 0);
         setHighlight(mapped.length ? 0 : -1);
-      } catch (err) {
-        // ignorer AbortError / erreurs réseau
+      } catch {
+        // ignore
       } finally {
         setLoading(false);
       }
@@ -96,25 +104,26 @@ function useCityAutocomplete() {
     setOpen,
     highlight,
     setHighlight,
+    composingRef,
   };
 }
 
 /* ------------------------------ Clean filters ------------------------------ */
+// ⚠️ Règle demandée : si une "localisation" (ville) existe → PAS de latitude/longitude.
 function cleanFormFilters(formIn) {
   const form = { ...formIn };
 
-  // Si “autour de moi” : ignorer la ville texte (coords via geoloc)
   if (form.autourDeMoi) {
     form.localisation = "";
     delete form.latitude;
     delete form.longitude;
-  } else if (form.localisation) {
-    // Mode ville : s'assurer qu’on n’est pas en “autour de moi”
+    if (!form.rayon) form.rayon = DEFAULT_RAYON;
+  } else if (form.localisation && String(form.localisation).trim().length) {
     form.autourDeMoi = false;
+    delete form.latitude;   // 🔥 on retire systématiquement
+    delete form.longitude;  // 🔥 on retire systématiquement
     if (!form.rayon) delete form.rayon;
-    // latitude/longitude peuvent rester si issues de l’autocomplétion
   } else {
-    // Ni autour de moi, ni ville => pas de coords
     delete form.latitude;
     delete form.longitude;
     delete form.rayon;
@@ -125,22 +134,18 @@ function cleanFormFilters(formIn) {
   return form;
 }
 
-const DEFAULT_RAYON = 20;
-
-/* --------------------------- Helper: géocodage --------------------------- */
+/* --------------------------- Helper: géocodage (optionnel) ---------------------------
+   Tu peux l'utiliser pour un usage interne (stats, suggestion, etc.).
+   Ici, on ne remontera JAMAIS lat/lng vers l'URL parent si une ville est présente. */
 async function geocodeCityByName(name) {
   const q = String(name || "").trim();
   if (!q) return null;
-
-  // "Lille (59)" -> "Lille"
   const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
-
   const url =
     `https://geo.api.gouv.fr/communes` +
     `?nom=${encodeURIComponent(plain)}` +
     `&fields=nom,code,centre,departement,population` +
     `&boost=population&limit=1`;
-
   try {
     const res = await fetch(url);
     const data = await res.json();
@@ -191,10 +196,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // 🔥 important : texte brut tapé par l’utilisateur (séparé de form.localisation)
+  // Texte brut tapé pour la ville (séparé de form.localisation)
   const [cityText, setCityText] = useState("");
   useEffect(() => {
-    // si form.localisation est changé via voix/sélection, on aligne l’input
     setCityText(form.localisation || "");
   }, [form.localisation]);
 
@@ -207,16 +211,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     experience: false,
     autres: false,
   });
-
-  const toggleSection = (key) => {
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  const toggleSection = (key) =>
+    setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
   /* ----------------------------- Autocomplétion ----------------------------- */
   const city = useCityAutocomplete();
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
+  // Fermer le menu si clic dehors
   useEffect(() => {
     function onDocClick(e) {
       if (!dropdownRef.current) return;
@@ -227,17 +230,20 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   }, [city]);
 
   function selectCity(item) {
+    // On remplit l’étiquette lisible
+    const label = `${item.nom} (${item.departement || "—"})`;
     setForm((prev) => ({
       ...prev,
-      localisation: `${item.nom} (${item.departement || "—"})`,
-      latitude: item.latitude,
-      longitude: item.longitude,
+      localisation: label,
       autourDeMoi: false,
+      // On invalide volontairement les coords pour respecter la règle "ville seule"
+      latitude: undefined,
+      longitude: undefined,
     }));
-    setCityText(`${item.nom} (${item.departement || "—"})`);
+    setCityText(label);
     city.setQuery(item.nom);
     city.setOpen(false);
-    // garder le focus pour continuer à éditer si besoin
+    // garder le focus pour continuer à taper si besoin
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
@@ -260,7 +266,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = async (formRaw) => {
-    // --- 1) Exclusivité des modes ---
+    // 1) Exclusivité des modes
     const raw = { ...formRaw };
     if (raw.autourDeMoi) {
       raw.localisation = "";
@@ -268,12 +274,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       raw.longitude = undefined;
     } else if (raw.localisation?.trim()) {
       raw.autourDeMoi = false;
+      // 🔥 ville seule => on purge coords ici aussi
+      raw.latitude = undefined;
+      raw.longitude = undefined;
     } else {
       raw.latitude = undefined;
       raw.longitude = undefined;
     }
 
-    // --- 2) Nettoyage/normalisation existants ---
+    // 2) Nettoyage/normalisation
     const f = cleanFormFilters(raw);
     const normalizeArray = (arr) =>
       Array.isArray(arr) ? arr.map(normalizeToDb) : [];
@@ -290,7 +299,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     f.cheveux = normalizeArray(f.cheveux);
     f.envies = normalizeArray(f.envies);
 
-    // --- 3) Branche "Autour de moi" ---
+    // 3) Autour de moi : calcule coords via geoloc (sans les mettre dans l’URL)
     if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
@@ -298,6 +307,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           setLoadingGeo(false);
           onSearch?.({
             ...f,
+            // on passe au parent pour la requête, mais il ne devra pas les garder en URL
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             rayon: Number(f.rayon || DEFAULT_RAYON),
@@ -313,32 +323,26 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    // --- 4) Branche "Ville" (accepte la saisie brute si pas de sélection)
+    // 4) Branche "Ville" — URL = ville (+ rayon), JAMAIS de coords
     const candidateCity = (f.localisation || cityText || "").trim();
     if (candidateCity) {
-      if (f.latitude == null || f.longitude == null) {
-        const geo = await geocodeCityByName(candidateCity);
-        if (geo && geo.lat != null && geo.lng != null) {
-          f.localisation = `${geo.nom} (${geo.dep || "—"})`;
-          f.latitude = geo.lat;
-          f.longitude = geo.lng;
-          setCityText(f.localisation);
-        }
-      }
+      f.localisation = candidateCity;
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
       f.autourDeMoi = false;
+      delete f.latitude;
+      delete f.longitude;
       onSearch?.(f);
       return;
     }
 
-    // --- 5) Aucun mode (ni ville ni autour) → recherche globale
+    // 5) Global
     onSearch?.(f);
   };
 
   useImperativeHandle(ref, () => ({
     handleVocalFiltres(filtres) {
       setForm((prev) => {
-        const next = { ...prev };
+        let next = { ...prev };
         Object.entries(filtres).forEach(([k, v]) => {
           if (Array.isArray(next[k]) && Array.isArray(v)) {
             next[k] = [...new Set([...next[k], ...v])];
@@ -346,8 +350,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             next[k] = v;
           }
         });
-        // si la voix a mis une ville texte, aligner l'input
-        if (next.localisation) setCityText(next.localisation);
+
+        // Si la voix a mis une ville texte → on purge coords
+        if (next.localisation) {
+          delete next.latitude;
+          delete next.longitude;
+        }
+        setCityText(next.localisation || "");
         handleSearch(next);
         return next;
       });
@@ -356,6 +365,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   const isMobile = useIsMobile(768);
 
+  // Lien simplifié sur mobile en dehors de /recherche
   if (isMobile && pathname !== "/recherche") {
     return (
       <aside className="recherche-sidebar recherche-sidebar--mobile">
@@ -364,7 +374,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         </a>
       </aside>
     );
-    }
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -378,40 +388,28 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         <ReconnaissanceVocale
           onResult={async (texte) => {
             setResumeVocal(texte);
-
-            // 1) Extraire les filtres depuis le texte
             let filtres = {};
             try {
               filtres = extraireFiltresVocal(texte) || {};
             } catch {}
-
-            // 2) Fusionner avec le form courant
             let next = { ...form, ...filtres };
 
-            // 3) Si une ville est présente sans coords → géocoder
+            // Si la voix a saisi une ville → on enlève coords pour l’URL propre
             const villeVoix =
               next.localisation || next.ville || next.city || next.commune;
-
-            if (villeVoix && (next.latitude == null || next.longitude == null)) {
-              const geo = await geocodeCityByName(villeVoix);
-              if (geo && geo.lat != null && geo.lng != null) {
-                next = {
-                  ...next,
-                  localisation: `${geo.nom} (${geo.dep || "—"})`,
-                  latitude: geo.lat,
-                  longitude: geo.lng,
-                  autourDeMoi: false,
-                  rayon: next.rayon || DEFAULT_RAYON,
-                };
-              }
+            if (villeVoix) {
+              delete next.latitude;
+              delete next.longitude;
+              next.autourDeMoi = false;
+              next.rayon = next.rayon || DEFAULT_RAYON;
             }
 
-            // 4) Appliquer & lancer la recherche
             setForm(next);
-            if (next.localisation) setCityText(next.localisation);
+            setCityText(next.localisation || "");
             handleSearch(next);
           }}
         />
+
         {resumeVocal && (
           <div
             style={{
@@ -428,6 +426,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
           </div>
         )}
+
         {loadingGeo && (
           <div style={{ color: "#e0c084", fontWeight: 600, marginBottom: 8 }}>
             ⏳ Récupération de ta position...
@@ -559,7 +558,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               type="text"
               name="localisation"
               className="input-recherche"
-              placeholder="Commune (ex: Lille)"
+              placeholder="Commune (ex: Paris)"
               value={cityText}
               autoComplete="off"
               autoCorrect="off"
@@ -567,23 +566,43 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onFocus={() => {
                 if (city.items.length) city.setOpen(true);
               }}
+              onCompositionStart={() => {
+                city.composingRef.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                city.composingRef.current = false;
+                // Re-déclenche la recherche avec le texte finalisé
+                const v = e.currentTarget.value;
+                city.setQuery(v);
+                if (v.trim().length >= 2 && city.items.length) {
+                  city.setOpen(true);
+                }
+              }}
               onChange={(e) => {
                 const v = e.target.value;
-                setCityText(v); // texte brut
+                setCityText(v); // texte affiché
                 setForm((prev) => ({
                   ...prev,
+                  localisation: v, // on aligne directement : plus naturel pour l’URL
                   autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
+                  latitude: undefined,   // 🔥 invalide coords
+                  longitude: undefined,  // 🔥 invalide coords
                 }));
-                city.setQuery(v);
-                city.setOpen(v.trim().length >= 2);
+                if (!city.composingRef.current) {
+                  city.setQuery(v);
+                  city.setOpen(v.trim().length >= 2);
+                }
               }}
               onKeyDown={onCityKeyDown}
             />
             {city.loading && <div className="city-hint">Recherche…</div>}
             {city.open && city.items.length > 0 && (
-              <ul className="city-dropdown" tabIndex={-1}>
+              <ul
+                className="city-dropdown"
+                tabIndex={-1}
+                // Empêche la perte de focus & clic hasardeux
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
@@ -591,10 +610,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onMouseDown={(e) => {
-                      e.preventDefault(); // éviter le blur
-                      selectCity(item);
-                    }}
+                    onClick={() => selectCity(item)}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
                   >
                     <span className="city-name">{item.label}</span>
@@ -733,18 +749,18 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         ...prev,
         autourDeMoi: checked,
         localisation: checked ? "" : prev.localisation,
-        latitude: checked ? undefined : prev.latitude,
-        longitude: checked ? undefined : prev.longitude,
+        latitude: undefined,
+        longitude: undefined,
       }));
       if (checked) {
         city.setOpen(false);
-        setCityText(""); // vider aussi l’input texte
+        setCityText("");
       }
       return;
     }
 
     if (name === "localisation") {
-      // géré spécifiquement dans l’onChange de l’input ville
+      // géré dans l’onChange de l’input ville ci-dessus
       return;
     }
 
@@ -772,7 +788,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               type="checkbox"
               name={name}
               value={opt}
-              checked={form[name]?.includes(opt)}
+              checked={Array.isArray(form[name]) ? form[name]?.includes(opt) : false}
               onChange={handleChange}
             />
             {opt}
