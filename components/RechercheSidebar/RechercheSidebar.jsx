@@ -1,10 +1,10 @@
 "use client";
 import React, {
   useState,
-  useEffect,
   useImperativeHandle,
   forwardRef,
   useRef,
+  useEffect,
 } from "react";
 import "./recherche-sidebar.css";
 import { extraireFiltresVocal } from "../../lib/extraireFiltresVocal";
@@ -40,11 +40,11 @@ function useCityAutocomplete() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Pour éviter de lancer la recherche au milieu d’un accent (IME)
+  // évite les requêtes pendant la composition d’accent (IME)
   const composingRef = useRef(false);
 
   useEffect(() => {
-    if (composingRef.current) return; // ne pas requêter pendant la composition IME
+    if (composingRef.current) return;
 
     if (!query || query.trim().length < 2) {
       setItems([]);
@@ -109,7 +109,7 @@ function useCityAutocomplete() {
 }
 
 /* ------------------------------ Clean filters ------------------------------ */
-// ⚠️ Règle demandée : si une "localisation" (ville) existe → PAS de latitude/longitude.
+// Règle: si une "localisation" (ville) existe → PAS de latitude/longitude dans l’URL.
 function cleanFormFilters(formIn) {
   const form = { ...formIn };
 
@@ -120,8 +120,8 @@ function cleanFormFilters(formIn) {
     if (!form.rayon) form.rayon = DEFAULT_RAYON;
   } else if (form.localisation && String(form.localisation).trim().length) {
     form.autourDeMoi = false;
-    delete form.latitude;   // 🔥 on retire systématiquement
-    delete form.longitude;  // 🔥 on retire systématiquement
+    delete form.latitude;
+    delete form.longitude;
     if (!form.rayon) delete form.rayon;
   } else {
     delete form.latitude;
@@ -130,37 +130,7 @@ function cleanFormFilters(formIn) {
   }
 
   if (!form.autourDeMoi) delete form.autourDeMoi;
-
   return form;
-}
-
-/* --------------------------- Helper: géocodage (optionnel) ---------------------------
-   Tu peux l'utiliser pour un usage interne (stats, suggestion, etc.).
-   Ici, on ne remontera JAMAIS lat/lng vers l'URL parent si une ville est présente. */
-async function geocodeCityByName(name) {
-  const q = String(name || "").trim();
-  if (!q) return null;
-  const plain = q.replace(/\s*\([\dA-Za-z\-]+\)\s*$/, "");
-  const url =
-    `https://geo.api.gouv.fr/communes` +
-    `?nom=${encodeURIComponent(plain)}` +
-    `&fields=nom,code,centre,departement,population` +
-    `&boost=population&limit=1`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    const c = Array.isArray(data) && data[0];
-    if (!c) return null;
-    return {
-      nom: c.nom,
-      dep: c.departement?.code || "",
-      lat: c.centre?.coordinates?.[1] ?? null,
-      lng: c.centre?.coordinates?.[0] ?? null,
-      population: c.population ?? 0,
-    };
-  } catch {
-    return null;
-  }
 }
 
 /* ================================ Component ================================ */
@@ -196,11 +166,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // Texte brut tapé pour la ville (séparé de form.localisation)
+  // ✨ Texte de saisie ville, totalement décorrélé de form.localisation
   const [cityText, setCityText] = useState("");
-  useEffect(() => {
-    setCityText(form.localisation || "");
-  }, [form.localisation]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -219,7 +186,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
-  // Fermer le menu si clic dehors
+  // Ferme la liste si clic dehors
   useEffect(() => {
     function onDocClick(e) {
       if (!dropdownRef.current) return;
@@ -230,21 +197,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   }, [city]);
 
   function selectCity(item) {
-    // On remplit l’étiquette lisible
     const label = `${item.nom} (${item.departement || "—"})`;
-    setForm((prev) => ({
-      ...prev,
-      localisation: label,
-      autourDeMoi: false,
-      // On invalide volontairement les coords pour respecter la règle "ville seule"
-      latitude: undefined,
-      longitude: undefined,
-    }));
+    // ✅ on n’écrit pas dans form ici : on évite les remounts intempestifs
     setCityText(label);
     city.setQuery(item.nom);
     city.setOpen(false);
-    // garder le focus pour continuer à taper si besoin
-    setTimeout(() => cityInputRef.current?.focus(), 0);
+    requestAnimationFrame(() => cityInputRef.current?.focus());
   }
 
   function onCityKeyDown(e) {
@@ -272,9 +230,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       raw.localisation = "";
       raw.latitude = undefined;
       raw.longitude = undefined;
+    } else if (cityText.trim()) {
+      // ✅ priorité à ce qu’il y a dans l’input
+      raw.localisation = cityText.trim();
+      raw.autourDeMoi = false;
+      raw.latitude = undefined;
+      raw.longitude = undefined;
     } else if (raw.localisation?.trim()) {
       raw.autourDeMoi = false;
-      // 🔥 ville seule => on purge coords ici aussi
       raw.latitude = undefined;
       raw.longitude = undefined;
     } else {
@@ -299,7 +262,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     f.cheveux = normalizeArray(f.cheveux);
     f.envies = normalizeArray(f.envies);
 
-    // 3) Autour de moi : calcule coords via geoloc (sans les mettre dans l’URL)
+    // 3) Autour de moi : on calcule les coords, mais on ne les garde pas en URL
     if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
@@ -307,7 +270,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           setLoadingGeo(false);
           onSearch?.({
             ...f,
-            // on passe au parent pour la requête, mais il ne devra pas les garder en URL
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             rayon: Number(f.rayon || DEFAULT_RAYON),
@@ -323,8 +285,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    // 4) Branche "Ville" — URL = ville (+ rayon), JAMAIS de coords
-    const candidateCity = (f.localisation || cityText || "").trim();
+    // 4) Ville : URL = ville (+ rayon), jamais de coords
+    const candidateCity = (f.localisation || "").trim();
     if (candidateCity) {
       f.localisation = candidateCity;
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
@@ -342,8 +304,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   useImperativeHandle(ref, () => ({
     handleVocalFiltres(filtres) {
       setForm((prev) => {
-        let next = { ...prev };
+        // On fusionne tout SAUF la ville (on la met dans cityText)
+        const next = { ...prev };
         Object.entries(filtres).forEach(([k, v]) => {
+          if (k === "localisation" || k === "ville" || k === "city" || k === "commune") {
+            // ✅ la ville va dans l’input, sans toucher form
+            const txt = Array.isArray(v) ? v[0] : v;
+            if (txt) setCityText(String(txt));
+            return;
+          }
           if (Array.isArray(next[k]) && Array.isArray(v)) {
             next[k] = [...new Set([...next[k], ...v])];
           } else {
@@ -351,12 +320,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           }
         });
 
-        // Si la voix a mis une ville texte → on purge coords
-        if (next.localisation) {
-          delete next.latitude;
-          delete next.longitude;
-        }
-        setCityText(next.localisation || "");
+        // Mode exclusif
+        next.autourDeMoi = false;
+        delete next.latitude;
+        delete next.longitude;
+
+        // Lance la recherche avec ce state et la ville prise depuis cityText
         handleSearch(next);
         return next;
       });
@@ -392,21 +361,19 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             try {
               filtres = extraireFiltresVocal(texte) || {};
             } catch {}
-            let next = { ...form, ...filtres };
-
-            // Si la voix a saisi une ville → on enlève coords pour l’URL propre
-            const villeVoix =
-              next.localisation || next.ville || next.city || next.commune;
-            if (villeVoix) {
-              delete next.latitude;
-              delete next.longitude;
-              next.autourDeMoi = false;
-              next.rayon = next.rayon || DEFAULT_RAYON;
+            // Passe par handleVocalFiltres (exposed via ref) si tu l’utilises depuis le parent.
+            // Ici on applique localement :
+            if (filtres.localisation || filtres.ville || filtres.city || filtres.commune) {
+              const vo = filtres.localisation || filtres.ville || filtres.city || filtres.commune;
+              const txt = Array.isArray(vo) ? vo[0] : vo;
+              if (txt) setCityText(String(txt));
+              delete filtres.localisation;
+              delete filtres.ville;
+              delete filtres.city;
+              delete filtres.commune;
             }
-
-            setForm(next);
-            setCityText(next.localisation || "");
-            handleSearch(next);
+            setForm((prev) => ({ ...prev, ...filtres, autourDeMoi: false }));
+            handleSearch({ ...form, ...filtres, autourDeMoi: false });
           }}
         />
 
@@ -565,13 +532,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               ref={cityInputRef}
               onFocus={() => {
                 if (city.items.length) city.setOpen(true);
+                requestAnimationFrame(() => cityInputRef.current?.focus());
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
               }}
               onCompositionEnd={(e) => {
                 city.composingRef.current = false;
-                // Re-déclenche la recherche avec le texte finalisé
                 const v = e.currentTarget.value;
                 city.setQuery(v);
                 if (v.trim().length >= 2 && city.items.length) {
@@ -580,18 +547,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onChange={(e) => {
                 const v = e.target.value;
-                setCityText(v); // texte affiché
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v, // on aligne directement : plus naturel pour l’URL
-                  autourDeMoi: false,
-                  latitude: undefined,   // 🔥 invalide coords
-                  longitude: undefined,  // 🔥 invalide coords
-                }));
+                setCityText(v);                 // ✅ on tape librement
                 if (!city.composingRef.current) {
-                  city.setQuery(v);
+                  city.setQuery(v);             // autocomplétion (debounced)
                   city.setOpen(v.trim().length >= 2);
                 }
+                // ❌ ne pas setForm ici (ça causait le blur)
               }}
               onKeyDown={onCityKeyDown}
             />
@@ -600,8 +561,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               <ul
                 className="city-dropdown"
                 tabIndex={-1}
-                // Empêche la perte de focus & clic hasardeux
-                onMouseDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()} // anti-blur
               >
                 {city.items.map((item, idx) => (
                   <li
@@ -760,7 +720,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
 
     if (name === "localisation") {
-      // géré dans l’onChange de l’input ville ci-dessus
+      // géré via cityText ; on ne touche pas form ici
       return;
     }
 
