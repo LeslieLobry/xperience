@@ -82,7 +82,7 @@ export default function RechercheResultats({ className = "" }) {
     <div className={`profil-list1 ${className}`}>
       {/* Barre d’actions (visible même en chargement) */}
       {hasParams && (
-        <div className="recherche-toolbar" role="region" aria-label="Actions de recherche">
+        <div className="recherche-toolbar2" role="region" aria-label="Actions de recherche">
           <button className="btn-outlined" onClick={handleResetSearch}>
             Nouvelle recherche
           </button>
