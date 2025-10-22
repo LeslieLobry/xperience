@@ -76,11 +76,10 @@ function makeIdentity(base) {
 // format stable pour la room : "conversation-<id>"
 function normalizeRoom(input) {
   if (!input) return null;
-  const s = String(input).trim();
-  if (/^\d+$/.test(s)) return `conversation-${s}`;
-  if (/^conversation-/.test(s)) return s;
-  return s;
+  const m = String(input).match(/\d+/); // extrait le 1er nombre
+  return m ? `conversation-${m[0]}` : null;
 }
+
 
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
