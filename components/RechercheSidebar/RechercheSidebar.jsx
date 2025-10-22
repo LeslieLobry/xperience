@@ -28,6 +28,11 @@ function useIsMobile(breakpoint = 768) {
 }
 
 const DEFAULT_RAYON = 20;
+const mountRef = useRef(0);
+useEffect(() => {
+  mountRef.current += 1;
+  console.log("[Sidebar][mount count]", mountRef.current);
+}, []);
 
 /* --------------------------- Autocomplétion ville --------------------------- */
 function useCityAutocomplete() {
