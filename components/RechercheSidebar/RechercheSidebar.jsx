@@ -204,10 +204,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const cityEditingTimeoutRef = useRef(null);         // FIX: anti-rafale
 
   useEffect(() => {
-    // FIX: n’écrase PAS la frappe si on est en cours d’édition
-    if (cityEditingRef.current) return;               // FIX
-    setCityText(form.localisation || "");
-  }, [form.localisation]);
+if (cityEditingRef.current) return;
+  const next = form.localisation || "";
+  if (next !== cityText) setCityText(next);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [form.localisation]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -248,7 +249,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       longitude: undefined,
     }));
     setCityText(label);
-    city.setQuery(item.nom);
     city.setOpen(false);
     // garder le focus pour continuer à taper si besoin
     // FIX: on sort explicitement du mode édition (plus de blocage du useEffect)
@@ -573,7 +573,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               autoCorrect="off"
               ref={cityInputRef}
               onFocus={() => {
-                if (city.items.length) city.setOpen(true);
+                 if (cityText.trim().length >= 2 && city.items.length) city.setOpen(true);
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -587,29 +587,34 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                   city.setOpen(true);
                 }
               }}
-              onChange={(e) => {
-                const v = e.target.value;
+ onChange={(e) => {
+  const v = e.target.value;
 
-                // FIX: on signale qu’on édite, pour empêcher le useEffect d’écraser la frappe
-                cityEditingRef.current = true;                     // FIX
-                clearTimeout(cityEditingTimeoutRef.current);        // FIX
-                cityEditingTimeoutRef.current = setTimeout(() => {  // FIX
-                  cityEditingRef.current = false;
-                }, 250);
+  cityEditingRef.current = true;
+  clearTimeout(cityEditingTimeoutRef.current);
+  cityEditingTimeoutRef.current = setTimeout(() => {
+    cityEditingRef.current = false;
+  }, 250);
 
-                setCityText(v); // texte affiché
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v, // on aligne directement : plus naturel pour l’URL
-                  autourDeMoi: false,
-                  latitude: undefined,   // 🔥 invalide coords
-                  longitude: undefined,  // 🔥 invalide coords
-                }));
-                if (!city.composingRef.current) {
-                  city.setQuery(v);
-                  city.setOpen(v.trim().length >= 2);
-                }
-              }}
+  // 👉 Pendant la frappe : on ne touche qu’au texte & à l’autocomplétion
+  setCityText(v);
+  if (!city.composingRef.current) {
+    city.setQuery(v);
+    city.setOpen(v.trim().length >= 2);
+  }
+}}
+onBlur={(e) => {
+  const v = e.target.value.trim();
+  // 👉 À la sortie de champ : on “valide” dans le form (sans coords)
+  setForm((prev) => ({
+    ...prev,
+    localisation: v,
+    autourDeMoi: false,
+    latitude: undefined,
+    longitude: undefined,
+  }));
+}}
+
               onKeyDown={onCityKeyDown}
             />
             {city.loading && <div className="city-hint">Recherche…</div>}
