@@ -6,7 +6,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/* ===================== ENV ===================== */
 const LIVEKIT_URL =
   process.env.LIVEKIT_URL ||
   process.env.LIVEKIT_WS_URL ||
@@ -15,25 +14,21 @@ const LIVEKIT_URL =
 const API_KEY = process.env.LIVEKIT_API_KEY || process.env.LIVEKIT_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET || process.env.LIVEKIT_SECRET;
 
-/* ===================== UTILS ===================== */
-const TAG = "[LIVEKIT_TOKEN]";
-
+/* ============================================================
+ *  UTILS
+ * ============================================================ */
 function normalizeWs(url) {
   if (!url) return null;
   let u = String(url).trim();
   if (u.startsWith("http://")) u = u.replace("http://", "ws://");
   if (u.startsWith("https://")) u = u.replace("https://", "wss://");
-  if (!u.startsWith("ws://") && !u.startsWith("wss://")) u = "wss://" + u.replace(/^\/+/, "");
+  if (!u.startsWith("ws://") && !u.startsWith("wss://"))
+    u = "wss://" + u.replace(/^\/+/, "");
   return u;
 }
 
-// Sécurise l'identity (et aligne _ -> - pour coller aux "expectedIdentity" côté app)
 function sanitizeIdentity(id) {
-  return String(id || "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/_/g, "-")
-    .slice(0, 128);
+  return String(id || "").trim().replace(/\s+/g, "_").slice(0, 128);
 }
 
 function makeIdentity(base) {
@@ -42,10 +37,18 @@ function makeIdentity(base) {
   return sanitizeIdentity(s);
 }
 
+// ✅ Nouvelle fonction : garantit un format stable pour la room
+function normalizeRoom(input) {
+  if (!input) return null;
+  const s = String(input).trim();
+  if (/^\d+$/.test(s)) return `conversation-${s}`;
+  if (/^conversation-/.test(s)) return s;
+  return s;
+}
+
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
-  if (!API_KEY || !API_SECRET) {
+  if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
-  }
   const at = new AccessToken(API_KEY, API_SECRET, {
     identity: sanitizeIdentity(identity),
     ttl: ttlSec,
@@ -58,33 +61,17 @@ async function buildJwt({ identity, room, ttlSec = 600, name }) {
     canSubscribe: true,
     canPublishData: true,
   });
-  return at.toJwt();
+  return await at.toJwt();
 }
 
-/** Construit une room sûre:
- *  1) si conversationId numérique fourni -> "conversation-<id>"
- *  2) sinon, accepte legacy room/roomName UNIQUEMENT si "conversation-<id>"
- */
-function resolveRoom({ conversationId, legacyRoom, legacyRoomName }) {
-  const conv = conversationId ?? null;
-  if (conv != null && /^\d+$/.test(String(conv))) {
-    return { room: `conversation-${String(conv).trim()}`, source: "conversationId" };
-  }
-  const legacy = legacyRoom ?? legacyRoomName ?? null;
-  if (legacy && /^conversation-\d+$/.test(String(legacy))) {
-    return { room: String(legacy).trim(), source: "legacy" };
-  }
-  return { room: null, source: "invalid" };
-}
-
-/* ===================== GET ===================== */
+/* ============================================================
+ *  GET
+ * ============================================================ */
 export async function GET(req) {
-  const url = new URL(req.url);
-  const qp = url.searchParams;
-
   try {
-    // Diagnostic léger d'env
-    if (qp.get("diag") === "1") {
+    const { searchParams } = new URL(req.url);
+
+    if (searchParams.get("diag") === "1") {
       return NextResponse.json({
         hasUrl: !!LIVEKIT_URL,
         hasKey: !!API_KEY,
@@ -94,43 +81,38 @@ export async function GET(req) {
       });
     }
 
-    const debug = qp.get("debug") === "1";
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    // ---- Room sûre
-    const { room, source } = resolveRoom({
-      conversationId: qp.get("conversationId"),
-      legacyRoom: qp.get("room"),
-      legacyRoomName: qp.get("roomName"),
-    });
+    const rawRoom =
+      searchParams.get("room") ||
+      searchParams.get("roomName") ||
+      searchParams.get("conversationId");
+    const room = normalizeRoom(rawRoom);
 
     if (!room) {
-      const msg = "conversationId requis (ou room='conversation-<id>')";
-      if (debug) {
-        return NextResponse.json(
-          { success: false, error: msg, debug: { source, raw: Object.fromEntries(qp.entries()) } },
-          { status: 400 }
-        );
-      }
-      return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "room/conversationId requis" },
+        { status: 400 }
+      );
     }
 
-    // ---- Identity
-    const identityBase = qp.get("identity") || qp.get("userId") || "user-anon";
+    const identityBase =
+      searchParams.get("identity") ||
+      searchParams.get("userId") ||
+      "user-anon";
     const identity = makeIdentity(identityBase);
-    const name = qp.get("name") || undefined;
 
-    // ---- Token
-    const token = await buildJwt({ identity, room, ttlSec: 600, name });
+    const token = await buildJwt({ identity, room, ttlSec: 600 });
 
-    // ---- Log + réponse
-    console.log(TAG, "GET issue", { room, identity, source });
-    const payload = { success: true, token, wsUrl, identity, room };
-    if (debug) payload.debug = { source };
-    return NextResponse.json(payload, { status: 200 });
+    console.log("[LIVEKIT][GET]", { room, identity }); // debug simple
+
+    return NextResponse.json(
+      { success: true, token, wsUrl, identity, room },
+      { status: 200 }
+    );
   } catch (e) {
-    console.error(TAG, "GET error:", e);
+    console.error("[livekit/token][GET]", e);
     return NextResponse.json(
       { success: false, error: e?.message || "Token build failed" },
       { status: 500 }
@@ -138,13 +120,14 @@ export async function GET(req) {
   }
 }
 
-/* ===================== POST ===================== */
+/* ============================================================
+ *  POST
+ * ============================================================ */
 export async function POST(req) {
   try {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (wss://…)");
 
-    // Body tolerant (JSON ou x-www-form-urlencoded)
     let bodyText = "";
     try {
       bodyText = await req.text();
@@ -157,41 +140,31 @@ export async function POST(req) {
       body = Object.fromEntries(p.entries());
     }
 
-    const debug = !!body.debug;
-
-    // ---- Room sûre
-    const { room, source } = resolveRoom({
-      conversationId: body.conversationId ?? body.convId,
-      legacyRoom: body.room,
-      legacyRoomName: body.roomName,
-    });
+    const rawRoom =
+      body.room || body.roomName || body.conversationId || body.convId;
+    const room = normalizeRoom(rawRoom);
 
     if (!room) {
-      const msg = "conversationId requis (ou room='conversation-<id>')";
-      if (debug) {
-        return NextResponse.json(
-          { success: false, error: msg, debug: { source, body } },
-          { status: 400 }
-        );
-      }
-      return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "room/conversationId requis" },
+        { status: 400 }
+      );
     }
 
-    // ---- Identity
     const identityBase = body.identity || body.userId || "user-anon";
-    const identity = makeIdentity(identityBase);
     const name = body.name || undefined;
+    const identity = makeIdentity(identityBase);
 
-    // ---- Token
     const token = await buildJwt({ identity, room, ttlSec: 600, name });
 
-    // ---- Log + réponse
-    console.log(TAG, "POST issue", { room, identity, source });
-    const payload = { success: true, token, wsUrl, identity, room };
-    if (debug) payload.debug = { source, received: body };
-    return NextResponse.json(payload, { status: 200 });
+    console.log("[LIVEKIT][POST]", { room, identity }); // debug simple
+
+    return NextResponse.json(
+      { success: true, token, wsUrl, identity, room },
+      { status: 200 }
+    );
   } catch (e) {
-    console.error(TAG, "POST error:", e);
+    console.error("[livekit/token][POST]", e);
     return NextResponse.json(
       { success: false, error: e?.message || "Token build failed" },
       { status: 500 }
