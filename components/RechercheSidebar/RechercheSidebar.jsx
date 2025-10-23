@@ -18,7 +18,6 @@ function normalizeToDb(val) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 }
-console.log("[RechercheSidebar] render @", Date.now());
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -50,7 +49,8 @@ function useCityAutocomplete() {
   useEffect(() => {
     if (composingRef.current) return;
 
-    if (!query || query.trim().length < 2) {
+    const q = (query || "").trim();
+    if (q.length < 2) {
       setItems([]);
       setOpen(false);
       setHighlight(-1);
@@ -66,7 +66,7 @@ function useCityAutocomplete() {
 
         const url =
           `https://geo.api.gouv.fr/communes` +
-          `?nom=${encodeURIComponent(query.trim())}` +
+          `?nom=${encodeURIComponent(q)}` +
           `&fields=nom,code,centre,departement,population` +
           `&boost=population&limit=8`;
 
@@ -177,6 +177,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const cityEditingRef = useRef(false);
   const cityEditingTimeoutRef = useRef(null);
 
+  // garde cityText aligné si form.localisation bouge ailleurs (vocal/blur)
   useEffect(() => {
     if (cityEditingRef.current) return;
     const next = form.localisation || "";
@@ -217,8 +218,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [city]);
 
+  /* -------- helper de sélection de ville -------- */
   function selectCity(item) {
     const label = `${item.nom} (${item.departement || "—"})`;
+
+    // 1) input contrôlé
+    setCityText(label);
+
+    // 2) form
     setForm((prev) => ({
       ...prev,
       localisation: label,
@@ -226,14 +233,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       latitude: undefined,
       longitude: undefined,
     }));
-    setCityText(label);
+
+    // 3) UI
     city.setOpen(false);
-    cityEditingRef.current = false;
+    city.setHighlight(-1);
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
-    // Bloque le submit implicite du form
     if (e.key === "Enter" || e.key === "NumpadEnter") {
       if (city.open && city.items.length) {
         e.preventDefault();
@@ -527,111 +534,96 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             />
           </div>
 
-          {/* --- Autocomplétion Ville --- */}
-{/* --- Autocomplétion Ville (UNCONTROLLED) --- */}
-<div className="filters-group" ref={dropdownRef} style={{ position: "relative" }}>
-  <h4>Ville</h4>
-  <input
-    type="text"
-    name="localisation"
-    className="input-recherche"
-    placeholder="Commune (ex: Paris)"
-    // ❌ pas de value — uncontrolled !
-    defaultValue={form.localisation || ""}     // valeur initiale si tu veux
-    autoComplete="off"
-    autoCorrect="off"
-    ref={cityInputRef}
-    onFocus={() => {
-      const v = cityInputRef.current?.value || "";
-      if (v.trim().length >= 2 && city.items.length) city.setOpen(true);
-    }}
-    onCompositionStart={() => { city.composingRef.current = true; }}
-    onCompositionEnd={(e) => {
-      city.composingRef.current = false;
-      const v = e.currentTarget.value;
-      setCityText(v);                // on alimente l’autocomplete
-      city.setQuery(v);
-      if (v.trim().length >= 2 && city.items.length) city.setOpen(true);
-    }}
-    onChange={(e) => {
-      const v = e.target.value;
+          {/* --- Autocomplétion Ville (CONTRÔLÉ) --- */}
+          <div
+            className="filters-group"
+            ref={dropdownRef}
+            style={{ position: "relative" }}
+          >
+            <h4>Ville</h4>
+            <input
+              type="text"
+              name="localisation"
+              className="input-recherche"
+              placeholder="Commune (ex: Paris)"
+              value={cityText} // <-- contrôlé
+              autoComplete="off"
+              autoCorrect="off"
+              ref={cityInputRef}
+              onFocus={() => {
+                const v = cityText.trim();
+                if (v.length >= 2 && city.items.length) city.setOpen(true);
+              }}
+              onCompositionStart={() => {
+                city.composingRef.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                city.composingRef.current = false;
+                const v = e.currentTarget.value;
+                setCityText(v);
+                city.setQuery(v);
+                if (v.trim().length >= 2 && city.items.length) city.setOpen(true);
+              }}
+              onChange={(e) => {
+                const v = e.target.value;
 
-      // flag d’édition pour ne pas copier quoi que ce soit dessus
-      cityEditingRef.current = true;
-      clearTimeout(cityEditingTimeoutRef.current);
-      cityEditingTimeoutRef.current = setTimeout(() => {
-        cityEditingRef.current = false;
-      }, 250);
+                // flag d’édition pour ne pas écraser cityText via d’autres effets
+                cityEditingRef.current = true;
+                clearTimeout(cityEditingTimeoutRef.current);
+                cityEditingTimeoutRef.current = setTimeout(() => {
+                  cityEditingRef.current = false;
+                }, 250);
 
-      // alimente UNIQUEMENT l’autocomplete (pas le value)
-      setCityText(v);
-      if (!city.composingRef.current) {
-        city.setQuery(v);
-        city.setOpen(v.trim().length >= 2);
-      }
-    }}
-    onBlur={(e) => {
-      const v = e.target.value.trim();
-      // on “valide” la ville dans le form (sans coords)
-      setForm((prev) => ({
-        ...prev,
-        localisation: v,
-        autourDeMoi: false,
-        latitude: undefined,
-        longitude: undefined,
-      }));
-      // (facultatif) tu peux déclencher la recherche au blur si tu veux :
-      // handleSearch({ ...form, localisation: v });
-    }}
-    onKeyDown={onCityKeyDown}
-  />
+                // on ne touche PAS à form ici : juste l’UI
+                setCityText(v);
+                if (!city.composingRef.current) {
+                  city.setQuery(v);
+                  city.setOpen(v.trim().length >= 2);
+                }
+              }}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                // on “valide” dans le form uniquement au blur
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
+              }}
+              onKeyDown={onCityKeyDown}
+            />
 
-  {city.loading && <div className="city-hint">Recherche…</div>}
+            {city.loading && <div className="city-hint">Recherche…</div>}
 
-  {city.open && city.items.length > 0 && (
-    <ul
-      className="city-dropdown"
-      tabIndex={-1}
-      onMouseDown={(e) => e.preventDefault()} // garde le focus dans l’input
-    >
-      {city.items.map((item, idx) => (
-        <li
-          key={`${item.code}-${idx}`}
-          className={`city-option ${idx === city.highlight ? "is-active" : ""}`}
-          onMouseEnter={() => city.setHighlight(idx)}
-          onClick={() => {
-            const label = `${item.nom} (${item.departement || "—"})`;
-            // 1) on met la valeur DANS l’input, directement
-            if (cityInputRef.current) cityInputRef.current.value = label;
-
-            // 2) on met à jour le form (sans coords)
-            setForm((prev) => ({
-              ...prev,
-              localisation: label,
-              autourDeMoi: false,
-              latitude: undefined,
-              longitude: undefined,
-            }));
-
-            // 3) on ferme la liste, on réinitialise l’état interne
-            setCityText(label);
-            city.setOpen(false);
-            cityEditingRef.current = false;
-            setTimeout(() => cityInputRef.current?.focus(), 0);
-          }}
-          title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
-        >
-          <span className="city-name">{item.label}</span>
-          {item.latitude != null && item.longitude != null && (
-            <span className="city-geo">
-              · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
+            {city.open && city.items.length > 0 && (
+              <ul
+                className="city-dropdown"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()} // garde le focus dans l’input
+              >
+                {city.items.map((item, idx) => (
+                  <li
+                    key={`${item.code}-${idx}`}
+                    className={`city-option ${
+                      idx === city.highlight ? "is-active" : ""
+                    }`}
+                    onMouseEnter={() => city.setHighlight(idx)}
+                    onClick={() => selectCity(item)}
+                    title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
+                  >
+                    <span className="city-name">{item.label}</span>
+                    {item.latitude != null && item.longitude != null && (
+                      <span className="city-geo">
+                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <input
             type="number"
@@ -793,7 +785,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               type="checkbox"
               name={name}
               value={opt}
-              checked={Array.isArray(form[name]) ? form[name]?.includes(opt) : false}
+              checked={
+                Array.isArray(form[name]) ? form[name]?.includes(opt) : false
+              }
               onChange={handleChange}
             />
             {opt}
