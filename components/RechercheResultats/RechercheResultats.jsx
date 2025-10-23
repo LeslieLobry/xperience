@@ -39,7 +39,6 @@ function usePresignedPhotos(users) {
     if (Array.isArray(users) && users.length) fetchAll();
     else setPhotoUrls({});
     return () => { canceled = true; };
-    // stringify pour déclencher quand la liste change réellement
   }, [JSON.stringify(users)]);
   return photoUrls;
 }
@@ -61,22 +60,45 @@ export default function RechercheResultats({ className = "" }) {
 
   useEffect(() => {
     const params = searchParams.toString();
-    if (!params) return;
+
+    // 🔁 Si plus de paramètres -> on vide la liste et on repasse en "pas encore cherché"
+    if (!params) {
+      setUtilisateurs([]);
+      setHasSearched(false);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
     setLoading(true);
     setHasSearched(true);
-    fetch(`/api/recherche?${params}`)
+
+    fetch(`/api/recherche?${params}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
         setUtilisateurs(Array.isArray(data.utilisateurs) ? data.utilisateurs : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        if (err?.name !== "AbortError") setLoading(false);
+      });
+
+    // Annule la requête précédente si les params changent
+    return () => controller.abort();
   }, [searchParams]);
 
   if (!hasSearched) return null;
 
-  const handleResetSearch = () => router.push("/recherche"); 
-  const handleGoHome = () => router.push("/accueil-page");        // change en "/" si besoin
+  const handleResetSearch = () => {
+    // 🧹 vide immédiatement l’affichage AVANT de naviguer
+    setUtilisateurs([]);
+    setHasSearched(false);
+    setLoading(false);
+    router.push("/recherche");
+  };
+
+  const handleGoHome = () => router.push("/accueil-page"); // ou "/" selon ton routing
 
   return (
     <div className={`profil-list1 ${className}`}>
