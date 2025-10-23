@@ -1,6 +1,7 @@
 .PageRecherche .page-recherche {
   display: flex;
   gap: 2rem;
+  align-items: center;
 }
 
 .PageRecherche .recherche-resultats {
