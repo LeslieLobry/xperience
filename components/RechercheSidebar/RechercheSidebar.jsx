@@ -58,7 +58,7 @@ function useCityAutocomplete() {
     }
 
     setLoading(true);
-    clearTimeout(debounceRef.current);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
         controllerRef.current?.abort?.();
@@ -94,7 +94,7 @@ function useCityAutocomplete() {
     }, 200);
 
     return () => {
-      clearTimeout(debounceRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       controllerRef.current?.abort?.();
     };
   }, [query]);
@@ -172,24 +172,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   // Texte brut tapé pour la ville (séparé de form.localisation)
   const [cityText, setCityText] = useState("");
+  const [isCityFocused, setIsCityFocused] = useState(false);
 
-  // flag d’édition pour éviter d’écraser la frappe
-  const cityEditingRef = useRef(false);
-  const cityEditingTimeoutRef = useRef(null);
-
-  // garde cityText aligné si form.localisation bouge ailleurs (vocal/blur)
+  // garde cityText aligné si form.localisation bouge ailleurs (ex: vocal)
   useEffect(() => {
-    if (cityEditingRef.current) return;
+    // Ne PAS écraser la frappe quand l'input est focus ou en composition IME
+    if (isCityFocused) return;
     const next = form.localisation || "";
     if (next !== cityText) setCityText(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.localisation]);
-
-  useEffect(() => {
-    return () => {
-      clearTimeout(cityEditingTimeoutRef.current);
-    };
-  }, []);
+  }, [form.localisation, isCityFocused]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -278,20 +270,20 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
 
     const f = cleanFormFilters(raw);
-    const normalizeArray = (arr) =>
+    const normalizeArrayLocal = (arr) =>
       Array.isArray(arr) ? arr.map(normalizeToDb) : [];
-    f.orientation = normalizeArray(f.orientation);
-    f.type = normalizeArray(f.type);
-    f.rechercheType = normalizeArray(f.rechercheType);
-    f.recherches = normalizeArray(f.recherches);
-    f.experience = normalizeArray(f.experience);
-    f.fumeur = normalizeArray(f.fumeur);
-    f.silhouette = normalizeArray(f.silhouette);
-    f.taille = normalizeArray(f.taille);
-    f.origines = normalizeArray(f.origines);
-    f.yeux = normalizeArray(f.yeux);
-    f.cheveux = normalizeArray(f.cheveux);
-    f.envies = normalizeArray(f.envies);
+    f.orientation = normalizeArrayLocal(f.orientation);
+    f.type = normalizeArrayLocal(f.type);
+    f.rechercheType = normalizeArrayLocal(f.rechercheType);
+    f.recherches = normalizeArrayLocal(f.recherches);
+    f.experience = normalizeArrayLocal(f.experience);
+    f.fumeur = normalizeArrayLocal(f.fumeur);
+    f.silhouette = normalizeArrayLocal(f.silhouette);
+    f.taille = normalizeArrayLocal(f.taille);
+    f.origines = normalizeArrayLocal(f.origines);
+    f.yeux = normalizeArrayLocal(f.yeux);
+    f.cheveux = normalizeArrayLocal(f.cheveux);
+    f.envies = normalizeArrayLocal(f.envies);
 
     if (f.autourDeMoi) {
       setLoadingGeo(true);
@@ -551,8 +543,21 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               autoCorrect="off"
               ref={cityInputRef}
               onFocus={() => {
+                setIsCityFocused(true);
                 const v = cityText.trim();
                 if (v.length >= 2 && city.items.length) city.setOpen(true);
+              }}
+              onBlur={(e) => {
+                setIsCityFocused(false);
+                const v = e.target.value.trim();
+                // on “valide” dans le form uniquement au blur
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -566,31 +571,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onChange={(e) => {
                 const v = e.target.value;
-
-                // flag d’édition pour ne pas écraser cityText via d’autres effets
-                cityEditingRef.current = true;
-                clearTimeout(cityEditingTimeoutRef.current);
-                cityEditingTimeoutRef.current = setTimeout(() => {
-                  cityEditingRef.current = false;
-                }, 250);
-
                 // on ne touche PAS à form ici : juste l’UI
                 setCityText(v);
                 if (!city.composingRef.current) {
                   city.setQuery(v);
                   city.setOpen(v.trim().length >= 2);
                 }
-              }}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                // on “valide” dans le form uniquement au blur
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
               }}
               onKeyDown={onCityKeyDown}
             />
