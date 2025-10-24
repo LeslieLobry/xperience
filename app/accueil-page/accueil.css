@@ -65,13 +65,19 @@
 
 /* Profils (uniquement sur la page accueil) */
 .accueil-page :where(.profil-card) {
-  height: 350px;
-  border: 1px solid #e0c084;
-  border-radius: 10px;
-  padding: 1rem;
-  text-align: center;
-  background-color: transparent;
-  box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
+flex-direction: column;
+    justify-content: space-around;
+    width: 180px;
+    height: 300px;
+    background: rgb(255 255 255 / 3%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 20px;
+    padding: 1rem;
+    position: relative;
+    text-align: center;
+    transition: transform .2s 
+ease, box-shadow .2s 
+ease;
 }
 .accueil-page :where(.profil-photo) {
   width: 100%;
