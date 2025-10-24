@@ -14,7 +14,6 @@ import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper
 
 import { Suspense } from "react";
 import "./accueil.css";
-import AccueilStyleFix from "./_AccueilStyleFix"; // ⬅️
 
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -53,9 +52,8 @@ export default async function AccueilPage() {
 
   return (
     <div className="accueil-page">
-      <AccueilStyleFix /> {/* ⬅️ injecte le correctif ciblé */}
-
       {user.verificationIdentiteStatut !== true && <RappelVerification />}
+
       <LoaderAnnonce />
 
       <div className="grid-accueil">
