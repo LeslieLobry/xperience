@@ -122,4 +122,8 @@
   .accueil-page :where(.toggle-box) {
     flex-direction: column;
   }
+  .grid-profil {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
 }
