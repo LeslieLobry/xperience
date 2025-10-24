@@ -1,4 +1,4 @@
-.page {
+.accueil-page {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -13,12 +13,11 @@
   gap: 25px;
 }
 
-/* background image */
-.page::before {
+.accueil-page::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: url("/images/skin.jpg"); /* chemin public/… simplifié */
+  background-image: url('../../public/images/skin.jpg');
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
@@ -26,8 +25,7 @@
   z-index: -1;
 }
 
-/* Grille principale */
-.gridAccueil {
+.grid-accueil {
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
   grid-template-rows: auto auto;
@@ -35,15 +33,15 @@
   gap: 16px;
 }
 
-/* Col 1 : la sidebar recherche (classe venant du composant) */
-:global(#accueil-scope .recherche-sidebar) {
+/* Colonne 1 */
+.recherche-sidebar {
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: start;
 }
 
-/* Col 2 */
-.profilList1 {
+/* Colonne 2 */
+.profil-list1 {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -51,19 +49,20 @@
   grid-row: 1 / span 2;
 }
 
-/* Col 3 */
-.gridArticles {
+/* Colonne 3 */
+.grid-articles {
   grid-column: 3;
   grid-row: 1;
 }
-.gridEvent {
+
+.grid-event {
   grid-column: 3;
   grid-row: 2;
   text-align: center;
 }
 
-/* Styles des cartes profils — appliqués UNIQUEMENT dans cette page */
-:global(#accueil-scope .profil-card) {
+/* Profils */
+.profil-card {
   height: 350px;
   border: 1px solid #e0c084;
   border-radius: 10px;
@@ -72,24 +71,33 @@
   background-color: transparent;
   box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
 }
-:global(#accueil-scope .profil-photo) {
+
+.profil-photo {
   width: 100%;
   object-fit: cover;
   border-radius: 8px;
 }
-:global(#accueil-scope .profil-list1-title),
-:global(#accueil-scope .profil-card-title),
-:global(#accueil-scope .afficher-plus) {
+
+.profil-list1-title {
   color: #e0c084;
 }
-:global(#accueil-scope .profil-card-title) {
+
+.profil-card-title {
+  color: #e0c084;
   text-align: center;
-  word-break: break-word;
+  word-break: word-break;
   margin: 0.5rem 0;
 }
-:global(#accueil-scope .profil-card-details) { color: #f5ece0; }
 
-:global(#accueil-scope .grid-profil) {
+.profil-card-details {
+  color: #f5ece0;
+}
+
+.afficher-plus {
+  color: #e0c084;
+}
+
+.grid-profil {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
@@ -97,26 +105,28 @@
 }
 
 /* Toggle statut */
-:global(#accueil-scope .profil-toggle-wrapper) {
+.profil-toggle-wrapper {
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.95rem;
 }
-:global(#accueil-scope .profil-toggle-wrapper input[type="checkbox"]) {
+
+.profil-toggle-wrapper input[type="checkbox"] {
   transform: scale(1.2);
   cursor: pointer;
 }
 
 /* Responsive */
 @media (width <= 768px) {
-  .gridAccueil {
+  .grid-accueil {
     display: flex;
     flex-direction: column;
     align-items: center;
   }
-  :global(#accueil-scope .toggle-box) {
+
+  .toggle-box{
     flex-direction: column;
   }
 }
