@@ -14,16 +14,14 @@ import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper
 
 import { Suspense } from "react";
 import "./accueil.css";
+import AccueilReset from "./_AccueilReset";
 
 export default async function AccueilPage() {
   const user = await getUserFromToken();
-
   if (!user?.id || isNaN(Number(user.id))) {
-    console.warn("❌ Utilisateur non connecté ou ID invalide :", user);
     return redirect("/connexion");
   }
 
-  // Préchargement côté serveur
   const exclusPromise = getIdsUtilisateursExclus(user.id);
 
   const [articles, evenementsRaw] = await Promise.all([
@@ -35,64 +33,48 @@ export default async function AccueilPage() {
         titre: true,
         slug: true,
         createdAt: true,
-        images: {
-          take: 1,
-          select: { url: true },
-        },
+        images: { take: 1, select: { url: true } },
       },
     }),
-
     prisma.evenement.findMany({
-      select: {
-        id: true,
-        titre: true,
-        imageUrl: true,
-        dates: true,
-        lieu: true,
-      },
+      select: { id: true, titre: true, imageUrl: true, dates: true, lieu: true },
     }),
   ]);
 
-  // On filtre et trie les événements : seulement ceux à venir, triés par la date la plus proche
   const now = new Date();
   const evenements = evenementsRaw
-    .filter(
-      (evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now)
-    )
+    .filter(evt => Array.isArray(evt.dates) && evt.dates.some(d => new Date(d) >= now))
     .sort((a, b) => {
-      const nextDateA =
-        (a.dates || []).find((d) => new Date(d) >= now) || a.dates[0];
-      const nextDateB =
-        (b.dates || []).find((d) => new Date(d) >= now) || b.dates[0];
+      const nextDateA = (a.dates || []).find(d => new Date(d) >= now) || a.dates[0];
+      const nextDateB = (b.dates || []).find(d => new Date(d) >= now) || b.dates[0];
       return new Date(nextDateA) - new Date(nextDateB);
     })
     .slice(0, 3);
 
   return (
-   
-    <div className="accueil-page accueil-isolee">
-      {user.verificationIdentiteStatut !== true && <RappelVerification />}
+    <div id="accueil-scope">
+      <AccueilReset />
+      <div className="accueil-page">
+        {user.verificationIdentiteStatut !== true && <RappelVerification />}
 
-      <LoaderAnnonce />
+        <LoaderAnnonce />
 
-      <div className="grid-accueil">
-        <RechercheWrapper />
+        <div className="grid-accueil">
+          <RechercheWrapper />
 
-        <div className="profil-list1">
-          <Suspense fallback={<p>Chargement des profils...</p>}>
-            <ProfilsDisplayServer
-              userId={user.id}
-              exclusPromise={exclusPromise}
-            />
-          </Suspense>
-        </div>
+          <div className="profil-list1">
+            <Suspense fallback={<p>Chargement des profils...</p>}>
+              <ProfilsDisplayServer userId={user.id} exclusPromise={exclusPromise} />
+            </Suspense>
+          </div>
 
-        <div className="grid-articles">
-          <DerniersArticles articles={articles} />
-        </div>
+          <div className="grid-articles">
+            <DerniersArticles articles={articles} />
+          </div>
 
-        <div className="grid-event">
-          <DerniersEvenements evenements={evenements} />
+          <div className="grid-event">
+            <DerniersEvenements evenements={evenements} />
+          </div>
         </div>
       </div>
     </div>
