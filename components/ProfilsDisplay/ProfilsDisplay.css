@@ -303,7 +303,7 @@ input[type="range"].profil-range {
 
 @media (width <= 768px) {
   .grid-profil {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr !important;
   }
 
   .toggle-box{
