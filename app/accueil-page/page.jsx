@@ -14,7 +14,7 @@ import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper
 
 import { Suspense } from "react";
 import "./accueil.css";
-import AccueilReset from "./_AccueilReset";
+import CleanHeadFromRechercheCss from "./_CleanHeadFromRechercheCss";
 
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -43,38 +43,36 @@ export default async function AccueilPage() {
 
   const now = new Date();
   const evenements = evenementsRaw
-    .filter(evt => Array.isArray(evt.dates) && evt.dates.some(d => new Date(d) >= now))
+    .filter((evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now))
     .sort((a, b) => {
-      const nextDateA = (a.dates || []).find(d => new Date(d) >= now) || a.dates[0];
-      const nextDateB = (b.dates || []).find(d => new Date(d) >= now) || b.dates[0];
+      const nextDateA = (a.dates || []).find((d) => new Date(d) >= now) || a.dates[0];
+      const nextDateB = (b.dates || []).find((d) => new Date(d) >= now) || b.dates[0];
       return new Date(nextDateA) - new Date(nextDateB);
     })
     .slice(0, 3);
 
   return (
-    <div id="accueil-scope">
-      <AccueilReset />
-      <div className="accueil-page">
-        {user.verificationIdentiteStatut !== true && <RappelVerification />}
+    <div className="accueil-page">
+      <CleanHeadFromRechercheCss />
 
-        <LoaderAnnonce />
+      {user.verificationIdentiteStatut !== true && <RappelVerification />}
+      <LoaderAnnonce />
 
-        <div className="grid-accueil">
-          <RechercheWrapper />
+      <div className="grid-accueil">
+        <RechercheWrapper />
 
-          <div className="profil-list1">
-            <Suspense fallback={<p>Chargement des profils...</p>}>
-              <ProfilsDisplayServer userId={user.id} exclusPromise={exclusPromise} />
-            </Suspense>
-          </div>
+        <div className="profil-list1">
+          <Suspense fallback={<p>Chargement des profils...</p>}>
+            <ProfilsDisplayServer userId={user.id} exclusPromise={exclusPromise} />
+          </Suspense>
+        </div>
 
-          <div className="grid-articles">
-            <DerniersArticles articles={articles} />
-          </div>
+        <div className="grid-articles">
+          <DerniersArticles articles={articles} />
+        </div>
 
-          <div className="grid-event">
-            <DerniersEvenements evenements={evenements} />
-          </div>
+        <div className="grid-event">
+          <DerniersEvenements evenements={evenements} />
         </div>
       </div>
     </div>
