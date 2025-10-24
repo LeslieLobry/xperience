@@ -174,10 +174,23 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const [cityText, setCityText] = useState("");
   const [isCityFocused, setIsCityFocused] = useState(false);
 
+  // Anti-submit juste après fermeture du menu (Escape/clic dehors)
+  const justClosedRef = useRef(false);
+  const city = useCityAutocomplete();
+  const dropdownRef = useRef(null);
+  const cityInputRef = useRef(null);
+
+  const closeCityMenu = () => {
+    city.setOpen(false);
+    justClosedRef.current = true;
+    setTimeout(() => {
+      justClosedRef.current = false;
+    }, 120);
+  };
+
   // garde cityText aligné si form.localisation bouge ailleurs (ex: vocal)
   useEffect(() => {
-    // Ne PAS écraser la frappe quand l'input est focus ou en composition IME
-    if (isCityFocused) return;
+    if (isCityFocused) return; // ne pas écraser la frappe
     const next = form.localisation || "";
     if (next !== cityText) setCityText(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,20 +208,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const toggleSection = (key) =>
     setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
-  /* ----------------------------- Autocomplétion ----------------------------- */
-  const city = useCityAutocomplete();
-  const dropdownRef = useRef(null);
-  const cityInputRef = useRef(null);
-
   // Fermer le menu si clic dehors
   useEffect(() => {
     function onDocClick(e) {
       if (!dropdownRef.current) return;
-      if (!dropdownRef.current.contains(e.target)) city.setOpen(false);
+      if (!dropdownRef.current.contains(e.target)) closeCityMenu();
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [city]);
+  }, []);
 
   /* -------- helper de sélection de ville -------- */
   function selectCity(item) {
@@ -233,15 +241,20 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   }
 
   function onCityKeyDown(e) {
-    if (e.key === "Enter" || e.key === "NumpadEnter") {
-      if (city.open && city.items.length) {
-        e.preventDefault();
-        const item = city.items[city.highlight] || city.items[0];
-        if (item) selectCity(item);
-        return;
-      }
+    // Valider la suggestion avec Enter, NumpadEnter OU Tab
+    if (
+      (e.key === "Enter" || e.key === "NumpadEnter" || e.key === "Tab") &&
+      city.open &&
+      city.items.length
+    ) {
+      e.preventDefault(); // empêche le submit du form
+      const item = city.items[city.highlight] || city.items[0];
+      if (item) selectCity(item);
+      return;
     }
+
     if (!city.open || !city.items.length) return;
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       city.setHighlight((i) => (i + 1) % city.items.length);
@@ -249,7 +262,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       e.preventDefault();
       city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
     } else if (e.key === "Escape") {
-      city.setOpen(false);
+      e.preventDefault();
+      closeCityMenu();
     }
   }
 
@@ -357,6 +371,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   }
 
   function handleSubmit(e) {
+    if (justClosedRef.current) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     handleSearch(form);
   }
@@ -541,6 +559,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               value={cityText} // <-- contrôlé
               autoComplete="off"
               autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               ref={cityInputRef}
               onFocus={() => {
                 setIsCityFocused(true);
@@ -549,8 +569,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onBlur={(e) => {
                 setIsCityFocused(false);
+                // Si le menu est ouvert, on NE commit PAS tout de suite (sinon course blur/click)
+                if (city.open) return;
+
                 const v = e.target.value.trim();
-                // on “valide” dans le form uniquement au blur
                 setForm((prev) => ({
                   ...prev,
                   localisation: v,
@@ -571,11 +593,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               }}
               onChange={(e) => {
                 const v = e.target.value;
-                // on ne touche PAS à form ici : juste l’UI
                 setCityText(v);
                 if (!city.composingRef.current) {
-                  city.setQuery(v);
-                  city.setOpen(v.trim().length >= 2);
+                  city.setQuery(v); // on déclenche la recherche
+                  // ne pas forcer open : l'effet l'ouvrira s'il y a des résultats
                 }
               }}
               onKeyDown={onCityKeyDown}
@@ -596,7 +617,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onClick={() => selectCity(item)}
+                    onPointerDown={(e) => {
+                      e.preventDefault(); // garde le focus dans l’input
+                      selectCity(item);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault(); // ceinture + bretelles
+                      selectCity(item);
+                    }}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
                   >
                     <span className="city-name">{item.label}</span>
