@@ -7,6 +7,7 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/* ---------- utils ---------- */
 function safeEqual(a = "", b = "") {
   const A = Buffer.from(a);
   const B = Buffer.from(b);
@@ -22,48 +23,61 @@ function hasValidAuth(req) {
 
   const url = new URL(req.url);
   const q = url.searchParams.get("token") || url.searchParams.get("secret") || "";
-
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
 
   return safeEqual(bearer, secret) || safeEqual(q, secret) || (isVercelCron && safeEqual(q, secret));
 }
-function htmlEscape(s = "") {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+const htmlEscape = (s = "") => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
+/* ---------- core ---------- */
 async function runJob(req, { dry = false } = {}) {
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json({ ok:false, error:"RESEND_API_KEY absente" }, { status: 500 });
+  }
+
   const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
   const RAW_FROM = process.env.EMAIL_FROM || "no-reply@x-periences.fr";
-  const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `Xperience <${RAW_FROM}>`;
+  const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `Xpérience <${RAW_FROM}>`;
+  console.log("[reminder-profile] FROM =", FROM);
 
   const now = Date.now();
   const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
   const BATCH = 500;
 
+  // ⚠️ IMPORTANT : inclure aussi les NULL (not: true couvre false ET null)
   const candidates = await prisma.utilisateur.findMany({
     where: {
       createdAt: { lte: twentyFourHoursAgo },
-      profilComplet: false,
-      reminderSent: false,
+      OR: [{ profilComplet: { not: true } }, { profilComplet: null }],
+      OR: [{ reminderSent: { not: true } }, { reminderSent: null }],
       email: { not: null },
     },
     select: { id: true, email: true, pseudo: true },
     take: BATCH,
   });
+  console.log("[reminder-profile] candidates =", candidates.length);
 
+  // Dry-run pour vérifier la cible
   if (dry) {
-    return NextResponse.json({ ok: true, dry: true, count: candidates.length, sample: candidates.slice(0, 20) });
+    return NextResponse.json({
+      ok: true,
+      dry: true,
+      count: candidates.length,
+      sample: candidates.slice(0, 10),
+    });
   }
 
   if (!candidates.length) {
     return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
   }
 
-  const ids = candidates.map((u) => u.id);
-  await prisma.utilisateur.updateMany({
-    where: { id: { in: ids }, reminderSent: false },
+  // Lock optimiste (inclure null → on met à true)
+  const ids = candidates.map(u => u.id);
+  const lock = await prisma.utilisateur.updateMany({
+    where: { id: { in: ids }, OR: [{ reminderSent: { not: true } }, { reminderSent: null }] },
     data: { reminderSent: true },
   });
+  console.log("[reminder-profile] locked =", lock.count);
 
   let sent = 0;
   const actuallySent = [];
@@ -87,7 +101,7 @@ async function runJob(req, { dry = false } = {}) {
         </div>
       `;
 
-      await resend.emails.send({
+      const r = await resend.emails.send({
         from: FROM,
         to: user.email,
         subject: "Il ne vous reste qu’une étape pour vivre de vraies Xpériences…",
@@ -100,15 +114,24 @@ Complétez votre profil pour être bien visible et commencer à échanger.
 → ${origin}/accueil-page
 
 — L’équipe Xpérience`,
-        headers: {
-          "List-Unsubscribe": `<${origin}/parametres/notifications>`,
-        },
+        headers: { "List-Unsubscribe": `<${origin}/parametres/notifications>` },
       });
 
+      if (r?.error) {
+        console.error("[reminder-profile] Resend error:", user.email, r.error);
+        // rollback pour cet utilisateur
+        await prisma.utilisateur.update({
+          where: { id: user.id },
+          data: { reminderSent: false },
+        });
+        continue;
+      }
+
+      console.log("[reminder-profile] sent ok:", user.email, r?.data?.id);
       sent++;
       actuallySent.push(user);
     } catch (e) {
-      console.error("Erreur envoi email reminder:", user.email, e);
+      console.error("[reminder-profile] exception:", user.email, e);
       await prisma.utilisateur.update({
         where: { id: user.id },
         data: { reminderSent: false },
@@ -116,10 +139,11 @@ Complétez votre profil pour être bien visible et commencer à échanger.
     }
   }
 
+  // Récap interne
   if (sent > 0) {
-    const lines = actuallySent.map((u) => `- ${u.pseudo || u.email} (${u.email})`).join("<br>");
+    const lines = actuallySent.map(u => `- ${u.pseudo || u.email} (${u.email})`).join("<br>");
     try {
-      await resend.emails.send({
+      const recap = await resend.emails.send({
         from: FROM,
         to: process.env.CONTACT_EMAIL || "contact@x-periences.fr",
         subject: `Récap Cron: ${sent} relance(s) profil envoyée(s)`,
@@ -132,14 +156,16 @@ Complétez votre profil pour être bien visible et commencer à échanger.
           </div>
         `,
       });
+      if (recap?.error) console.error("[reminder-profile] recap error:", recap.error);
     } catch (e) {
-      console.error("Erreur envoi recap:", e);
+      console.error("[reminder-profile] recap exception:", e);
     }
   }
 
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({ ok: true, sent, totalCandidates: candidates.length });
 }
 
+/* ---------- handlers ---------- */
 export async function GET(req) {
   const url = new URL(req.url);
   const dry = url.searchParams.get("dry") === "1";
@@ -148,7 +174,6 @@ export async function GET(req) {
   }
   return runJob(req, { dry });
 }
-
 export async function POST(req) {
   if (!hasValidAuth(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
