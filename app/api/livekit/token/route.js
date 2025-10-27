@@ -215,6 +215,16 @@ export async function POST(req) {
     const identity = makeIdentity(identityBase);
 
     const token = await buildJwt({ identity, room, ttlSec: 600, name });
+function decodeIss(t){
+  try{
+    const b=t.split(".")[1];
+    return JSON.parse(Buffer.from(b,"base64url").toString("utf8")).iss || null;
+  }catch{return null}
+}
+const iss = decodeIss(token);
+if (iss !== API_KEY) {
+  throw new Error(`LIVEKIT_TOKEN_MISMATCH: iss=${iss} != API_KEY=${String(API_KEY).slice(0,8)}…`);
+}
 
     // ASSERT: même clé que l'ENV
     const dbg = decodeJwtIss(token);
