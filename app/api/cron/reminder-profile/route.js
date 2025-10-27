@@ -41,7 +41,7 @@ async function runJob(req, { dry = false } = {}) {
     const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
     const BATCH = 500;
 
-    // En dry mode, on n'exige pas la clé Resend
+    // En dry mode on n’exige pas la clé Resend
     if (!dry && !process.env.RESEND_API_KEY) {
       return NextResponse.json(
         { ok: false, error: "RESEND_API_KEY absente (prod)" },
@@ -49,12 +49,14 @@ async function runJob(req, { dry = false } = {}) {
       );
     }
 
-    // ✅ Filtre robuste: "différent de true" (couvre false ET null)
+    // ✅ Filtre robuste : "différent de true" (couvre false ET null)
+    // ❌ NE PAS mettre email: { not: null } si le champ est non-nullable
     const candidates = await prisma.utilisateur.findMany({
       where: {
         createdAt: { lte: twentyFourHoursAgo },
         AND: [{ NOT: { profilComplet: true } }, { NOT: { reminderSent: true } }],
-        email: { not: null },
+        // Facultatif si tu veux éviter les emails vides :
+        // email: { not: "" },
       },
       select: { id: true, email: true, pseudo: true },
       take: BATCH,
@@ -74,7 +76,7 @@ async function runJob(req, { dry = false } = {}) {
       return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
     }
 
-    // Lock optimiste: ne locke que ceux qui ne sont pas déjà à true
+    // Lock optimiste : ne locke que ceux qui ne sont pas déjà à true
     const ids = candidates.map((u) => u.id);
     const lock = await prisma.utilisateur.updateMany({
       where: { id: { in: ids }, NOT: { reminderSent: true } },

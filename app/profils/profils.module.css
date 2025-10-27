@@ -1,0 +1,50 @@
+.page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #0f172a; /* fond cohérent */
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+}
+
+/* --- layout principal --- */
+.layout {
+  display: grid;
+  grid-template-columns: 25% 75%;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 1400px;
+}
+
+/* Sidebar (RechercheWrapper) */
+.sidebar {
+  background-color: #1f2937;
+  border-radius: 12px;
+  padding: 1rem;
+  box-sizing: border-box;
+  height: fit-content;
+}
+
+/* Zone principale (ProfilsDisplay) */
+.main {
+  background-color: #1f2937;
+  border-radius: 12px;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* --- responsive mobile --- */
+@media (max-width: 768px) {
+  .layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar,
+  .main {
+    width: 100%;
+  }
+}

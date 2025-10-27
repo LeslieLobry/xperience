@@ -5,7 +5,8 @@ import { prisma } from "../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDisplay";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
-import "./profils.css"
+import styles from "./profils.module.css"; // <-- CSS local à la page
+
 const secret = process.env.JWT_SECRET;
 
 export default async function PageTousLesProfils() {
@@ -25,9 +26,7 @@ export default async function PageTousLesProfils() {
 
   const utilisateurs = await prisma.utilisateur.findMany({
     where: {
-      NOT: {
-        id: { in: [...exclus, decoded.id] },
-      },
+      NOT: { id: { in: [...exclus, decoded.id] } },
     },
     select: {
       id: true,
@@ -35,19 +34,23 @@ export default async function PageTousLesProfils() {
       photoUrl: true,
       age: true,
       localisation: true,
-      statut: true, 
+      statut: true,
       type: true,
-      verificationIdentiteStatut: true, 
+      verificationIdentiteStatut: true,
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: { createdAt: "desc" },
   });
 
   return (
-    <div className="Profils-page">
-      <RechercheWrapper />
-      <ProfilsDisplay profils={utilisateurs} context="recherche" />
+    <div className={styles.page}>
+      <div className={styles.layout}>
+        <aside className={styles.sidebar}>
+          <RechercheWrapper />
+        </aside>
+        <main className={styles.main}>
+          <ProfilsDisplay profils={utilisateurs} context="recherche" />
+        </main>
+      </div>
     </div>
   );
 }
