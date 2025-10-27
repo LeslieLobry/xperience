@@ -8,10 +8,10 @@ export const revalidate = 0;
 
 /* -------------------------------- Env -------------------------------- */
 // (Tu voulais conserver les fallbacks, on les garde.)
-// const LIVEKIT_URL =
-//   process.env.LIVEKIT_URL ||
-//   process.env.LIVEKIT_WS_URL ||
-//   process.env.NEXT_PUBLIC_LIVEKIT_URL;
+const LIVEKIT_URL =
+  process.env.LIVEKIT_URL ||
+  process.env.LIVEKIT_WS_URL ||
+  process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
 const API_KEY =
   process.env.LIVEKIT_API_KEY ||
