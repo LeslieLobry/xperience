@@ -5,7 +5,7 @@ import { prisma } from "../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDisplay";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
-
+import "./profils.css"
 const secret = process.env.JWT_SECRET;
 
 export default async function PageTousLesProfils() {
@@ -45,7 +45,7 @@ export default async function PageTousLesProfils() {
   });
 
   return (
-    <div className="accueil-page">
+    <div className="Profils-page">
       <RechercheWrapper />
       <ProfilsDisplay profils={utilisateurs} context="recherche" />
     </div>
