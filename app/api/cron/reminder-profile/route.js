@@ -27,7 +27,8 @@ function hasValidAuth(req) {
 
   return safeEqual(bearer, secret) || safeEqual(q, secret) || (isVercelCron && safeEqual(q, secret));
 }
-const esc = (s="") => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const esc = (s = "") =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /* ------- core ------- */
 async function runJob(req, { dry = false } = {}) {
@@ -35,28 +36,30 @@ async function runJob(req, { dry = false } = {}) {
     const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
     const RAW_FROM = process.env.EMAIL_FROM || "no-reply@x-periences.fr";
     const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `Xpérience <${RAW_FROM}>`;
+
     const now = Date.now();
     const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
     const BATCH = 500;
 
-    // IMPORTANT: en dry mode, ne pas exiger la clé Resend
+    // En dry mode, on n'exige pas la clé Resend
     if (!dry && !process.env.RESEND_API_KEY) {
-      return NextResponse.json({ ok:false, error:"RESEND_API_KEY absente (prod)" }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: "RESEND_API_KEY absente (prod)" },
+        { status: 500 }
+      );
     }
 
-    // Inclure aussi les NULL
+    // ✅ Filtre robuste: "différent de true" (couvre false ET null)
     const candidates = await prisma.utilisateur.findMany({
       where: {
         createdAt: { lte: twentyFourHoursAgo },
-        OR: [{ profilComplet: { not: true } }, { profilComplet: null }],
-        OR: [{ reminderSent: { not: true } }, { reminderSent: null }],
+        AND: [{ NOT: { profilComplet: true } }, { NOT: { reminderSent: true } }],
         email: { not: null },
       },
       select: { id: true, email: true, pseudo: true },
       take: BATCH,
     });
 
-    // Dry run: on ne fait que compter/montrer
     if (dry) {
       return NextResponse.json({
         ok: true,
@@ -71,10 +74,10 @@ async function runJob(req, { dry = false } = {}) {
       return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
     }
 
-    // Lock optimiste (couvre false ET null)
-    const ids = candidates.map(u => u.id);
+    // Lock optimiste: ne locke que ceux qui ne sont pas déjà à true
+    const ids = candidates.map((u) => u.id);
     const lock = await prisma.utilisateur.updateMany({
-      where: { id: { in: ids }, OR: [{ reminderSent: { not: true } }, { reminderSent: null }] },
+      where: { id: { in: ids }, NOT: { reminderSent: true } },
       data: { reminderSent: true },
     });
 
@@ -118,6 +121,7 @@ Complétez votre profil pour être bien visible et commencer à échanger.
 
         if (r?.error) {
           console.error("[reminder-profile] Resend error:", user.email, r.error);
+          // rollback pour retenter plus tard
           await prisma.utilisateur.update({
             where: { id: user.id },
             data: { reminderSent: false },
@@ -137,10 +141,18 @@ Complétez votre profil pour être bien visible et commencer à échanger.
       }
     }
 
-    return NextResponse.json({ ok: true, sent, totalCandidates: candidates.length, locked: lock?.count || 0 });
+    return NextResponse.json({
+      ok: true,
+      sent,
+      totalCandidates: candidates.length,
+      locked: lock?.count || 0,
+    });
   } catch (err) {
     console.error("[reminder-profile] FATAL:", err);
-    return NextResponse.json({ ok:false, error: err?.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -149,10 +161,10 @@ export async function GET(req) {
   if (!hasValidAuth(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  // dry=1 pour tester sans envoyer
   const dry = new URL(req.url).searchParams.get("dry") === "1";
   return runJob(req, { dry });
 }
+
 export async function POST(req) {
   if (!hasValidAuth(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
