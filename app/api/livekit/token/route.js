@@ -7,8 +7,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 /* -------------------------------- Env -------------------------------- */
-// ⚠️ Tu voulais garder les fallbacks → on les laisse.
-//    Assure-toi simplement que ces variables pointent toutes vers la MÊME instance.
 const LIVEKIT_URL =
   process.env.LIVEKIT_URL ||
   process.env.LIVEKIT_WS_URL ||
@@ -18,6 +16,11 @@ const API_KEY = process.env.LIVEKIT_API_KEY || process.env.LIVEKIT_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET || process.env.LIVEKIT_SECRET;
 
 /* ------------------------------ CORS ---------------------------------- */
+/** ⚠️ N'impacte pas le web en same-origin.
+ * - Si Origin ∈ ALLOWED_ORIGINS → on le renvoie tel quel
+ * - Si Origin est vide/"null" (cas RN) → on renvoie "*"
+ * - Sinon → on renvoie le domaine par défaut (web), ce qui reste neutre pour web.
+ */
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:19006",
@@ -33,6 +36,7 @@ function pickAllowOrigin(origin = "") {
 }
 
 function corsHeaders(req) {
+  // pour web same-origin : le navigateur ignore CORS, donc aucun changement de comportement
   const origin = req.headers.get("origin") || "";
   const allowOrigin = pickAllowOrigin(origin);
   return {
@@ -40,7 +44,7 @@ function corsHeaders(req) {
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
     "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
+    "Vary": "Origin",
   };
 }
 
@@ -49,26 +53,20 @@ export async function OPTIONS(req) {
 }
 
 /* ------------------------------ Utils --------------------------------- */
-/** Normalise toute forme d’entrée (http(s)/wss(s)/domaine nu)
- *  → retourne TOUJOURS: wss://<host>/rtc
- */
 function normalizeWs(url) {
   if (!url) return null;
   let u = String(url).trim();
-
-  // enlève protocole si présent
-  u = u.replace(/^https?:\/\//, "").replace(/^wss?:\/\//, "");
-  // supprime les trailing slashes
-  u = u.replace(/\/+$/, "");
-  // force /rtc
-  if (!/\/rtc(\?|$)/.test(u)) u = u + "/rtc";
-
-  return "wss://" + u;
+  if (u.startsWith("http://")) u = u.replace("http://", "ws://");
+  if (u.startsWith("https://")) u = u.replace("https://", "wss://");
+  if (!u.startsWith("ws://") && !u.startsWith("wss://"))
+    u = "wss://" + u.replace(/^\/+/, "");
+  return u;
 }
 
 function sanitizeIdentity(id) {
   return String(id || "").trim().replace(/\s+/g, "_").slice(0, 128);
 }
+
 function makeIdentity(base) {
   let s = String(base ?? "user-anon").trim();
   if (/^\d+$/.test(s)) s = `user-${s}`;
@@ -82,10 +80,10 @@ function normalizeRoom(input) {
   return m ? `conversation-${m[0]}` : null;
 }
 
+
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
-
   const at = new AccessToken(API_KEY, API_SECRET, {
     identity: sanitizeIdentity(identity),
     ttl: ttlSec,
@@ -113,8 +111,7 @@ export async function GET(req) {
           hasKey: !!API_KEY,
           hasSecret: !!API_SECRET,
           runtime: "nodejs",
-          wsUrl: LIVEKIT_URL ? normalizeWs(LIVEKIT_URL) : null, // ← inclut /rtc
-          keyPrefix: API_KEY ? String(API_KEY).slice(0, 6) : null, // aide debug
+          wsUrl: normalizeWs(LIVEKIT_URL) || null,
         },
         { headers: corsHeaders(req) }
       );
@@ -123,7 +120,7 @@ export async function GET(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl)
       throw new Error(
-        "LIVEKIT_URL manquante (mets https://<ton-sous-domaine>.livekit.cloud)"
+        "LIVEKIT_URL manquante (mets wss://<ton-sous-domaine>.livekit.cloud)"
       );
     if (!API_KEY || !API_SECRET)
       throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
@@ -147,8 +144,10 @@ export async function GET(req) {
 
     const token = await buildJwt({ identity, room, ttlSec: 600 });
 
+    // debug léger
     console.log("[LIVEKIT][GET]", { room, identity });
 
+    // ⚠️ structure identique à ta version précédente
     return NextResponse.json(
       { success: true, token, wsUrl, identity, room },
       { status: 200, headers: corsHeaders(req) }
@@ -168,7 +167,7 @@ export async function POST(req) {
     const wsUrl = normalizeWs(LIVEKIT_URL);
     if (!wsUrl)
       throw new Error(
-        "LIVEKIT_URL manquante (mets https://<ton-sous-domaine>.livekit.cloud)"
+        "LIVEKIT_URL manquante (mets wss://<ton-sous-domaine>.livekit.cloud)"
       );
     if (!API_KEY || !API_SECRET)
       throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
@@ -204,6 +203,7 @@ export async function POST(req) {
 
     console.log("[LIVEKIT][POST]", { room, identity });
 
+    // ⚠️ structure identique à ta version précédente
     return NextResponse.json(
       { success: true, token, wsUrl, identity, room },
       { status: 200, headers: corsHeaders(req) }
