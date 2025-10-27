@@ -159,6 +159,14 @@ export async function GET(req) {
     const identity = makeIdentity(identityBase);
 
     const token = await buildJwt({ identity, room, ttlSec: 600 });
+function _iss(t){
+  try { return JSON.parse(Buffer.from(t.split(".")[1], "base64url").toString("utf8")).iss || null; }
+  catch { return null; }
+}
+const iss = _iss(token);
+if (iss !== API_KEY) {
+  throw new Error(`LIVEKIT_TOKEN_MISMATCH: iss=${iss} != API_KEY=${String(API_KEY).slice(0,8)}…`);
+}
 
     // ASSERT: le token est bien signé avec la même clé que l'ENV
     const dbg = decodeJwtIss(token);
