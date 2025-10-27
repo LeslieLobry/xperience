@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 
-const LIVEKIT_URL = process.env.LIVEKIT_URL;            // https://xperiences-6q6jj78.livekit.cloud
+const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;            // https://xperiences-6q6jj78.livekit.cloud
 const API_KEY     = process.env.LIVEKIT_API_KEY;
 const API_SECRET  = process.env.LIVEKIT_API_SECRET;
 
