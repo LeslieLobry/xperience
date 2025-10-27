@@ -8,21 +8,33 @@ const API_SECRET  = process.env.LIVEKIT_API_SECRET;
 
 export async function GET() {
   try {
-    if (!LIVEKIT_URL || !API_KEY || !API_SECRET) throw new Error("ENV manquantes");
+    if (!LIVEKIT_URL || !API_KEY || !API_SECRET) {
+      return NextResponse.json({ ok: false, error: "ENV manquantes", LIVEKIT_URL: !!LIVEKIT_URL, API_KEY: !!API_KEY, API_SECRET: !!API_SECRET }, { status: 500 });
+    }
 
-    const at = new AccessToken(API_KEY, API_SECRET, { identity: "diag-user", ttl: 300 });
+    // 1) fabrique un token court
+    const at = new AccessToken(API_KEY, API_SECRET, { identity: "diag-user", ttl: 120 });
     at.addGrant({ roomJoin: true, room: "conversation-999", canPublish: true, canSubscribe: true });
     const token = await at.toJwt();
 
-    const wsBase = LIVEKIT_URL.replace(/^https?:\/\//, "https://").replace(/\/+$/, "");
-    const url = `${wsBase}/rtc/validate?access_token=${encodeURIComponent(token)}`;
-    const r = await fetch(url, { method: "GET" });
+    // 2) normalise l’URL base en https (sans slash final)
+    const base = String(LIVEKIT_URL).replace(/^wss?:\/\//, "https://").replace(/^https?:\/\//, "https://").replace(/\/+$/, "");
+
+    const validateUrl = `${base}/rtc/validate?access_token=${encodeURIComponent(token)}`;
+    const regionsUrl  = `${base}/settings/regions`;
+
+    // 3) tente les 2 fetch (sans cache)
+    const resValidate = await fetch(validateUrl, { method: "GET", cache: "no-store" }).catch(e => ({ _err: String(e?.message || e) }));
+    const resRegions  = await fetch(regionsUrl,  { method: "GET", cache: "no-store" }).catch(e => ({ _err: String(e?.message || e) }));
 
     return NextResponse.json({
-      wsBase, keyPrefix: API_KEY.slice(0,8),
-      validateStatus: r.status, ok: r.ok
+      ok: !!(resValidate?.ok || resRegions?.ok),
+      base,
+      keyPrefix: API_KEY.slice(0,8),
+      validate: { url: validateUrl, status: resValidate?.status ?? null, ok: !!resValidate?.ok, err: resValidate?._err || null },
+      regions:  { url: regionsUrl,  status: resRegions?.status  ?? null, ok: !!resRegions?.ok,  err: resRegions?._err  || null },
     });
   } catch (e) {
-    return NextResponse.json({ ok:false, error: e.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
