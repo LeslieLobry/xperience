@@ -1,3 +1,4 @@
+// /app/api/cron/send-digests/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { resend } from "../../../../lib/resend";
@@ -6,7 +7,7 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// ----- utils -----
+/* ------- auth utils ------- */
 function safeEqual(a = "", b = "") {
   const A = Buffer.from(a);
   const B = Buffer.from(b);
@@ -22,135 +23,166 @@ function hasValidAuth(req) {
 
   const url = new URL(req.url);
   const q = url.searchParams.get("token") || url.searchParams.get("secret") || "";
-
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
 
   return safeEqual(bearer, secret) || safeEqual(q, secret) || (isVercelCron && safeEqual(q, secret));
 }
-function htmlEscape(s = "") {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const esc = (s = "") =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ------- petit helper HTML ------- */
+function layout({ origin, title, bodyHtml }) {
+  return `
+  <div style="font-family: Raleway, Arial, sans-serif; color:#1a1a1a; font-size:16px; line-height:1.6; background:#f7f8fa; padding:32px 24px;">
+    <div style="text-align:center; margin-bottom:18px;">
+      <img src="${origin}/logo.png" alt="Xpérience" style="height:60px;"/>
+    </div>
+    <h2 style="font-weight:700; margin:0 0 12px;">${esc(title)}</h2>
+    ${bodyHtml}
+    <p style="margin-top:24px; font-size:13px; color:#777">
+      — L’équipe Xpérience • <a href="${origin}/parametres/notifications">Gérer mes emails</a>
+    </p>
+  </div>`;
 }
 
-// ----- core job -----
+/* ------- core ------- */
 async function runJob(req, { dry = false } = {}) {
-  const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
+  try {
+    const origin = process.env.NEXT_PUBLIC_URL || new URL(req.url).origin;
+    const RAW_FROM = process.env.EMAIL_FROM || "noreply@x-periences.fr";
+    const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `Xperiences <${RAW_FROM}>`;
 
-  // "Nom <mail>" accepté par Resend si le domaine est validé
-  const RAW_FROM = process.env.EMAIL_FROM || "no-reply@x-periences.fr";
-  const FROM = /<[^>]+>/.test(RAW_FROM) ? RAW_FROM : `"Xpérience" <${RAW_FROM}>`;
+    const now = Date.now();
+    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const BATCH = 500;
 
-  const now = Date.now();
-  const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
-  const BATCH = 500;
+    // En dry mode, on ne bloque pas si la clé manque (diagnostic uniquement)
+    if (!dry && !process.env.RESEND_API_KEY) {
+      return NextResponse.json(
+        { ok: false, error: "RESEND_API_KEY absente (prod)" },
+        { status: 500 }
+      );
+    }
 
-  const candidates = await prisma.utilisateur.findMany({
-    where: {
-      createdAt: { lte: twentyFourHoursAgo },
-      profilComplet: false,
-      reminderSent: false,
-      email: { not: null },
-    },
-    select: { id: true, email: true, pseudo: true },
-    take: BATCH,
-  });
+    /**
+     * 🎯 QUI RECEVRA LE DIGEST ?
+     * - Exemple générique et safe :
+     *   - utilisateurs avec email vérifié (emailVerified != null)
+     *   - actifs récemment (lastSeenAt dans les 60 jours) — optionnel
+     *   - pas de filtre sur des champs possiblement NULL non-nullable
+     *
+     * 💡 Adapte ce WHERE à ta logique métier si tu as un flag "digestEnabled" par ex.
+     */
+    const sixtyDaysAgo = new Date(now - 60 * 24 * 60 * 60 * 1000);
+    const candidates = await prisma.utilisateur.findMany({
+      where: {
+        // email vérifié (souvent un DateTime nullable) → "différent de null"
+        NOT: { emailVerified: null },
+        // optionnel : présents dans les 60 derniers jours
+        OR: [{ lastSeenAt: { gte: sixtyDaysAgo } }, { lastSeenAt: null }],
+      },
+      select: { id: true, email: true, pseudo: true },
+      take: BATCH,
+    });
 
-  if (dry) {
-    return NextResponse.json({ ok: true, dry: true, count: candidates.length, sample: candidates.slice(0, 20) });
-  }
-
-  if (!candidates.length) {
-    return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
-  }
-
-  // lock optimiste
-  const ids = candidates.map(u => u.id);
-  await prisma.utilisateur.updateMany({
-    where: { id: { in: ids }, reminderSent: false },
-    data: { reminderSent: true },
-  });
-
-  let sent = 0;
-  const actuallySent = [];
-
-  for (const user of candidates) {
-    try {
-      const pseudo = user.pseudo || "";
-      const html = `
-        <div style="font-family: Raleway, Arial, sans-serif; color: #1a1a1a; font-size: 16px; line-height: 1.6; background: #f7f8fa; padding: 32px 24px;">
-          <div style="text-align:center; margin-bottom: 18px;">
-            <img src="${origin}/logo.png" alt="Xpérience" style="height:60px;"/>
-          </div>
-          <h2 style="font-weight:700; color:#1a1a1a; margin-bottom: 0.7em;">Bonjour ${htmlEscape(pseudo)},</h2>
-          <p>Vous êtes inscrit sur <b>Xpérience</b>, mais votre profil n’est pas encore complété…</p>
-          <p style="margin-top:1em;">✨ Pour commencer à échanger et vivre des rencontres élégantes, complétez votre profil pour être bien visible.</p>
-          <div style="margin:2em 0;">
-            <a href="${origin}/accueil-page" style="display:inline-block;background:#1a1a1a;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:18px;letter-spacing:1px;">➡️ Compléter mon profil maintenant</a>
-          </div>
-          <p style="margin-top:1.5em;">🎁 <b>Bonus</b> : les profils complets sont mis en avant automatiquement dans les recherches !</p>
-          <p style="margin-top:2.5em;">À très vite sur <a href="${origin}" style="color:#0070f3;text-decoration:underline;">x-periences.fr</a><br><b>L’équipe Xpérience</b></p>
-        </div>
-      `;
-
-      await resend.emails.send({
+    if (dry) {
+      return NextResponse.json({
+        ok: true,
+        dry: true,
         from: FROM,
-        to: user.email,
-        subject: "Il ne vous reste qu’une étape pour vivre de vraies Xpériences…",
-        html,
-        text: `Bonjour ${pseudo},
-
-Vous êtes inscrit sur Xpérience, mais votre profil n’est pas encore complété.
-Complétez votre profil pour être bien visible et commencer à échanger.
-
-→ ${origin}/accueil-page
-
-— L’équipe Xpérience`,
-        headers: {
-          "List-Unsubscribe": `<${origin}/parametres/notifications>`,
-        },
-      });
-
-      sent++;
-      actuallySent.push(user);
-    } catch (e) {
-      console.error("Erreur envoi email reminder:", user.email, e);
-      await prisma.utilisateur.update({
-        where: { id: user.id },
-        data: { reminderSent: false },
+        count: candidates.length,
+        sample: candidates.slice(0, 10),
       });
     }
-  }
 
-  if (sent > 0) {
-    const lines = actuallySent.map(u => `- ${u.pseudo || u.email} (${u.email})`).join("<br>");
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: process.env.CONTACT_EMAIL || "contact@x-periences.fr",
-        subject: `Récap Cron: ${sent} relance(s) profil envoyée(s)`,
-        html: `
-          <div style="font-family:Arial,sans-serif">
-            <h2>Cron Xpérience – Récap des relances</h2>
-            <p><b>${sent}</b> mail(s) de rappel profil envoyés :</p>
-            <div style="margin-top:1.5em">${lines}</div>
-            <p style="margin-top:2em;font-size:13px;color:#888">--<br>Email automatique de la cron.</p>
-          </div>
-        `,
-      });
-    } catch (e) {
-      console.error("Erreur envoi recap:", e);
+    if (!candidates.length) {
+      return NextResponse.json({ ok: true, sent: 0, info: "No candidates" });
     }
-  }
 
-  return NextResponse.json({ ok: true, sent });
+    /**
+     * 🧠 CONTENU DU DIGEST
+     * Ici, on envoie un digest simple “nouveautés des dernières 24h”.
+     * Remplace la partie "stats" par tes vraies données si besoin (messages non lus, nouveaux profils, événements…).
+     * Le code ci-dessous est volontairement générique pour fonctionner même sans tables spécifiques.
+     */
+
+    // Exemple de “stats” bidon (remplace par des requêtes réelles si tu veux)
+    const stats = {
+      nouveauxProfils: 0,
+      nouveauxArticles: 0,
+      prochainsEvenements: 0,
+    };
+
+    let sent = 0;
+
+    for (const u of candidates) {
+      try {
+        const title = `Votre digest Xpérience — dernières 24h`;
+        const bodyHtml = `
+          <p>Bonjour ${esc(u.pseudo || "")}, voici un rapide aperçu des nouveautés :</p>
+          <ul>
+            <li>Nouveaux profils : <b>${stats.nouveauxProfils}</b></li>
+            <li>Articles publiés : <b>${stats.nouveauxArticles}</b></li>
+            <li>Événements à venir : <b>${stats.prochainsEvenements}</b></li>
+          </ul>
+          <div style="margin:20px 0;">
+            <a href="${origin}/accueil-page"
+               style="display:inline-block;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;">
+              Ouvrir Xpérience
+            </a>
+          </div>
+        `;
+
+        const r = await resend.emails.send({
+          from: FROM,
+          to: u.email,
+          subject: "Votre digest Xpérience",
+          html: layout({ origin, title, bodyHtml }),
+          text:
+            `Bonjour ${u.pseudo || ""},\n\n` +
+            `Voici votre digest des dernières 24h sur Xpérience.\n` +
+            `Ouvrir : ${origin}/accueil-page\n\n` +
+            `— L’équipe Xpérience`,
+          headers: {
+            "List-Unsubscribe": `<${origin}/parametres/notifications>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            // "Reply-To": "contact@x-periences.fr", // optionnel
+          },
+        });
+
+        if (r?.error) {
+          console.error("[send-digests] Resend error:", u.email, r.error);
+          continue;
+        }
+
+        console.log("[send-digests] sent ok:", u.email, r?.data?.id);
+        sent++;
+      } catch (e) {
+        console.error("[send-digests] exception:", u.email, e);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      sent,
+      totalCandidates: candidates.length,
+    });
+  } catch (err) {
+    console.error("[send-digests] FATAL:", err);
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Server error" },
+      { status: 500 }
+    );
+  }
 }
 
-// ----- handlers -----
+/* ------- handlers ------- */
 export async function GET(req) {
-  const url = new URL(req.url);
-  const dry = url.searchParams.get("dry") === "1";
   if (!hasValidAuth(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // dry=1 pour tester sans envoyer
+  const dry = new URL(req.url).searchParams.get("dry") === "1";
   return runJob(req, { dry });
 }
 
