@@ -1,6 +1,6 @@
 // app/api/livekit/token/route.js
 import { NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk"; // ⬅️ v2: pas de VideoGrant
+import { AccessToken } from "livekit-server-sdk"; // v2 (pas de VideoGrant)
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ const API_SECRET =
   process.env.LIVEKIT_API_SECRET ||
   process.env.LIVEKIT_SECRET;
 
-// (optionnel) verrouille l'host attendu
+// facultatif : verrouille l’host attendu
 const EXPECT_HOST =
   process.env.LIVEKIT_EXPECT_HOST ||
   (LIVEKIT_URL ? new URL(LIVEKIT_URL.replace(/^wss?:\/\//, "https://")).host : null);
@@ -85,7 +85,6 @@ function makeIdentity(base) {
   if (/^\d+$/.test(s)) s = `user-${s}`;
   return sanitizeIdentity(s);
 }
-// "conversation-<id>"
 function normalizeRoom(input) {
   if (!input) return null;
   const m = String(input).match(/\d+/);
@@ -93,28 +92,30 @@ function normalizeRoom(input) {
 }
 
 /* --------------------------- JWT builder (v2) -------------------------- */
+// ✅ v2 officiel : grants passés dans le constructeur ET sous "video"
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
 
-  const at = new AccessToken(API_KEY, API_SECRET, {
+  const at = new AccessToken({
+    apiKey: API_KEY,
+    apiSecret: API_SECRET,
     identity: sanitizeIdentity(identity),
     ttl: ttlSec,
-    // v2: si tu veux propager un nom, mets-le dans metadata
     metadata: name ? JSON.stringify({ name }) : undefined,
+    grants: {
+      video: {
+        room: String(room),
+        roomJoin: true,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true,
+        canUpdateOwnMetadata: true,
+      },
+    },
   });
 
-  // v2: on passe un objet de droits directement
-  at.addGrant({
-    roomJoin: true,
-    room,
-    canPublish: true,
-    canSubscribe: true,
-    canPublishData: true,
-    canUpdateOwnMetadata: true,
-  });
-
-  return await at.toJwt();
+  return at.toJwt();
 }
 
 function decodeJwt(t) {
@@ -153,7 +154,6 @@ export async function GET(req) {
     if (!wsUrl) throw new Error("LIVEKIT_URL manquante (ex: https://<sous-domaine>.livekit.cloud)");
     if (!API_KEY || !API_SECRET) throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
 
-    // 🔒 force l'host attendu si défini
     if (EXPECT_HOST && hostOf(wsUrl) !== EXPECT_HOST) {
       wsUrl = "wss://" + EXPECT_HOST;
     }
@@ -177,14 +177,25 @@ export async function GET(req) {
     const payload = decodeJwt(token);
 
     if (payload?.iss !== API_KEY) {
-      throw new Error(`LIVEKIT_TOKEN_MISMATCH: iss=${payload?.iss || "null"} != API_KEY=${String(API_KEY).slice(0,8)}…`);
+      throw new Error(
+        `LIVEKIT_TOKEN_MISMATCH: iss=${payload?.iss || "null"} != API_KEY=${String(API_KEY).slice(0, 8)}…`
+      );
     }
 
     return NextResponse.json(
       {
-        success: true, token, wsUrl, identity, room,
-        // en v2, la room peut se trouver sous payload.grants.room
-        _diag: { iss: payload?.iss, room: payload?.grants?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
+        success: true,
+        token,
+        wsUrl,
+        identity,
+        room,
+        _diag: {
+          iss: payload?.iss,
+          video: payload?.video,                  // devrait exister en v2 ctor
+          room: payload?.video?.room || payload?.room,
+          nbf: payload?.nbf,
+          exp: payload?.exp,
+        },
       },
       { status: 200, headers: corsHeaders(req) }
     );
@@ -208,11 +219,11 @@ export async function POST(req) {
       wsUrl = "wss://" + EXPECT_HOST;
     }
 
-    let bodyText = "";
-    try { bodyText = await req.text(); } catch {}
+    const bodyText = await req.text();
     let body = {};
-    try { if (bodyText) body = JSON.parse(bodyText); }
-    catch {
+    try {
+      if (bodyText) body = JSON.parse(bodyText);
+    } catch {
       const p = new URLSearchParams(bodyText);
       body = Object.fromEntries(p.entries());
     }
@@ -234,13 +245,25 @@ export async function POST(req) {
     const payload = decodeJwt(token);
 
     if (payload?.iss !== API_KEY) {
-      throw new Error(`LIVEKIT_TOKEN_MISMATCH: iss=${payload?.iss || "null"} != API_KEY=${String(API_KEY).slice(0,8)}…`);
+      throw new Error(
+        `LIVEKIT_TOKEN_MISMATCH: iss=${payload?.iss || "null"} != API_KEY=${String(API_KEY).slice(0, 8)}…`
+      );
     }
 
     return NextResponse.json(
       {
-        success: true, token, wsUrl, identity, room,
-        _diag: { iss: payload?.iss, room: payload?.grants?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
+        success: true,
+        token,
+        wsUrl,
+        identity,
+        room,
+        _diag: {
+          iss: payload?.iss,
+          video: payload?.video,
+          room: payload?.video?.room || payload?.room,
+          nbf: payload?.nbf,
+          exp: payload?.exp,
+        },
       },
       { status: 200, headers: corsHeaders(req) }
     );
