@@ -12,7 +12,7 @@ const ABLY_API_KEY = process.env.NEXT_PUBLIC_ABLY_API_KEY;
 const ably = new AblyRest(ABLY_API_KEY);
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*", // en prod: "https://www.x-periences.fr"
+  "Access-Control-Allow-Origin": "*", 
   "Access-Control-Allow-Methods": "POST,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
@@ -25,7 +25,7 @@ async function getUserFromToken() {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS });
-}
+} 
 
 export async function POST(req) {
   try {
