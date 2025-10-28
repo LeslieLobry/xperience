@@ -1,20 +1,25 @@
+// app/api/push/register/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { getUserFromToken } from "../../../../lib/auth";
 
 export async function POST(req) {
-  const me = await getUserFromToken();
-  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId, token } = await req.json();
+    if (!userId || !token) {
+      return NextResponse.json({ ok: false, error: "userId et token requis" }, { status: 400 });
+    }
 
-  const { expoPushToken } = await req.json();
-  if (!expoPushToken) {
-    return NextResponse.json({ error: "Missing token" }, { status: 400 });
+    await prisma.utilisateur.update({
+      where: { id: Number(userId) },
+      data: {
+        expoPushToken: token,         // ✅ juste la string
+        // ou: expoPushToken: { set: token },
+      },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }
-
-  await prisma.utilisateur.update({
-    where: { id: me.id },
-    data: { expoPushToken },
-  });
-
-  return NextResponse.json({ ok: true });
 }
