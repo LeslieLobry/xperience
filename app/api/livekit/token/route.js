@@ -1,6 +1,6 @@
 // app/api/livekit/token/route.js
 import { NextResponse } from "next/server";
-import { AccessToken, VideoGrant } from "livekit-server-sdk"; // ⬅️ VideoGrant
+import { AccessToken } from "livekit-server-sdk"; // ⬅️ v2: pas de VideoGrant
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +92,7 @@ function normalizeRoom(input) {
   return m ? `conversation-${m[0]}` : null;
 }
 
+/* --------------------------- JWT builder (v2) -------------------------- */
 async function buildJwt({ identity, room, ttlSec = 600, name }) {
   if (!API_KEY || !API_SECRET)
     throw new Error("LIVEKIT_API_KEY / LIVEKIT_API_SECRET manquants");
@@ -99,18 +100,19 @@ async function buildJwt({ identity, room, ttlSec = 600, name }) {
   const at = new AccessToken(API_KEY, API_SECRET, {
     identity: sanitizeIdentity(identity),
     ttl: ttlSec,
-    name: name ? String(name).slice(0, 128) : undefined,
+    // v2: si tu veux propager un nom, mets-le dans metadata
+    metadata: name ? JSON.stringify({ name }) : undefined,
   });
 
-  // ⬅️ Grant typé pour assurer la section 'video' correcte
-  const grant = new VideoGrant({
-    room,
+  // v2: on passe un objet de droits directement
+  at.addGrant({
     roomJoin: true,
+    room,
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
+    canUpdateOwnMetadata: true,
   });
-  at.addGrant(grant);
 
   return await at.toJwt();
 }
@@ -181,8 +183,8 @@ export async function GET(req) {
     return NextResponse.json(
       {
         success: true, token, wsUrl, identity, room,
-        // diag minimal (retire en prod si tu veux)
-        _diag: { iss: payload?.iss, room: payload?.video?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
+        // en v2, la room peut se trouver sous payload.grants.room
+        _diag: { iss: payload?.iss, room: payload?.grants?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
       },
       { status: 200, headers: corsHeaders(req) }
     );
@@ -238,7 +240,7 @@ export async function POST(req) {
     return NextResponse.json(
       {
         success: true, token, wsUrl, identity, room,
-        _diag: { iss: payload?.iss, room: payload?.video?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
+        _diag: { iss: payload?.iss, room: payload?.grants?.room || payload?.room, nbf: payload?.nbf, exp: payload?.exp }
       },
       { status: 200, headers: corsHeaders(req) }
     );
