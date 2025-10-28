@@ -12,11 +12,11 @@ const LIVEKIT_URL =
   process.env.LIVEKIT_WS_URL ||
   process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-const API_KEY =
+const API_KEY = "API8ng8u3NfF45z" ||
   process.env.LIVEKIT_API_KEY ||
   process.env.LIVEKIT_KEY;
 
-const API_SECRET =
+const API_SECRET = "v3seTBOPfHnsfLNHRX7EGnvDHZNo7twKJ0M3lz8WP6fB" ||
   process.env.LIVEKIT_API_SECRET ||
   process.env.LIVEKIT_SECRET;
 
