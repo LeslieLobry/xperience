@@ -128,3 +128,44 @@ if (existing) {
     );
   }
 }
+export async function GET() {
+  try {
+    const cookieStore = cookies();
+    const utilisateur = await getUserFromToken(cookieStore);
+    if (!utilisateur?.id) {
+      return NextResponse.json(
+        { success: false, message: "Non autorisé" },
+        { status: 401, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    // on prend la dernière demande (si elle existe)
+    const last = await prisma.verificationIdentite.findFirst({
+      where: { utilisateurId: utilisateur.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, statut: true, createdAt: true, updatedAt: true },
+    });
+
+    const statut = last?.statut || "AUCUNE";
+    const verified = ["ACCEPTEE", "VALIDEE", "VERIFIEE"].includes(statut);
+    const pending = statut === "EN_ATTENTE";
+
+    return NextResponse.json(
+      {
+        success: true,
+        verified,
+        pending,
+        statut,            // pour affichage si besoin
+        demandeId: last?.id ?? null,
+        updatedAt: last?.updatedAt ?? null,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (e) {
+    console.error("GET /verification-identite/status error:", e);
+    return NextResponse.json(
+      { success: false, message: "Erreur serveur" },
+      { status: 500, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+}
