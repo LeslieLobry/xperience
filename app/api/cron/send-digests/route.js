@@ -190,7 +190,7 @@ async function runJob(req, { dry = false } = {}) {
           <li>Nouveaux <b>likes</b> : <b>${likesRecus}</b></li>
         </ul>
         <div style="margin:20px 0;">
-          <a href="${origin}/accueil"
+          <a href="${origin}/accueil-page"
              style="display:inline-block;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;">
             Ouvrir Xpérience
           </a>
