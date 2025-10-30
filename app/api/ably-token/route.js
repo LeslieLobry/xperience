@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import Ably from "ably/promises";
+import Ably from "ably";
 import jwt from "jsonwebtoken";
 
 /* ---------------- CORS ---------------- */
