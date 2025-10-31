@@ -4,7 +4,7 @@ import { getUserFromToken } from "../../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/* -------- CORS (identique à /api/photos/[id]) -------- */
+/* -------- CORS -------- */
 function corsHeaders(origin = "") {
   const ALLOWED = [
     "http://localhost:8081",
@@ -27,160 +27,106 @@ export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-/* ---------------- Helpers ---------------- */
+/* -------- Helpers -------- */
 function normKey(input = "") {
-  try {
-    const u = new URL(input, "https://www.x-periences.fr");
-    return u.pathname; // "/uploads/.../file.ext" ou "/file.ext"
-  } catch {
-    return String(input).split("?")[0];
-  }
+  try { const u = new URL(input, "https://www.x-periences.fr"); return u.pathname; }
+  catch { return String(input).split("?")[0]; }
 }
 function baseName(input = "") {
   return (normKey(input).split("/").pop() || "").toLowerCase();
 }
 
 async function getUserFromReqSafe(req) {
-  try {
-    const u = await getUserFromToken(); // cookie (web)
-    if (u) return u;
-  } catch {}
+  try { const u = await getUserFromToken(); if (u) return u; } catch {}
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (m) {
-    try {
-      const u2 = await getUserFromToken(m[1]); // si ta fonction accepte le token brut
-      if (u2) return u2;
-    } catch {}
-  }
+  if (m) { try { const u2 = await getUserFromToken(m[1]); if (u2) return u2; } catch {} }
   return null;
 }
 
-/**
- * Essaie plusieurs "groupes" de colonnes. Chaque tentative est isolée dans un try/catch :
- * si un champ n'existe pas dans TON schéma, on passe à la suivante sans 500.
- */
-async function tryResolve(utilisateurId, k, name) {
+const COLS_STRICT = ["url","key","s3Key","path","photoUrl","imageUrl","filename","filePath","photo","image","uri"];
+const OR_strict = (k, name) => [
+  ...COLS_STRICT.map(c => ({ [c]: k })),                         // égalité
+  ...COLS_STRICT.map(c => ({ [c]: { endsWith: name } })),       // se termine par filename
+];
+
+const OR_contains = (name) => [
+  ...COLS_STRICT.map(c => ({ [c]: { contains: name, mode: "insensitive" } })),
+];
+
+/* -------- Handler commun -------- */
+async function doResolve({ utilisateurId, key }) {
   const uid = Number(utilisateurId);
+  const k = normKey(key);
+  const name = baseName(key);
 
-  const attempts = [
-    // 1) Colonnes classiques vues dans ton projet
-    () =>
-      prisma.photo.findFirst({
-        select: { id: true },
-        where: {
-          utilisateurId: uid,
-          OR: [
-            { url: k }, { key: k }, { s3Key: k }, { path: k },
-            { url: { endsWith: name } },
-            { key: { endsWith: name } },
-            { s3Key: { endsWith: name } },
-            { path: { endsWith: name } },
-          ],
-        },
-      }),
+  // 1) strict (égalité / endsWith)
+  try {
+    const p1 = await prisma.photo.findFirst({
+      select: { id: true, utilisateurId: true },
+      where: { utilisateurId: uid, OR: OR_strict(k, name) },
+      orderBy: { id: "desc" },
+    });
+    if (p1?.id) { console.log("[resolve-id] strict hit", p1.id); return p1.id; }
+  } catch (e) { console.warn("[resolve-id] strict failed:", e?.message); }
 
-    // 2) Variantes fréquentes
-    () =>
-      prisma.photo.findFirst({
-        select: { id: true },
-        where: {
-          utilisateurId: uid,
-          OR: [
-            { photoUrl: k }, { imageUrl: k }, { filename: k }, { filePath: k },
-            { photoUrl: { endsWith: name } },
-            { imageUrl: { endsWith: name } },
-            { filename: { endsWith: name } },
-            { filePath: { endsWith: name } },
-          ],
-        },
-      }),
+  // 2) contains insensible (plus permissif)
+  try {
+    const p2 = await prisma.photo.findFirst({
+      select: { id: true, utilisateurId: true },
+      where: { utilisateurId: uid, OR: OR_contains(name) },
+      orderBy: { id: "desc" },
+    });
+    if (p2?.id) { console.log("[resolve-id] contains hit", p2.id); return p2.id; }
+  } catch (e) { console.warn("[resolve-id] contains failed:", e?.message); }
 
-    // 3) Encore d'autres alias possibles
-    () =>
-      prisma.photo.findFirst({
-        select: { id: true },
-        where: {
-          utilisateurId: uid,
-          OR: [
-            { photo: k }, { image: k }, { uri: k },
-            { photo: { endsWith: name } },
-            { image: { endsWith: name } },
-            { uri: { endsWith: name } },
-          ],
-        },
-      }),
-  ];
-
-  for (let i = 0; i < attempts.length; i++) {
-    try {
-      const res = await attempts[i]();
-      if (res?.id) {
-        console.log("[resolve-id] matched on attempt", i + 1, "→ id", res.id);
-        return res.id;
+  // 3) dernier recours: sans filtre user (debug), puis vérification ownership
+  try {
+    const p3 = await prisma.photo.findFirst({
+      select: { id: true, utilisateurId: true },
+      where: { OR: [...OR_strict(k, name), ...OR_contains(name)] },
+      orderBy: { id: "desc" },
+    });
+    if (p3?.id) {
+      if (Number(p3.utilisateurId) === uid) {
+        console.log("[resolve-id] loose hit", p3.id);
+        return p3.id;
+      } else {
+        console.log("[resolve-id] found but belongs to", p3.utilisateurId, "≠", uid);
+        return null; // sécurité: pas au user courant
       }
-    } catch (e) {
-      // On log mais on continue d'essayer (champ inconnu, etc.)
-      console.warn("[resolve-id] attempt", i + 1, "failed:", e?.message);
     }
-  }
+  } catch (e) { console.warn("[resolve-id] loose failed:", e?.message); }
+
   return null;
 }
 
-/* ------------- Handler commun POST / GET ------------- */
 async function handleResolve(req) {
   const origin = req.headers.get("origin") || "";
   let key = "";
-
-  // Récup param
   try {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       key = body?.key || "";
     } else {
-      const url = new URL(req.url);
-      key = url.searchParams.get("key") || "";
+      const u = new URL(req.url);
+      key = u.searchParams.get("key") || "";
     }
   } catch {}
-  if (!key) {
-    return NextResponse.json(
-      { ok: false, error: "missing_key" },
-      { status: 400, headers: corsHeaders(origin) }
-    );
-  }
+  if (!key) return NextResponse.json({ ok:false, error:"missing_key" }, { status:400, headers: corsHeaders(origin) });
 
-  // Auth
   const user = await getUserFromReqSafe(req);
-  if (!user?.id) {
-    return NextResponse.json(
-      { ok: false, error: "unauthorized" },
-      { status: 401, headers: corsHeaders(origin) }
-    );
-  }
-
-  const k = normKey(key);
-  const name = baseName(key);
+  if (!user?.id) return NextResponse.json({ ok:false, error:"unauthorized" }, { status:401, headers: corsHeaders(origin) });
 
   try {
-    const id = await tryResolve(user.id, k, name);
-    if (!id) {
-      return NextResponse.json(
-        { ok: false, error: "not_found" },
-        { status: 404, headers: corsHeaders(origin) }
-      );
-    }
-    return NextResponse.json(
-      { ok: true, id },
-      { status: 200, headers: corsHeaders(origin) }
-    );
+    const id = await doResolve({ utilisateurId: user.id, key });
+    if (!id) return NextResponse.json({ ok:false, error:"not_found" }, { status:404, headers: corsHeaders(origin) });
+    return NextResponse.json({ ok:true, id }, { status:200, headers: corsHeaders(origin) });
   } catch (e) {
-    console.error("[resolve-id] fatal error:", e);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500, headers: corsHeaders(origin) }
-    );
+    console.error("[resolve-id] fatal:", e);
+    return NextResponse.json({ ok:false, error:"server_error" }, { status:500, headers: corsHeaders(origin) });
   }
 }
 
-export async function POST(req) { return handleResolve(req); }
-export async function GET(req)  { return handleResolve(req); }
+export async function POST(req){ return handleResolve(req); }
+export async function GET(req){ return handleResolve(req); }
