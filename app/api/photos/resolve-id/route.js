@@ -1,11 +1,10 @@
-// app/api/photos/resolve-id/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getUserFromToken } from "../../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/* ---------- CORS identique à /api/photos/[id] ---------- */
+/* -------- CORS (identique à /api/photos/[id]) -------- */
 function corsHeaders(origin = "") {
   const ALLOWED = [
     "http://localhost:8081",
@@ -28,7 +27,7 @@ export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-/* ---------- Helpers ---------- */
+/* ---------------- Helpers ---------------- */
 function normKey(input = "") {
   try {
     const u = new URL(input, "https://www.x-periences.fr");
@@ -42,88 +41,128 @@ function baseName(input = "") {
 }
 
 async function getUserFromReqSafe(req) {
-  // 1) Essai cookie (web)
   try {
-    const u = await getUserFromToken();
+    const u = await getUserFromToken(); // cookie (web)
     if (u) return u;
-  } catch {
-    // ignore
-  }
-  // 2) Essai Authorization: Bearer <token> (mobile)
+  } catch {}
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m) {
     try {
-      // ⚠️ si getUserFromToken n'accepte pas d'argument dans ton projet,
-      // remplace par getUserFromRawToken(m[1]) si tu en as une.
-      const u2 = await getUserFromToken(m[1]);
+      const u2 = await getUserFromToken(m[1]); // si ta fonction accepte le token brut
       if (u2) return u2;
-    } catch {
-      // ignore
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Essaie plusieurs "groupes" de colonnes. Chaque tentative est isolée dans un try/catch :
+ * si un champ n'existe pas dans TON schéma, on passe à la suivante sans 500.
+ */
+async function tryResolve(utilisateurId, k, name) {
+  const uid = Number(utilisateurId);
+
+  const attempts = [
+    // 1) Colonnes classiques vues dans ton projet
+    () =>
+      prisma.photo.findFirst({
+        select: { id: true },
+        where: {
+          utilisateurId: uid,
+          OR: [
+            { url: k }, { key: k }, { s3Key: k }, { path: k },
+            { url: { endsWith: name } },
+            { key: { endsWith: name } },
+            { s3Key: { endsWith: name } },
+            { path: { endsWith: name } },
+          ],
+        },
+      }),
+
+    // 2) Variantes fréquentes
+    () =>
+      prisma.photo.findFirst({
+        select: { id: true },
+        where: {
+          utilisateurId: uid,
+          OR: [
+            { photoUrl: k }, { imageUrl: k }, { filename: k }, { filePath: k },
+            { photoUrl: { endsWith: name } },
+            { imageUrl: { endsWith: name } },
+            { filename: { endsWith: name } },
+            { filePath: { endsWith: name } },
+          ],
+        },
+      }),
+
+    // 3) Encore d'autres alias possibles
+    () =>
+      prisma.photo.findFirst({
+        select: { id: true },
+        where: {
+          utilisateurId: uid,
+          OR: [
+            { photo: k }, { image: k }, { uri: k },
+            { photo: { endsWith: name } },
+            { image: { endsWith: name } },
+            { uri: { endsWith: name } },
+          ],
+        },
+      }),
+  ];
+
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const res = await attempts[i]();
+      if (res?.id) {
+        console.log("[resolve-id] matched on attempt", i + 1, "→ id", res.id);
+        return res.id;
+      }
+    } catch (e) {
+      // On log mais on continue d'essayer (champ inconnu, etc.)
+      console.warn("[resolve-id] attempt", i + 1, "failed:", e?.message);
     }
   }
   return null;
 }
 
-async function resolveIdCore({ utilisateurId, key }) {
-  const k = normKey(key);
-  const name = baseName(key);
-
-  // Si tu connais la/les colonnes exactes utilisées, adapte ici.
-  // On cherche par chemin exact OU par nom de fichier.
-  const photo = await prisma.photo.findFirst({
-    select: { id: true },
-    where: {
-      utilisateurId: Number(utilisateurId),
-      OR: [
-        { url: k }, { key: k }, { s3Key: k }, { path: k },
-        { url:   { endsWith: name } },
-        { key:   { endsWith: name } },
-        { s3Key: { endsWith: name } },
-        { path:  { endsWith: name } },
-      ],
-    },
-  });
-
-  return photo?.id ?? null;
-}
-
-/* ---------- POST / GET ---------- */
+/* ------------- Handler commun POST / GET ------------- */
 async function handleResolve(req) {
   const origin = req.headers.get("origin") || "";
   let key = "";
 
-  // lecture param
+  // Récup param
   try {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       key = body?.key || "";
-    } else if (req.method === "GET") {
+    } else {
       const url = new URL(req.url);
       key = url.searchParams.get("key") || "";
     }
-  } catch {
-    key = "";
-  }
-
+  } catch {}
   if (!key) {
     return NextResponse.json(
-      { ok: false, error: "missing key" },
+      { ok: false, error: "missing_key" },
       { status: 400, headers: corsHeaders(origin) }
     );
   }
 
-  // auth
+  // Auth
   const user = await getUserFromReqSafe(req);
-  if (!user || !user.id) {
+  if (!user?.id) {
     return NextResponse.json(
       { ok: false, error: "unauthorized" },
       { status: 401, headers: corsHeaders(origin) }
     );
   }
 
+  const k = normKey(key);
+  const name = baseName(key);
+
   try {
-    const id = await resolveIdCore({ utilisateurId: user.id, key });
+    const id = await tryResolve(user.id, k, name);
     if (!id) {
       return NextResponse.json(
         { ok: false, error: "not_found" },
@@ -135,8 +174,7 @@ async function handleResolve(req) {
       { status: 200, headers: corsHeaders(origin) }
     );
   } catch (e) {
-    // log côté serveur
-    console.error("resolve-id error:", e);
+    console.error("[resolve-id] fatal error:", e);
     return NextResponse.json(
       { ok: false, error: "server_error" },
       { status: 500, headers: corsHeaders(origin) }
@@ -144,9 +182,5 @@ async function handleResolve(req) {
   }
 }
 
-export async function POST(req) {
-  return handleResolve(req);
-}
-export async function GET(req) {
-  return handleResolve(req);
-}
+export async function POST(req) { return handleResolve(req); }
+export async function GET(req)  { return handleResolve(req); }
