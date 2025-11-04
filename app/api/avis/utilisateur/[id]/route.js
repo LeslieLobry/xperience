@@ -1,12 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-/** ✅ Force Node.js runtime (obligatoire pour Prisma sur Vercel) */
 export const runtime = "nodejs";
-/** (optionnel) évite le cache RSC sur cette route */
 export const dynamic = "force-dynamic";
 
-/* ---------- Prisma singleton ---------- */
 let prisma;
 if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient();
@@ -24,16 +21,23 @@ const ALLOWED_ORIGINS = [
   "https://x-periences.fr",
 ];
 function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform, X-Action, X-Client",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Platform, X-Action, X-Client",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
     "Content-Type": "application/json",
   };
+}
+export async function OPTIONS(req) {
+  const origin = req.headers.get("origin") || "";
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
 /* ---------- BigInt-safe JSON ---------- */
@@ -43,14 +47,10 @@ function safeJson(data) {
   );
 }
 
-export async function OPTIONS(req) {
-  const origin = req.headers.get("origin") || "";
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
-}
-
 /**
- * GET /api/avis/utilisateur/[id]?take=10&beforeId=123
- * - tri par id (champ sûr) pour éviter l’erreur si createdAt n’existe pas
+ * GET /api/avis/utilisateur/[id]?take=10&beforeId=123&type=recus|laisses
+ * - Par défaut renvoie les AVIS REÇUS (cibleId = id)
+ * - Pagination par id DESC
  */
 export async function GET(req, { params }) {
   const origin = req.headers.get("origin") || "";
@@ -63,17 +63,23 @@ export async function GET(req, { params }) {
     if (!idRaw) {
       return NextResponse.json({ error: "ID requis" }, { status: 400, headers });
     }
-    const cibleId = parseInt(String(idRaw), 10);
-    if (Number.isNaN(cibleId)) {
+    const userId = parseInt(String(idRaw), 10);
+    if (Number.isNaN(userId) || userId <= 0) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400, headers });
     }
 
+    const type = (searchParams.get("type") || "recus").toLowerCase();
     let take = parseInt(String(searchParams.get("take") ?? "10"), 10);
     if (Number.isNaN(take) || take < 1 || take > 50) take = 10;
 
-    const where = { cibleId };
+    // where conforme à ton schéma
+    const where =
+      type === "laisses"
+        ? { auteurId: userId }
+        : { cibleId: userId }; // défaut: reçus
+
     const beforeIdRaw = searchParams.get("beforeId");
-    if (beforeIdRaw != null && String(beforeIdRaw).length) {
+    if (beforeIdRaw) {
       const b = parseInt(String(beforeIdRaw), 10);
       if (!Number.isNaN(b)) where.id = { lt: b };
     }
@@ -81,43 +87,31 @@ export async function GET(req, { params }) {
     const rows = await prisma.avis.findMany({
       where,
       take,
-      orderBy: { id: "desc" }, // ✅ champ toujours présent
+      orderBy: { id: "desc" },
       include: {
-        // ✅ on inclut tout l'auteur pour éviter les 'Unknown arg ... in select'
-        auteur: true,
+        // champs existants dans Utilisateur d'après ton schéma
+        auteur: { select: { id: true, pseudo: true, photoUrl: true } },
+        cible: { select: { id: true, pseudo: true, photoUrl: true } },
       },
     });
 
-    // Normalisation de l’avatar → un seul champ "avatarUrl" côté client
-    const items = rows.map((a) => {
-      const { auteur, ...rest } = a;
-      const avatarUrl =
-        auteur?.avatarUrl ??
-        auteur?.photoUrl ??
-        auteur?.avatar ??
-        null;
-      return {
-        ...rest,
-        auteur: {
-          id: auteur?.id ?? null,
-          pseudo: auteur?.pseudo ?? "",
-          avatarUrl,
-        },
-      };
-    });
+    // Normalisation simple; avatar = photoUrl chez toi
+    const items = rows.map((a) => ({
+      id: a.id,
+      commentaire: a.commentaire,
+      createdAt: a.createdAt,
+      auteur: a.auteur
+        ? { id: a.auteur.id, pseudo: a.auteur.pseudo || "", avatarUrl: a.auteur.photoUrl || null }
+        : null,
+      cible: a.cible
+        ? { id: a.cible.id, pseudo: a.cible.pseudo || "", avatarUrl: a.cible.photoUrl || null }
+        : null,
+    }));
 
     const nextCursor = items.length ? items[items.length - 1].id : null;
-
     return NextResponse.json(safeJson({ items, nextCursor }), { headers });
   } catch (error) {
-    // On renvoie explicitement le message pour débogage
-    const payload = {
-      error: "Erreur serveur",
-      message: String(error?.message || ""),
-      // décommente temporairement si besoin
-      // stack: String(error?.stack || ""),
-    };
-    console.error("❌ GET /api/avis/utilisateur/[id] :", payload);
-    return NextResponse.json(payload, { status: 500, headers });
+    console.error("❌ GET /api/avis/utilisateur/[id]:", error?.code, error?.message);
+    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500, headers });
   }
 }
