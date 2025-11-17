@@ -7,8 +7,7 @@ import tik from "../../public/images/tik.png";
 import facebook from "../../public/images/facebook.png";
 
 import "../Footer/Footer.css";
-import NewsletterForm from "../NewsLetterForm/NewsLetterForm";
-
+import NewsletterForm from "../NewsLetterForm/NewsLetterForm"
 function Footer() {
   return (
     <div className="footer-contenant">

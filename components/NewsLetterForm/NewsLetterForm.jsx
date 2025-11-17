@@ -1,44 +1,35 @@
-// app/api/newsletter/abonner/route.js
-import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+"use client";
+import { useState } from "react";
+import "./NewsletterForm.css";
 
-export async function POST(req) {
-  const { email } = await req.json();
+export default function NewsletterForm() {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
 
-  if (!email || !email.includes("@")) {
-    return NextResponse.json(
-      { success: false, error: "Email invalide" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const deja = await prisma.abonneNewsletter.findUnique({
-      where: { email },
+  const inscrire = async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/newsletter/abonner", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      headers: { "Content-Type": "application/json" },
     });
+    const data = await res.json();
+    if (data.success) setMessage("Merci pour votre inscription !");
+    else setMessage("Erreur ou déjà inscrit.");
+  };
 
-    if (deja) {
-      return NextResponse.json({
-        success: true,
-        already: true,
-        message: "Vous êtes déjà inscrit à la newsletter.",
-      });
-    }
-
-    await prisma.abonneNewsletter.create({
-      data: { email },
-    });
-
-    return NextResponse.json({
-      success: true,
-      already: false,
-      message: "Merci pour votre inscription !",
-    });
-  } catch (err) {
-    console.error("Erreur newsletter:", err);
-    return NextResponse.json(
-      { success: false, error: "Erreur serveur, réessayez plus tard." },
-      { status: 500 }
-    );
-  }
+  return (
+    <form onSubmit={inscrire} className="newsletter-form">
+      <h2 className="newsletter-title">📬 Abonnez-vous à notre newsletter</h2>
+      <input
+        type="email"
+        placeholder="Votre email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <button type="submit">S’abonner</button>
+      {message && <p>{message}</p>}
+    </form>
+  );
 }
