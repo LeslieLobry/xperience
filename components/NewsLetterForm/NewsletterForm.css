@@ -21,7 +21,7 @@ input[type="email"] {
   padding: 8px 16px;
   border: 1px solid #e0c084;
   border-radius: 8px;
-  color: #fff;
+  color: #e0c084;
 }
 
 input[type="email"]::placeholder {
@@ -46,4 +46,8 @@ button[type="submit"]:hover {
   font-size: 0.95rem;
   color: #e0c084;
   text-align: center;
+}
+
+.newsletter-form input[type="email"] {
+  color: #e0c084 !important;
 }
