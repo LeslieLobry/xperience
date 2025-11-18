@@ -69,6 +69,7 @@ export default function Navbar() {
       console.error("Erreur fetch unread messages", err);
     }
   };
+
   useEffect(() => {
     if (localUser) fetchUnreadMessages();
   }, [localUser]);
@@ -136,20 +137,6 @@ export default function Navbar() {
       setNotifCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Erreur PATCH notification", err);
-    }
-  };
-
-  // (optionnel) marquer TOUT comme lu
-  const markAllRead = async () => {
-    try {
-      await fetch("/api/notifications", {
-        method: "PATCH",
-        credentials: "include",
-      });
-      setNotifications([]);
-      setNotifCount(0);
-    } catch (err) {
-      console.error("Erreur marquer notifications lues", err);
     }
   };
 
@@ -252,14 +239,6 @@ export default function Navbar() {
                 <div className="notif-section">
                   <div className="notif-header-row">
                     <span className="notif-title">Notifications</span>
-                    {notifications.length > 0 && (
-                      <button
-                        className="notif-mark-all-btn"
-                        onClick={markAllRead}
-                      >
-                        Tout marquer comme lues
-                      </button>
-                    )}
                   </div>
                   <ul>
                     {notifications.length === 0 && (
