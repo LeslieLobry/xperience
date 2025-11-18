@@ -1,0 +1,79 @@
+.likes-container {
+  padding: 20px;
+}
+
+.likes-title {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #e0c084;
+  text-align: center;
+}
+
+.likes-tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.likes-tabs button {
+  padding: 8px 18px;
+  margin: 0 6px;
+  border-radius: 6px;
+  border: none;
+  background: #1f2937;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.likes-tabs .active {
+  background: #e0c084;
+  color: #0b0f14;
+  font-weight: bold;
+}
+
+.likes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.like-item {
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  transition: 0.2s;
+}
+
+.like-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.like-content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.like-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.like-info {
+  margin-left: 12px;
+}
+
+.like-nom {
+  margin: 0;
+  font-size: 16px;
+  color: white;
+}
+
+.like-date {
+  font-size: 12px;
+  color: #ccc;
+}

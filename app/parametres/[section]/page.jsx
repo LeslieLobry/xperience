@@ -5,7 +5,7 @@ import SecuriteSection from "../../../components/Parametres/SecuritySection/Secu
 import BlocagesSection from "../../../components/Parametres/BlocagesSection/BlocagesSection";
 import GalerieSection from "../../../components/Parametres/GalerieSection/GalerieSection";
 import VisitesSection from "../../../components/Parametres/VisitesSection/VisitesSection";
-
+import LikesSection from "../../../components/LikesSection/LikesSection";
 
 export default async function SectionPage({ params }) {
   const connectedUser = await getUserFromToken();
@@ -22,6 +22,7 @@ export default async function SectionPage({ params }) {
     blocages: <BlocagesSection />,
     galerie: <GalerieSection utilisateurId={connectedUser.id} />,
     visites: <VisitesSection />,
+    likes : <LikesSection />
   };
 
   return sectionComponents[section] || (
