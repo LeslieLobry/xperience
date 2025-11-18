@@ -32,6 +32,28 @@
   background: #121b2a;
   color: #fff;
 }
+.admin-newsletter-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.admin-newsletter-preview {
+  background: #050711;
+  border: 1px solid #222633;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.admin-newsletter-preview-frame {
+  margin-top: 8px;
+  background: #0b0f14;
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 600px;
+  overflow: auto;
+}
 
 .admin-newsletter-form input::placeholder,
 .admin-newsletter-form textarea::placeholder {
