@@ -38,7 +38,7 @@ async function getUserFromRequest(req) {
   const match = auth.match(/^Bearer\s+(.+)$/i);
   const tokenHeader = match?.[1];
 
-  const cookieStore = await cookies();
+  const cookieStore = cookies(); // pas besoin de await ici
   const tokenCookie = cookieStore.get("token")?.value;
 
   const token = tokenHeader || tokenCookie;
@@ -67,14 +67,21 @@ export async function GET(req) {
     const userId = Number(user.id);
 
     const likes = await prisma.like.findMany({
-      where: { auteurId: userId },
+      where: { auteurId: userId },          // 👉 likes que TU as envoyés
       orderBy: { createdAt: "desc" },
       include: {
+        auteur: {
+          select: {
+            id: true,
+            pseudo: true,
+            photoUrl: true,                // toi
+          },
+        },
         cible: {
           select: {
             id: true,
             pseudo: true,
-            photoUrl: true,
+            photoUrl: true,                // la personne que tu as likée
           },
         },
       },
@@ -83,7 +90,8 @@ export async function GET(req) {
     const payload = likes.map((l) => ({
       id: l.id,
       createdAt: l.createdAt,
-      to: l.cible, // { id, pseudo, photoUrl }
+      from: l.auteur,  // { id, pseudo, photoUrl }
+      to: l.cible,     // { id, pseudo, photoUrl }
     }));
 
     return NextResponse.json(payload, { headers });

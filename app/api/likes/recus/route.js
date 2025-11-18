@@ -38,7 +38,7 @@ async function getUserFromRequest(req) {
   const match = auth.match(/^Bearer\s+(.+)$/i);
   const tokenHeader = match?.[1];
 
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const tokenCookie = cookieStore.get("token")?.value;
 
   const token = tokenHeader || tokenCookie;
@@ -77,14 +77,21 @@ export async function GET(req) {
             photoUrl: true,
           },
         },
+        cible: {
+          select: {
+            id: true,
+            pseudo: true,
+            photoUrl: true,
+          },
+        },
       },
     });
 
-    // On renvoie un format simple pour le mobile
     const payload = likes.map((l) => ({
       id: l.id,
       createdAt: l.createdAt,
       from: l.auteur, // { id, pseudo, photoUrl }
+      to: l.cible,    // { id, pseudo, photoUrl }
     }));
 
     return NextResponse.json(payload, { headers });
