@@ -10,36 +10,101 @@ export default function VisitesSection() {
   const [visites, setVisites] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const endpoint = onglet === "recues" ? "/api/visites/recues" : "/api/visites/faites";
+  const endpoint =
+    onglet === "recues" ? "/api/visites/recues" : "/api/visites/faites";
+
+  // 🔧 Résolution de la vraie URL (S3 présignée ou autre)
+  async function resolvePhotoUrl(photoUrl, cache) {
+    if (!photoUrl) return "/images/default-avatar.png";
+
+    // déjà une URL complète
+    if (photoUrl.startsWith("http")) {
+      return photoUrl;
+    }
+
+    // éviter les appels en double pour la même clé
+    if (cache.has(photoUrl)) {
+      return cache.get(photoUrl);
+    }
+
+    try {
+      const res = await fetch("/api/photos/presign", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: photoUrl }),
+      });
+
+      if (!res.ok) throw new Error("presign failed");
+      const data = await res.json();
+      const finalUrl = data.url || "/images/default-avatar.png";
+      cache.set(photoUrl, finalUrl);
+      return finalUrl;
+    } catch (e) {
+      console.error("Erreur presign photo visite:", e);
+      cache.set(photoUrl, "/images/default-avatar.png");
+      return "/images/default-avatar.png";
+    }
+  }
 
   useEffect(() => {
-    setLoading(true);
-    fetch(endpoint)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!Array.isArray(data)) {
-          console.warn("❗️Données non valides");
-          setVisites([]);
-        } else {
-          // 🔁 Suppression des doublons par utilisateur.id
-          const seen = new Set();
-          const uniques = data.filter(({ visiteur, visite }) => {
-            const utilisateur = visiteur || visite;
-            if (!utilisateur?.id) return false;
-            if (seen.has(utilisateur.id)) return false;
-            seen.add(utilisateur.id);
-            return true;
-          });
+    let cancelled = false;
+    const photoCache = new Map();
 
-          setVisites(uniques);
+    async function loadVisites() {
+      setLoading(true);
+      try {
+        const res = await fetch(endpoint, { cache: "no-store" });
+        const data = await res.json();
+
+        if (!Array.isArray(data)) {
+          console.warn("❗️Données non valides", data);
+          if (!cancelled) setVisites([]);
+          return;
         }
-        setLoading(false);
-      })
-      .catch((err) => {
+
+        const seen = new Set();
+        const processed = [];
+
+        for (const item of data) {
+          const rawUser = item.visiteur || item.visite;
+          if (!rawUser?.id) continue;
+
+          // anti doublon
+          if (seen.has(rawUser.id)) continue;
+          seen.add(rawUser.id);
+
+          const resolvedPhotoUrl = await resolvePhotoUrl(
+            rawUser.photoUrl,
+            photoCache
+          );
+
+          processed.push({
+            id: item.id,
+            date: item.date,
+            utilisateur: {
+              ...rawUser,
+              resolvedPhotoUrl,
+            },
+          });
+        }
+
+        if (!cancelled) {
+          setVisites(processed);
+        }
+      } catch (err) {
         console.error("❌ Erreur lors du chargement des visites :", err);
-        setVisites([]);
-        setLoading(false);
-      });
+        if (!cancelled) setVisites([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadVisites();
+
+    return () => {
+      cancelled = true;
+    };
   }, [endpoint]);
 
   return (
@@ -47,11 +112,17 @@ export default function VisitesSection() {
       <h2 className="visite-titre"> Historique de visites</h2>
 
       <div className="visites-tabs">
-        <button className={onglet === "recues" ? "active" : ""} onClick={() => setOnglet("recues")}>
-        Ils m'ont visité  
+        <button
+          className={onglet === "recues" ? "active" : ""}
+          onClick={() => setOnglet("recues")}
+        >
+          Ils m&apos;ont visité
         </button>
-        <button className={onglet === "faites" ? "active" : ""} onClick={() => setOnglet("faites")}>
-           J'ai visité
+        <button
+          className={onglet === "faites" ? "active" : ""}
+          onClick={() => setOnglet("faites")}
+        >
+          J&apos;ai visité
         </button>
       </div>
 
@@ -61,8 +132,7 @@ export default function VisitesSection() {
         <p className="aucune">😕 Aucune visite pour le moment</p>
       ) : (
         <ul className="liste-visites">
-          {visites.map(({ id, visiteur, visite, date }) => {
-            const utilisateur = visiteur || visite;
+          {visites.map(({ id, utilisateur, date }) => {
             if (!utilisateur?.id) return null;
 
             return (
@@ -70,11 +140,12 @@ export default function VisitesSection() {
                 <Link href={`/profil/${utilisateur.id}`}>
                   <div className="visite-content">
                     <Image
-                      src={utilisateur.photoUrl || "/images/default-avatar.png"}
+                      src={utilisateur.resolvedPhotoUrl || "/images/default-avatar.png"}
                       alt={utilisateur.pseudo}
                       width={50}
                       height={50}
                       className="visite-avatar"
+                      unoptimized
                     />
                     <div className="visite-info">
                       <h3 className="visite-nom">{utilisateur.pseudo}</h3>

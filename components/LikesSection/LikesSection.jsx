@@ -10,38 +10,100 @@ export default function LikesSection() {
   const [likes, setLikes] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Sélection de la route API selon l’onglet
   const endpoint =
     onglet === "recus" ? "/api/likes/recus" : "/api/likes/donnes";
 
-  useEffect(() => {
-    setLoading(true);
+  // Petite fonction utilitaire pour avoir une vraie URL d'image
+  async function resolvePhotoUrl(photoUrl, cache) {
+    if (!photoUrl) return "/default.jpg";
 
-    fetch(endpoint, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
+    // Si c'est déjà une URL complète => on renvoie tel quel
+    if (photoUrl.startsWith("http")) {
+      return photoUrl;
+    }
+
+    // On évite de refaire 10x le même appel pour la même clé
+    if (cache.has(photoUrl)) {
+      return cache.get(photoUrl);
+    }
+
+    try {
+      const res = await fetch("/api/photos/presign", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: photoUrl }),
+      });
+
+      if (!res.ok) throw new Error("presign failed");
+      const data = await res.json();
+      const finalUrl = data.url || "/default.jpg";
+      cache.set(photoUrl, finalUrl);
+      return finalUrl;
+    } catch (e) {
+      console.error("Erreur presign photo:", e);
+      cache.set(photoUrl, "/default.jpg");
+      return "/default.jpg";
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    const photoCache = new Map();
+
+    async function loadLikes() {
+      setLoading(true);
+      try {
+        const res = await fetch(endpoint, { cache: "no-store" });
+        const data = await res.json();
+
         if (!Array.isArray(data)) {
           console.warn("❗️Données invalides :", data);
-          setLikes([]);
-        } else {
-          // Nettoyage doublons par utilisateur.id
-          const seen = new Set();
-          const uniques = data.filter((item) => {
-            const utilisateur = item.from || item.to;
-            if (!utilisateur?.id) return false;
-            if (seen.has(utilisateur.id)) return false;
-            seen.add(utilisateur.id);
-            return true;
-          });
-
-          setLikes(uniques);
+          if (!cancelled) setLikes([]);
+          return;
         }
-      })
-      .catch((err) => {
+
+        const seen = new Set();
+        const processed = [];
+
+        for (const item of data) {
+          const rawUser = item.from || item.to;
+          if (!rawUser?.id) continue;
+
+          if (seen.has(rawUser.id)) continue;
+          seen.add(rawUser.id);
+
+          const resolvedPhotoUrl = await resolvePhotoUrl(
+            rawUser.photoUrl,
+            photoCache
+          );
+
+          processed.push({
+            id: item.id,
+            createdAt: item.createdAt,
+            utilisateur: {
+              ...rawUser,
+              resolvedPhotoUrl,
+            },
+          });
+        }
+
+        if (!cancelled) {
+          setLikes(processed);
+        }
+      } catch (err) {
         console.error("❌ Erreur chargement likes :", err);
-        setLikes([]);
-      })
-      .finally(() => setLoading(false));
+        if (!cancelled) setLikes([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadLikes();
+
+    return () => {
+      cancelled = true;
+    };
   }, [endpoint]);
 
   return (
@@ -53,14 +115,14 @@ export default function LikesSection() {
           className={onglet === "recus" ? "active" : ""}
           onClick={() => setOnglet("recus")}
         >
-          Ils m'ont liké ❤️
+          Ils m&apos;ont liké ❤️
         </button>
 
         <button
           className={onglet === "donnes" ? "active" : ""}
           onClick={() => setOnglet("donnes")}
         >
-          J'ai liké ⭐
+          J&apos;ai liké ⭐
         </button>
       </div>
 
@@ -70,8 +132,7 @@ export default function LikesSection() {
         <p className="aucune">😕 Aucun like pour le moment</p>
       ) : (
         <ul className="likes-list">
-          {likes.map(({ id, from, to, createdAt }) => {
-            const utilisateur = from || to;
+          {likes.map(({ id, utilisateur, createdAt }) => {
             if (!utilisateur?.id) return null;
 
             return (
@@ -79,11 +140,12 @@ export default function LikesSection() {
                 <Link href={`/profil/${utilisateur.id}`}>
                   <div className="like-content">
                     <Image
-                      src={utilisateur.photoUrl || "/images/default-avatar.png"}
+                      src={utilisateur.resolvedPhotoUrl || "/default.jpg"}
                       alt={utilisateur.pseudo}
                       width={50}
                       height={50}
                       className="like-avatar"
+                      unoptimized // comme ta modale, on évite les soucis de domaine au début
                     />
 
                     <div className="like-info">
