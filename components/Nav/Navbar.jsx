@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../public/images/logo.png";
-import { LogIn, Settings } from "lucide-react";
+import { LogIn } from "lucide-react";
 import "../Nav/Navbar.css";
 
 const navLinks = [
@@ -40,7 +40,6 @@ export default function Navbar() {
         setPresignedPhoto(localUser.photoUrl);
         return;
       }
-      // Demande la presigned URL côté backend
       try {
         const res = await fetch("/api/photos/presign", {
           method: "POST",
@@ -80,16 +79,10 @@ export default function Navbar() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(event.target)
-      ) {
+      if (popupRef.current && !popupRef.current.contains(event.target)) {
         setDropdownOpen(false);
       }
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
       }
     };
@@ -120,7 +113,7 @@ export default function Navbar() {
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
-        setNotifCount(data.length);
+        setNotifCount(data.length); // si l'API renvoie seulement les non lues
       }
     } catch (err) {
       console.error("Erreur fetch notifications", err);
@@ -131,12 +124,29 @@ export default function Navbar() {
     if (localUser) fetchNotifications();
   }, [localUser]);
 
+  // 🔹 Marquer UNE notification comme lue
+  const markNotificationRead = async (id) => {
+    try {
+      await fetch(`/api/notifications/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      // mise à jour locale optimiste
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setNotifCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Erreur PATCH notification", err);
+    }
+  };
+
+  // (optionnel) marquer TOUT comme lu
   const markAllRead = async () => {
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
         credentials: "include",
       });
+      setNotifications([]);
       setNotifCount(0);
     } catch (err) {
       console.error("Erreur marquer notifications lues", err);
@@ -144,13 +154,7 @@ export default function Navbar() {
   };
 
   const handleAvatarClick = () => {
-    const willOpen = !dropdownOpen;
-    setDropdownOpen(willOpen);
-    if (willOpen && notifCount > 0) {
-      setTimeout(() => {
-        markAllRead();
-      }, 3000);
-    }
+    setDropdownOpen((prev) => !prev);
   };
 
   const handleGoTo = (href) => {
@@ -162,7 +166,14 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="navbar-left">
         <Link href="/accueil-page">
-          <Image src={logo} alt="logo xpérience" width={120} height={120} className="navbar-logo" priority />
+          <Image
+            src={logo}
+            alt="logo xpérience"
+            width={120}
+            height={120}
+            className="navbar-logo"
+            priority
+          />
         </Link>
         {localUser && (
           <h3 className="navbar-pseudo">
@@ -171,20 +182,33 @@ export default function Navbar() {
         )}
       </div>
 
-      <div className={`burger${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(!menuOpen)}>
+      <div
+        className={`burger${menuOpen ? " open" : ""}`}
+        onClick={() => setMenuOpen(!menuOpen)}
+      >
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
       </div>
 
-      {/* CSS: .nav-links */}
-      <ul ref={menuRef} className={`nav-links${menuOpen ? " active" : ""}`}>
+      <ul
+        ref={menuRef}
+        className={`nav-links${menuOpen ? " active" : ""}`}
+      >
         {navLinks.map((link) => (
-          <li key={link.href} onClick={() => {
-            setMenuOpen(false);
-            if (link.href === "/messagerie") setUnreadCount(0);
-          }}>
-            <Link href={link.href} className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}>
+          <li
+            key={link.href}
+            onClick={() => {
+              setMenuOpen(false);
+              if (link.href === "/messagerie") setUnreadCount(0);
+            }}
+          >
+            <Link
+              href={link.href}
+              className={
+                link.href === "/messagerie" ? "nav-messagerie-link" : ""
+              }
+            >
               {link.label}
               {link.href === "/messagerie" && unreadCount > 0 && (
                 <span className="messagerie-badge">{unreadCount}</span>
@@ -192,6 +216,7 @@ export default function Navbar() {
             </Link>
           </li>
         ))}
+
         {localUser?.role === "ADMIN" && (
           <li onClick={() => setMenuOpen(false)}>
             <Link href="/admin">🛠 Admin</Link>
@@ -200,7 +225,10 @@ export default function Navbar() {
 
         {localUser ? (
           <li className="nav-avatar-wrapper">
-            <div className="nav-avatar-container" onClick={handleAvatarClick}>
+            <div
+              className="nav-avatar-container"
+              onClick={handleAvatarClick}
+            >
               <Image
                 src={presignedPhoto}
                 alt="Photo de profil"
@@ -209,42 +237,65 @@ export default function Navbar() {
                 className="nav-avatar"
               />
               {notifCount > 0 && (
-                <span className="notif-badge-on-avatar">{notifCount}</span>
+                <span className="notif-badge-on-avatar">
+                  {notifCount}
+                </span>
               )}
             </div>
 
             {dropdownOpen && (
-              <div className="nav-combined-popup" ref={popupRef} onClick={(e) => e.stopPropagation()}>
+              <div
+                className="nav-combined-popup"
+                ref={popupRef}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="notif-section">
+                  <div className="notif-header-row">
+                    <span className="notif-title">Notifications</span>
+                    {notifications.length > 0 && (
+                      <button
+                        className="notif-mark-all-btn"
+                        onClick={markAllRead}
+                      >
+                        Tout marquer comme lues
+                      </button>
+                    )}
+                  </div>
                   <ul>
                     {notifications.length === 0 && (
                       <li>Aucune notification</li>
                     )}
                     {notifications.map((notif) => (
                       <li key={notif.id}>
-                        {notif.lien && notif.lien.startsWith("/")
-                          ? (
-                            <span
-                              className="notif-link"
-                              onClick={() => {
-                                setDropdownOpen(false);
-                                router.push(notif.lien);
-                              }}
-                            >
-                              {notif.message}
-                            </span>
-                          )
-                          : (
-                            <a
-                              href={notif.lien || "#"}
-                              target={notif.lien ? "_blank" : undefined}
-                              rel={notif.lien ? "noopener noreferrer" : undefined}
-                              onClick={() => setDropdownOpen(false)}
-                            >
-                              {notif.message}
-                            </a>
-                          )
-                        }
+                        {notif.lien && notif.lien.startsWith("/") ? (
+                          <span
+                            className="notif-link"
+                            onClick={() => {
+                              // on marque cette notif comme lue puis on navigue
+                              markNotificationRead(notif.id);
+                              setDropdownOpen(false);
+                              router.push(notif.lien);
+                            }}
+                          >
+                            {notif.message}
+                          </span>
+                        ) : (
+                          <a
+                            href={notif.lien || "#"}
+                            target={notif.lien ? "_blank" : undefined}
+                            rel={
+                              notif.lien
+                                ? "noopener noreferrer"
+                                : undefined
+                            }
+                            onClick={() => {
+                              markNotificationRead(notif.id);
+                              setDropdownOpen(false);
+                            }}
+                          >
+                            {notif.message}
+                          </a>
+                        )}
                         <small>
                           {new Date(notif.createdAt).toLocaleString()}
                         </small>
@@ -289,7 +340,10 @@ export default function Navbar() {
             )}
           </li>
         ) : (
-          <li onClick={() => setMenuOpen(false)} title="Connexion">
+          <li
+            onClick={() => setMenuOpen(false)}
+            title="Connexion"
+          >
             <Link href="/connexion">
               <LogIn className="nav-icon" />
             </Link>
