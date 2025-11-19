@@ -5,9 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles"; // styles par défaut LiveKit
 
-// ⚠️ IMPORTANT : cette page suppose que tu as déjà une route /api/livekit/token
-// qui accepte ?conversationId=... et renvoie { token, wsUrl } (ou { data:{token,wsUrl} })
-
 export default function AppelPage({ params }) {
   const { conversationId } = params;
   const searchParams = useSearchParams();
@@ -18,7 +15,6 @@ export default function AppelPage({ params }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Récupérer le token LiveKit pour cette conversation
   useEffect(() => {
     let cancelled = false;
 
@@ -27,9 +23,42 @@ export default function AppelPage({ params }) {
         setLoading(true);
         setError("");
 
+        /* ------------------ 1) Récupérer l'utilisateur courant ------------------ */
+        let identity = null;
+        let name = null;
+
+        try {
+          const meRes = await fetch("/api/me", {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+
+          if (meRes.ok) {
+            const meData = await meRes.json().catch(() => null);
+            const user = meData?.user || meData || null;
+
+            if (user) {
+              identity =
+                user.id ??
+                user.utilisateurId ??
+                user.userId ??
+                user.uid ??
+                null;
+              name = user.pseudo || user.name || null;
+            }
+          }
+        } catch (e) {
+          console.warn("[AppelPage] /api/me error (non bloquant):", e);
+        }
+
+        /* ------------------ 2) Appel /api/livekit/token ------------------ */
         const qs = new URLSearchParams({
           conversationId: String(conversationId || ""),
         });
+        if (identity != null) {
+          qs.set("identity", String(identity));
+        }
 
         const res = await fetch(`/api/livekit/token?${qs.toString()}`, {
           method: "GET",
@@ -40,9 +69,14 @@ export default function AppelPage({ params }) {
         const data = await res.json().catch(() => ({}));
 
         // La route peut renvoyer { token, wsUrl } ou { data: { token, wsUrl } }
-        const payload = data?.token || data?.wsUrl ? data : data?.data || data;
+        const payload =
+          data?.token || data?.wsUrl ? data : data?.data || data;
         const tk = payload?.token;
-        const ws = payload?.wsUrl || payload?.url || payload?.livekitUrl || payload?.ws;
+        const ws =
+          payload?.wsUrl ||
+          payload?.url ||
+          payload?.livekitUrl ||
+          payload?.ws;
 
         if (!res.ok || !tk || !ws) {
           console.error("[LiveKit token error]", res.status, data);
@@ -88,7 +122,8 @@ export default function AppelPage({ params }) {
           alignItems: "center",
           justifyContent: "center",
           color: "#e0c084",
-          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
         }}
       >
         Connexion à l’appel…
@@ -111,7 +146,8 @@ export default function AppelPage({ params }) {
           color: "#f87171",
           padding: "16px",
           textAlign: "center",
-          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
         }}
       >
         <h1 style={{ fontSize: "1.3rem", marginBottom: "0.75rem" }}>
@@ -141,10 +177,6 @@ export default function AppelPage({ params }) {
         data-lk-theme="default"
         style={{ width: "100%", height: "100%" }}
       >
-        {/* 
-          VideoConference = UI prête à l’emploi (mute, caméra, grid, chat, etc.)
-          Tu pourras plus tard la remplacer par une UI custom si tu veux un style X-periences plus poussé.
-        */}
         <VideoConference />
       </LiveKitRoom>
     </div>
