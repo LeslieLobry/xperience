@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
-import "@livekit/components-styles"; // styles par défaut LiveKit
+import "@livekit/components-styles";
 
 export default function AppelPage({ params }) {
   const { conversationId } = params;
@@ -12,10 +12,32 @@ export default function AppelPage({ params }) {
 
   const [token, setToken] = useState(null);
   const [serverUrl, setServerUrl] = useState(null);
+  const [deviceId, setDeviceId] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  /* ---------------------------------------------------------------------------
+     1) Génération d’un deviceId unique par appareil
+     --------------------------------------------------------------------------- */
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const KEY = "lk-device-id";
+    let v = window.localStorage.getItem(KEY);
+
+    if (!v) {
+      v = `dev-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+      window.localStorage.setItem(KEY, v);
+    }
+
+    setDeviceId(v);
+  }, []);
+
+  /* ---------------------------------------------------------------------------
+     2) Récupération du token LiveKit une fois deviceId disponible
+     --------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!deviceId) return;
     let cancelled = false;
 
     async function fetchToken() {
@@ -23,80 +45,32 @@ export default function AppelPage({ params }) {
         setLoading(true);
         setError("");
 
-        /* ------------------ 1) Récupérer l'utilisateur courant ------------------ */
-        let identity = null;
-        let name = null;
-
-        try {
-          const meRes = await fetch("/api/me", {
-            method: "GET",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          });
-
-          if (meRes.ok) {
-            const meData = await meRes.json().catch(() => null);
-            const user = meData?.user || meData || null;
-
-            if (user) {
-              identity =
-                user.id ??
-                user.utilisateurId ??
-                user.userId ??
-                user.uid ??
-                null;
-              name = user.pseudo || user.name || null;
-            }
-          }
-        } catch (e) {
-          console.warn("[AppelPage] /api/me error (non bloquant):", e);
-        }
-
-        /* ------------------ 2) Appel /api/livekit/token ------------------ */
+        // Appel /api/livekit/token
         const qs = new URLSearchParams({
           conversationId: String(conversationId || ""),
+          deviceId: String(deviceId),
         });
-        if (identity != null) {
-          qs.set("identity", String(identity));
-        }
 
         const res = await fetch(`/api/livekit/token?${qs.toString()}`, {
           method: "GET",
-          headers: { Accept: "application/json" },
           credentials: "include",
         });
 
         const data = await res.json().catch(() => ({}));
-
-        // La route peut renvoyer { token, wsUrl } ou { data: { token, wsUrl } }
         const payload =
           data?.token || data?.wsUrl ? data : data?.data || data;
-        const tk = payload?.token;
-        const ws =
-          payload?.wsUrl ||
-          payload?.url ||
-          payload?.livekitUrl ||
-          payload?.ws;
 
-        if (!res.ok || !tk || !ws) {
-          console.error("[LiveKit token error]", res.status, data);
-          throw new Error(
-            data?.error ||
-              `Réponse invalide de /api/livekit/token (status ${res.status})`
-          );
+        if (!payload?.token || !payload?.wsUrl) {
+          throw new Error("Réponse invalide du serveur LiveKit.");
         }
 
         if (!cancelled) {
-          setToken(tk);
-          setServerUrl(ws);
+          setToken(payload.token);
+          setServerUrl(payload.wsUrl);
         }
       } catch (e) {
-        console.error("[AppelPage] fetchToken error:", e);
         if (!cancelled) {
-          setError(
-            e?.message ||
-              "Impossible d'initialiser l'appel. Réessaie dans quelques instants."
-          );
+          setError(e?.message || "Erreur de connexion à LiveKit.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -104,13 +78,14 @@ export default function AppelPage({ params }) {
     }
 
     fetchToken();
-
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [conversationId, deviceId]);
 
-  // Écran de chargement
+  /* ---------------------------------------------------------------------------
+     UI : Loading
+     --------------------------------------------------------------------------- */
   if (loading) {
     return (
       <div
@@ -122,8 +97,6 @@ export default function AppelPage({ params }) {
           alignItems: "center",
           justifyContent: "center",
           color: "#e0c084",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
         }}
       >
         Connexion à l’appel…
@@ -131,7 +104,9 @@ export default function AppelPage({ params }) {
     );
   }
 
-  // Erreur
+  /* ---------------------------------------------------------------------------
+     UI : Erreur
+     --------------------------------------------------------------------------- */
   if (error || !token || !serverUrl) {
     return (
       <div
@@ -140,25 +115,22 @@ export default function AppelPage({ params }) {
           height: "100vh",
           background: "#050811",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          color: "#f87171",
-          padding: "16px",
+          color: "#ff8080",
+          fontSize: "1.1rem",
           textAlign: "center",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
+          padding: 20,
         }}
       >
-        <h1 style={{ fontSize: "1.3rem", marginBottom: "0.75rem" }}>
-          Erreur lors de l’appel
-        </h1>
-        <p style={{ maxWidth: 400, opacity: 0.9 }}>{error}</p>
+        {error}
       </div>
     );
   }
 
-  // ✅ Affichage de la room LiveKit
+  /* ---------------------------------------------------------------------------
+     UI : Appel LiveKit
+     --------------------------------------------------------------------------- */
   return (
     <div
       style={{
@@ -173,7 +145,7 @@ export default function AppelPage({ params }) {
         token={token}
         connect={true}
         audio={true}
-        video={!audioOnly} // si audioOnly=1 => pas de vidéo
+        video={!audioOnly}
         data-lk-theme="default"
         style={{ width: "100%", height: "100%" }}
       >
