@@ -1,198 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  LiveKitRoom,
-  GridLayout,
-  ParticipantTile,
-  ControlBar,
-  useTracks,
-} from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
-
-function MessengerCallLayout({ audioOnly }) {
-  // On récupère toutes les caméras (local + remote)
-  const tracks = useTracks(
-    [Track.Source.Camera, Track.Source.ScreenShare],
-    { onlySubscribed: true }
-  );
-
-  const { mainTracks, localTrack } = useMemo(() => {
-    const cameraTracks = tracks.filter(
-      (tr) => tr.publication?.source === Track.Source.Camera
-    );
-
-    const local = cameraTracks.find((tr) => tr.participant.isLocal);
-    const remotes = cameraTracks.filter((tr) => !tr.participant.isLocal);
-
-    return {
-      localTrack: local || null,
-      // Si pas encore de remote (en attendant l’autre), on affiche ta cam en grand
-      mainTracks: remotes.length > 0 ? remotes : cameraTracks,
-    };
-  }, [tracks]);
-
-  if (audioOnly) {
-    return (
-      <div className="call-root">
-        <div className="call-audio-placeholder">
-          <p>Appel audio en cours…</p>
-        </div>
-        <div className="call-controls">
-          <ControlBar controls={{ screenShare: false }} />
-        </div>
-
-        <style jsx global>{`
-          .call-root {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            background: #050811;
-            display: flex;
-            flex-direction: column;
-          }
-
-          .call-audio-placeholder {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #e0c084;
-            font-size: 1.2rem;
-          }
-
-          .call-controls {
-            padding: 12px 24px 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: radial-gradient(
-                circle at top,
-                rgba(255, 255, 255, 0.06),
-                transparent 65%
-              )
-              #050811;
-            border-top: 1px solid rgba(224, 192, 132, 0.2);
-          }
-
-          .call-controls .lk-control-bar {
-            max-width: 520px;
-            width: 100%;
-            justify-content: space-between;
-          }
-
-          @media (max-width: 768px) {
-            .call-controls {
-              padding: 8px 12px 16px;
-            }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
-  return (
-    <div className="call-root">
-      <div className="call-main">
-        {/* Vidéo principale (l'autre en grand, sinon toi en grand en attendant) */}
-        <GridLayout tracks={mainTracks}>
-          <ParticipantTile />
-        </GridLayout>
-
-        {/* Petite vignette avec ta propre caméra en bas à droite */}
-        {localTrack && (
-          <div className="call-self">
-            <GridLayout tracks={[localTrack]}>
-              <ParticipantTile />
-            </GridLayout>
-          </div>
-        )}
-      </div>
-
-      {/* Barre de contrôle en bas comme Messenger */}
-      <div className="call-controls">
-        <ControlBar />
-      </div>
-
-      <style jsx global>{`
-        .call-root {
-          position: relative;
-          width: 100vw;
-          height: 100vh;
-          background: #050811;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .call-main {
-          position: relative;
-          flex: 1;
-          overflow: hidden;
-        }
-
-        .call-main .lk-grid-layout {
-          width: 100%;
-          height: 100%;
-        }
-
-        .call-main .lk-participant-tile {
-          border-radius: 18px;
-          overflow: hidden;
-        }
-
-        .call-self {
-          position: absolute;
-          bottom: 90px;
-          right: 24px;
-          width: 220px;
-          max-width: 35vw;
-          aspect-ratio: 16 / 9;
-          border-radius: 18px;
-          overflow: hidden;
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-        }
-
-        .call-self .lk-grid-layout {
-          width: 100%;
-          height: 100%;
-        }
-
-        .call-controls {
-          padding: 12px 24px 20px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: radial-gradient(
-              circle at top,
-              rgba(255, 255, 255, 0.06),
-              transparent 65%
-            )
-            #050811;
-          border-top: 1px solid rgba(224, 192, 132, 0.2);
-        }
-
-        .call-controls .lk-control-bar {
-          max-width: 520px;
-          width: 100%;
-          justify-content: space-between;
-        }
-
-        @media (max-width: 768px) {
-          .call-self {
-            width: 140px;
-            bottom: 80px;
-            right: 16px;
-          }
-          .call-controls {
-            padding: 8px 12px 16px;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 export default function AppelPage({ params }) {
   const { conversationId } = params;
@@ -205,7 +16,9 @@ export default function AppelPage({ params }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 1) deviceId
+  /* ---------------------------------------------------------------------------
+     1) Génération d’un deviceId unique par appareil
+     --------------------------------------------------------------------------- */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -220,7 +33,9 @@ export default function AppelPage({ params }) {
     setDeviceId(v);
   }, []);
 
-  // 2) token LiveKit
+  /* ---------------------------------------------------------------------------
+     2) Récupération du token LiveKit une fois deviceId disponible
+     --------------------------------------------------------------------------- */
   useEffect(() => {
     if (!deviceId) return;
     let cancelled = false;
@@ -230,6 +45,7 @@ export default function AppelPage({ params }) {
         setLoading(true);
         setError("");
 
+        // Appel /api/livekit/token
         const qs = new URLSearchParams({
           conversationId: String(conversationId || ""),
           deviceId: String(deviceId),
@@ -267,6 +83,9 @@ export default function AppelPage({ params }) {
     };
   }, [conversationId, deviceId]);
 
+  /* ---------------------------------------------------------------------------
+     UI : Loading
+     --------------------------------------------------------------------------- */
   if (loading) {
     return (
       <div
@@ -285,6 +104,9 @@ export default function AppelPage({ params }) {
     );
   }
 
+  /* ---------------------------------------------------------------------------
+     UI : Erreur
+     --------------------------------------------------------------------------- */
   if (error || !token || !serverUrl) {
     return (
       <div
@@ -301,22 +123,34 @@ export default function AppelPage({ params }) {
           padding: 20,
         }}
       >
-        {error || "Impossible de rejoindre l’appel."}
+        {error}
       </div>
     );
   }
 
+  /* ---------------------------------------------------------------------------
+     UI : Appel LiveKit
+     --------------------------------------------------------------------------- */
   return (
-    <LiveKitRoom
-      serverUrl={serverUrl}
-      token={token}
-      connect={true}
-      audio={true}
-      video={!audioOnly}
-      data-lk-theme="default"
-      style={{ width: "100vw", height: "100vh" }}
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        background: "#050811",
+        overflow: "hidden",
+      }}
     >
-      <MessengerCallLayout audioOnly={audioOnly} />
-    </LiveKitRoom>
+      <LiveKitRoom
+        serverUrl={serverUrl}
+        token={token}
+        connect={true}
+        audio={true}
+        video={!audioOnly}
+        data-lk-theme="default"
+        style={{ width: "100%", height: "100%" }}
+      >
+        <VideoConference />
+      </LiveKitRoom>
+    </div>
   );
 }
