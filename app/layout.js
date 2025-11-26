@@ -7,9 +7,10 @@ import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 import { Analytics } from "@vercel/analytics/next";
 import { ToastContainer } from "react-toastify";
-import Script from "next/script"; // ✅ important
+import Script from "next/script";
 import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
+import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -47,6 +48,9 @@ export default function RootLayout({ children }) {
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
+
+        {/* ✅ Bannière "Télécharger l’app" pour Android mobile */}
+        <InstallAppBanner />
 
         {/* ✅ Notifications toast */}
         <ToastContainer
