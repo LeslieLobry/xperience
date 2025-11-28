@@ -3,6 +3,10 @@ import { prisma } from "../../../lib/prisma";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { sendPush } from "../../../lib/push"; // 🔔 PUSH EXPO
+import Ably from "ably"; // 🆕 temps réel bannière
+
+// 🆕 Client Ably REST (clé serveur)
+const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
 /* ---------- CORS ---------- */
 const ALLOWED_ORIGINS = [
@@ -78,7 +82,10 @@ export async function POST(req) {
     const auteurId = Number(user.id);
     const cibleIdNum = Number(cibleId);
     if (auteurId === cibleIdNum) {
-      return NextResponse.json({ message: "Auto-like ignoré" }, { status: 200, headers });
+      return NextResponse.json(
+        { message: "Auto-like ignoré" },
+        { status: 200, headers }
+      );
     }
 
     // Création du like
@@ -121,7 +128,7 @@ export async function POST(req) {
       }
     }
 
-    // Ajout au digest (⚠️ ton modèle n’a PAS de auteurId)
+    // Ajout au digest
     await prisma.digestNotification.create({
       data: {
         destinataireId: cibleIdNum,
@@ -129,6 +136,23 @@ export async function POST(req) {
         eventType: "LIKE",
       },
     });
+
+    // 🆕 Ably : notif temps réel pour bannière in-app (mobile)
+    try {
+      const channelName = `user-${cibleIdNum}`;
+      const channel = ably.channels.get(channelName);
+
+      await channel.publish("new-like", {
+        pseudo: auteur?.pseudo ?? "Un membre",
+        likerId: auteurId,
+        cibleId: cibleIdNum,
+        lien: `/profil/${auteurId}`, // ce qu'on ouvrira au clic sur la bannière
+      });
+
+      console.log("📡 Ably new-like envoyé sur", channelName);
+    } catch (e) {
+      console.warn("⚠️ Ably new-like error :", e?.message || e);
+    }
 
     return NextResponse.json(like, { headers });
   } catch (err) {
