@@ -3,13 +3,18 @@ import { getUserFromToken } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { sendPush } from "../../../lib/push"; // 🔔 helper push
 
+// 🆕 Ably pour le temps réel (bannière in-app)
+import { ably } from "../../../lib/ably";
+
 export async function POST(req) {
   try {
     const user = await getUserFromToken();
     if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const { visiteId } = await req.json();
-    if (!visiteId) return NextResponse.json({ error: "ID cible manquant" }, { status: 400 });
+    if (!visiteId) {
+      return NextResponse.json({ error: "ID cible manquant" }, { status: 400 });
+    }
 
     const visiteIdNum = Number(visiteId);
     console.log("📥 VISITE reçue :", { visiteur: user.id, visite: visiteIdNum });
@@ -46,7 +51,7 @@ export async function POST(req) {
 
     console.log("✅ Visite enregistrée :", created);
 
-    // ✅ notification interne (DB)
+    // ✅ notification interne (DB) → cloche
     await prisma.notification.create({
       data: {
         utilisateurId: visiteIdNum,
@@ -57,12 +62,12 @@ export async function POST(req) {
     });
 
     // ✅ push Expo immédiate
-    // - récupère token + opt-in du visité
     const cible = await prisma.utilisateur.findUnique({
       where: { id: visiteIdNum },
       select: { expoPushToken: true, pushEnabled: true },
     });
-    // - récupère le pseudo du visiteur pour le texte
+
+    // - récupère le pseudo du visiteur pour le texte (et pour Ably)
     const visiteur = await prisma.utilisateur.findUnique({
       where: { id: user.id },
       select: { pseudo: true },
@@ -91,6 +96,22 @@ export async function POST(req) {
         eventType: "VISITE",
       },
     });
+
+    // 🆕 Ably : event temps réel pour la bannière in-app sur mobile
+    try {
+      const channelName = `user-${visiteIdNum}`;
+      const channel = ably.channels.get(channelName);
+
+      await channel.publish("new-visit", {
+        pseudo: visiteur?.pseudo ?? "Un membre",
+        visiteurId: user.id,
+        visiteId: visiteIdNum,
+      });
+
+      console.log("📡 Ably new-visit envoyé sur", channelName);
+    } catch (e) {
+      console.warn("⚠️ Ably new-visit error :", e?.message || e);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

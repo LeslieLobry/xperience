@@ -144,7 +144,10 @@ export async function POST(req) {
           }
         } catch (error) {
           console.error("Erreur modération image (message):", error);
-          return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500 });
+          return NextResponse.json(
+            { success: false, message: "Erreur analyse image." },
+            { status: 500 }
+          );
         }
       }
 
@@ -180,14 +183,25 @@ export async function POST(req) {
     }
 
     const auteurId = user.id;
-    console.log("[LOG][POST] auteurId:", auteurId, "conversationId:", conversationId, "type:", type, "imageUrl:", imageUrl, "audioUrl:", audioUrl);
+    console.log(
+      "[LOG][POST] auteurId:",
+      auteurId,
+      "conversationId:",
+      conversationId,
+      "type:",
+      type,
+      "imageUrl:",
+      imageUrl,
+      "audioUrl:",
+      audioUrl
+    );
 
     // Participants (ids)
     const participants = await prisma.participant.findMany({
       where: { conversationId },
       select: { utilisateurId: true },
     });
-    console.log("[LOG][POST] participants:", participants?.map(p => p.utilisateurId));
+    console.log("[LOG][POST] participants:", participants?.map((p) => p.utilisateurId));
 
     const autresParticipants = (participants || [])
       .map((p) => p.utilisateurId)
@@ -243,7 +257,7 @@ export async function POST(req) {
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
-    // Publish Ably
+    // Publish Ably conversation
     console.log("[LOG][POST] publish Ably payload (avant):", {
       id: messageWithOptimisticKey.id,
       type: messageWithOptimisticKey.type,
@@ -251,7 +265,9 @@ export async function POST(req) {
       audioUrl: messageWithOptimisticKey.audioUrl,
       optimisticKey,
     });
-    await ably.channels.get(`conversation-${conversationId}`).publish("message", messageWithOptimisticKey);
+    await ably.channels
+      .get(`conversation-${conversationId}`)
+      .publish("message", messageWithOptimisticKey);
     console.log("[LOG][POST] publish Ably: OK");
 
     await prisma.conversation.update({
@@ -274,7 +290,7 @@ export async function POST(req) {
     );
     console.log("[LOG][POST] notifications enregistrées pour:", autresParticipants);
 
-    // DIGEST QUOTIDIEN : on empile pour envoi plus tard
+    // DIGEST QUOTIDIEN
     if (autresParticipants.length > 0) {
       await prisma.digestNotification.createMany({
         data: autresParticipants.map((destId) => ({
@@ -284,7 +300,10 @@ export async function POST(req) {
         })),
         skipDuplicates: true,
       });
-      console.log("[LOG][POST] digestNotification createMany OK (count≈):", autresParticipants.length);
+      console.log(
+        "[LOG][POST] digestNotification createMany OK (count≈):",
+        autresParticipants.length
+      );
     }
 
     // 🔔 PUSH EXPO : envoi aux autres participants de la conv
@@ -314,6 +333,28 @@ export async function POST(req) {
       }
     }
 
+    // 🆕 ABLY IN-APP (BANNIÈRE MOBILE)
+    if (autresParticipants.length > 0) {
+      const preview = pushPreview(message.type, message.contenu);
+
+      for (const destId of autresParticipants) {
+        try {
+          await ably.channels
+            .get(`user-${destId}`)
+            .publish("new-message", {
+              conversationId: Number(conversationId),
+              fromPseudo: message.auteur.pseudo,
+              preview,
+              type: message.type,
+            });
+
+          console.log(`📡 Ably new-message envoyé sur user-${destId}`);
+        } catch (e) {
+          console.warn("⚠️ Erreur Ably new-message:", e?.message || e);
+        }
+      }
+    }
+
     // ✅ Réponse API avec optimisticKey
     console.log("[LOG][POST] réponse API:", {
       id: messageWithOptimisticKey.id,
@@ -322,10 +363,16 @@ export async function POST(req) {
       audioUrl: messageWithOptimisticKey.audioUrl,
       optimisticKey,
     });
-    return NextResponse.json({ success: true, message: messageWithOptimisticKey }, { status: 200 });
+    return NextResponse.json(
+      { success: true, message: messageWithOptimisticKey },
+      { status: 200 }
+    );
   } catch (err) {
     console.error("Erreur dans POST /api/messages :", err);
-    return NextResponse.json({ success: false, message: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Erreur serveur" },
+      { status: 500 }
+    );
   }
 }
 
@@ -341,7 +388,10 @@ export async function GET(req) {
     const user = await getUserFromToken();
     if (!user) {
       console.warn("[LOG][GET] getUserFromToken => null");
-      return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "Non autorisé" },
+        { status: 401 }
+      );
     }
     const auteurId = user.id;
 
@@ -350,13 +400,19 @@ export async function GET(req) {
       select: {
         utilisateurId: true,
         lastReadAt: true,
-        utilisateur: { select: { id: true, pseudo: true, photoUrl: true, type: true } },
+        utilisateur: {
+          select: { id: true, pseudo: true, photoUrl: true, type: true },
+        },
       },
     });
 
-    console.log("[LOG][GET] participants:", allParticipants.map(p => ({
-      utilisateurId: p.utilisateurId, lastReadAt: p.lastReadAt
-    })));
+    console.log(
+      "[LOG][GET] participants:",
+      allParticipants.map((p) => ({
+        utilisateurId: p.utilisateurId,
+        lastReadAt: p.lastReadAt,
+      }))
+    );
 
     const autresParticipants = allParticipants
       .map((p) => p.utilisateurId)
@@ -365,7 +421,10 @@ export async function GET(req) {
     const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
       console.warn("[LOG][GET] accès refusé (utilisateur bloqué)");
-      return NextResponse.json({ success: false, message: "Accès refusé à cette conversation." }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "Accès refusé à cette conversation." },
+        { status: 403 }
+      );
     }
 
     const messages = await prisma.message.findMany({
@@ -386,7 +445,9 @@ export async function GET(req) {
         createdAt: true,
         auteurId: true,
         lu: true,
-        auteur: { select: { id: true, pseudo: true, photoUrl: true, type: true } },
+        auteur: {
+          select: { id: true, pseudo: true, photoUrl: true, type: true },
+        },
         envoyeur: true,
         prenomEnvoyeur: true,
         reactions: {
@@ -400,10 +461,20 @@ export async function GET(req) {
     });
     messages.reverse(); // Chronologique
 
-    console.log("[LOG][GET] messages count:", messages.length);
-    console.log("[LOG][GET] tail sample:", messages.slice(-3).map(m => ({
-      id: m.id, type: m.type, imageUrl: m.imageUrl, audioUrl: m.audioUrl, createdAt: m.createdAt
-    })));
+    console.log(
+      "[LOG][GET] messages count:",
+      messages.length
+    );
+    console.log(
+      "[LOG][GET] tail sample:",
+      messages.slice(-3).map((m) => ({
+        id: m.id,
+        type: m.type,
+        imageUrl: m.imageUrl,
+        audioUrl: m.audioUrl,
+        createdAt: m.createdAt,
+      }))
+    );
 
     const lastReads = allParticipants.map((p) => ({
       utilisateurId: p.utilisateurId,
@@ -428,6 +499,9 @@ export async function GET(req) {
     );
   } catch (error) {
     console.error("[LOG][GET] erreur:", error);
-    return NextResponse.json({ success: false, message: "Impossible de récupérer les messages." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Impossible de récupérer les messages." },
+      { status: 500 }
+    );
   }
 }
