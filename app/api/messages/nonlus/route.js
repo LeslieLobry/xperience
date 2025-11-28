@@ -1,35 +1,37 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "../../../../lib/prisma"; // adapte si ton chemin est différent
 import jwt from "jsonwebtoken";
 import { cookies, headers } from "next/headers";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Récupère le token dans Authorization: Bearer xxx
-function getTokenFromAuthHeader(h) {
+/* --------- Récupération du token (header OU cookie) --------- */
+function getToken() {
+  const h = headers();
+
+  // 1) Auth header (mobile : Authorization: Bearer xxx)
   const auth = h.get("authorization") || h.get("Authorization");
-  if (!auth) return null;
-  if (!auth.toLowerCase().startsWith("bearer ")) return null;
-  return auth.slice(7).trim() || null;
+  if (auth && auth.toLowerCase().startsWith("bearer ")) {
+    const t = auth.slice(7).trim();
+    if (t) return t;
+  }
+
+  // 2) Cookie "token" (site web)
+  const cookieStore = cookies();
+  const cookieToken = cookieStore.get("token")?.value;
+  if (cookieToken) return cookieToken;
+
+  return null;
 }
 
 async function getUserFromToken() {
-  const h = headers();
-
-  // 1) App mobile : header Authorization
-  let token = getTokenFromAuthHeader(h);
-
-  // 2) Site web : cookie "token"
-  if (!token) {
-    const cookieStore = cookies();
-    token = cookieStore.get("token")?.value || null;
-  }
-
+  const token = getToken();
   if (!token || !JWT_SECRET) return null;
 
   try {
     return jwt.verify(token, JWT_SECRET);
-  } catch {
+  } catch (e) {
+    console.error("JWT error in /api/messages/nonlus:", e);
     return null;
   }
 }
@@ -44,30 +46,26 @@ export async function GET() {
       );
     }
 
+    // 🔥 Messages non lus pour l'utilisateur connecté
     const unreadMessages = await prisma.message.findMany({
       where: {
         lu: false,
-        auteurId: { not: user.id },
+        auteurId: { not: user.id }, // uniquement ce que tu as reçu
         conversation: {
           participants: {
             some: {
               utilisateurId: user.id,
-              // ⚠️ mets ici le BON nom de champ Prisma :
-              // supprime / deleted / etc.
-              supprime: false,
+              // si tu as un champ "supprime" / "deleted", on peut le remettre ensuite
+              // supprime: false,
             },
           },
         },
       },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 50,
       include: {
         auteur: {
-          select: {
-            id: true,
-            pseudo: true,
-            photoUrl: true,
-          },
+          select: { id: true, pseudo: true, photoUrl: true },
         },
         conversation: {
           select: { id: true },
@@ -75,9 +73,15 @@ export async function GET() {
       },
     });
 
+    console.log(
+      "GET /api/messages/nonlus =>",
+      unreadMessages.length,
+      "messages"
+    );
+
     return NextResponse.json(unreadMessages);
   } catch (error) {
-    console.error("GET /api/messages/nonlus error", error);
+    console.error("GET /api/messages/nonlus error:", error);
     return NextResponse.json(
       { error: "Erreur serveur" },
       { status: 500 }
