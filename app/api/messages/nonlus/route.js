@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma"; // adapte si ton chemin est différent
+import { prisma } from "../../../../lib/prisma";
 import jwt from "jsonwebtoken";
 import { cookies, headers } from "next/headers";
 
@@ -46,17 +46,16 @@ export async function GET() {
       );
     }
 
-    // 🔥 Messages non lus pour l'utilisateur connecté
-    const unreadMessages = await prisma.message.findMany({
+    // 🔥 Version SIMPLE : tous les derniers messages que tu as reçus,
+    // peu importe "lu" pour l’instant
+    const receivedMessages = await prisma.message.findMany({
       where: {
-        lu: false,
-        auteurId: { not: user.id }, // uniquement ce que tu as reçu
+        auteurId: { not: user.id },             // pas toi
         conversation: {
           participants: {
             some: {
-              utilisateurId: user.id,
-              // si tu as un champ "supprime" / "deleted", on peut le remettre ensuite
-              // supprime: false,
+              utilisateurId: user.id,          // tu es dans la conversation
+              // supprime: false,              // tu pourras remettre le champ exact plus tard
             },
           },
         },
@@ -75,11 +74,11 @@ export async function GET() {
 
     console.log(
       "GET /api/messages/nonlus =>",
-      unreadMessages.length,
-      "messages"
+      receivedMessages.length,
+      "messages (version simple)"
     );
 
-    return NextResponse.json(unreadMessages);
+    return NextResponse.json(receivedMessages);
   } catch (error) {
     console.error("GET /api/messages/nonlus error:", error);
     return NextResponse.json(
