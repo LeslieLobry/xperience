@@ -25,7 +25,7 @@ const safeFetcher = async (url) => {
 export default function ListeConversations({
   userId,
   onSelectConversation,
-  autoSelectFirst = true, // <- NEW: contrôle l’auto-ouverture
+  autoSelectFirst = true, // contrôle l’auto-ouverture
   className,
 }) {
   const router = useRouter();
@@ -168,11 +168,15 @@ export default function ListeConversations({
               Number(selectedId) === Number(conv.id) ? "active" : ""
             }`}
           >
+            {/* Zone cliquable = ouvre la conversation */}
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-info">
                 <div className="conv-pseudo">
                   {renamingId === conv.id ? (
-                    <>
+                    <div
+                      className="rename-inline"
+                      onClick={(e) => e.stopPropagation()} // évite d'ouvrir la conv en renommant
+                    >
                       <input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
@@ -192,41 +196,38 @@ export default function ListeConversations({
                       >
                         Annuler
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      {conv.nom || pseudo}
-                      <button
-                        className="rename-conv-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRenamingId(conv.id);
-                          setNewName(conv.nom || "");
-                        }}
-                        title="Renommer cette conversation"
-                        style={{
-                          marginLeft: 8,
-                          fontSize: 14,
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                      >
-                        ✏️
-                      </button>
-                    </>
+                    <>{conv.nom || pseudo}</>
                   )}
                 </div>
                 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
               </div>
             </div>
-            <button
-              className="delete-conv-button"
-              onClick={() => handleDelete(conv.id)}
-              title="Supprimer cette conversation"
-            >
-              🗑️
-            </button>
+
+            {/* Actions à droite = hors zone cliquable */}
+            <div className="conv-actions">
+              {renamingId !== conv.id && (
+                <button
+                  className="rename-conv-button"
+                  onClick={(e) => {
+                    e.stopPropagation(); // par sécurité
+                    setRenamingId(conv.id);
+                    setNewName(conv.nom || "");
+                  }}
+                  title="Renommer cette conversation"
+                >
+                  ✏️
+                </button>
+              )}
+              <button
+                className="delete-conv-button"
+                onClick={() => handleDelete(conv.id)}
+                title="Supprimer cette conversation"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
         );
       })}
