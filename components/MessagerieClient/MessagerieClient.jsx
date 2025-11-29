@@ -1,105 +1,86 @@
 "use client";
 
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import ListeConversations from "../ListeConversations/ListeConversations";
 import dynamic from "next/dynamic";
-
 import "../../app/messagerie/messagerie.css";
 import "./MessagerieClient.css";
 
-/* ---------------------------------------------------------------------------
-   🔹 Dynamic imports pour charger les gros blocs en différé
-   --------------------------------------------------------------------------- */
 const ChatBox = dynamic(() => import("../ChatBox/ChatBox"), {
   ssr: false,
   loading: () => <p>Chargement du chat...</p>,
 });
 
-const ListeConversations = dynamic(
-  () => import("../ListeConversations/ListeConversations"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="messagerie-loading">
-        Chargement des conversations...
-      </div>
-    ),
-  }
-);
-
-/* ---------------------------------------------------------------------------
-   🔹 Hook pour savoir si on est sur mobile
-   --------------------------------------------------------------------------- */
+// HOOK pour détecter le mobile
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" && window.innerWidth < breakpoint
   );
-
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < breakpoint);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, [breakpoint]);
-
   return isMobile;
 }
 
-/* ---------------------------------------------------------------------------
-   🔹 Composant principal
-   --------------------------------------------------------------------------- */
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
+  const [conversationId, setConversationId] = useState(null);
+
   const { user: currentUser, refreshUser, loading } = useAuth();
 
-  // ⚡ On ne rafraîchit l'utilisateur QUE si on n'a rien du tout
   useEffect(() => {
-    if (!currentUser && !user && !loading) {
-      refreshUser();
+    refreshUser();
+  }, [refreshUser]);
+
+  // ✅ Source de vérité = query `conversationId`
+  useEffect(() => {
+    const id = searchParams.get("conversationId");
+    if (id && !isNaN(Number(id))) {
+      setConversationId(Number(id));
+    } else {
+      setConversationId(null);
     }
-  }, [currentUser, user, loading, refreshUser]);
+  }, [searchParams]);
 
-  const displayedUser = currentUser ?? user;
+  // ⛔️ BUGGY → ENLEVÉ :
+  // useEffect(() => {
+  //   if (pathname === "/messagerie") {
+  //     setConversationId(null);
+  //   }
+  // }, [pathname]);
 
+  // --- MOBILE/RESPONSIVE LOGIC ---
   const isMobile = useIsMobile(900);
 
-  // ✅ Source de vérité unique : l'URL
-  const conversationId = useMemo(() => {
-    if (pathname === "/messagerie") return null;
-    const id = searchParams.get("conversationId");
-    if (!id || isNaN(Number(id))) return null;
-    return Number(id);
-  }, [searchParams, pathname]);
-
-  // Navigation = met à jour l'URL (et donc conversationId automatiquement)
+  // Navigation = met à jour l'URL et le state
   const handleSelectConversation = (id) => {
     router.push(`/messagerie?conversationId=${id}`, { scroll: false });
+    setConversationId(id);
   };
 
   const handleBack = () => {
     router.push(`/messagerie`, { scroll: false });
+    setConversationId(null);
   };
 
-  if (loading && !displayedUser?.id) {
+  const displayedUser = currentUser ?? user;
+
+  if (loading || !displayedUser?.id) {
     return (
-      <div className="messagerie-loading">
-        Chargement de la messagerie...
+      <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
+        Chargement messagerie...
       </div>
     );
   }
 
-  if (!displayedUser?.id) {
-    return (
-      <div className="messagerie-loading">
-        Impossible de charger la messagerie.
-      </div>
-    );
-  }
-
-  /* ------------------------ VUE MOBILE ------------------------ */
+  // --- MOBILE VIEW ---
   if (isMobile) {
     if (!conversationId) {
       return (
@@ -112,20 +93,20 @@ export default function MessagerieClient({ user }) {
           />
         </div>
       );
+    } else {
+      return (
+        <div className="messagerie-mobile-chat">
+          <ChatBox
+            conversationId={conversationId}
+            utilisateur={displayedUser}
+            onBack={handleBack}
+          />
+        </div>
+      );
     }
-
-    return (
-      <div className="messagerie-mobile-chat">
-        <ChatBox
-          conversationId={conversationId}
-          utilisateur={displayedUser}
-          onBack={handleBack}
-        />
-      </div>
-    );
   }
 
-  /* ------------------------ VUE DESKTOP ------------------------ */
+  // --- DESKTOP VIEW ---
   return (
     <div className="messagerie-page">
       <ListeConversations
@@ -137,15 +118,13 @@ export default function MessagerieClient({ user }) {
       />
 
       <div className="chat-section">
-    {conversationId ? (
-  <ChatBox
-    key={conversationId}   // ⬅️ important
-    conversationId={conversationId}
-    utilisateur={displayedUser}
-    onBack={handleBack}
-  />
-) : 
- (
+        {conversationId ? (
+          <ChatBox
+            conversationId={conversationId}
+            utilisateur={displayedUser}
+            onBack={handleBack}
+          />
+        ) : (
           <div className="no-conversation">
             <p>Sélectionne une conversation</p>
           </div>
