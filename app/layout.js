@@ -1,4 +1,5 @@
-import "../app/globals.css";
+// app/layout.jsx (ou app/layout.js)
+import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
@@ -43,28 +44,20 @@ export default function RootLayout({ children }) {
           <ClientWrapper>
             <ConditionalNavbar />
             <HeartbeatClient intervalMs={60_000} />
+
+            {/* 📲 Bannière "Télécharger l’app" → dans le contexte client */}
+            <InstallAppBanner />
+
             {children}
             <Footer />
             <BandeauCookies />
+
+            {/* 🔔 Notifications toast */}
+            <ToastProvider />
           </ClientWrapper>
         </AuthProvider>
 
-        {/* ✅ Bannière "Télécharger l’app" pour Android mobile */}
-        <InstallAppBanner />
-
-        {/* ✅ Notifications toast */}
-        <ToastContainer
-          position="top-right"
-          autoClose={4000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="dark"
-        />
-
-        {/* ✅ Analytics Vercel */}
+        {/* 📊 Analytics Vercel */}
         <Analytics />
 
         {/* ✅ Script Metricool (à garder en bas du body) */}
@@ -85,6 +78,6 @@ export default function RootLayout({ children }) {
           `}
         </Script>
       </body>
-    </html>
+    </html>   
   );
 }
