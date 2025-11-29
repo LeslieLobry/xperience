@@ -19,6 +19,24 @@
   background: transparent;
   border: 1px #e0c084 solid;
 }
+.call-timer-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 25px;
+  text-align: center;
+  font-weight: 500;
+  color: #7d5d2a;
+  font-size: 1.1em;
+  z-index: 20;
+  letter-spacing: 1px;
+}
+
+.typing-notif {
+  color: #888;
+  font-style: italic;
+  margin: 0 0 4px 8px;
+}
 
 .chat-participants {
   display: flex;

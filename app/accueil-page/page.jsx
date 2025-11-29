@@ -11,14 +11,14 @@ import DerniersEvenements from "../../components/DerniersEvenements/DerniersEven
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
 
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic"; // ✅ renommé
 import { Suspense } from "react";
 import "./accueil.css";
 
 /* --------------------------------------------------------------------------
-   🔍 Recherche : gros composant client → dynamic + client-only (SANS JSX ici)
+   🔍 Recherche : gros composant client → dynamic + client-only
    -------------------------------------------------------------------------- */
-const RechercheWrapper = dynamic(
+const RechercheWrapper = nextDynamic(
   () => import("../../components/RechercheWrapper/RechercheWrapper"),
   { ssr: false }
 );
