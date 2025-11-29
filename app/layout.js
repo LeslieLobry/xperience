@@ -1,32 +1,24 @@
-import "./globals.css";
+import "../app/globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
-import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
-import ToastProvider from "../components/ToastProvider";
-
-// 🔹 Import direct des composants client
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
+import { Analytics } from "@vercel/analytics/next";
+import { ToastContainer } from "react-toastify";
+import Script from "next/script";
+import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
 
-// 🔹 Fonts
-const allura = Allura({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-allura",
-});
-
+const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-raleway",
 });
 
-// 🔹 SEO / favicon / PWA
 export const metadata = {
   title: "Xperiences",
   description: "Site échangiste, libertinage",
@@ -50,29 +42,32 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ClientWrapper>
             <ConditionalNavbar />
-
-            {/* 🔁 Heartbeat → client-only */}
             <HeartbeatClient intervalMs={60_000} />
-
             {children}
-
             <Footer />
-
-            {/* 🍪 Bandeau cookies → client-only */}
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
 
-        {/* 📲 Bannière "Télécharger l’app" */}
+        {/* ✅ Bannière "Télécharger l’app" pour Android mobile */}
         <InstallAppBanner />
 
-        {/* 🔔 Notifications toast */}
-        <ToastProvider />
+        {/* ✅ Notifications toast */}
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="dark"
+        />
 
-        {/* 📊 Analytics Vercel */}
+        {/* ✅ Analytics Vercel */}
         <Analytics />
 
-        {/* 📈 Script Metricool (en bas du body) */}
+        {/* ✅ Script Metricool (à garder en bas du body) */}
         <Script id="metricool" strategy="afterInteractive">
           {`
             function loadScript(a){
