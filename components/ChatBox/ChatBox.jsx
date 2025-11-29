@@ -218,20 +218,34 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       })
       .catch(() => setPrenomsCouple(null));
   }, [conversationId, utilisateur.type]);
+// 🔁 Quand la conversation change, on reset l'état de scroll
+useEffect(() => {
+  setLoadingInitial(true);
+  lastMsgIdRef.current = null;
+  skipNextAutoScrollRef.current = false;
+}, [conversationId]);
 
-  /* --------------------- Fin du chargement initial ---------------------- */
-  useEffect(() => {
-    if (messages.length) setLoadingInitial(false);
-  }, [messages.length]);
+// --------------------- Scroll initial quand les messages sont là ----------------------
+useEffect(() => {
+  if (!messages?.length || !loadingInitial) return;
 
-  /* --------------------- Scroll initial quand la conv change ---------------------- */
-  useEffect(() => {
-    if (messages?.length) {
-      scrollToBottom(false);
-      lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, loadingInitial]);
+  const lastMsg = messages[messages.length - 1];
+
+  // ⚠️ Si les messages sont encore ceux de l’ancienne conversation, on ignore
+  if (
+    lastMsg?.conversationId &&
+    Number(lastMsg.conversationId) !== Number(conversationId)
+  ) {
+    return;
+  }
+
+  // On force le scroll en bas SANS animation quand on ouvre la conversation
+  scrollToBottom(false);
+  lastMsgIdRef.current = lastMsg?.id || null;
+
+  // On considère que le chargement initial est terminé pour CETTE conversation
+  setLoadingInitial(false);
+}, [messages, loadingInitial, conversationId]);
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
