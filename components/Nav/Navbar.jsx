@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../public/images/logo.png";
 import { LogIn } from "lucide-react";
@@ -23,13 +23,17 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const router = useRouter();
+  const pathname = usePathname();
+
   const menuRef = useRef();
   const popupRef = useRef();
-  const [unreadCount, setUnreadCount] = useState(0);
 
   // ➡️ AVATAR PRESIGNED URL
   const [presignedPhoto, setPresignedPhoto] = useState("/default.jpg");
+
   useEffect(() => {
     async function loadPresigned() {
       if (!localUser?.photoUrl) {
@@ -55,6 +59,7 @@ export default function Navbar() {
     loadPresigned();
   }, [localUser?.photoUrl]);
 
+  // 🔹 Messages non lus
   const fetchUnreadMessages = async () => {
     try {
       const res = await fetch("/api/messages/nonlus", {
@@ -63,21 +68,34 @@ export default function Navbar() {
       });
       if (res.ok) {
         const data = await res.json();
-        setUnreadCount(data.length);
+        setUnreadCount(Array.isArray(data) ? data.length : 0);
       }
     } catch (err) {
       console.error("Erreur fetch unread messages", err);
     }
   };
 
-  useEffect(() => {
-    if (localUser) fetchUnreadMessages();
-  }, [localUser]);
-
+  // Quand l'utilisateur change, on le recopie en local
   useEffect(() => {
     setLocalUser(user);
   }, [user]);
 
+  // 👉 Met à jour le compteur selon la page
+  useEffect(() => {
+    if (!localUser) return;
+
+    // Sur la page messagerie : tout est considéré comme lu côté front
+    if (pathname === "/messagerie") {
+      setUnreadCount(0);
+      return;
+    }
+
+    // Sur les autres pages : on récupère le vrai nombre non lu
+    fetchUnreadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localUser, pathname]);
+
+  // fermer menus si clic à l'extérieur
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popupRef.current && !popupRef.current.contains(event.target)) {
@@ -105,6 +123,7 @@ export default function Navbar() {
     }
   };
 
+  // 🔹 Notifications (visites, etc.)
   const fetchNotifications = async () => {
     try {
       const res = await fetch("/api/notifications", {
