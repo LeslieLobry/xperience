@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../public/images/logo.png";
 import { LogIn } from "lucide-react";
+import { Realtime } from "ably"; // ✅ Ably côté client
 import "../Nav/Navbar.css";
 
 const navLinks = [
@@ -15,6 +16,23 @@ const navLinks = [
   { label: "Blog", href: "/blog" },
   { label: "Nos partenaires", href: "/partenaires" },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* 🔗 Ably : singleton propre pour éviter plusieurs connexions                */
+/* -------------------------------------------------------------------------- */
+let ablyClient = null;
+
+function getAblyClient() {
+  if (ablyClient) return ablyClient;
+
+  ablyClient = new Realtime({
+    authUrl: "/api/ably-token", // ✅ tu l'as déjà côté backend
+    echoMessages: false,
+    transports: ["web_socket", "xhr_streaming", "xhr_polling"],
+  });
+
+  return ablyClient;
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -75,25 +93,95 @@ export default function Navbar() {
     }
   };
 
+  // 🔹 Notifications (visites, likes, nouveau message, etc.)
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+        setNotifCount(data.length); // si l'API renvoie seulement les non lues
+      }
+    } catch (err) {
+      console.error("Erreur fetch notifications", err);
+    }
+  };
+
   // Quand l'utilisateur change, on le recopie en local
   useEffect(() => {
     setLocalUser(user);
   }, [user]);
 
-  // 👉 Met à jour le compteur selon la page
+  /* ------------------------------------------------------------------------ */
+  /* 🔁 Sync propre : initial + Ably temps réel + petit fallback 60s          */
+  /* ------------------------------------------------------------------------ */
   useEffect(() => {
-    if (!localUser) return;
+    if (!localUser?.id) return;
 
-    // Sur la page messagerie : tout est considéré comme lu côté front
-    if (pathname === "/messagerie") {
-      setUnreadCount(0);
-      return;
+    let isCancelled = false;
+    let intervalId;
+    let channel;
+
+    const syncCounts = async () => {
+      if (isCancelled) return;
+
+      // On évite de poller si onglet pas visible (optimisation)
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+
+      try {
+        if (pathname === "/messagerie") {
+          // On considère les messages comme "vus" côté front
+          setUnreadCount(0);
+        } else {
+          await fetchUnreadMessages();
+        }
+        await fetchNotifications();
+      } catch (e) {
+        console.error("Erreur syncCounts Navbar :", e);
+      }
+    };
+
+    // 1️⃣ sync immédiat au montage / changement de page
+    syncCounts();
+
+    // 2️⃣ Ably : on écoute le canal notification-${userId}
+    try {
+      const client = getAblyClient();
+      channel = client.channels.get(`notification-${localUser.id}`);
+
+      channel.subscribe((msg) => {
+        // Peu importe le type de message (nouveau message, like, visite...)
+        // → on resynchronise les compteurs
+        // console.log("📩 Ably notif reçue Navbar:", msg.name, msg.data);
+        syncCounts();
+      });
+    } catch (e) {
+      console.error("Erreur Ably Navbar :", e);
     }
 
-    // Sur les autres pages : on récupère le vrai nombre non lu
-    fetchUnreadMessages();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localUser, pathname]);
+    // 3️⃣ petit fallback : resync toutes les 60s au cas où
+    intervalId = setInterval(syncCounts, 60000);
+
+    // 4️⃣ quand on revient sur l'onglet → resync direct
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncCounts();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      isCancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      if (channel) channel.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [localUser?.id, pathname]);
 
   // fermer menus si clic à l'extérieur
   useEffect(() => {
@@ -123,27 +211,6 @@ export default function Navbar() {
     }
   };
 
-  // 🔹 Notifications (visites, etc.)
-  const fetchNotifications = async () => {
-    try {
-      const res = await fetch("/api/notifications", {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data);
-        setNotifCount(data.length); // si l'API renvoie seulement les non lues
-      }
-    } catch (err) {
-      console.error("Erreur fetch notifications", err);
-    }
-  };
-
-  useEffect(() => {
-    if (localUser) fetchNotifications();
-  }, [localUser]);
-
   // 🔹 Marquer UNE notification comme lue
   const markNotificationRead = async (id) => {
     try {
@@ -168,10 +235,9 @@ export default function Navbar() {
     router.push(href);
   };
 
-  // 🔹 Compteur global pour le badge sur le burger
-  const burgerBadgeCount = (notifCount || 0) + (unreadCount || 0);
-  // 👉 Si tu ne veux QUE les notifications (sans les messages non lus) :
-  // const burgerBadgeCount = notifCount || 0;
+  // 🔹 Badge du burger : même comportement pour message / visite / like
+  // → tu génères déjà une notification pour un nouveau message
+  const burgerBadgeCount = notifCount || 0;
 
   return (
     <nav className="navbar">
