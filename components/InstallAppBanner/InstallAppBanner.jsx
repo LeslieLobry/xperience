@@ -8,8 +8,21 @@ const ANDROID_APP_URL =
   process.env.NEXT_PUBLIC_ANDROID_APP_URL ||
   "https://play.google.com/store/apps/details?id=fr.xperiences.app";
 
-// 🔹 on change la clé pour ignorer les anciens "fermés"
-const STORAGE_KEY = "xperiences_android_app_banner_dismissed_v2";
+// On stocke la date de fermeture en ms
+const STORAGE_KEY = "xperiences_android_app_banner_dismissed_ts";
+// Durée pendant laquelle on cache la bannière (1h ici)
+const DISMISS_DURATION_MS = 60 * 60 * 1000; // 1 heure
+
+function isAndroidMobile() {
+  if (typeof window === "undefined") return false;
+
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const isAndroid = /Android/i.test(ua);
+
+  console.log("[InstallAppBanner] UA =", ua, "isAndroid =", isAndroid);
+
+  return isAndroid;
+}
 
 export default function InstallAppBanner() {
   const [visible, setVisible] = useState(false);
@@ -17,25 +30,41 @@ export default function InstallAppBanner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    console.log("[InstallAppBanner DEBUG] mount, url =", ANDROID_APP_URL);
+    console.log("[InstallAppBanner] ANDROID_APP_URL =", ANDROID_APP_URL);
 
-    // 🔥 DEBUG : on ignore complètement Android / iPhone et on reset l'ancienne valeur
-    window.localStorage.removeItem("xperiences_android_app_banner_dismissed");
+    if (!ANDROID_APP_URL) {
+      console.warn(
+        "[InstallAppBanner] Pas d'URL Android définie. Vérifie NEXT_PUBLIC_ANDROID_APP_URL sur Vercel."
+      );
+      return;
+    }
 
-    const alreadyDismissed =
-      window.localStorage.getItem(STORAGE_KEY) === "1";
-    console.log("[InstallAppBanner DEBUG] alreadyDismissed =", alreadyDismissed);
+    // 🔹 Vérifie si la bannière a été fermée récemment
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const lastDismiss = Number(raw);
+      if (!Number.isNaN(lastDismiss)) {
+        const elapsed = Date.now() - lastDismiss;
+        console.log("[InstallAppBanner] elapsed since dismiss (ms) =", elapsed);
+        // Si < 1h -> on ne montre pas
+        if (elapsed < DISMISS_DURATION_MS) {
+          return;
+        }
+      }
+    }
 
-    if (!alreadyDismissed) {
-      setVisible(true); // ⬅️ on l'affiche TOUJOURS
+    // 🔹 On n'affiche que sur Android
+    if (isAndroidMobile()) {
+      setVisible(true);
     }
   }, []);
 
   const handleClose = () => {
     setVisible(false);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, "1");
-      console.log("[InstallAppBanner] bannière fermée, flag enregistré.");
+      // ⏱️ On enregistre le moment de fermeture
+      window.localStorage.setItem(STORAGE_KEY, String(Date.now()));
+      console.log("[InstallAppBanner] bannière fermée, timestamp enregistré.");
     }
   };
 
