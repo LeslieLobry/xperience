@@ -11,7 +11,7 @@ import Script from "next/script";
 import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
-import ToastProvider from "../components/ToastProvider/ToastProvider"; // ✅ NOUVEL IMPORT
+import ToastProvider from "../components/ToastProvider"; 
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
