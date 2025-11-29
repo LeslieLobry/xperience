@@ -46,16 +46,16 @@ export async function GET() {
       );
     }
 
-    // 🔥 Version SIMPLE : tous les derniers messages que tu as reçus,
-    // peu importe "lu" pour l’instant
-    const receivedMessages = await prisma.message.findMany({
+    // ✅ VRAIS messages non lus
+    const unreadMessages = await prisma.message.findMany({
       where: {
-        auteurId: { not: user.id },             // pas toi
+        lu: false,                  // <--- la clé
+        auteurId: { not: user.id }, // pas toi
         conversation: {
           participants: {
             some: {
-              utilisateurId: user.id,          // tu es dans la conversation
-              // supprime: false,              // tu pourras remettre le champ exact plus tard
+              utilisateurId: user.id, // tu es dans la conversation
+              // si tu as un champ "supprime" sur Participant, tu pourras le rajouter ici
             },
           },
         },
@@ -74,11 +74,11 @@ export async function GET() {
 
     console.log(
       "GET /api/messages/nonlus =>",
-      receivedMessages.length,
-      "messages (version simple)"
+      unreadMessages.length,
+      "messages (lu = false)"
     );
 
-    return NextResponse.json(receivedMessages);
+    return NextResponse.json(unreadMessages);
   } catch (error) {
     console.error("GET /api/messages/nonlus error:", error);
     return NextResponse.json(
