@@ -1,37 +1,47 @@
-import { PrismaClient } from "@prisma/client";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma"; // ⬅️ IMPORTANT : on importe le singleton
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
-async function getUserIdFromToken() {
+// Pas besoin d'async, on lit juste les cookies + JWT
+function getUserIdFromToken() {
   const token = cookies().get("token")?.value;
   if (!token) return null;
 
   try {
     const decoded = jwt.verify(token, secret);
-    return decoded?.id || null;
+    const id = decoded?.id;
+
+    if (!id) return null;
+
+    // On renvoie toujours un nombre
+    return typeof id === "number" ? id : parseInt(id, 10);
   } catch {
     return null;
   }
 }
 
 export async function PATCH(req, { params }) {
-  const userId = await getUserIdFromToken();
-  if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  const userId = getUserIdFromToken();
+  if (!userId) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
 
   const { id } = params;
   const { commentaire } = await req.json();
 
-  const avis = await prisma.avis.findUnique({ where: { id: parseInt(id) } });
+  const avisId = parseInt(id, 10);
+
+  const avis = await prisma.avis.findUnique({ where: { id: avisId } });
+
   if (!avis || avis.auteurId !== userId) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
   const updated = await prisma.avis.update({
-    where: { id: parseInt(id) },
+    where: { id: avisId },
     data: { commentaire },
   });
 
@@ -39,16 +49,21 @@ export async function PATCH(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
-  const userId = await getUserIdFromToken();
-  if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  const userId = getUserIdFromToken();
+  if (!userId) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
 
   const { id } = params;
+  const avisId = parseInt(id, 10);
 
-  const avis = await prisma.avis.findUnique({ where: { id: parseInt(id) } });
+  const avis = await prisma.avis.findUnique({ where: { id: avisId } });
+
   if (!avis || avis.auteurId !== userId) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
-  await prisma.avis.delete({ where: { id: parseInt(id) } });
+  await prisma.avis.delete({ where: { id: avisId } });
+
   return NextResponse.json({ success: true });
 }

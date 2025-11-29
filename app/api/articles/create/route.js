@@ -1,31 +1,39 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { slugify } from "../../../../lib/slugify";
+import { prisma } from "../../../../lib/prisma"; // ⬅️ IMPORTANT : on importe ton singleton
 
-const prisma = new PrismaClient();
 const secret = process.env.JWT_SECRET;
 
 export async function POST(req) {
-  const cookieStore = await cookies(); // ✅
+  const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
 
   if (!token) {
-    return NextResponse.json({ success: false, message: "Non authentifié." }, { status: 401 });
+    return NextResponse.json(
+      { success: false, message: "Non authentifié." },
+      { status: 401 }
+    );
   }
 
   let decoded;
   try {
     decoded = jwt.verify(token, secret);
   } catch {
-    return NextResponse.json({ success: false, message: "Token invalide." }, { status: 403 });
+    return NextResponse.json(
+      { success: false, message: "Token invalide." },
+      { status: 403 }
+    );
   }
 
   const { titre, description, contenu, images } = await req.json();
 
   if (!titre || !contenu) {
-    return NextResponse.json({ success: false, message: "Titre et contenu requis." }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: "Titre et contenu requis." },
+      { status: 400 }
+    );
   }
 
   const slug = slugify(titre);
@@ -37,7 +45,7 @@ export async function POST(req) {
         slug,
         description,
         contenu,
-        auteurId: parseInt(decoded.id), // ✅ Sécurité ici
+        auteurId: parseInt(decoded.id),
       },
     });
 
@@ -53,6 +61,9 @@ export async function POST(req) {
     return NextResponse.json({ success: true, article });
   } catch (err) {
     console.error("Erreur création article :", err);
-    return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Erreur serveur." },
+      { status: 500 }
+    );
   }
 }
