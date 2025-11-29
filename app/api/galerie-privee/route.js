@@ -1,50 +1,43 @@
 import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs"; // 🔐 Pour hasher le code
+import { getUserFromToken } from "../../../lib/auth"; // adapte le chemin à ton projet
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { nom, codeAcces, utilisateurId } = body;
-
-    // ✅ Vérification des champs obligatoires
-    if (!nom || !codeAcces || !utilisateurId) {
+    const user = await getUserFromToken();
+    if (!user) {
       return NextResponse.json(
-        { error: "Données manquantes." },
-        { status: 400 }
+        { error: "Non authentifié." },
+        { status: 401 }
       );
     }
 
-    // 🔍 Vérifie s’il existe déjà une galerie pour cet utilisateur
-    const existing = await prisma.galeriePrivee.findFirst({
-      where: { utilisateurId },
+    const body = await req.json().catch(() => ({}));
+    const { nom } = body; // optionnel
+
+    // 🔍 Cherche si une galerie existe déjà pour cet utilisateur
+    let galerie = await prisma.galeriePrivee.findFirst({
+      where: { utilisateurId: user.id },
     });
 
-    if (existing) {
-      return NextResponse.json(
-        { error: "Une galerie privée existe déjà pour cet utilisateur." },
-        { status: 400 }
-      );
+    if (!galerie) {
+      // ✅ Création si elle n'existe pas encore
+      galerie = await prisma.galeriePrivee.create({
+        data: {
+          nom: nom || "Galerie privée",
+          utilisateurId: user.id,
+          // si ton modèle a encore `codeAcces` en optionnel :
+          // codeAcces: null,
+        },
+      });
     }
 
-    // 🔐 Hash du code d'accès
-    const hashedCode = await bcrypt.hash(codeAcces, 10);
-
-    // ✅ Création de la galerie avec code hashé
-    const galerie = await prisma.galeriePrivee.create({
-      data: {
-        nom,
-        codeAcces: hashedCode,
-        utilisateurId,
-      },
-    });
-
-    return NextResponse.json(galerie, { status: 201 });
-
+    // 🔁 On renvoie toujours la galerie (existante ou nouvellement créée)
+    return NextResponse.json(galerie, { status: 200 });
   } catch (err) {
-    console.error("Erreur création galerie privée:", err);
+    console.error("Erreur création/recup galerie privée:", err);
     return NextResponse.json(
-      { error: "Erreur serveur lors de la création." },
+      { error: "Erreur serveur lors de la création de la galerie." },
       { status: 500 }
     );
   }
