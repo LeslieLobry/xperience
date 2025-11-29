@@ -165,6 +165,12 @@ export default function RegisterForm() {
   const prevStep = () => setStep((s) => s - 1);
 
   const isValidName = (name) => /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
+const isPseudoEmailLike = (pseudo) => {
+  if (!pseudo) return false;
+  // ✅ Regex simple pour détecter un format email
+  const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+  return emailRegex.test(pseudo);
+};
 
   // --- Photo obligatoire + coordonnées monde ---
   const validateStep = () => {
@@ -174,6 +180,9 @@ export default function RegisterForm() {
         return setError("Merci de remplir tous les champs requis."), false;
       if (!isValidName(nom) || !isValidName(prenom))
         return setError("Le nom et le prénom doivent contenir uniquement des lettres."), false;
+      
+  if (isPseudoEmailLike(pseudo))
+    return setError("Votre pseudo ne peut pas contenir d'adresse email."), false;
       if (password !== confirmPassword)
         return setError("Les mots de passe ne correspondent pas."), false;
       if (!isPasswordStrong(password))
