@@ -1,4 +1,4 @@
-// app/layout.jsx (ou app/layout.js)
+// app/layout.jsx
 import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
@@ -7,11 +7,11 @@ import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 import { Analytics } from "@vercel/analytics/next";
-import { ToastContainer } from "react-toastify";
 import Script from "next/script";
 import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
+import ToastProvider from "../components/ToastProvider/ToastProvider"; // ✅ NOUVEL IMPORT
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -45,14 +45,14 @@ export default function RootLayout({ children }) {
             <ConditionalNavbar />
             <HeartbeatClient intervalMs={60_000} />
 
-            {/* 📲 Bannière "Télécharger l’app" → dans le contexte client */}
+            {/* 📲 Bannière "Télécharger l’app" → composant client */}
             <InstallAppBanner />
 
             {children}
             <Footer />
             <BandeauCookies />
 
-            {/* 🔔 Notifications toast */}
+            {/* 🔔 Notifications toast (dans un composant client dédié) */}
             <ToastProvider />
           </ClientWrapper>
         </AuthProvider>
@@ -78,6 +78,6 @@ export default function RootLayout({ children }) {
           `}
         </Script>
       </body>
-    </html>   
+    </html>
   );
 }
