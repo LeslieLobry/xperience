@@ -59,7 +59,7 @@
   padding: 4px 8px;
 }
   
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   /* Option : cacher la bannière sur desktop/tablette large */
   .banner {
     display: none;
