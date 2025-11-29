@@ -5,10 +5,12 @@ import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import { Analytics } from "@vercel/analytics/next";
+import { ToastContainer } from "react-toastify";
 import Script from "next/script";
+import "react-toastify/dist/ReactToastify.css";
 import dynamic from "next/dynamic";
 
-// 🔹 Composants chargés côté client uniquement (pas au 1er rendu serveur)
+// 🔹 Ces composants sont chargés côté client uniquement (lazy)
 const BandeauCookies = dynamic(
   () => import("../components/BandeauCookies/BandeauCookies"),
   { ssr: false }
@@ -24,12 +26,6 @@ const InstallAppBanner = dynamic(
   { ssr: false }
 );
 
-const ToastProvider = dynamic(
-  () => import("../components/ToastProvider"),
-  { ssr: false }
-);
-
-// ⚠️ optionnel : on pourrait ajouter "variable" ici, mais je ne touche pas pour l’instant
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
   subsets: ["latin"],
@@ -61,28 +57,37 @@ export default function RootLayout({ children }) {
           <ClientWrapper>
             <ConditionalNavbar />
 
-            {/* 🔁 Heartbeat chargé côté client */}
+            {/* 🔁 Heartbeat → client-only */}
             <HeartbeatClient intervalMs={60_000} />
 
             {children}
 
             <Footer />
 
-            {/* 🍪 Bandeau cookies lazy client */}
+            {/* 🍪 Bandeau cookies → client-only */}
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
 
-        {/* 📲 Bannière install app (client-only) */}
+        {/* 📲 Bannière "Télécharger l’app" → client-only */}
         <InstallAppBanner />
 
-        {/* 🔔 Toasts (client-only) */}
-        <ToastProvider />
+        {/* 🔔 Notifications toast */}
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="dark"
+        />
 
         {/* 📊 Analytics Vercel */}
         <Analytics />
 
-        {/* 📈 Script Metricool */}
+        {/* 📈 Script Metricool (en bas du body) */}
         <Script id="metricool" strategy="afterInteractive">
           {`
             function loadScript(a){
