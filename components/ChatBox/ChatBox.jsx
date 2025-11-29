@@ -95,29 +95,15 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   };
 
   // 🔧 scrollToBottom plus robuste, qui cible PRIORITAIREMENT la div de MessagesList
-  const scrollToBottom = (smooth = true) => {
-    const behavior = smooth ? "smooth" : "auto";
+const scrollToBottom = (smooth = true) => {
+  if (!messagesEndRef.current) return;
 
-    const doScroll = () => {
-      const el = messagesContainerRef.current;
-      if (el && typeof el.scrollTo === "function") {
-        el.scrollTo({
-          top: el.scrollHeight,
-          behavior,
-        });
-      } else if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({
-          behavior,
-          block: "end",
-        });
-      }
-    };
+  messagesEndRef.current.scrollIntoView({
+    behavior: smooth ? "smooth" : "auto",
+    block: "end",
+  });
+};
 
-    // plusieurs passes pour être sûr que le layout est OK
-    doScroll();
-    requestAnimationFrame(doScroll);
-    setTimeout(doScroll, 80);
-  };
 
   const {
     messages,
