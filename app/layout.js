@@ -4,14 +4,32 @@ import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
-import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 import { Analytics } from "@vercel/analytics/next";
-import { ToastContainer } from "react-toastify";
 import Script from "next/script";
-import "react-toastify/dist/ReactToastify.css";
-import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
-import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
+import dynamic from "next/dynamic";
 
+// 🔹 Composants chargés côté client uniquement (pas au 1er rendu serveur)
+const BandeauCookies = dynamic(
+  () => import("../components/BandeauCookies/BandeauCookies"),
+  { ssr: false }
+);
+
+const HeartbeatClient = dynamic(
+  () => import("../components/HeartbeatClient/HeartbeatClient"),
+  { ssr: false }
+);
+
+const InstallAppBanner = dynamic(
+  () => import("../components/InstallAppBanner/InstallAppBanner"),
+  { ssr: false }
+);
+
+const ToastProvider = dynamic(
+  () => import("../components/ToastProvider"),
+  { ssr: false }
+);
+
+// ⚠️ optionnel : on pourrait ajouter "variable" ici, mais je ne touche pas pour l’instant
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
   subsets: ["latin"],
@@ -42,32 +60,29 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ClientWrapper>
             <ConditionalNavbar />
+
+            {/* 🔁 Heartbeat chargé côté client */}
             <HeartbeatClient intervalMs={60_000} />
+
             {children}
+
             <Footer />
+
+            {/* 🍪 Bandeau cookies lazy client */}
             <BandeauCookies />
           </ClientWrapper>
         </AuthProvider>
 
-        {/* ✅ Bannière "Télécharger l’app" pour Android mobile */}
+        {/* 📲 Bannière install app (client-only) */}
         <InstallAppBanner />
 
-        {/* ✅ Notifications toast */}
-        <ToastContainer
-          position="top-right"
-          autoClose={4000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="dark"
-        />
+        {/* 🔔 Toasts (client-only) */}
+        <ToastProvider />
 
-        {/* ✅ Analytics Vercel */}
+        {/* 📊 Analytics Vercel */}
         <Analytics />
 
-        {/* ✅ Script Metricool (à garder en bas du body) */}
+        {/* 📈 Script Metricool */}
         <Script id="metricool" strategy="afterInteractive">
           {`
             function loadScript(a){
