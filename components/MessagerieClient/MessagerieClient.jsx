@@ -1,100 +1,119 @@
 "use client";
 
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import ListeConversations from "../ListeConversations/ListeConversations";
 import dynamic from "next/dynamic";
+
 import "../../app/messagerie/messagerie.css";
 import "./MessagerieClient.css";
 
+/* ---------------------------------------------------------------------------
+   🔹 Dynamic imports pour charger les gros blocs en différé
+   --------------------------------------------------------------------------- */
 const ChatBox = dynamic(() => import("../ChatBox/ChatBox"), {
   ssr: false,
   loading: () => <p>Chargement du chat...</p>,
 });
 
-// HOOK pour détecter le mobile
+const ListeConversations = dynamic(
+  () => import("../ListeConversations/ListeConversations"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="messagerie-loading">
+        Chargement des conversations...
+      </div>
+    ),
+  }
+);
+
+/* ---------------------------------------------------------------------------
+   🔹 Hook pour savoir si on est sur mobile
+   --------------------------------------------------------------------------- */
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" && window.innerWidth < breakpoint
   );
+
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < breakpoint);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, [breakpoint]);
+
   return isMobile;
 }
 
+/* ---------------------------------------------------------------------------
+   🔹 Composant principal
+   --------------------------------------------------------------------------- */
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
-  const [conversationId, setConversationId] = useState(null);
-
   const { user: currentUser, refreshUser, loading } = useAuth();
 
+  // ⚡ On ne rafraîchit l'utilisateur QUE si on n'a rien du tout
   useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
-
-  // Source de vérité = URL
-  useEffect(() => {
-    const id = searchParams.get("conversationId");
-    if (id && !isNaN(Number(id))) {
-      setConversationId(Number(id));
-    } else {
-      setConversationId(null);
+    if (!currentUser && !user && !loading) {
+      refreshUser();
     }
-  }, [searchParams]);
-
-  // Si on est exactement sur /messagerie, on force l'ID à null
-  useEffect(() => {
-    if (pathname === "/messagerie") {
-      setConversationId(null);
-    }
-  }, [pathname]);
-
-  // --- MOBILE/RESPONSIVE LOGIC ---
-  const isMobile = useIsMobile(900);
-
-  // Navigation = met à jour l'URL et le state
-  const handleSelectConversation = (id) => {
-    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
-    setConversationId(id);
-  };
-
-  const handleBack = () => {
-    // Revient explicitement à la LISTE (pas back())
-    router.push(`/messagerie`, { scroll: false });
-    setConversationId(null);
-  };
+  }, [currentUser, user, loading, refreshUser]);
 
   const displayedUser = currentUser ?? user;
 
-  if (loading || !displayedUser?.id) {
+  const isMobile = useIsMobile(900);
+
+  // ✅ Source de vérité unique : l'URL
+  const conversationId = useMemo(() => {
+    if (pathname === "/messagerie") return null;
+    const id = searchParams.get("conversationId");
+    if (!id || isNaN(Number(id))) return null;
+    return Number(id);
+  }, [searchParams, pathname]);
+
+  // Navigation = met à jour l'URL (et donc conversationId automatiquement)
+  const handleSelectConversation = (id) => {
+    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
+  };
+
+  const handleBack = () => {
+    router.push(`/messagerie`, { scroll: false });
+  };
+
+  if (loading && !displayedUser?.id) {
     return (
-      <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
-        Chargement messagerie...
+      <div className="messagerie-loading">
+        Chargement de la messagerie...
       </div>
     );
   }
 
-// --- MOBILE VIEW ---
-if (isMobile) {
-  if (!conversationId) {
+  if (!displayedUser?.id) {
     return (
-      <div className="messagerie-mobile-list">
-        <ListeConversations
-          userId={displayedUser.id}
-          onSelectConversation={handleSelectConversation}
-          selectedId={conversationId}
-          autoSelectFirst={false}   // ⬅️ AJOUTE ÇA
-        />
+      <div className="messagerie-loading">
+        Impossible de charger la messagerie.
       </div>
     );
-  } else {
+  }
+
+  /* ------------------------ VUE MOBILE ------------------------ */
+  if (isMobile) {
+    if (!conversationId) {
+      return (
+        <div className="messagerie-mobile-list">
+          <ListeConversations
+            userId={displayedUser.id}
+            onSelectConversation={handleSelectConversation}
+            selectedId={conversationId}
+            autoSelectFirst={false}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="messagerie-mobile-chat">
         <ChatBox
@@ -105,26 +124,24 @@ if (isMobile) {
       </div>
     );
   }
-}
 
-
-  // --- DESKTOP VIEW ---
+  /* ------------------------ VUE DESKTOP ------------------------ */
   return (
     <div className="messagerie-page">
-    <ListeConversations
-  userId={displayedUser.id}
-  onSelectConversation={handleSelectConversation}
-  selectedId={conversationId}
-  className="liste-conversations"
-  autoSelectFirst={false}   // << important
-/>
+      <ListeConversations
+        userId={displayedUser.id}
+        onSelectConversation={handleSelectConversation}
+        selectedId={conversationId}
+        className="liste-conversations"
+        autoSelectFirst={false}
+      />
 
       <div className="chat-section">
         {conversationId ? (
           <ChatBox
             conversationId={conversationId}
             utilisateur={displayedUser}
-            onBack={handleBack} // <-- passe onBack aussi sur desktop
+            onBack={handleBack}
           />
         ) : (
           <div className="no-conversation">

@@ -16,23 +16,17 @@ import { Suspense } from "react";
 import "./accueil.css";
 
 /* --------------------------------------------------------------------------
-   🔍 Recherche : gros composant client → dynamic + client-only
+   🔍 Recherche : gros composant client → dynamic + client-only (SANS JSX ici)
    -------------------------------------------------------------------------- */
 const RechercheWrapper = dynamic(
   () => import("../../components/RechercheWrapper/RechercheWrapper"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="recherche-loading">Chargement de la recherche...</div>
-    ),
-  }
+  { ssr: false }
 );
 
 /* --------------------------------------------------------------------------
    👥 Section profils : server component autonome + Suspense
    -------------------------------------------------------------------------- */
 async function ProfilsSection({ userId }) {
-  // On calcule les exclus ici, pas dans la page principale
   const exclusPromise = getIdsUtilisateursExclus(userId);
 
   return (
@@ -87,8 +81,6 @@ async function EvenementsSection() {
 
 /* --------------------------------------------------------------------------
    🚀 Page d’accueil : hyper légère
-   - auth + redirection
-   - tout le reste est streamé / chargé en morceaux
    -------------------------------------------------------------------------- */
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -103,8 +95,18 @@ export default async function AccueilPage() {
       <LoaderAnnonce />
 
       <div className="grid-accueil">
-        {/* 🔍 Recherche : client-only, charge vite avec un petit loader */}
-        <RechercheWrapper />
+        {/* 🔍 Recherche : client-only, avec Suspense pour le loader */}
+        <div className="accueil-recherche">
+          <Suspense
+            fallback={
+              <div className="recherche-loading">
+                Chargement de la recherche...
+              </div>
+            }
+          >
+            <RechercheWrapper />
+          </Suspense>
+        </div>
 
         {/* 👥 Profils : stream + fallback */}
         <div className="profil-list1">

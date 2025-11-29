@@ -29,6 +29,12 @@
   color: #666;
 }
 
+.messagerie-loading {
+  text-align: center;
+  margin-top: 40px;
+  color: #b89760;
+}
+
 /* Responsive mobile */
 @media screen and (width <= 768px) {
   .messagerie-page {
