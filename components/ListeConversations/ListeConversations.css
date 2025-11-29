@@ -19,7 +19,10 @@
   font-weight: bold;
   margin-bottom: 0.5rem;
 }
-
+.rename-conv-button{
+  border: none;
+  background: none;
+}
 .new-conv-button {
   background-color: transparent;
   border: 1px solid #e0c084;
