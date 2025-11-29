@@ -15,20 +15,41 @@ export async function GET(req, { params }) {
       );
     }
 
-    const galerie = await prisma.galeriePrivee.findUnique({
+    let galerie = await prisma.galeriePrivee.findUnique({
       where: { utilisateurId },
       include: { photos: { select: { id: true, url: true } } },
     });
 
-    // 🔹 Pas de galerie => pas de 404, juste "none"
+    // 🔹 1) PAS DE GALERIE
     if (!galerie) {
+      // → si c'est le propriétaire qui regarde, on la crée automatiquement
+      if (visiteurId && visiteurId === utilisateurId) {
+        galerie = await prisma.galeriePrivee.create({
+          data: {
+            utilisateurId,
+            nom: "Galerie privée",
+          },
+          include: { photos: { select: { id: true, url: true } } },
+        });
+
+        return NextResponse.json(
+          {
+            access: "granted",
+            photos: galerie.photos,
+            galerieId: galerie.id,
+          },
+          { status: 200 }
+        );
+      }
+
+      // → sinon, simple "none"
       return NextResponse.json(
         { access: "none", photos: [], galerieId: null },
         { status: 200 }
       );
     }
 
-    // 🔹 Le propriétaire voit toujours sa galerie
+    // 🔹 2) GALERIE EXISTANTE — propriétaire
     if (visiteurId && visiteurId === utilisateurId) {
       return NextResponse.json(
         {
@@ -40,7 +61,7 @@ export async function GET(req, { params }) {
       );
     }
 
-    // 🔹 Visiteur ≠ propriétaire → on regarde la demande d'accès
+    // 🔹 3) GALERIE EXISTANTE — visiteur ≠ propriétaire : on vérifie la demande d'accès
     const demande = visiteurId
       ? await prisma.demandeAcces.findUnique({
           where: {
@@ -73,7 +94,7 @@ export async function GET(req, { params }) {
       );
     }
 
-    // 🔹 DEMANDE ACCEPTÉE
+    // 🔹 4) DEMANDE ACCEPTÉE
     return NextResponse.json(
       { access: "granted", photos: galerie.photos, galerieId: galerie.id },
       { status: 200 }
