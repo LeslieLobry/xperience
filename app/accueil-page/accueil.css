@@ -129,7 +129,10 @@ ease;
     flex-direction: column;
   }
   .grid-profil {
-    grid-template-columns: 1fr 1fr !important;
+    display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        justify-content: center;
   }
 
 }
