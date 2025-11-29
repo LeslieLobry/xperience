@@ -2,6 +2,8 @@ import { prisma } from "../../lib/prisma";
 import ProfilsDisplay from "../ProfilsDisplay/ProfilsDisplay";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 
+const PAGE_SIZE = 20;
+
 export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
   const userIdInt = Number(userId);
 
@@ -50,11 +52,16 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
       statut: true,
       type: true,
     },
-    // tri indexable facilement (crééAt ou id)
-    orderBy: { createdAt: "desc" },
-    // ⚠️ tu peux jouer sur ce chiffre pour accélérer encore plus
-    take: 20,
+    // 🔁 Idem que ta route /api/profils (id desc) pour éviter les doublons
+    orderBy: { id: "desc" },
+    take: PAGE_SIZE,
   });
 
-  return <ProfilsDisplay profils={profils} afficherPlus={true} />;
+  return (
+    <ProfilsDisplay
+      profils={profils}
+      afficherPlus={true}
+      pageSize={PAGE_SIZE}
+    />
+  );
 }
