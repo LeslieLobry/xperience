@@ -137,13 +137,15 @@ export default function MessagerieClient({ user }) {
       />
 
       <div className="chat-section">
-        {conversationId ? (
-          <ChatBox
-            conversationId={conversationId}
-            utilisateur={displayedUser}
-            onBack={handleBack}
-          />
-        ) : (
+    {conversationId ? (
+  <ChatBox
+    key={conversationId}   // ⬅️ important
+    conversationId={conversationId}
+    utilisateur={displayedUser}
+    onBack={handleBack}
+  />
+) : 
+ (
           <div className="no-conversation">
             <p>Sélectionne une conversation</p>
           </div>
