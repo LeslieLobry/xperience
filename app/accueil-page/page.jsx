@@ -10,21 +10,13 @@ import DerniersArticles from "../../components/DerniersArticles/DerniersArticles
 import DerniersEvenements from "../../components/DerniersEvenements/DerniersEvenements";
 import RappelVerification from "../../components/RappelVerification/RappelVerification";
 import LoaderAnnonce from "../../components/LoaderAnnonce/LoaderAnnonce";
+import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper"; // ✅ import direct
 
-import nextDynamic from "next/dynamic"; // ✅ renommé
 import { Suspense } from "react";
 import "./accueil.css";
 
 /* --------------------------------------------------------------------------
-   🔍 Recherche : gros composant client → dynamic + client-only
-   -------------------------------------------------------------------------- */
-const RechercheWrapper = nextDynamic(
-  () => import("../../components/RechercheWrapper/RechercheWrapper"),
-  { ssr: false }
-);
-
-/* --------------------------------------------------------------------------
-   👥 Section profils : server component autonome + Suspense
+   👥 Section profils : server component autonome
    -------------------------------------------------------------------------- */
 async function ProfilsSection({ userId }) {
   const exclusPromise = getIdsUtilisateursExclus(userId);
@@ -54,7 +46,7 @@ async function ArticlesSection() {
 }
 
 /* --------------------------------------------------------------------------
-   📅 Section événements : idem, mais filtré côté serveur
+   📅 Section événements : filtrés côté serveur
    -------------------------------------------------------------------------- */
 async function EvenementsSection() {
   const evenementsRaw = await prisma.evenement.findMany({
@@ -80,7 +72,7 @@ async function EvenementsSection() {
 }
 
 /* --------------------------------------------------------------------------
-   🚀 Page d’accueil : hyper légère
+   🚀 Page d’accueil
    -------------------------------------------------------------------------- */
 export default async function AccueilPage() {
   const user = await getUserFromToken();
@@ -88,30 +80,25 @@ export default async function AccueilPage() {
     return redirect("/connexion");
   }
 
+  const userId = Number(user.id);
+
   return (
     <div className="accueil-page">
       {user.verificationIdentiteStatut !== true && <RappelVerification />}
 
+      {/* Loader global (annonce) */}
       <LoaderAnnonce />
 
       <div className="grid-accueil">
-        {/* 🔍 Recherche : client-only, avec Suspense pour le loader */}
+        {/* 🔍 Recherche : composant client importé directement */}
         <div className="accueil-recherche">
-          <Suspense
-            fallback={
-              <div className="recherche-loading">
-                Chargement de la recherche...
-              </div>
-            }
-          >
-            <RechercheWrapper />
-          </Suspense>
+          <RechercheWrapper userId={userId} />
         </div>
 
-        {/* 👥 Profils : stream + fallback */}
+        {/* 👥 Profils */}
         <div className="profil-list1">
           <Suspense fallback={<p>Chargement des profils...</p>}>
-            <ProfilsSection userId={user.id} />
+            <ProfilsSection userId={userId} />
           </Suspense>
         </div>
 

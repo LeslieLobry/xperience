@@ -375,15 +375,27 @@ export async function POST(req) {
     );
   }
 }
-
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const conversationId = parseInt(searchParams.get("conversationId") || "", 10);
+    const conversationId = parseInt(
+      searchParams.get("conversationId") || "",
+      10
+    );
     const beforeId = searchParams.get("beforeId");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 50);
+    const limit = Math.min(
+      parseInt(searchParams.get("limit") || "30", 10),
+      50
+    );
 
     console.log("[LOG][GET] params:", { conversationId, beforeId, limit });
+
+    if (!conversationId || Number.isNaN(conversationId)) {
+      return NextResponse.json(
+        { success: false, message: "conversationId manquant" },
+        { status: 400 }
+      );
+    }
 
     const user = await getUserFromToken();
     if (!user) {
@@ -395,6 +407,7 @@ export async function GET(req) {
     }
     const auteurId = user.id;
 
+    // Participants + droits
     const allParticipants = await prisma.participant.findMany({
       where: { conversationId },
       select: {
@@ -427,13 +440,16 @@ export async function GET(req) {
       );
     }
 
-    const messages = await prisma.message.findMany({
-      where: {
-        conversationId,
-        ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
-      },
+    // 🔥 Pagination : on prend limit + 1 pour savoir s'il reste des messages
+    const where = {
+      conversationId,
+      ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
+    };
+
+    const rows = await prisma.message.findMany({
+      where,
       orderBy: { id: "desc" },
-      take: limit,
+      take: limit + 1, // <= important
       select: {
         id: true,
         contenu: true,
@@ -459,12 +475,19 @@ export async function GET(req) {
         },
       },
     });
-    messages.reverse(); // Chronologique
 
-    console.log(
-      "[LOG][GET] messages count:",
-      messages.length
-    );
+    let hasMore = false;
+    let messages = rows;
+
+    if (rows.length > limit) {
+      hasMore = true;
+      messages = rows.slice(0, limit);
+    }
+
+    // On renvoie au front en ordre chronologique (ancien -> récent)
+    messages.reverse();
+
+    console.log("[LOG][GET] messages count:", messages.length);
     console.log(
       "[LOG][GET] tail sample:",
       messages.slice(-3).map((m) => ({
@@ -494,6 +517,7 @@ export async function GET(req) {
         destinataire,
         participants: participantsInfos,
         lastReads,
+        hasMore, // 👈 ajouté pour le front
       },
       { status: 200 }
     );
