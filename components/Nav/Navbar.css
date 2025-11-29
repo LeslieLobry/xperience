@@ -10,6 +10,31 @@
   color: white;
   background-color: transparent;
 }
+.burger {
+  position: relative; /* important pour positionner le badge */
+}
+
+/* Petit badge rond sur le burger */
+.burger-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e53935; /* rouge X-periences */
+  color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none; /* ne bloque pas le clic sur le burger */
+}
+
 .nav-combined-popup {
   position: absolute;
   top: 60px;

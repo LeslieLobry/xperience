@@ -14,17 +14,35 @@ import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
 
-const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), { ssr: false, loading: Spinner });
-const AvisList = dynamic(() => import("../AvisList/AvisList"), { ssr: false, loading: Spinner });
-const MenuProfilActions = dynamic(() => import("../MenuProfilActions/MenuProfilActions"), { ssr: false });
-const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), { ssr: false, loading: Spinner });
-const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
-const DemandesAccesGalerie = dynamic(() => import("../DemandesAccesGalerie/DemandesAccesGalerie"), { ssr: false });
+const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
+  ssr: false,
+  loading: Spinner,
+});
+const AvisList = dynamic(() => import("../AvisList/AvisList"), {
+  ssr: false,
+  loading: Spinner,
+});
+const MenuProfilActions = dynamic(
+  () => import("../MenuProfilActions/MenuProfilActions"),
+  { ssr: false }
+);
+const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), {
+  ssr: false,
+  loading: Spinner,
+});
+const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), {
+  ssr: false,
+});
+const DemandesAccesGalerie = dynamic(
+  () => import("../DemandesAccesGalerie/DemandesAccesGalerie"),
+  { ssr: false }
+);
 
-function SimpleModal({ open, onClose, children }) {
+/* -------------------------------------------------------------------------- */
+/* 🖼️ SimpleModal : offsetTop optionnel (0 = plein écran)                     */
+/* -------------------------------------------------------------------------- */
+function SimpleModal({ open, onClose, children, offsetTop = 0 }) {
   if (!open) return null;
-
-  const HEADER_HEIGHT = 300; // ⬅️ adapte à la hauteur réelle de ton header (60, 72, 90, etc.)
 
   return (
     <div
@@ -32,7 +50,7 @@ function SimpleModal({ open, onClose, children }) {
       onClick={onClose}
       style={{
         position: "fixed",
-        top: HEADER_HEIGHT,   // ⬅️ démarre sous le header
+        top: offsetTop, // 0 = recouvre tout l'écran
         left: 0,
         right: 0,
         bottom: 0,
@@ -52,7 +70,7 @@ function SimpleModal({ open, onClose, children }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ❌ Bouton de fermeture dans le cadre de la photo */}
+        {/* ❌ Bouton de fermeture */}
         <button
           type="button"
           className="profil-photo-modal-close"
@@ -87,12 +105,18 @@ function SimpleModal({ open, onClose, children }) {
   );
 }
 
-
 function calculateProfileCompletion(user) {
   const fields = [
-    "pseudo", "email", "orientation", "age",
-    "localisation", "description", "photoUrl",
-    "taille", "silhouette", "origines"
+    "pseudo",
+    "email",
+    "orientation",
+    "age",
+    "localisation",
+    "description",
+    "photoUrl",
+    "taille",
+    "silhouette",
+    "origines",
   ];
   if (user.type?.toLowerCase() === "couple") {
     fields.push("age2", "taille2", "silhouette2", "origines2");
@@ -120,7 +144,8 @@ export default function Profil({ user, connectedUser }) {
 
   // États modals d’édition
   const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
-  const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
+  const [openProfilDetailsModal, setOpenProfilDetailsModal] =
+    useState(false);
 
   // Uploader photo de profil
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
@@ -129,7 +154,10 @@ export default function Profil({ user, connectedUser }) {
   // Anti double-clic & UX bouton message
   const [startingConv, setStartingConv] = useState(false);
 
-  const completion = useMemo(() => calculateProfileCompletion(user), [user]);
+  const completion = useMemo(
+    () => calculateProfileCompletion(user),
+    [user]
+  );
 
   // Parse JSON “safe” (gère HTML/texte en cas de redirection côté API)
   async function parseJsonSafe(res) {
@@ -202,15 +230,26 @@ export default function Profil({ user, connectedUser }) {
 
   // Champs à éditer via ProfilDetailsForm
   const profilDetailsFields = [
-    "Taille", "Silhouette", "Origines", "Âge", "Fume", "Yeux", "Cheveux",
-    "Taille du/de la partenaire", "Silhouette du/de la partenaire",
-    "Origines du/de la partenaire", "Âge du/de la partenaire",
-    "Fume du/de la partenaire", "Yeux du/de la partenaire", "Cheveux du/de la partenaire"
+    "Taille",
+    "Silhouette",
+    "Origines",
+    "Âge",
+    "Fume",
+    "Yeux",
+    "Cheveux",
+    "Taille du/de la partenaire",
+    "Silhouette du/de la partenaire",
+    "Origines du/de la partenaire",
+    "Âge du/de la partenaire",
+    "Fume du/de la partenaire",
+    "Yeux du/de la partenaire",
+    "Cheveux du/de la partenaire",
   ];
 
   function handleEditField(champ) {
     if (champ === "Description") setOpenDescriptionModal(true);
-    else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
+    else if (profilDetailsFields.includes(champ))
+      setOpenProfilDetailsModal(true);
     else if (champ === "Photo de profil") {
       setUploaderKey(Date.now()); // Force un composant neuf à chaque ouverture
       setOpenPhotoUploader(true);
@@ -229,14 +268,16 @@ export default function Profil({ user, connectedUser }) {
 
       const res = await fetch("/api/conversations", {
         method: "POST",
-        credentials: "include", // garantit l’envoi du cookie JWT même cross-origin si besoin
+        credentials: "include", // garantit l’envoi du cookie JWT
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ participantIds: [meId, otherId] }),
       });
 
-      // Non-auth / redirections traitées proprement
+      // Non-auth / redirections
       if (res.status === 401 || res.status === 403) {
-        router.push(`/connexion?next=${encodeURIComponent(`/messagerie`)}`);
+        router.push(
+          `/connexion?next=${encodeURIComponent(`/messagerie`)}`
+        );
         return;
       }
       if (res.redirected) {
@@ -246,7 +287,6 @@ export default function Profil({ user, connectedUser }) {
 
       const data = await parseJsonSafe(res);
 
-      // Compatibilité avec plusieurs formats de payload
       const convId =
         data?.conversation?.id ??
         data?.existingConversation?.id ??
@@ -258,16 +298,22 @@ export default function Profil({ user, connectedUser }) {
         const msg =
           data?.error ||
           data?.message ||
-          (typeof data?.__raw === "string" ? data.__raw.slice(0, 200) : "") ||
+          (typeof data?.__raw === "string"
+            ? data.__raw.slice(0, 200)
+            : "") ||
           `HTTP ${res.status}`;
-        throw new Error(`Création/lookup conversation échouée: ${msg}`);
+        throw new Error(
+          `Création/lookup conversation échouée: ${msg}`
+        );
       }
 
-      // Conserve le routing d’origine (query string)
       router.push(`/messagerie?conversationId=${convId}`);
     } catch (err) {
       console.error("handleStartConversation error:", err);
-      alert("Impossible de démarrer la conversation. " + (err?.message || ""));
+      alert(
+        "Impossible de démarrer la conversation. " +
+          (err?.message || "")
+      );
     } finally {
       setStartingConv(false);
     }
@@ -276,7 +322,12 @@ export default function Profil({ user, connectedUser }) {
   return (
     <div className="profil-page">
       {/* Modal d’upload photo déclenché par la complétion ou le bouton "changer photo" */}
-      <SimpleModal open={openPhotoUploader} onClose={() => setOpenPhotoUploader(false)}>
+      {/* Ici on garde un léger offset pour rester sous le header si tu veux */}
+      <SimpleModal
+        open={openPhotoUploader}
+        onClose={() => setOpenPhotoUploader(false)}
+        offsetTop={80} // adapte à la hauteur de ton header ou mets 0
+      >
         <PhotoUploader
           key={uploaderKey}
           priority
@@ -292,20 +343,27 @@ export default function Profil({ user, connectedUser }) {
       <div className="profil-header-horizontal">
         <div className="profil-header-row">
           <div className="profil-avatar-horizontal">
-            {/* Clique = ouvre la lightbox */}
-            <div style={{ cursor: "zoom-in" }} onClick={() => setModalOpen(true)}>
+            {/* Clique = ouvre la lightbox plein écran */}
+            <div
+              style={{ cursor: "zoom-in" }}
+              onClick={() => setModalOpen(true)}
+            >
               <PhotoUploader
                 priority
                 currentUrl={photoUrl}
                 isOwnProfile={isOwnProfile}
                 onUpload={(url) => {
                   setPhotoUrl(url);
-                  setUploaderKey(Date.now()); // évite un bug si on change direct après
+                  setUploaderKey(Date.now());
                 }}
               />
             </div>
-            {/* Affichage modal photo grand */}
-            <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
+
+            {/* Affichage modal photo grand => aucun offset, recouvre tout */}
+            <SimpleModal
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+            >
               <img
                 src={presignedPhotoUrl || "/default.jpg"}
                 alt="Photo de profil"
@@ -313,7 +371,8 @@ export default function Profil({ user, connectedUser }) {
                   maxWidth: "90vw",
                   maxHeight: "90vh",
                   borderRadius: "12px",
-                  boxShadow: "0 8px 32px 0 #0008"
+                  boxShadow: "0 8px 32px 0 #0008",
+                  objectFit: "contain",
                 }}
               />
             </SimpleModal>
@@ -321,7 +380,8 @@ export default function Profil({ user, connectedUser }) {
 
           <div className="profil-name-like">
             <h1 className="profil-name">
-              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+              {user.pseudo.charAt(0).toUpperCase() +
+                user.pseudo.slice(1).toLowerCase()}
               {user.verificationIdentiteStatut && (
                 <img
                   src="/Profilverif.png"
@@ -341,7 +401,12 @@ export default function Profil({ user, connectedUser }) {
                   title="Envoyer un message"
                 >
                   <div className="tooltip-container">
-                    <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
+                    <Image
+                      src="/images/enveloppe.svg"
+                      alt="Envoyer un message"
+                      width={46}
+                      height={46}
+                    />
                     <span className="tooltip">
                       {startingConv ? "Ouverture…" : "Envoyer un message"}
                     </span>
@@ -354,8 +419,14 @@ export default function Profil({ user, connectedUser }) {
           </div>
 
           <div>
-            <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
-            <div className="profil-badge">{user.type} {user.orientation}</div>
+            <StatutToggle
+              statut={statut}
+              statutAuto={statutAuto}
+              editable={isOwnProfile}
+            />
+            <div className="profil-badge">
+              {user.type} {user.orientation}
+            </div>
           </div>
         </div>
       </div>
@@ -384,7 +455,9 @@ export default function Profil({ user, connectedUser }) {
           visiteurId={connectedUser.id}
         />
 
-        {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
+        {isOwnProfile && (
+          <DemandesAccesGalerie isOwnProfile={isOwnProfile} />
+        )}
 
         <PreferencesSummary editable={isOwnProfile} user={user} />
 
@@ -395,11 +468,17 @@ export default function Profil({ user, connectedUser }) {
           setIsModalOpen={setOpenProfilDetailsModal}
         />
 
-        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
+        <AvisList
+          cibleId={user.id}
+          connectedUserId={connectedUser.id}
+        />
 
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
 
-        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
+        <AProposCard
+          createdAt={user.createdAt}
+          lastLogin={user.lastLogin}
+        />
       </div>
     </div>
   );

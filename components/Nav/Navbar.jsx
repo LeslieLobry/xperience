@@ -168,6 +168,11 @@ export default function Navbar() {
     router.push(href);
   };
 
+  // 🔹 Compteur global pour le badge sur le burger
+  const burgerBadgeCount = (notifCount || 0) + (unreadCount || 0);
+  // 👉 Si tu ne veux QUE les notifications (sans les messages non lus) :
+  // const burgerBadgeCount = notifCount || 0;
+
   return (
     <nav className="navbar">
       <div className="navbar-left">
@@ -192,6 +197,10 @@ export default function Navbar() {
         className={`burger${menuOpen ? " open" : ""}`}
         onClick={() => setMenuOpen(!menuOpen)}
       >
+        {/* 🔴 Badge sur le burger */}
+        {burgerBadgeCount > 0 && (
+          <span className="burger-badge">{burgerBadgeCount}</span>
+        )}
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
