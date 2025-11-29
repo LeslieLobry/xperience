@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useLayoutEffect } from "react"; // 🔧 ajouté useLayoutEffect
 import { Realtime } from "ably";
 import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
@@ -76,7 +76,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
-  const messagesContainerRef = useRef(null);
+  const messagesContainerRef = useRef(null); // <- ref vers la div scrollable de MessagesList
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({ buffer: [], length: 0 });
@@ -93,19 +93,30 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     const diff = el.scrollHeight - el.scrollTop - el.clientHeight;
     return diff < SCROLL_TOLERANCE_PX;
   };
+
+  // 🔧 scrollToBottom plus robuste, qui cible PRIORITAIREMENT la div de MessagesList
   const scrollToBottom = (smooth = true) => {
-    const el = messagesContainerRef.current;
-    if (el && typeof el.scrollTo === "function") {
-      el.scrollTo({
-        top: el.scrollHeight,
-        behavior: smooth ? "smooth" : "auto",
-      });
-    } else {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "end",
-      });
-    }
+    const behavior = smooth ? "smooth" : "auto";
+
+    const doScroll = () => {
+      const el = messagesContainerRef.current;
+      if (el && typeof el.scrollTo === "function") {
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior,
+        });
+      } else if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({
+          behavior,
+          block: "end",
+        });
+      }
+    };
+
+    // plusieurs passes pour être sûr que le layout est OK
+    doScroll();
+    requestAnimationFrame(doScroll);
+    setTimeout(doScroll, 80);
   };
 
   const {
@@ -218,34 +229,36 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       })
       .catch(() => setPrenomsCouple(null));
   }, [conversationId, utilisateur.type]);
-// 🔁 Quand la conversation change, on reset l'état de scroll
-useEffect(() => {
-  setLoadingInitial(true);
-  lastMsgIdRef.current = null;
-  skipNextAutoScrollRef.current = false;
-}, [conversationId]);
 
-// --------------------- Scroll initial quand les messages sont là ----------------------
-useEffect(() => {
-  if (!messages?.length || !loadingInitial) return;
+  // 🔁 Quand la conversation change, on reset l'état de scroll
+  useEffect(() => {
+    setLoadingInitial(true);
+    lastMsgIdRef.current = null;
+    skipNextAutoScrollRef.current = false;
+  }, [conversationId]);
 
-  const lastMsg = messages[messages.length - 1];
+  // --------------------- Scroll initial quand les messages sont là ----------------------
+  // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage
+  useLayoutEffect(() => {
+    if (!messages?.length || !loadingInitial) return;
 
-  // ⚠️ Si les messages sont encore ceux de l’ancienne conversation, on ignore
-  if (
-    lastMsg?.conversationId &&
-    Number(lastMsg.conversationId) !== Number(conversationId)
-  ) {
-    return;
-  }
+    const lastMsg = messages[messages.length - 1];
 
-  // On force le scroll en bas SANS animation quand on ouvre la conversation
-  scrollToBottom(false);
-  lastMsgIdRef.current = lastMsg?.id || null;
+    // ⚠️ Si les messages sont encore ceux de l’ancienne conversation, on ignore
+    if (
+      lastMsg?.conversationId &&
+      Number(lastMsg.conversationId) !== Number(conversationId)
+    ) {
+      return;
+    }
 
-  // On considère que le chargement initial est terminé pour CETTE conversation
-  setLoadingInitial(false);
-}, [messages, loadingInitial, conversationId]);
+    // On force le scroll en bas SANS animation quand on ouvre la conversation
+    scrollToBottom(false);
+    lastMsgIdRef.current = lastMsg?.id || null;
+
+    // On considère que le chargement initial est terminé pour CETTE conversation
+    setLoadingInitial(false);
+  }, [messages, loadingInitial, conversationId]);
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
@@ -671,7 +684,7 @@ useEffect(() => {
       )}
 
       <MessagesList
-        ref={messagesContainerRef}
+        ref={messagesContainerRef} // 🔴 c’est cette ref qu’on utilise pour le scroll
         messages={messages}
         utilisateur={utilisateur}
         onReact={handleReaction}
