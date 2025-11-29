@@ -35,9 +35,22 @@ export default function MessagerieClient({ user }) {
 
   const { user: currentUser, refreshUser, loading } = useAuth();
 
+  // user courant (priorité au contexte)
+  const displayedUser = currentUser ?? user;
+
   useEffect(() => {
     refreshUser();
   }, [refreshUser]);
+
+  // 🔴 ICI : quand on est dans la messagerie et qu'on connaît l'utilisateur,
+  // on marque tous les messages non lus comme lus
+  useEffect(() => {
+    if (!displayedUser?.id) return;
+
+    fetch("/api/messages/nonlus", {
+      method: "PATCH",
+    }).catch(() => {});
+  }, [displayedUser?.id]);
 
   // ✅ Source de vérité = query `conversationId`
   useEffect(() => {
@@ -48,13 +61,6 @@ export default function MessagerieClient({ user }) {
       setConversationId(null);
     }
   }, [searchParams]);
-
-  // ⛔️ BUGGY → ENLEVÉ :
-  // useEffect(() => {
-  //   if (pathname === "/messagerie") {
-  //     setConversationId(null);
-  //   }
-  // }, [pathname]);
 
   // --- MOBILE/RESPONSIVE LOGIC ---
   const isMobile = useIsMobile(900);
@@ -69,8 +75,6 @@ export default function MessagerieClient({ user }) {
     router.push(`/messagerie`, { scroll: false });
     setConversationId(null);
   };
-
-  const displayedUser = currentUser ?? user;
 
   if (loading || !displayedUser?.id) {
     return (

@@ -36,6 +36,7 @@ async function getUserFromToken() {
   }
 }
 
+/* ==================== GET : liste des vrais non lus ==================== */
 export async function GET() {
   try {
     const user = await getUserFromToken();
@@ -46,16 +47,15 @@ export async function GET() {
       );
     }
 
-    // ✅ VRAIS messages non lus
     const unreadMessages = await prisma.message.findMany({
       where: {
-        lu: false,                  // <--- la clé
+        lu: false,                  // ✅ la clé
         auteurId: { not: user.id }, // pas toi
         conversation: {
           participants: {
             some: {
               utilisateurId: user.id, // tu es dans la conversation
-              // si tu as un champ "supprime" sur Participant, tu pourras le rajouter ici
+              // supprime: false,     // à rajouter si tu as ce champ sur Participant
             },
           },
         },
@@ -81,6 +81,52 @@ export async function GET() {
     return NextResponse.json(unreadMessages);
   } catch (error) {
     console.error("GET /api/messages/nonlus error:", error);
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
+  }
+}
+
+/* ==================== PATCH : tout marquer comme lu ==================== */
+export async function PATCH() {
+  try {
+    const user = await getUserFromToken();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Non authentifié" },
+        { status: 401 }
+      );
+    }
+
+    const result = await prisma.message.updateMany({
+      where: {
+        lu: false,
+        auteurId: { not: user.id },
+        conversation: {
+          participants: {
+            some: {
+              utilisateurId: user.id,
+              // supprime: false,   // pareil, à remettre si tu as ce champ
+            },
+          },
+        },
+      },
+      data: { lu: true },
+    });
+
+    console.log(
+      "PATCH /api/messages/nonlus =>",
+      result.count,
+      "messages mis à lu"
+    );
+
+    return NextResponse.json({
+      ok: true,
+      updated: result.count,
+    });
+  } catch (error) {
+    console.error("PATCH /api/messages/nonlus error:", error);
     return NextResponse.json(
       { error: "Erreur serveur" },
       { status: 500 }
