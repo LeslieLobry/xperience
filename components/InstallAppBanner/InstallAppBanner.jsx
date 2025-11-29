@@ -4,25 +4,12 @@
 import { useEffect, useState } from "react";
 import styles from "./InstallAppBanner.module.css";
 
-// 🔹 URL Play Store depuis l'ENV ou fallback en dur
 const ANDROID_APP_URL =
   process.env.NEXT_PUBLIC_ANDROID_APP_URL ||
   "https://play.google.com/store/apps/details?id=fr.xperiences.app";
 
-const STORAGE_KEY = "xperiences_android_app_banner_dismissed";
-
-function isAndroidMobile() {
-  if (typeof window === "undefined") return false;
-
-  const ua = navigator.userAgent || navigator.vendor || window.opera;
-
-  // 🔹 On simplifie : Android suffit (Chrome mobile l’a toujours)
-  const isAndroid = /Android/i.test(ua);
-
-  console.log("[InstallAppBanner] UA =", ua, "isAndroid =", isAndroid);
-
-  return isAndroid;
-}
+// 🔹 on change la clé pour ignorer les anciens "fermés"
+const STORAGE_KEY = "xperiences_android_app_banner_dismissed_v2";
 
 export default function InstallAppBanner() {
   const [visible, setVisible] = useState(false);
@@ -30,25 +17,17 @@ export default function InstallAppBanner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    console.log("[InstallAppBanner] ANDROID_APP_URL =", ANDROID_APP_URL);
+    console.log("[InstallAppBanner DEBUG] mount, url =", ANDROID_APP_URL);
 
-    // ⚠️ Si même le fallback est vide (très improbable), on sort
-    if (!ANDROID_APP_URL) {
-      console.warn(
-        "[InstallAppBanner] Pas d'URL Android définie. Vérifie NEXT_PUBLIC_ANDROID_APP_URL sur Vercel."
-      );
-      return;
-    }
+    // 🔥 DEBUG : on ignore complètement Android / iPhone et on reset l'ancienne valeur
+    window.localStorage.removeItem("xperiences_android_app_banner_dismissed");
 
     const alreadyDismissed =
       window.localStorage.getItem(STORAGE_KEY) === "1";
+    console.log("[InstallAppBanner DEBUG] alreadyDismissed =", alreadyDismissed);
 
-    console.log("[InstallAppBanner] alreadyDismissed =", alreadyDismissed);
-
-    if (alreadyDismissed) return;
-
-    if (isAndroidMobile()) {
-      setVisible(true);
+    if (!alreadyDismissed) {
+      setVisible(true); // ⬅️ on l'affiche TOUJOURS
     }
   }, []);
 
