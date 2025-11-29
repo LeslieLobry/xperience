@@ -304,6 +304,10 @@ input[type="range"].profil-range {
 @media (width <= 768px) {
   .grid-profil {
     grid-template-columns: 1fr 1fr !important;
+    display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        justify-content: center;
   }
 
   .toggle-box{

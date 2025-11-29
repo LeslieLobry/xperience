@@ -7,13 +7,7 @@
     font-size: 25px;
   }
   
-  /* .profil-page {
-    padding: 1rem;
-    color: var(--text-light);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  } */
+
   .profil-page{
         position: relative;
     display: flex;
