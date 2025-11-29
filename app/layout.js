@@ -1,29 +1,25 @@
-import "../app/globals.css";
+import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
 import Footer from "../components/Footer/Footer";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import { Analytics } from "@vercel/analytics/next";
-import { ToastContainer } from "react-toastify";
 import Script from "next/script";
-import "react-toastify/dist/ReactToastify.css";
-import dynamic from "next/dynamic";
-import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner"; // ✅ import direct
+import ToastProvider from "../components/ToastProvider";
 
-// 🔹 Ces composants sont chargés côté client uniquement (lazy)
-const BandeauCookies = dynamic(
-  () => import("../components/BandeauCookies/BandeauCookies"),
-  { ssr: false }
-);
-
-const HeartbeatClient = dynamic(
-  () => import("../components/HeartbeatClient/HeartbeatClient"),
-  { ssr: false }
-);
+// 🔹 Import direct des composants client
+import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
+import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
+import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
 
 // 🔹 Fonts
-const allura = Allura({ subsets: ["latin"], weight: "400" });
+const allura = Allura({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-allura",
+});
+
 const raleway = Raleway({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
@@ -71,16 +67,7 @@ export default function RootLayout({ children }) {
         <InstallAppBanner />
 
         {/* 🔔 Notifications toast */}
-        <ToastContainer
-          position="top-right"
-          autoClose={4000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="dark"
-        />
+        <ToastProvider />
 
         {/* 📊 Analytics Vercel */}
         <Analytics />
