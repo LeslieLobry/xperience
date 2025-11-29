@@ -1,3 +1,4 @@
+// app/layout.jsx (ou app/layout.js)
 import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
@@ -54,20 +55,20 @@ export default function RootLayout({ children }) {
             {/* 🔁 Heartbeat → client-only */}
             <HeartbeatClient intervalMs={60_000} />
 
+            {/* 📲 Bannière "Télécharger l’app" → dans le contexte client */}
+            <InstallAppBanner />
+
             {children}
 
             <Footer />
 
             {/* 🍪 Bandeau cookies → client-only */}
             <BandeauCookies />
+
+            {/* 🔔 Notifications toast */}
+            <ToastProvider />
           </ClientWrapper>
         </AuthProvider>
-
-        {/* 📲 Bannière "Télécharger l’app" */}
-        <InstallAppBanner />
-
-        {/* 🔔 Notifications toast */}
-        <ToastProvider />
 
         {/* 📊 Analytics Vercel */}
         <Analytics />

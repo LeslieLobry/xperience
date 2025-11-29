@@ -23,14 +23,20 @@ const DemandesAccesGalerie = dynamic(() => import("../DemandesAccesGalerie/Deman
 
 function SimpleModal({ open, onClose, children }) {
   if (!open) return null;
+
+  const HEADER_HEIGHT = 300; // ⬅️ adapte à la hauteur réelle de ton header (60, 72, 90, etc.)
+
   return (
     <div
       className="profil-photo-modal-bg"
       onClick={onClose}
       style={{
         position: "fixed",
-        inset: 0,
-        zIndex: 1000,
+        top: HEADER_HEIGHT,   // ⬅️ démarre sous le header
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
         background: "rgba(0,0,0,0.85)",
         display: "flex",
         alignItems: "center",
@@ -39,14 +45,48 @@ function SimpleModal({ open, onClose, children }) {
     >
       <div
         className="profil-photo-modal-img-wrapper"
-        style={{ maxWidth: "90vw", maxHeight: "90vh" }}
+        style={{
+          position: "relative",
+          maxWidth: "90vw",
+          maxHeight: "90vh",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* ❌ Bouton de fermeture dans le cadre de la photo */}
+        <button
+          type="button"
+          className="profil-photo-modal-close"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          aria-label="Fermer"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            fontSize: 24,
+            background: "rgba(0,0,0,0.6)",
+            border: "none",
+            borderRadius: "999px",
+            color: "#fff",
+            width: 36,
+            height: 36,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+
         {children}
       </div>
     </div>
   );
 }
+
 
 function calculateProfileCompletion(user) {
   const fields = [
