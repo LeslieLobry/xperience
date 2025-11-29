@@ -1,38 +1,34 @@
+// app/api/galeries-privees/route.js
 import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../lib/auth"; // adapte le chemin à ton projet
+import { getUserFromToken } from "../../../lib/auth"; // adapte le chemin
 
 export async function POST(req) {
   try {
     const user = await getUserFromToken();
     if (!user) {
-      return NextResponse.json(
-        { error: "Non authentifié." },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
-    const { nom } = body; // optionnel
+    const { nom } = body;
 
-    // 🔍 Cherche si une galerie existe déjà pour cet utilisateur
+    // Cherche une galerie existante
     let galerie = await prisma.galeriePrivee.findFirst({
       where: { utilisateurId: user.id },
     });
 
     if (!galerie) {
-      // ✅ Création si elle n'existe pas encore
+      // Crée si elle n'existe pas
       galerie = await prisma.galeriePrivee.create({
         data: {
           nom: nom || "Galerie privée",
           utilisateurId: user.id,
-          // si ton modèle a encore `codeAcces` en optionnel :
-          // codeAcces: null,
+          // codeAcces: null, // si ce champ existe encore et est optionnel
         },
       });
     }
 
-    // 🔁 On renvoie toujours la galerie (existante ou nouvellement créée)
     return NextResponse.json(galerie, { status: 200 });
   } catch (err) {
     console.error("Erreur création/recup galerie privée:", err);

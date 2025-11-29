@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { toast } from 'react-toastify'; // 👈 Ajoute ceci
+import { toast } from 'react-toastify';
 import "../PhotoUploader/PhotoUploader.css";
 import { Camera, Plus } from 'lucide-react';
 
@@ -86,13 +86,19 @@ export default function PhotoUploader({
     const formData = new FormData();
     formData.append('photo', file);
 
-    if (isGallery && isPublic) formData.append('isPublic', 'true');
+    // ✅ Galerie publique : inchangé
+    if (isGallery && isPublic) {
+      formData.append('isPublic', 'true');
+    }
+
+    // ✅ Galerie privée : check simplifié, ne casse pas les IDs string
     if (isGallery && !isPublic) {
-      if (!galerieId || isNaN(parseInt(galerieId))) {
-        toast.error("Erreur : galerie privée introuvable."); // 👈 toast aussi ici
+      if (!galerieId) {
+        toast.error("Erreur : galerie privée introuvable.");
+        console.error("PhotoUploader → galerieId manquant pour galerie privée :", galerieId);
         return;
       }
-      formData.append('galerieId', galerieId.toString());
+      formData.append('galerieId', String(galerieId));
     }
 
     try {
@@ -120,7 +126,6 @@ export default function PhotoUploader({
 
       // Après upload, on force la preview via presigned URL (pour le S3 privé)
       if (typeof url === "string" && !url.startsWith("http")) {
-        // Nouvelle clé => on re-fetch la presigned
         const r = await fetch("/api/photos/presign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -164,7 +169,6 @@ export default function PhotoUploader({
             />
           )}
           {isOwnProfile && (
-            // Uniquement l'icône déclenche l'input file :
             <label
               htmlFor="photo-upload"
               className="camera-label"

@@ -7,36 +7,43 @@ import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 // HOOK pour charger les presigned URLs des photos S3
 function usePresignedGalleryUrls(photoList) {
   const [presignedUrls, setPresignedUrls] = useState({});
+
   useEffect(() => {
     if (!Array.isArray(photoList)) return;
     let unmounted = false;
 
     const load = async () => {
       const map = {};
-      await Promise.all(photoList.map(async (photo) => {
-        if (!photo?.url) {
-          map[photo.id] = "/default.jpg";
-        } else if (photo.url.startsWith("http")) {
-          map[photo.id] = photo.url;
-        } else {
-          try {
-            const res = await fetch("/api/photos/presign", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ key: photo.url }),
-            });
-            const data = await res.json();
-            map[photo.id] = data.url || "/default.jpg";
-          } catch {
-            map[photo.id] = "/default.jpg";
+      await Promise.all(
+        photoList.map(async (photo) => {
+          if (!photo?.url) {
+            map[photo.id] = '/default.jpg';
+          } else if (photo.url.startsWith('http')) {
+            map[photo.id] = photo.url;
+          } else {
+            try {
+              const res = await fetch('/api/photos/presign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: photo.url }),
+              });
+              const data = await res.json();
+              map[photo.id] = data.url || '/default.jpg';
+            } catch {
+              map[photo.id] = '/default.jpg';
+            }
           }
-        }
-      }));
+        })
+      );
       if (!unmounted) setPresignedUrls(map);
     };
+
     load();
-    return () => { unmounted = true; };
+    return () => {
+      unmounted = true;
+    };
   }, [photoList]);
+
   return presignedUrls;
 }
 
@@ -47,31 +54,77 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState(null); // 'granted' | 'pending' | 'denied' | null
 
+  // ⭐ id réel de la galerie privée
+  const [galerieId, setGalerieId] = useState(null);
+
+  // 1) Charger les photos + statut d'accès
   useEffect(() => {
     if (!utilisateurId) return;
     const visiteur = visiteurId || utilisateurId;
     setLoading(true);
+
     fetch(`/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.access === "pending") {
-          setAccessStatus("pending");
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.access === 'pending') {
+          setAccessStatus('pending');
           setPhotoList([]);
-        } else if (data.access === "refused" || data.access === "none") {
-          setAccessStatus("denied");
+        } else if (data.access === 'refused' || data.access === 'none') {
+          setAccessStatus('denied');
           setPhotoList([]);
-        } else if (data.access === "granted") {
-          setAccessStatus("granted");
+        } else if (data.access === 'granted') {
+          setAccessStatus('granted');
           setPhotoList(data.photos || []);
         }
+
+        // si l'API renvoie déjà l'id de galerie
+        if (data.galerieId) {
+          setGalerieId(data.galerieId);
+        }
       })
-      .catch(err => {
-        console.error("Erreur galerie privée :", err);
-        setAccessStatus("denied");
+      .catch((err) => {
+        console.error('Erreur galerie privée :', err);
+        setAccessStatus('denied');
         setPhotoList([]);
       })
       .finally(() => setLoading(false));
   }, [utilisateurId, visiteurId]);
+
+  // 2) Pour l'UTILISATEUR LUI-MÊME (editable = true) :
+  //    on s'assure d'avoir une galerie en base et on récupère son id
+  useEffect(() => {
+    // si on a déjà un galerieId, pas besoin de rappeler l'API
+    if (!editable || !utilisateurId || galerieId) return;
+
+    let cancelled = false;
+
+    async function ensureGaleriePrivee() {
+      try {
+        const res = await fetch('/api/galeries-privees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        if (!res.ok) {
+          console.error('Erreur API /galeries-privees', await res.text());
+          return;
+        }
+
+        const galerie = await res.json();
+        if (!cancelled) {
+          setGalerieId(galerie.id);
+        }
+      } catch (e) {
+        console.error('Impossible de récupérer/creer la galerie privée', e);
+      }
+    }
+
+    ensureGaleriePrivee();
+    return () => {
+      cancelled = true;
+    };
+  }, [editable, utilisateurId, galerieId]);
 
   // On génère les presigned URLs pour CHAQUE photo (clé: id)
   const presignedUrls = usePresignedGalleryUrls(photoList);
@@ -94,18 +147,19 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     setLoading(false);
   };
 
-  const handleNewPhoto = (photo) => setPhotoList(prev => [...prev, photo]);
+  const handleNewPhoto = (photo) => setPhotoList((prev) => [...prev, photo]);
+
   const handleDelete = async (id) => {
     if (!editable) return;
     const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-    if (res.ok) setPhotoList(prev => prev.filter(p => p.id !== id));
+    if (res.ok) setPhotoList((prev) => prev.filter((p) => p.id !== id));
   };
 
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
     if (e.key === 'Escape') setCurrentIndex(null);
-    if (e.key === 'ArrowLeft') setCurrentIndex(i => (i > 0 ? i - 1 : i));
-    if (e.key === 'ArrowRight') setCurrentIndex(i => (i < photoList.length - 1 ? i + 1 : i));
+    if (e.key === 'ArrowLeft') setCurrentIndex((i) => (i > 0 ? i - 1 : i));
+    if (e.key === 'ArrowRight') setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
   };
 
   useEffect(() => {
@@ -114,9 +168,11 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   }, [currentIndex, photoList.length]);
 
   if (loading) return <div>Chargement...</div>;
+
   if (!editable && accessStatus === 'pending') {
     return <div>Votre demande d'accès est en attente de validation.</div>;
   }
+
   if (!editable && (accessStatus === 'denied' || accessStatus === null)) {
     return (
       <div>
@@ -125,15 +181,17 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
       </div>
     );
   }
+
   if (!editable && accessStatus !== 'granted') {
     return <div>Accès non autorisé.</div>;
   }
 
-  const emptySlots = MAX_PHOTOS - photoList.length;
+  const emptySlots = Math.max(0, MAX_PHOTOS - photoList.length);
 
   return (
     <div className="profil-section">
       <h3 className="profil-section-title">Galerie privée</h3>
+
       <div className="gallery-grid">
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id || index}>
@@ -143,39 +201,52 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
               </button>
             )}
             <img
-              src={presignedUrls[photo.id] || "/default.jpg"}
+              src={presignedUrls[photo.id] || '/default.jpg'}
               alt={`Photo ${index + 1}`}
               onClick={() => setCurrentIndex(index)}
-              style={{ cursor: "zoom-in" }}
+              style={{ cursor: 'zoom-in' }}
             />
           </div>
         ))}
 
-        {editable && emptySlots > 0 && Array.from({ length: emptySlots }).map((_, idx) => (
-          <div className="gallery-slot empty" key={`empty-${idx}`}>
-            <PhotoUploader isGallery galerieId={utilisateurId} onUpload={handleNewPhoto} />
-          </div>
-        ))}
+        {editable &&
+          emptySlots > 0 &&
+          Array.from({ length: emptySlots }).map((_, idx) => (
+            <div className="gallery-slot empty" key={`empty-${idx}`}>
+              {galerieId ? (
+                <PhotoUploader
+                  isGallery
+                  galerieId={galerieId}
+                  onUpload={handleNewPhoto}
+                />
+              ) : (
+                <span>Préparation de la galerie…</span>
+              )}
+            </div>
+          ))}
       </div>
 
       {currentIndex !== null && photoList[currentIndex] && (
         <div className="lightbox" onClick={() => setCurrentIndex(null)}>
-          <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
             <button className="lightbox-close" onClick={() => setCurrentIndex(null)}>
               <X size={24} />
             </button>
+
             {currentIndex > 0 && (
-              <button className="lightbox-prev" onClick={() => setCurrentIndex(i => i - 1)}>
+              <button className="lightbox-prev" onClick={() => setCurrentIndex((i) => i - 1)}>
                 <ChevronLeft size={32} />
               </button>
             )}
+
             {currentIndex < photoList.length - 1 && (
-              <button className="lightbox-next" onClick={() => setCurrentIndex(i => i + 1)}>
+              <button className="lightbox-next" onClick={() => setCurrentIndex((i) => i + 1)}>
                 <ChevronRight size={32} />
               </button>
             )}
+
             <img
-              src={presignedUrls[photoList[currentIndex].id] || "/default.jpg"}
+              src={presignedUrls[photoList[currentIndex].id] || '/default.jpg'}
               alt="Agrandissement"
             />
           </div>
