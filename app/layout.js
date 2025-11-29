@@ -91,6 +91,6 @@ export default function RootLayout({ children }) {
           `}
         </Script>
       </body>
-    </html>
+    </html>   
   );
 }
