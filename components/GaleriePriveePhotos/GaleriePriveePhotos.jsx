@@ -53,11 +53,9 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   const [currentIndex, setCurrentIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState(null); // 'granted' | 'pending' | 'denied' | null
+  const [galerieId, setGalerieId] = useState(null);       // ⭐ id réel de la galerie privée
 
-  // ⭐ id réel de la galerie privée
-  const [galerieId, setGalerieId] = useState(null);
-
-  // 1) Charger les photos + statut d'accès
+  // 1) Charger les photos + statut d'accès (+ galerieId)
   useEffect(() => {
     if (!utilisateurId) return;
     const visiteur = visiteurId || utilisateurId;
@@ -77,7 +75,6 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
           setPhotoList(data.photos || []);
         }
 
-        // si l'API renvoie déjà l'id de galerie
         if (data.galerieId) {
           setGalerieId(data.galerieId);
         }
@@ -90,43 +87,6 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
       .finally(() => setLoading(false));
   }, [utilisateurId, visiteurId]);
 
-  // 2) Pour l'UTILISATEUR LUI-MÊME (editable = true) :
-  //    on s'assure d'avoir une galerie en base et on récupère son id
-  useEffect(() => {
-    // si on a déjà un galerieId, pas besoin de rappeler l'API
-    if (!editable || !utilisateurId || galerieId) return;
-
-    let cancelled = false;
-
-    async function ensureGaleriePrivee() {
-      try {
-        const res = await fetch('/api/galeries-privees', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-
-        if (!res.ok) {
-          console.error('Erreur API /galeries-privees', await res.text());
-          return;
-        }
-
-        const galerie = await res.json();
-        if (!cancelled) {
-          setGalerieId(galerie.id);
-        }
-      } catch (e) {
-        console.error('Impossible de récupérer/creer la galerie privée', e);
-      }
-    }
-
-    ensureGaleriePrivee();
-    return () => {
-      cancelled = true;
-    };
-  }, [editable, utilisateurId, galerieId]);
-
-  // On génère les presigned URLs pour CHAQUE photo (clé: id)
   const presignedUrls = usePresignedGalleryUrls(photoList);
 
   const handleDemandeAcces = async () => {
