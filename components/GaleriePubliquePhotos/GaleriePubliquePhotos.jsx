@@ -68,7 +68,10 @@ function usePresignedGalleryUrls(photoList) {
 function isVideo(url) {
   if (!url) return false;
   try {
-    const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const u = new URL(
+      url,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost"
+    );
     const path = u.pathname.toLowerCase();
     return /\.(mp4|webm|ogg|mov)$/i.test(path);
   } catch {
@@ -91,19 +94,49 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
   const [presignedUrls, setPresignedUrls] = usePresignedGalleryUrls(photoList);
 
   /* ---------------------------------------------------------------------- */
-  /* ➕ Ajout d'une nouvelle photo : on force l'URL affichable immédiatement */
+  /* ➕ Ajout d'une nouvelle photo : normalisation + URL affichable          */
   /* ---------------------------------------------------------------------- */
-  const handleNewPhoto = (photo) => {
-    // On ajoute la photo dans la liste
+  const handleNewPhoto = (payload) => {
+    let photo = null;
+
+    // Cas galerie : PhotoUploader t'envoie 'data' (JSON complet)
+    // On essaie d'en extraire un objet du type { id, url }
+    if (payload && typeof payload === "object") {
+      // 1) Si l'API renvoie { photo: { id, url, ... }, photoUrl: "...", ... }
+      if (payload.photo && typeof payload.photo === "object") {
+        photo = payload.photo;
+      }
+      // 2) Si l'API renvoie directement { id, url }
+      else if (payload.id && payload.url) {
+        photo = { id: payload.id, url: payload.url };
+      }
+      // 3) Si l'API renvoie { id, photoUrl }
+      else if (payload.id && payload.photoUrl) {
+        photo = { id: payload.id, url: payload.photoUrl };
+      }
+      // 4) Si l'API renvoie uniquement { photoUrl: "..." }
+      else if (payload.photoUrl) {
+        photo = { id: Date.now(), url: payload.photoUrl };
+      }
+    } else if (typeof payload === "string") {
+      // fallback : juste une URL
+      photo = { id: Date.now(), url: payload };
+    }
+
+    if (!photo || !photo.id || !photo.url) {
+      console.warn("handleNewPhoto: payload inattendu", payload);
+      return;
+    }
+
+    // ⬇️ On ajoute la photo normalisée à la liste
     setPhotoList((prev) => [...prev, photo]);
 
-    // On essaie tout de suite de calculer une URL affichable pour éviter /default.jpg
+    // Option : on pousse tout de suite une URL affichable dans la map
     (async () => {
       try {
         let finalUrl = "/default.jpg";
 
-        if (photo?.url) {
-          // Si le backend/PhotoUploader renvoie déjà une URL HTTP complète
+        if (photo.url) {
           if (
             photo.url.startsWith("http") ||
             photo.url.startsWith("blob:") ||
@@ -111,7 +144,6 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
           ) {
             finalUrl = photo.url;
           } else {
-            // Sinon, on va chercher sa presigned URL pour cette clé
             const res = await fetch("/api/photos/presign", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -122,7 +154,6 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
           }
         }
 
-        // On met à jour la map uniquement pour cette nouvelle photo
         setPresignedUrls((prev) => ({
           ...prev,
           [photo.id]: finalUrl,
@@ -196,7 +227,7 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, photoList.length, safeSetCurrentIndex]);
 
-  const emptySlots = MAX_PHOTOS - photoList.length;
+  const emptySlots = Math.max(0, MAX_PHOTOS - photoList.length);
 
   /* ---------------------------------------------------------------------- */
   /* 🧩 Rendu                                                               */
