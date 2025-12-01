@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
-import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
@@ -21,6 +20,17 @@ const safeFetcher = async (url) => {
   if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
   return data;
 };
+
+// Petit helper pour générer des initiales
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function ListeConversations({
   userId,
@@ -157,9 +167,14 @@ export default function ListeConversations({
           .filter((p) => Number(p.utilisateurId) !== Number(userId))
           .map((p) => p.utilisateur)
           .filter(Boolean);
+
         const pseudo =
           autres.length === 1 ? autres[0].pseudo : autres.map((u) => u.pseudo).join(", ");
+
         const unreadCount = conv.unreadCount || 0;
+
+        // On prend max 2 personnes pour l’avatar (stack si groupe)
+        const avatarUsers = autres.slice(0, 2);
 
         return (
           <div
@@ -170,38 +185,89 @@ export default function ListeConversations({
           >
             {/* Zone cliquable = ouvre la conversation */}
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
-              <div className="conv-info">
-                <div className="conv-pseudo">
-                  {renamingId === conv.id ? (
-                    <div
-                      className="rename-inline"
-                      onClick={(e) => e.stopPropagation()} // évite d'ouvrir la conv en renommant
-                    >
-                      <input
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename(conv.id);
-                        }}
-                        autoFocus
-                        style={{ width: 120, marginRight: 6 }}
-                        maxLength={40}
-                      />
-                      <button onClick={() => handleRename(conv.id)}>OK</button>
-                      <button
-                        onClick={() => {
-                          setRenamingId(null);
-                          setNewName("");
-                        }}
-                      >
-                        Annuler
-                      </button>
+              <div className="conv-main">
+                {/* === Avatar / stack d’avatars === */}
+                <div className="conv-avatar">
+                  {avatarUsers.length === 0 && (
+                    <div className="conv-avatar-placeholder">
+                      {getInitials(conv.nom || pseudo || "")}
                     </div>
-                  ) : (
-                    <>{conv.nom || pseudo}</>
+                  )}
+
+                  {avatarUsers.length === 1 && (
+                    <>
+                      {avatarUsers[0].photoUrl ? (
+                        <img
+                          src={avatarUsers[0].photoUrl}
+                          alt={avatarUsers[0].pseudo || "Photo de profil"}
+                          className="conv-avatar-img"
+                        />
+                      ) : (
+                        <div className="conv-avatar-placeholder">
+                          {getInitials(avatarUsers[0].pseudo)}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {avatarUsers.length > 1 && (
+                    <div className="conv-avatar-stack">
+                      {avatarUsers.map((u, index) =>
+                        u.photoUrl ? (
+                          <img
+                            key={u.id || index}
+                            src={u.photoUrl}
+                            alt={u.pseudo || "Photo de profil"}
+                            className={`conv-avatar-img stacked stacked-${index}`}
+                          />
+                        ) : (
+                          <div
+                            key={u.id || index}
+                            className={`conv-avatar-placeholder stacked stacked-${index}`}
+                          >
+                            {getInitials(u.pseudo)}
+                          </div>
+                        )
+                      )}
+                    </div>
                   )}
                 </div>
-                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+
+                {/* === Infos conversation (nom + badge) === */}
+                <div className="conv-info">
+                  <div className="conv-pseudo">
+                    {renamingId === conv.id ? (
+                      <div
+                        className="rename-inline"
+                        onClick={(e) => e.stopPropagation()} // évite d'ouvrir la conv en renommant
+                      >
+                        <input
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(conv.id);
+                          }}
+                          autoFocus
+                          style={{ width: 120, marginRight: 6 }}
+                          maxLength={40}
+                        />
+                        <button onClick={() => handleRename(conv.id)}>OK</button>
+                        <button
+                          onClick={() => {
+                            setRenamingId(null);
+                            setNewName("");
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    ) : (
+                      <>{conv.nom || pseudo}</>
+                    )}
+                  </div>
+
+                  {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+                </div>
               </div>
             </div>
 
