@@ -124,15 +124,16 @@
 .chat-actions button:hover {
   opacity: 0.8;
 }
-
-/* === Zone messages === */
 .chat-messages {
-  flex-grow: 1;
+  flex: 1 1 auto;
+  min-height: 0;                        /* ⚠️ indispensable pour que le scroll marche */
+  max-height: calc(100vh - 160px);      /* header + input (à ajuster si besoin) */
   overflow-y: auto;
   padding: 1rem;
   display: flex;
   flex-direction: column;
 }
+
 
 /* === Messages & Bubbles === */
 .message-bubble {
@@ -699,8 +700,17 @@
     left: 0;
     right: 0;
     z-index: 50;
-    background: #050509;   /* ou ta couleur de fond de chat */
+    background: #050509;  
     border-left: none;
     border-right: none;
   }
+}
+.chatbox-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100vh;   
+  min-height: 0;       
+  position: relative;
+  overflow: hidden;    
 }
