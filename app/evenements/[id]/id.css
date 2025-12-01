@@ -49,6 +49,20 @@ color:#ccc
 .event-details-title{
   color: #e0c084;
 }
+.evenement-details {
+  border: 1px solid #e0c084;
+  padding: 8px;
+  border-radius: 16px;
+  width: 65%;
+  overflow-wrap: anywhere;   /* moderne */
+  word-wrap: break-word;     /* fallback */
+}
+
+/* Au cas où, on force aussi sur le lien */
+.evenement-details a {
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+}
 
 .evenement-details{
    border: 1px solid #e0c084;
