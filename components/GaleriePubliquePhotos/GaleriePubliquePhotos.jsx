@@ -69,10 +69,34 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
 
   const handleNewPhoto = (photo) => setPhotoList(prev => [...prev, photo]);
 
-  const handleDelete = async (id) => {
-    const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-    if (res.ok) setPhotoList(prev => prev.filter(p => p.id !== id));
-  };
+const handleDelete = async (id) => {
+  // On ferme éventuellement la lightbox
+  setCurrentIndex(null);
+
+  // On sauvegarde l'état actuel au cas où
+  setPhotoList((prev) => {
+    const updated = prev.filter((p) => p.id !== id);
+
+    // On lance la requête en arrière-plan
+    (async () => {
+      try {
+        const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
+
+        if (!res.ok) {
+          console.error("Erreur suppression photo:", res.status);
+          // Si tu veux être très strict, tu peux rétablir l'ancienne liste :
+          // setPhotoList(prev);  // <-- à décommenter si tu veux rollback
+        }
+      } catch (err) {
+        console.error("Erreur réseau suppression photo:", err);
+        // idem : possibilité de rollback si tu veux
+        // setPhotoList(prev);
+      }
+    })();
+
+    return updated;
+  });
+};
 
   // Sécurise l'accès à l'index
   const safeSetCurrentIndex = useCallback((setter) => {
