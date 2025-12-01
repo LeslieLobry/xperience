@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* -------------------------------------------------------------------------- */
-/* ⚙️ CORS                                                                    */
+/* CORS                                                                       */
 /* -------------------------------------------------------------------------- */
 
 const ALLOWED_ORIGINS = [
@@ -41,23 +41,23 @@ export async function OPTIONS() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 🔐 AUTH                                                                    */
+/* AUTH                                                                       */
 /* -------------------------------------------------------------------------- */
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
 function extractToken(reqHeaders) {
-  // 1) Authorization: Bearer xxx (app mobile)
+  // 1) Authorization: Bearer xxx (app)
   const auth = reqHeaders.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
 
-  // 2) Cookie 'token=' (web)
+  // 2) Cookie 'token' (web)
   try {
     const cookieStore = getCookies();
-    const cookieToken = cookieStore.get("token")?.value;
-    if (cookieToken) return cookieToken;
+    const c = cookieStore.get("token")?.value;
+    if (c) return c;
   } catch {
     // ignore
   }
@@ -76,8 +76,14 @@ function safeNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function safeDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /* -------------------------------------------------------------------------- */
-/* 📨 POST /api/update-profil                                                 */
+/* POST /api/update-profil                                                    */
 /* -------------------------------------------------------------------------- */
 
 export async function POST(req) {
@@ -85,7 +91,7 @@ export async function POST(req) {
   const origin = reqHeaders.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  /* --- Auth --- */
+  // --- Auth ---
   const token = extractToken(reqHeaders);
   if (!token) {
     return NextResponse.json(
@@ -113,7 +119,7 @@ export async function POST(req) {
     );
   }
 
-  /* --- Body JSON --- */
+  // --- Body JSON ---
   let body;
   try {
     body = await req.json();
@@ -125,40 +131,56 @@ export async function POST(req) {
     );
   }
 
-  /* --- Construction des données à mettre à jour --- */
+  /* -------------------------------------------------------------- */
+  /* Construction de l'objet data pour Prisma                       */
+  /* -------------------------------------------------------------- */
+
   const data = {};
 
-  if (body.pseudo !== undefined) data.pseudo = String(body.pseudo).trim();
-  if (body.description !== undefined)
-    data.description = String(body.description).trim();
+  // commun
   if (body.localisation !== undefined)
-    data.localisation = String(body.localisation).trim();
+    data.localisation = body.localisation || null;
+  if (body.experience !== undefined)
+    data.experience = body.experience || null;
+  if (body.rechercheType !== undefined)
+    data.rechercheType = body.rechercheType || null;
+  if (body.type !== undefined) data.type = body.type || null;
 
-  // numériques : on ne met à jour que si valeur valide
-  if (body.age !== undefined) {
-    const n = safeNumber(body.age);
-    if (n !== null) data.age = n;
-  }
-  if (body.taille !== undefined) {
-    const n = safeNumber(body.taille);
-    if (n !== null) data.taille = n;
-  }
+  // membre 1
+  if (body.age !== undefined) data.age = safeNumber(body.age);
+  if (body.dateNaissance !== undefined)
+    data.dateNaissance = body.dateNaissance
+      ? safeDate(body.dateNaissance)
+      : null;
+  if (body.fumeur !== undefined) data.fumeur = body.fumeur || null;
+  if (body.silhouette !== undefined)
+    data.silhouette = body.silhouette || null;
+  if (body.taille !== undefined) data.taille = safeNumber(body.taille);
+  if (body.origines !== undefined) data.origines = body.origines || null;
+  if (body.yeux !== undefined) data.yeux = body.yeux || null;
+  if (body.cheveux !== undefined) data.cheveux = body.cheveux || null;
 
-  if (body.silhouette !== undefined) data.silhouette = body.silhouette;
-  if (body.yeux !== undefined) data.yeux = body.yeux;
-  if (body.cheveux !== undefined) data.cheveux = body.cheveux;
-  if (body.statut !== undefined) data.statut = body.statut;
-  if (body.experience !== undefined) data.experience = body.experience;
+  // membre 2 (couple)
+  if (body.age2 !== undefined) data.age2 = safeNumber(body.age2);
+  if (body.dateNaissance2 !== undefined)
+    data.dateNaissance2 = body.dateNaissance2
+      ? safeDate(body.dateNaissance2)
+      : null;
+  if (body.fumeur2 !== undefined) data.fumeur2 = body.fumeur2 || null;
+  if (body.silhouette2 !== undefined)
+    data.silhouette2 = body.silhouette2 || null;
+  if (body.taille2 !== undefined) data.taille2 = safeNumber(body.taille2);
+  if (body.origines2 !== undefined) data.origines2 = body.origines2 || null;
+  if (body.yeux2 !== undefined) data.yeux2 = body.yeux2 || null;
+  if (body.cheveux2 !== undefined) data.cheveux2 = body.cheveux2 || null;
+  if (body.description2 !== undefined)
+    data.description2 = body.description2 || null;
 
-  // GPS éventuels
-  if (body.latitude !== undefined) {
-    const n = safeNumber(body.latitude);
-    if (n !== null) data.latitude = n;
-  }
-  if (body.longitude !== undefined) {
-    const n = safeNumber(body.longitude);
-    if (n !== null) data.longitude = n;
-  }
+  // éventuellement GPS si tu les ajoutes dans le form plus tard
+  if (body.latitude !== undefined)
+    data.latitude = safeNumber(body.latitude);
+  if (body.longitude !== undefined)
+    data.longitude = safeNumber(body.longitude);
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
@@ -167,27 +189,16 @@ export async function POST(req) {
     );
   }
 
-  /* --- Update Prisma --- */
+  /* -------------------------------------------------------------- */
+  /* Update Prisma                                                  */
+  /* -------------------------------------------------------------- */
+
   try {
     const updated = await prisma.utilisateur.update({
       where: { id: userId },
       data,
-      select: {
-        id: true,
-        pseudo: true,
-        description: true,
-        localisation: true,
-        age: true,
-        taille: true,
-        silhouette: true,
-        yeux: true,
-        cheveux: true,
-        statut: true,
-        experience: true,
-        latitude: true,
-        longitude: true,
-        photoUrl: true,
-      },
+      // pas de select : on renvoie tout l'utilisateur pour rester
+      // compatible avec le reste de l'app
     });
 
     return NextResponse.json(
@@ -200,7 +211,7 @@ export async function POST(req) {
       {
         success: false,
         message: "Erreur serveur",
-        error: e.message, // tu pourras enlever ce champ en prod si tu veux
+        error: e.message, // utile pour debug, tu peux enlever plus tard
       },
       { status: 500, headers }
     );
