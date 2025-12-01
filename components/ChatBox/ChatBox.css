@@ -223,11 +223,26 @@
 }
 
 /* === Réactions / Emojis === */
+/* Icônes de réaction à côté de la bulle */
 .div-react {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
 }
+
+/* Messages que TU envoies → à droite */
+.message-bubble.own .div-react {
+  right: -42px; /* ajuste si tu veux plus ou moins collé */
+}
+
+/* Messages reçus → à gauche */
+.message-bubble.other .div-react {
+  left: -42px;
+}
+
 .message-reactions {
   display: flex;
   gap: 8px;
@@ -333,6 +348,11 @@
   pointer-events: auto;
 }
 .reaction-bar-container {
+  position: absolute;
+  bottom: calc(100% + 6px); /* au-dessus du 😊 */
+  /* par défaut, centré sur le bouton */
+  left: 50%;
+  transform: translateX(-50%);
   border-radius: 12px;
   padding: 10px 12px;
   display: flex;
@@ -342,7 +362,24 @@
   background: #1c1c1c;
   box-shadow: 0 4px 12px rgb(0 0 0 / 50%);
   animation: fade-in 0.2s;
+  z-index: 30;
 }
+
+/* Quand c'est un message que TU envoies (open-left dans ton JSX) :
+   on colle le menu côté bulle */
+.reaction-bar-container.open-left {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* Message reçu (open-right) → collé de l'autre côté */
+.reaction-bar-container.open-right {
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
 .emoji-pack-selector {
   display: flex;
   align-items: center;
@@ -381,6 +418,16 @@
 .reaction-option:hover {
   transform: scale(1.2);
   background-color: #ffe4f0;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* === Zone saisie message === */
