@@ -1,49 +1,54 @@
-// app/api/upload-photo/route.js
+// app/api/update-profil/route.js
 import { NextResponse } from "next/server";
 import { cookies as getCookies, headers as getHeaders } from "next/headers";
 import jwt from "jsonwebtoken";
-import { prisma } from "../../../lib/prisma";         // adapte si besoin
-import { s3 } from "../../../lib/s3";                 // ton client S3 initialisé
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { isProfilComplet } from "../../../lib/isProfilComplet"; // si tu en as besoin ailleurs
+import { prisma } from "../../../lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ——— CORS ———
+/* ------------------------------- CORS ----------------------------------- */
+
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",   // Expo web
   "http://localhost:19006",  // Expo dev
   "https://www.x-periences.fr",
   "https://x-periences.fr",
 ];
+
 function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Requested-With",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
 }
+
 export async function OPTIONS() {
   const origin = (await getHeaders()).get("origin") || "";
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-// ——— Auth helpers ———
+/* ------------------------------- AUTH ----------------------------------- */
+
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
 function extractToken(reqHeaders) {
-  // 1) Authorization: Bearer ...
+  // 1) Authorization: Bearer xxx (mobile)
   const auth = reqHeaders.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
 
-  // 2) Cookie 'token=' (via next/headers cookies() si possible)
+  // 2) Cookie 'token=' (web)
   try {
     const c = getCookies().get("token")?.value;
     if (c) return c;
@@ -62,131 +67,119 @@ function safeNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+/* -------------------------------- POST ---------------------------------- */
+
 export async function POST(req) {
   const reqHeaders = await getHeaders();
   const origin = reqHeaders.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  // — Auth (JSON, pas de redirect)
+  // --- Auth ---
   const token = extractToken(reqHeaders);
   if (!token) {
-    return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401, headers });
+    return NextResponse.json(
+      { success: false, message: "Non autorisé" },
+      { status: 401, headers }
+    );
   }
+
   let decoded;
   try {
     decoded = jwt.verify(token, JWT_SECRET);
-  } catch {
-    return NextResponse.json({ success: false, message: "Token invalide" }, { status: 403, headers });
+  } catch (e) {
+    console.error("JWT error update-profil:", e);
+    return NextResponse.json(
+      { success: false, message: "Token invalide" },
+      { status: 403, headers }
+    );
   }
+
   const userId = Number(decoded.id || decoded.sub);
   if (!userId) {
-    return NextResponse.json({ success: false, message: "Token invalide" }, { status: 403, headers });
+    return NextResponse.json(
+      { success: false, message: "Token invalide" },
+      { status: 403, headers }
+    );
   }
 
-  // — FormData (multipart)
-  let formData, file, galerieId, isPublic;
+  // --- Body JSON ---
+  let body;
   try {
-    formData = await req.formData();
-    // accepte "photo" OU "file"
-    file = formData.get("photo") || formData.get("file");
-    galerieId = formData.get("galerieId");
-    isPublic = String(formData.get("isPublic") || "").toLowerCase() === "true";
-  } catch {
-    return NextResponse.json({ success: false, message: "FormData invalide" }, { status: 400, headers });
-  }
-
-  if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
-    return NextResponse.json({ success: false, message: "Fichier invalide" }, { status: 400, headers });
-  }
-
-  // — Buffer
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const contentType = file.type || "application/octet-stream";
-  const originalName = file.name || "upload.bin";
-
-  // — Modération (Sightengine)
-  try {
-    const moderationForm = new FormData();
-    moderationForm.append("media", new Blob([buffer], { type: contentType }), originalName);
-    moderationForm.append("models", "face-attributes");
-    moderationForm.append("api_user", process.env.SIGHTENGINE_USER || "");
-    moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET || "");
-
-    const moderationRes = await fetch("https://api.sightengine.com/1.0/check.json", {
-      method: "POST",
-      body: moderationForm,
-    });
-    const moderationData = await moderationRes.json();
-
-    const faces = Array.isArray(moderationData?.faces) ? moderationData.faces : [];
-    const hasMinor = faces.some((f) => (f?.attributes?.minor || 0) > 0.8); // seuil
-    if (hasMinor) {
-      return NextResponse.json(
-        { success: false, message: "Photo refusée : une personne semble mineure." },
-        { status: 400, headers }
-      );
-    }
+    body = await req.json();
   } catch (e) {
-    console.error("Modération image échouée:", e);
-    return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500, headers });
+    console.error("JSON parse error update-profil:", e);
+    return NextResponse.json(
+      { success: false, message: "JSON invalide" },
+      { status: 400, headers }
+    );
   }
 
-  // — Upload S3
-  const bucket = process.env.AWS_S3_BUCKET;
-  if (!bucket) {
-    return NextResponse.json({ success: false, message: "S3 non configuré" }, { status: 500, headers });
+  // On ne met à jour que les champs autorisés
+  const data = {};
+  if (body.pseudo !== undefined) data.pseudo = String(body.pseudo).trim();
+  if (body.description !== undefined)
+    data.description = String(body.description).trim();
+  if (body.localisation !== undefined)
+    data.localisation = String(body.localisation).trim();
+  if (body.ville !== undefined) data.ville = String(body.ville).trim();
+  if (body.departement !== undefined)
+    data.departement = String(body.departement).trim();
+
+  if (body.age !== undefined) data.age = safeNumber(body.age);
+  if (body.taille !== undefined) data.taille = safeNumber(body.taille);
+
+  if (body.silhouette !== undefined) data.silhouette = body.silhouette;
+  if (body.yeux !== undefined) data.yeux = body.yeux;
+  if (body.cheveux !== undefined) data.cheveux = body.cheveux;
+  if (body.statut !== undefined) data.statut = body.statut;
+  if (body.experience !== undefined) data.experience = body.experience;
+
+  // GPS éventuels
+  if (body.latitude !== undefined)
+    data.latitude = safeNumber(body.latitude);
+  if (body.longitude !== undefined)
+    data.longitude = safeNumber(body.longitude);
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Aucune donnée à mettre à jour" },
+      { status: 400, headers }
+    );
   }
-  const safeName = String(originalName).replace(/[^\w.\-]/g, "_");
-  const key = `photo_${userId}_${Date.now()}_${safeName}`;
 
   try {
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-        ACL: "private",
-      })
+    const updated = await prisma.utilisateur.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        pseudo: true,
+        description: true,
+        localisation: true,
+        ville: true,
+        departement: true,
+        age: true,
+        taille: true,
+        silhouette: true,
+        yeux: true,
+        cheveux: true,
+        statut: true,
+        experience: true,
+        latitude: true,
+        longitude: true,
+        photoUrl: true,
+      },
+    });
+
+    return NextResponse.json(
+      { success: true, user: updated },
+      { status: 200, headers }
     );
   } catch (e) {
-    console.error("S3 upload error:", e);
-    return NextResponse.json({ success: false, message: "Erreur upload" }, { status: 500, headers });
-  }
-
-  // — Persist DB (clé S3 uniquement)
-  try {
-    // Galerie privée ?
-    if (galerieId && !Number.isNaN(Number(galerieId))) {
-      const gal = await prisma.galeriePrivee.findUnique({ where: { id: Number(galerieId) } });
-      if (!gal) {
-        return NextResponse.json({ success: false, message: "Galerie privée introuvable." }, { status: 404, headers });
-      }
-      const photo = await prisma.photo.create({
-        data: { url: key, utilisateurId: userId, galeriePriveeId: gal.id },
-        select: { id: true, url: true, galeriePriveeId: true },
-      });
-      return NextResponse.json({ success: true, photoUrl: key, photo }, { headers });
-    }
-
-    // Galerie publique ?
-    if (isPublic) {
-      const photo = await prisma.photo.create({
-        data: { url: key, utilisateurId: userId, galeriePriveeId: null },
-        select: { id: true, url: true },
-      });
-      return NextResponse.json({ success: true, photoUrl: key, photo }, { headers });
-    }
-
-    // Photo de profil par défaut
-    await prisma.utilisateur.update({
-      where: { id: userId },
-      data: { photoUrl: key },
-    });
-    return NextResponse.json({ success: true, photoUrl: key }, { headers });
-  } catch (e) {
-    console.error("DB error:", e);
-    return NextResponse.json({ success: false, message: "Erreur serveur." }, { status: 500, headers });
+    console.error("DB error update-profil:", e);
+    return NextResponse.json(
+      { success: false, message: "Erreur serveur" },
+      { status: 500, headers }
+    );
   }
 }
