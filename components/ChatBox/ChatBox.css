@@ -19,6 +19,7 @@
   background: transparent;
   border: 1px #e0c084 solid;
 }
+
 .call-timer-badge {
   position: absolute;
   left: 0;
@@ -81,6 +82,7 @@
   font-weight: bold;
   cursor: pointer;
 }
+
 .appel-popup-actions button {
   padding: 10px 16px;
   border: none;
@@ -89,10 +91,12 @@
   cursor: pointer;
   font-size: 16px;
 }
+
 .appel-popup-actions button:first-child {
   background-color: #4caf50;
   color: white;
 }
+
 .appel-popup-actions button:last-child {
   background-color: #f44336;
   color: white;
@@ -106,6 +110,7 @@
   flex-shrink: 0;
   margin-left: 8px;
 }
+
 .chat-actions button {
   background: none;
   border: none;
@@ -115,6 +120,7 @@
   padding: 0.5rem;
   transition: opacity 0.2s;
 }
+
 .chat-actions button:hover {
   opacity: 0.8;
 }
@@ -140,6 +146,7 @@
   transition: background 0.2s;
   z-index: 1;
 }
+
 .message-bubble.own {
   background: linear-gradient(
     100deg,
@@ -152,6 +159,7 @@
   border-bottom-right-radius: 16px;
   width: 50%;
 }
+
 .message-bubble.other {
   background: rgb(30 20 7 / 72%);
   color: #f7f6f4;
@@ -160,11 +168,13 @@
   border-bottom-left-radius: 16px;
   width: 50%;
 }
+
 .message-class {
   display: flex;
   flex-direction: column;
   width: 100%;
 }
+
 .message-text {
   white-space: pre-line;
 }
@@ -177,6 +187,7 @@
   gap: 6px;
   border-bottom: 1px solid #e0c084;
 }
+
 .author-avatar {
   width: 26px;
   height: 26px;
@@ -186,12 +197,14 @@
   box-shadow: 0 0 2px #ddd8;
   margin-bottom: 6px;
 }
+
 .author-name {
   font-size: 0.97em;
   font-weight: 600;
   color: white;
   letter-spacing: 0.03em;
 }
+
 /* === Nom inline pour les couples === */
 .author-inline-name {
   font-size: 0.87em;
@@ -216,6 +229,7 @@
   display: flex;
   gap: 12px;
 }
+
 .message-time {
   display: flex;
   flex-direction: column;
@@ -379,127 +393,14 @@
   opacity: 0.4;
   transition: color 0.15s, opacity 0.15s;
 }
+
 .delete-message-button:hover {
   color: #e66;
   opacity: 1;
 }
+
 .message-bubble.own .delete-message-button {
   color: white;
-}
-
-/* === Emoji Picker (barre & bouton) === */
-.emoji-action-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  z-index: 10;
-}
-.emoji-action-wrapper.right {
-  flex-direction: row;
-  justify-content: flex-start;
-}
-.emoji-action-wrapper.left {
-  flex-direction: row-reverse;
-  justify-content: flex-end;
-}
-.emoji-fixed-btn {
-  border: none;
-  font-size: 19px;
-  cursor: pointer;
-  background: transparent;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
-  z-index: 10;
-}
-.emoji-fixed-btn:hover {
-  transform: scale(1.1);
-}
-.message-bubble:hover .emoji-fixed-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-.reaction-bar-container {
-  position: absolute;
-  bottom: calc(100% + 6px); /* au-dessus du 😊 */
-  /* par défaut, centré sur le bouton */
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 200px;
-  background: #1c1c1c;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 50%);
-  animation: fade-in 0.2s;
-  z-index: 30;
-}
-
-/* Quand c'est un message que TU envoies (open-left dans ton JSX) :
-   on colle le menu côté bulle */
-.reaction-bar-container.open-left {
-  left: auto;
-  right: 0;
-  transform: none;
-}
-
-/* Message reçu (open-right) → collé de l'autre côté */
-.reaction-bar-container.open-right {
-  left: 0;
-  right: auto;
-  transform: none;
-}
-
-.emoji-pack-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: space-between;
-}
-#emoji-pack-select {
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  background: #e0c084;
-  color: #8c6a5d;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-.reaction-bar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-.reaction-option {
-  font-size: 22px;
-  background: #f4f4f4;
-  border: none;
-  border-radius: 8px;
-  padding: 6px;
-  cursor: pointer;
-  transition: transform 0.2s, background-color 0.2s;
-  min-width: 36px;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.reaction-option:hover {
-  transform: scale(1.2);
-  background-color: #ffe4f0;
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* === Zone saisie message === */
@@ -509,9 +410,11 @@
   gap: 8px;
   padding: 8px;
 }
+
 .input-wrapper {
   flex: 1;
 }
+
 .input-text {
   flex: 6 1;
   padding: 10px 12px;
@@ -523,10 +426,12 @@
   line-height: 1.4;
   width: 100%;
 }
+
 .input-text:focus {
   outline: none;
   box-shadow: 0 0 3px #e0c084;
 }
+
 .message-btn,
 .audio-btn,
 .emoji-btn {
@@ -535,9 +440,11 @@
   font-size: 20px;
   cursor: pointer;
 }
-.message-btn{
+
+.message-btn {
   color: white;
 }
+
 .audio-btn.recording {
   color: red;
 }
@@ -557,6 +464,7 @@
   gap: 8px;
   width: 100%;
 }
+
 .playpause-button {
   background: none;
   border: none;
@@ -569,11 +477,13 @@
   transition: color 0.2s, opacity 0.2s, transform 0.2s;
   opacity: 1;
 }
+
 .playpause-button:hover {
   color: #fff;
   opacity: 0.85;
   transform: scale(1.1);
 }
+
 .audio-progress {
   flex: 1;
   height: 8px;
@@ -585,12 +495,14 @@
   min-width: 60px;
   overflow: hidden;
 }
+
 .audio-progress-bar {
   height: 100%;
   background: #e0c084;
   border-radius: 4px;
   transition: width 0.1s linear;
 }
+
 .duration {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
@@ -604,25 +516,28 @@
   .audio-bubble {
     font-size: 16px;
   }
+
   .playpause-button {
     font-size: 20px;
   }
+
   .duration {
     font-size: 9px;
   }
+
   .message-bubble.own,
-  .message-bubble.other{
+  .message-bubble.other {
     width: 60%;
   }
-  .input-wrapper{
+
+  .input-wrapper {
     display: flex;
     gap: 16px;
   }
-  .message-btn{
-  padding: 0.7rem 2rem !important;
-  
-}
 
+  .message-btn {
+    padding: 0.7rem 2rem !important;
+  }
 }
 
 /* === Webcam / Visio === */
@@ -638,9 +553,11 @@
   z-index: 1000;
   object-fit: cover;
 }
+
 .mini-webcam.remote {
   right: 200px;
 }
+
 .video-call-container {
   display: flex;
   flex-direction: column;
@@ -651,12 +568,14 @@
   height: 4000rem;
   margin-bottom: 10px;
 }
+
 .video-call-container video {
   width: 100%;
   border-radius: 8px;
   margin: 5px;
   background: #000;
 }
+
 .video-box {
   position: relative;
   display: inline-block;
@@ -665,12 +584,14 @@
   overflow: hidden;
   box-shadow: 0 4px 10px rgb(0 0 0 / 40%);
 }
+
 .video-box video {
   width: 240px;
   height: 180px;
   border-radius: 10px;
   object-fit: cover;
 }
+
 .video-label {
   position: absolute;
   bottom: 5px;
@@ -681,6 +602,7 @@
   font-size: 0.75rem;
   border-radius: 4px;
 }
+
 .hangup-button {
   background: red;
   color: white;
@@ -705,6 +627,7 @@
   box-shadow: 0 8px 32px #0002;
   min-width: 290px;
 }
+
 .add-participant-modal h3 {
   margin-top: 0;
   text-align: center;
@@ -724,40 +647,33 @@
   pointer-events: none;
 }
 
-/* === Keyframes en kebab-case === */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -10px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-
 /* === Responsive === */
 @media (max-width: 600px) {
   .message-bubble {
     max-width: 94vw;
     padding: 10px 10px 6px;
   }
+
   .author-info {
     gap: 4px;
   }
+
   .author-avatar {
     width: 22px;
     height: 22px;
   }
 }
+
 @media screen and (max-width: 768px) {
   .chat-input {
     flex-direction: column;
   }
+
   .participant-name {
     display: none !important;
   }
 }
+
 .chat-input-ephemere-btn,
 .chat-input-mic-btn,
 .chat-input-emoji-btn {

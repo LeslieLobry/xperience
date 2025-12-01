@@ -73,7 +73,7 @@ export default function MessageBubble({
     "👄": "Envie de t’embrasser",
   };
 
-  // Pack actif : on utilise celui passé en prop, sinon "sexy"
+  // Pack actif : celui passé en prop, sinon "sexy"
   const activePack = emojiPacks[emojiPack] || emojiPacks.sexy;
 
   /* ---------------------------------------------------------------------- */
@@ -99,7 +99,8 @@ export default function MessageBubble({
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, [isPickerOpen]);
 
   /* ---------------------------------------------------------------------- */
@@ -151,7 +152,7 @@ export default function MessageBubble({
     msg.type === "AUDIO" ? msg.audioUrl : null
   );
 
-  // Regroupement des réactions par emoji (comme WhatsApp : emoji + total)
+  // Regroupement des réactions par emoji (emoji + total)
   const groupedReactions = Object.entries(
     (msg.reactions || []).reduce((acc, r) => {
       if (!acc[r.emoji]) acc[r.emoji] = new Set();
@@ -245,7 +246,7 @@ export default function MessageBubble({
         </button>
       )}
 
-      {/* Réactions agrégées (comme WhatsApp : 😍 3, 😈 1...) */}
+      {/* Réactions agrégées sous la bulle */}
       {groupedReactions.length > 0 && (
         <div className="message-reactions">
           {groupedReactions.map(([emoji, utilisateursSet]) => {
@@ -265,6 +266,11 @@ export default function MessageBubble({
                   " — " +
                   (nb > 1 ? `${nb} personnes` : "1 personne")
                 }
+                onClick={() => {
+                  // 👉 Permet de re-caller onReact sur un emoji déjà présent
+                  // (pour que tu puisses gérer toggle côté backend)
+                  onReact?.(msg.id, emoji);
+                }}
               >
                 <span>{emoji}</span>
                 <span>{nb}</span>
@@ -287,10 +293,7 @@ export default function MessageBubble({
 
       {/* Picker d’emoji (bulle au-dessus de la bulle du message) */}
       {isPickerOpen && (
-        <div
-          ref={pickerRef}
-          className="reaction-picker"
-        >
+        <div ref={pickerRef} className="reaction-picker">
           {activePack.map((emo) => (
             <button
               key={emo}

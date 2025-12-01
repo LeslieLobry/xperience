@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
+import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
@@ -21,7 +22,7 @@ const safeFetcher = async (url) => {
   return data;
 };
 
-// Petit helper pour générer des initiales
+// --- mêmes initiales que tu avais avant ---
 function getInitials(name) {
   if (!name) return "?";
   const parts = name
@@ -30,6 +31,64 @@ function getInitials(name) {
     .filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+// --- HOOK commun : presign des photos utilisateurs (clé S3 -> URL) ---
+function usePresignedPhotos(users) {
+  const [photoUrls, setPhotoUrls] = useState({});
+
+  useEffect(() => {
+    if (!users || users.length === 0) {
+      setPhotoUrls({});
+      return;
+    }
+
+    let canceled = false;
+
+    async function fetchAll() {
+      const result = {};
+      await Promise.all(
+        users.map(async (u) => {
+          if (!u?.id) return;
+
+          // pas de photo → on note default, on gère l'affichage ensuite
+          if (!u.photoUrl) {
+            result[u.id] = "/default.jpg";
+            return;
+          }
+
+          // déjà une URL complète → on utilise directement
+          if (u.photoUrl.startsWith("http")) {
+            result[u.id] = u.photoUrl;
+            return;
+          }
+
+          // sinon on demande une URL presignée
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: u.photoUrl }),
+            });
+            const data = await res.json();
+            result[u.id] = data.url || "/default.jpg";
+          } catch (e) {
+            console.error("Erreur presign photo pour user", u.id, e);
+            result[u.id] = "/default.jpg";
+          }
+        })
+      );
+      if (!canceled) setPhotoUrls(result);
+    }
+
+    fetchAll();
+
+    return () => {
+      canceled = true;
+    };
+  }, [JSON.stringify(users)]); // simple, comme dans ton ChatHeader
+
+  return photoUrls;
 }
 
 export default function ListeConversations({
@@ -59,7 +118,24 @@ export default function ListeConversations({
     [rawConversations]
   );
 
-  // 🔁 URL -> state (ne déclenche pas d'ouverture depuis ici)
+  // 👉 on prépare une liste unique de tous les autres utilisateurs
+  const allAutresUsers = useMemo(() => {
+    const map = {};
+    conversations.forEach((conv) => {
+      (conv.participants || []).forEach((p) => {
+        if (Number(p.utilisateurId) === Number(userId)) return;
+        const u = p.utilisateur;
+        if (!u) return;
+        map[u.id] = u; // dédoublonnage par id
+      });
+    });
+    return Object.values(map);
+  }, [conversations, userId]);
+
+  // 🔗 presigned URLs pour tous ces utilisateurs
+  const photoUrls = usePresignedPhotos(allAutresUsers);
+
+  // 🔁 URL -> state
   useEffect(() => {
     const idParam = searchParams?.get("conversationId");
     const id = idParam ? Number(idParam) : null;
@@ -173,7 +249,6 @@ export default function ListeConversations({
 
         const unreadCount = conv.unreadCount || 0;
 
-        // On prend max 2 personnes pour l’avatar (stack si groupe)
         const avatarUsers = autres.slice(0, 2);
 
         return (
@@ -194,31 +269,43 @@ export default function ListeConversations({
                     </div>
                   )}
 
-                  {avatarUsers.length === 1 && (
-                    <>
-                      {avatarUsers[0].photoUrl ? (
-                        <img
-                          src={avatarUsers[0].photoUrl}
-                          alt={avatarUsers[0].pseudo || "Photo de profil"}
-                          className="conv-avatar-img"
-                        />
-                      ) : (
-                        <div className="conv-avatar-placeholder">
-                          {getInitials(avatarUsers[0].pseudo)}
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {avatarUsers.length === 1 && (() => {
+                    const u = avatarUsers[0];
+                    const url = photoUrls[u.id];
+
+                    // si on a une vraie URL (pas juste /default.jpg), on affiche la photo,
+                    // sinon on garde les initiales comme avant
+                    return url && url !== "/default.jpg" ? (
+                      <img
+                        src={url}
+                        alt={u.pseudo || "Photo de profil"}
+                        className="conv-avatar-img"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/default.jpg";
+                        }}
+                      />
+                    ) : (
+                      <div className="conv-avatar-placeholder">
+                        {getInitials(u.pseudo)}
+                      </div>
+                    );
+                  })()}
 
                   {avatarUsers.length > 1 && (
                     <div className="conv-avatar-stack">
-                      {avatarUsers.map((u, index) =>
-                        u.photoUrl ? (
+                      {avatarUsers.map((u, index) => {
+                        const url = photoUrls[u.id];
+                        return url && url !== "/default.jpg" ? (
                           <img
                             key={u.id || index}
-                            src={u.photoUrl}
+                            src={url}
                             alt={u.pseudo || "Photo de profil"}
                             className={`conv-avatar-img stacked stacked-${index}`}
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "/default.jpg";
+                            }}
                           />
                         ) : (
                           <div
@@ -227,8 +314,8 @@ export default function ListeConversations({
                           >
                             {getInitials(u.pseudo)}
                           </div>
-                        )
-                      )}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
