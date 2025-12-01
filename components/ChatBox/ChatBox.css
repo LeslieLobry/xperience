@@ -141,7 +141,7 @@
   margin: 8px 0;
   padding: 13px 18px 10px 14px;
   border-radius: 16px;
-  overflow-wrap: break-word; /* fix Stylelint */
+  overflow-wrap: break-word;
   box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
   transition: background 0.2s;
   z-index: 1;
@@ -237,11 +237,11 @@
 }
 
 /* === Réactions / Emojis === */
-
-/* Bouton qui ouvre les réactions (style Messenger) */
+/* Bouton qui ouvre les réactions (style Messenger), EN DEHORS de la bulle */
 .message-react-btn {
   position: absolute;
-  top: -12px;
+  top: 50%;
+  transform: translateY(-50%);
   border: none;
   background: #111;
   color: #f7f6f4;
@@ -259,13 +259,14 @@
   z-index: 5;
 }
 
-/* Position du bouton selon le côté du message */
+/* Messages que TU envoies → bouton à droite, décalé hors de la bulle */
 .message-bubble.own .message-react-btn {
-  right: 10px;
+  right: -36px;
 }
 
+/* Messages reçus → bouton à gauche, décalé hors de la bulle */
 .message-bubble.other .message-react-btn {
-  left: 10px;
+  left: -36px;
 }
 
 /* Desktop : le bouton apparaît au survol de la bulle */
@@ -285,14 +286,14 @@
 }
 
 .message-react-btn:hover {
-  transform: translateY(-1px) scale(1.05);
+  transform: translateY(-50%) scale(1.05);
 }
 
 /* Bulle avec les réactions possibles (😍 😈 💋...) */
 .reaction-picker {
   position: absolute;
   bottom: 100%;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   padding: 6px 8px;
   border-radius: 999px;
   background: rgba(5, 5, 9, 0.95);
@@ -302,12 +303,14 @@
   z-index: 10;
 }
 
+/* Alignée côté droit de la bulle (messages envoyés) */
 .message-bubble.own .reaction-picker {
-  right: 10px;
+  right: -10px;
 }
 
+/* Alignée côté gauche de la bulle (messages reçus) */
 .message-bubble.other .reaction-picker {
-  left: 10px;
+  left: -10px;
 }
 
 /* Boutons d'emoji dans le picker */
@@ -679,4 +682,25 @@
 .chat-input-emoji-btn {
   background-color: transparent;
   border: none;
+}
+
+/* 🧷 Header toujours visible sur mobile */
+@media (max-width: 768px) {
+  .chatbox-container {
+    position: relative;
+    height: 100vh;         /* le chat prend tout l'écran */
+    padding-top: 60px;     /* même hauteur que le header pour ne pas qu'il masque les messages */
+    box-sizing: border-box;
+  }
+
+  .chat-header-mobile {
+    position: fixed;
+    top: 0;                /* si tu as une navbar fixe, mets par ex. top: 56px; */
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: #050509;   /* ou ta couleur de fond de chat */
+    border-left: none;
+    border-right: none;
+  }
 }

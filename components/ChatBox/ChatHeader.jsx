@@ -43,11 +43,10 @@ export default function ChatHeader({
   onBack,
 }) {
   const photoUrls = usePresignedPhotos(participants);
-  // Simple détection mobile JS (optionnel)
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
   return (
-    <div className="chat-header">
+    <div className={`chat-header ${isMobile ? "chat-header-mobile" : ""}`}>
       <div className="chat-participants">
         {onBack && (
           <button
@@ -58,7 +57,6 @@ export default function ChatHeader({
               onBack?.();
             }}
             onMouseDown={(e) => {
-              // évite le focus/flicker pouvant déclencher des scroll handlers
               e.preventDefault();
               e.stopPropagation();
             }}
@@ -70,7 +68,7 @@ export default function ChatHeader({
               color: "#ad935e",
               background: "none",
               border: "none",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             <ArrowLeft />
