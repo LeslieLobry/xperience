@@ -225,7 +225,8 @@ list-style: none;
 
   .profil-name{
     font-size: 22px;
-  }
+    display: flex;
+  justify-content: center;  }
 
   .membre-colum{
     flex-direction: column;

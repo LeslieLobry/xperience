@@ -20,9 +20,10 @@ width: 100%;
   cursor: pointer;
   font-weight: bold;
   border-radius: 16px;
+  color: #fff !important;
 }
 
 .tabs-buttons button.active {
   background: #e0c084;
-  color: #fff;
+  color: #fff !important;
 }

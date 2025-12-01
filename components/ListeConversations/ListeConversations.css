@@ -194,7 +194,7 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  border: 2px solid #050509; /* bordure pour bien détacher les bulles */
+  border: 2px solid #e0c084; 
 }
 
 .conv-avatar-stack .stacked-0 {
