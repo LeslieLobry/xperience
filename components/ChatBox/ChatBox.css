@@ -158,6 +158,7 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 16px;
   width: 50%;
+  margin-right: 30px;        /* ← espace pour le bouton emoji */
 }
 
 .message-bubble.other {
@@ -167,6 +168,7 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 16px;
   width: 50%;
+  margin-left: 30px;         /* ← espace pour le bouton emoji */
 }
 
 .message-class {
@@ -237,7 +239,7 @@
 }
 
 /* === Réactions / Emojis === */
-/* Bouton qui ouvre les réactions (style Messenger), EN DEHORS de la bulle */
+/* Bouton qui ouvre les réactions (style Messenger), en DEHORS de la bulle */
 .message-react-btn {
   position: absolute;
   top: 50%;
@@ -259,17 +261,17 @@
   z-index: 5;
 }
 
-/* Messages que TU envoies → bouton à droite, décalé hors de la bulle */
+/* Messages envoyés → bouton à droite, légèrement sorti */
 .message-bubble.own .message-react-btn {
-  right: -36px;
+  right: -18px;
 }
 
-/* Messages reçus → bouton à gauche, décalé hors de la bulle */
+/* Messages reçus → bouton à gauche, légèrement sorti */
 .message-bubble.other .message-react-btn {
-  left: -36px;
+  left: -18px;
 }
 
-/* Desktop : le bouton apparaît au survol de la bulle */
+/* Desktop : bouton visible au survol */
 @media (hover: hover) and (pointer: fine) {
   .message-bubble:hover .message-react-btn {
     opacity: 1;
@@ -303,14 +305,13 @@
   z-index: 10;
 }
 
-/* Alignée côté droit de la bulle (messages envoyés) */
+/* Alignée côté droit / gauche selon le message */
 .message-bubble.own .reaction-picker {
-  right: -10px;
+  right: -4px;
 }
 
-/* Alignée côté gauche de la bulle (messages reçus) */
 .message-bubble.other .reaction-picker {
-  left: -10px;
+  left: -4px;
 }
 
 /* Boutons d'emoji dans le picker */
@@ -684,6 +685,7 @@
   border: none;
 }
 
+
 /* 🧷 Header toujours visible sur mobile */
 @media (max-width: 768px) {
   .chatbox-container {
@@ -695,7 +697,7 @@
 
   .chat-header-mobile {
     position: fixed;
-    top: 0;                /* si tu as une navbar fixe, mets par ex. top: 56px; */
+    top: 183px;               
     left: 0;
     right: 0;
     z-index: 50;
