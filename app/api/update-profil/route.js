@@ -7,7 +7,9 @@ import { prisma } from "../../../lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* ------------------------------- CORS ----------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* ⚙️ CORS                                                                    */
+/* -------------------------------------------------------------------------- */
 
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",   // Expo web
@@ -28,6 +30,7 @@ function corsHeaders(origin = "") {
       "Content-Type, Authorization, X-Requested-With",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
+    "Access-Control-Expose-Headers": "Content-Type, Content-Length",
     Vary: "Origin",
   };
 }
@@ -37,44 +40,52 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
 
-/* ------------------------------- AUTH ----------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* 🔐 AUTH                                                                    */
+/* -------------------------------------------------------------------------- */
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
 
 function extractToken(reqHeaders) {
-  // 1) Authorization: Bearer xxx (mobile)
+  // 1) Authorization: Bearer xxx (app mobile)
   const auth = reqHeaders.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
 
   // 2) Cookie 'token=' (web)
   try {
-    const c = getCookies().get("token")?.value;
-    if (c) return c;
-  } catch {}
+    const cookieStore = getCookies();
+    const cookieToken = cookieStore.get("token")?.value;
+    if (cookieToken) return cookieToken;
+  } catch {
+    // ignore
+  }
 
   // 3) Cookie header brut (fallback)
-  const cookie = reqHeaders.get("cookie") || "";
-  const pair = cookie.split(/;\s*/).find((x) => x.startsWith("token="));
+  const cookieHeader = reqHeaders.get("cookie") || "";
+  const pair = cookieHeader.split(/;\s*/).find((x) => x.startsWith("token="));
   if (pair) return decodeURIComponent(pair.split("=")[1]);
 
   return null;
 }
 
-function safeNumber(v) {
-  const n = Number(v);
+function safeNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-/* -------------------------------- POST ---------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* 📨 POST /api/update-profil                                                 */
+/* -------------------------------------------------------------------------- */
 
 export async function POST(req) {
   const reqHeaders = await getHeaders();
   const origin = reqHeaders.get("origin") || "";
   const headers = corsHeaders(origin);
 
-  // --- Auth ---
+  /* --- Auth --- */
   const token = extractToken(reqHeaders);
   if (!token) {
     return NextResponse.json(
@@ -102,7 +113,7 @@ export async function POST(req) {
     );
   }
 
-  // --- Body JSON ---
+  /* --- Body JSON --- */
   let body;
   try {
     body = await req.json();
@@ -114,19 +125,24 @@ export async function POST(req) {
     );
   }
 
-  // On ne met à jour que les champs autorisés
+  /* --- Construction des données à mettre à jour --- */
   const data = {};
+
   if (body.pseudo !== undefined) data.pseudo = String(body.pseudo).trim();
   if (body.description !== undefined)
     data.description = String(body.description).trim();
   if (body.localisation !== undefined)
     data.localisation = String(body.localisation).trim();
-  if (body.ville !== undefined) data.ville = String(body.ville).trim();
-  if (body.departement !== undefined)
-    data.departement = String(body.departement).trim();
 
-  if (body.age !== undefined) data.age = safeNumber(body.age);
-  if (body.taille !== undefined) data.taille = safeNumber(body.taille);
+  // numériques : on ne met à jour que si valeur valide
+  if (body.age !== undefined) {
+    const n = safeNumber(body.age);
+    if (n !== null) data.age = n;
+  }
+  if (body.taille !== undefined) {
+    const n = safeNumber(body.taille);
+    if (n !== null) data.taille = n;
+  }
 
   if (body.silhouette !== undefined) data.silhouette = body.silhouette;
   if (body.yeux !== undefined) data.yeux = body.yeux;
@@ -135,10 +151,14 @@ export async function POST(req) {
   if (body.experience !== undefined) data.experience = body.experience;
 
   // GPS éventuels
-  if (body.latitude !== undefined)
-    data.latitude = safeNumber(body.latitude);
-  if (body.longitude !== undefined)
-    data.longitude = safeNumber(body.longitude);
+  if (body.latitude !== undefined) {
+    const n = safeNumber(body.latitude);
+    if (n !== null) data.latitude = n;
+  }
+  if (body.longitude !== undefined) {
+    const n = safeNumber(body.longitude);
+    if (n !== null) data.longitude = n;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
@@ -147,6 +167,7 @@ export async function POST(req) {
     );
   }
 
+  /* --- Update Prisma --- */
   try {
     const updated = await prisma.utilisateur.update({
       where: { id: userId },
@@ -156,8 +177,6 @@ export async function POST(req) {
         pseudo: true,
         description: true,
         localisation: true,
-        ville: true,
-        departement: true,
         age: true,
         taille: true,
         silhouette: true,
@@ -178,7 +197,11 @@ export async function POST(req) {
   } catch (e) {
     console.error("DB error update-profil:", e);
     return NextResponse.json(
-      { success: false, message: "Erreur serveur" },
+      {
+        success: false,
+        message: "Erreur serveur",
+        error: e.message, // tu pourras enlever ce champ en prod si tu veux
+      },
       { status: 500, headers }
     );
   }
