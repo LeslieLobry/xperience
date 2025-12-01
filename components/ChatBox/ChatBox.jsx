@@ -76,7 +76,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
-  const messagesContainerRef = useRef(null); // <- ref vers la div scrollable de MessagesList
+  const messagesContainerRef = useRef(null); // <- wrapper scrollable des messages
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({ buffer: [], length: 0 });
@@ -94,16 +94,27 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     return diff < SCROLL_TOLERANCE_PX;
   };
 
-  // 🔧 scrollToBottom plus robuste, qui cible PRIORITAIREMENT la div de MessagesList
-const scrollToBottom = (smooth = true) => {
-  if (!messagesEndRef.current) return;
+  // 🔧 scrollToBottom : scrolle VRAIMENT en bas de la zone messages
+  const scrollToBottom = (smooth = true) => {
+    const el = messagesContainerRef.current;
 
-  messagesEndRef.current.scrollIntoView({
-    behavior: smooth ? "smooth" : "auto",
-    block: "end",
-  });
-};
+    if (el) {
+      if (smooth) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+      return;
+    }
 
+    // fallback au cas où
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "end",
+      });
+    }
+  };
 
   const {
     messages,
@@ -224,7 +235,7 @@ const scrollToBottom = (smooth = true) => {
   }, [conversationId]);
 
   // --------------------- Scroll initial quand les messages sont là ----------------------
-  // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage
+  // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage final
   useLayoutEffect(() => {
     if (!messages?.length || !loadingInitial) return;
 
@@ -575,9 +586,7 @@ const scrollToBottom = (smooth = true) => {
             if (!currentData) return currentData;
             return {
               ...currentData,
-              messages: currentData.messages.filter(
-                (m) => m.id !== messageId
-              ),
+              messages: currentData.messages.filter((m) => m.id !== messageId),
             };
           },
           false
@@ -590,8 +599,7 @@ const scrollToBottom = (smooth = true) => {
 
   const handleAddParticipant = async () => {
     setAddUserError("");
-    if (!addUserInput.trim())
-      return setAddUserError("Champ vide !");
+    if (!addUserInput.trim()) return setAddUserError("Champ vide !");
     setAddUserLoading(true);
     try {
       const res = await fetch(
@@ -669,26 +677,28 @@ const scrollToBottom = (smooth = true) => {
         />
       )}
 
-      <MessagesList
-        ref={messagesContainerRef} // 🔴 c’est cette ref qu’on utilise pour le scroll
-        messages={messages}
-        utilisateur={utilisateur}
-        onReact={handleReaction}
-        lastReads={lastReads}
-        typingPseudo={isTyping ? typingPseudo : null}
-        hasMore={hasMore}
-        onLoadMore={loadMoreMessages}
-        onDelete={handleDelete}
-        prenomsCouple={prenomsCouple}
-      />
+      {/* 🔹 Zone scrollable des messages */}
+      <div className="chat-messages" ref={messagesContainerRef}>
+        <MessagesList
+          messages={messages}
+          utilisateur={utilisateur}
+          onReact={handleReaction}
+          lastReads={lastReads}
+          typingPseudo={isTyping ? typingPseudo : null}
+          hasMore={hasMore}
+          onLoadMore={loadMoreMessages}
+          onDelete={handleDelete}
+          prenomsCouple={prenomsCouple}
+        />
 
-      <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} />
 
-      {isTyping && typingPseudo && (
-        <div className="typing-notif">
-          {typingPseudo} est en train d&apos;écrire...
-        </div>
-      )}
+        {isTyping && typingPseudo && (
+          <div className="typing-notif">
+            {typingPseudo} est en train d&apos;écrire...
+          </div>
+        )}
+      </div>
 
       <ChatInput
         utilisateur={utilisateur}
@@ -704,10 +714,7 @@ const scrollToBottom = (smooth = true) => {
           isImage = false
         ) => {
           const tmpId =
-            "tmp-" +
-            Date.now() +
-            "-" +
-            Math.floor(Math.random() * 10000);
+            "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 
           let optimisticMessage;
           if (isImage && contenu instanceof FormData) {
@@ -744,9 +751,7 @@ const scrollToBottom = (smooth = true) => {
               pseudo: utilisateur.pseudo,
               type: type || "TEXTE",
               contenu:
-                typeof contenu === "string"
-                  ? contenu
-                  : contenu.contenu,
+                typeof contenu === "string" ? contenu : contenu.contenu,
               createdAt: new Date().toISOString(),
               statut: "pending",
               ephemere: type === "EPHEMERE",
@@ -864,9 +869,7 @@ const scrollToBottom = (smooth = true) => {
       <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" />
 
       {appelRefuse && (
-        <div className="call-refused-notif">
-          Appel refusé 📵
-        </div>
+        <div className="call-refused-notif">Appel refusé 📵</div>
       )}
       {appelOccupe && (
         <div className="call-busy-notif">
