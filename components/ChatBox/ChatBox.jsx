@@ -95,26 +95,15 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   };
 
   // 🔧 scrollToBottom : scrolle VRAIMENT en bas de la zone messages
-  const scrollToBottom = (smooth = true) => {
-    const el = messagesContainerRef.current;
+// 🔧 scroll tout en bas en utilisant le sentinel
+const scrollToBottom = (smooth = true) => {
+  if (!messagesEndRef.current) return;
 
-    if (el) {
-      if (smooth) {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      } else {
-        el.scrollTop = el.scrollHeight;
-      }
-      return;
-    }
-
-    // fallback au cas où
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "end",
-      });
-    }
-  };
+  messagesEndRef.current.scrollIntoView({
+    behavior: smooth ? "smooth" : "auto",
+    block: "end",
+  });
+};
 
   const {
     messages,
@@ -236,26 +225,26 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
   // --------------------- Scroll initial quand les messages sont là ----------------------
   // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage final
-  useLayoutEffect(() => {
-    if (!messages?.length || !loadingInitial) return;
+useLayoutEffect(() => {
+  if (!messages?.length || !loadingInitial) return;
 
-    const lastMsg = messages[messages.length - 1];
+  const lastMsg = messages[messages.length - 1];
 
-    // ⚠️ Si les messages sont encore ceux de l’ancienne conversation, on ignore
-    if (
-      lastMsg?.conversationId &&
-      Number(lastMsg.conversationId) !== Number(conversationId)
-    ) {
-      return;
-    }
+  if (
+    lastMsg?.conversationId &&
+    Number(lastMsg.conversationId) !== Number(conversationId)
+  ) {
+    return;
+  }
 
-    // On force le scroll en bas SANS animation quand on ouvre la conversation
+  requestAnimationFrame(() => {
     scrollToBottom(false);
-    lastMsgIdRef.current = lastMsg?.id || null;
+  });
 
-    // On considère que le chargement initial est terminé pour CETTE conversation
-    setLoadingInitial(false);
-  }, [messages, loadingInitial, conversationId]);
+  lastMsgIdRef.current = lastMsg?.id || null;
+  setLoadingInitial(false);
+}, [messages, loadingInitial, conversationId]);
+
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {

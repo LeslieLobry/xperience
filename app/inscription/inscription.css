@@ -126,17 +126,58 @@ color: #e0c084;
   padding-right: 40px; /* espace pour le bouton 👁️ */
 }
 
+.input-wrapper {
+  position: relative;
+}
+
 .toggle-password {
   position: absolute;
-  right: 10px;
+  right: 1rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  font-size: 1.5rem;
   cursor: pointer;
-  color: #ccc;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/* Oeil "classy" */
+.eye-icon {
+  width: 22px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #e0c084;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.eye-icon::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #e0c084;
+}
+
+/* Quand l'oeil est "fermé" on ajoute une barre diagonale */
+.eye-closed::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  height: 2px;
+  background: #e0c084;
+  transform: translateY(-50%) rotate(35deg);
+}
+
 
  .modal-overlay {
   position: fixed;

@@ -50,8 +50,6 @@ export default function RegisterForm() {
     if (value.length >= 2) {
       debounceTimeout.current = setTimeout(async () => {
         try {
-          // --- Cas FRANCE : API officielle (en français) ---
-          // IMPORTANT: on demande explicitement les champs utiles (centre, departement, codeDepartement)
           const resFr = await fetch(
             `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(
               value
@@ -62,7 +60,7 @@ export default function RegisterForm() {
           if (Array.isArray(dataFr) && dataFr.length > 0) {
             setSuggestions(
               dataFr.map((v) => ({
-                label: `${v.nom} (${v.codeDepartement})`, // Ex: Lille (59)
+                label: `${v.nom} (${v.codeDepartement})`,
                 value: v.nom,
                 city: v.nom,
                 country: "France",
@@ -72,10 +70,9 @@ export default function RegisterForm() {
                 longitude: v?.centre?.coordinates?.[0],
               }))
             );
-            return; // ✅ On sort, pas besoin de GeoDB si on a trouvé en FR
+            return;
           }
 
-          // --- Sinon fallback mondial via GeoDB ---
           const res = await fetch(
             `https://wft-geo-db.p.rapidapi.com/v1/geo/cities?namePrefix=${encodeURIComponent(
               value
@@ -90,7 +87,9 @@ export default function RegisterForm() {
           const data = await res.json();
           setSuggestions(
             (data?.data || []).map((v) => ({
-              label: `${v.city}${v.region ? " (" + v.region + ")" : ""}, ${v.country}`,
+              label: `${v.city}${
+                v.region ? " (" + v.region + ")" : ""
+              }, ${v.country}`,
               value: v.city,
               city: v.city,
               country: v.country,
@@ -109,9 +108,7 @@ export default function RegisterForm() {
     }
   };
 
-  // Quand une ville est choisie (on prend la suggestion complète, pas juste le nom)
   const handleVilleSelect = (villeObj) => {
-    // Si c'est une ville FR, on affiche "Ville (XX)" ; sinon, on garde le label brut ("City, Country")
     const isFrance = villeObj.country === "France";
     const labelAffichee = isFrance
       ? `${villeObj.city}${villeObj.deptCode ? ` (${villeObj.deptCode})` : ""}`
@@ -119,10 +116,9 @@ export default function RegisterForm() {
 
     setForm((prev) => ({
       ...prev,
-      localisation: labelAffichee, // On stocke la string à afficher
+      localisation: labelAffichee,
       latitude: villeObj.latitude,
       longitude: villeObj.longitude,
-      // On conserve aussi des infos utiles si FR
       country: villeObj.country || null,
       deptCode: villeObj.deptCode || null,
       region: villeObj.region || null,
@@ -131,11 +127,18 @@ export default function RegisterForm() {
     setSuggestions([]);
   };
 
+  /** 🔧 handleChange : on force l'email en minuscules */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let newValue = type === "checkbox" ? checked : value;
+
+    if (name === "email") {
+      newValue = value.toLowerCase(); // <-- tout en minuscules
+    }
+
     setForm((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: newValue,
     }));
   };
 
@@ -165,24 +168,29 @@ export default function RegisterForm() {
   const prevStep = () => setStep((s) => s - 1);
 
   const isValidName = (name) => /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
-const isPseudoEmailLike = (pseudo) => {
-  if (!pseudo) return false;
-  // ✅ Regex simple pour détecter un format email
-  const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  return emailRegex.test(pseudo);
-};
+  const isPseudoEmailLike = (pseudo) => {
+    if (!pseudo) return false;
+    const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+    return emailRegex.test(pseudo);
+  };
 
-  // --- Photo obligatoire + coordonnées monde ---
   const validateStep = () => {
     if (step === 1) {
       const { nom, prenom, pseudo, email, password, confirmPassword } = form;
       if (!nom || !prenom || !pseudo || !email || !password || !confirmPassword)
         return setError("Merci de remplir tous les champs requis."), false;
       if (!isValidName(nom) || !isValidName(prenom))
-        return setError("Le nom et le prénom doivent contenir uniquement des lettres."), false;
-      
-  if (isPseudoEmailLike(pseudo))
-    return setError("Votre pseudo ne peut pas contenir d'adresse email."), false;
+        return (
+          setError(
+            "Le nom et le prénom doivent contenir uniquement des lettres."
+          ),
+          false
+        );
+
+      if (isPseudoEmailLike(pseudo))
+        return (
+          setError("Votre pseudo ne peut pas contenir d'adresse email."), false
+        );
       if (password !== confirmPassword)
         return setError("Les mots de passe ne correspondent pas."), false;
       if (!isPasswordStrong(password))
@@ -191,12 +199,19 @@ const isPseudoEmailLike = (pseudo) => {
 
     if (step === 2) {
       if (!form.type || !form.orientation)
-        return setError("Merci de sélectionner un type et une orientation."), false;
+        return (
+          setError("Merci de sélectionner un type et une orientation."), false
+        );
     }
 
     if (step === 3) {
       if (!form.age || !form.consent || !form.localisation || !photo)
-        return setError("Merci de compléter tous les champs requis, photo comprise."), false;
+        return (
+          setError(
+            "Merci de compléter tous les champs requis, photo comprise."
+          ),
+          false
+        );
     }
 
     setError("");
@@ -216,23 +231,27 @@ const isPseudoEmailLike = (pseudo) => {
       setLoading(true);
       const formData = new FormData();
 
-      // Si coords déjà renseignées (choix suggestion), sinon on tente de fetch (fallback)
       let latitude = form.latitude;
       let longitude = form.longitude;
 
-      // Fallback si non défini, tente une résolution serveur
       if (typeof latitude === "undefined" || typeof longitude === "undefined") {
         try {
           const coords = await getCoordsFromVille(form.localisation);
           latitude = coords.latitude;
           longitude = coords.longitude;
         } catch {
-          // ignore, on laisse vide si non trouvé
+          // ignore
         }
       }
 
+      // 🔧 on renormalise l'email au cas où
+      const normalizedEmail = form.email
+        ? form.email.toLowerCase().trim()
+        : "";
+
       Object.entries({
         ...form,
+        email: normalizedEmail,
         latitude,
         longitude,
       }).forEach(([key, value]) => {
@@ -337,10 +356,41 @@ const isPseudoEmailLike = (pseudo) => {
           {/* ETAPE 1 */}
           {step === 1 && (
             <>
-              <input type="text" name="nom" placeholder="Nom" onChange={handleChange} className="form-input" />
-              <input type="text" name="prenom" placeholder="Prénom" onChange={handleChange} className="form-input" />
-              <input type="text" name="pseudo" placeholder="Pseudo" onChange={handleChange} className="form-input" />
-              <input type="email" name="email" placeholder="Email" onChange={handleChange} className="form-input" />
+              <input
+                type="text"
+                name="nom"
+                placeholder="Nom"
+                onChange={handleChange}
+                className="form-input"
+              />
+              <input
+                type="text"
+                name="prenom"
+                placeholder="Prénom"
+                onChange={handleChange}
+                className="form-input"
+              />
+              <input
+                type="text"
+                name="pseudo"
+                placeholder="Pseudo"
+                onChange={handleChange}
+                className="form-input"
+              />
+
+              {/* 🔧 email contrôlé + pas de majuscule auto */}
+              <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={form.email}
+                onChange={handleChange}
+                className="form-input"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                inputMode="email"
+              />
 
               <div className="input-wrapper">
                 <input
@@ -354,9 +404,17 @@ const isPseudoEmailLike = (pseudo) => {
                   type="button"
                   className="toggle-password"
                   onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={
+                    showPassword
+                      ? "Masquer le mot de passe"
+                      : "Afficher le mot de passe"
+                  }
                 >
-                  {/* Icones */}
-                  {showPassword ? <span role="img" aria-label="eye-slash">🙈</span> : <span role="img" aria-label="eye">👁️</span>}
+                  <span
+                    className={`eye-icon ${
+                      showPassword ? "eye-open" : "eye-closed"
+                    }`}
+                  />
                 </button>
               </div>
 
@@ -371,14 +429,30 @@ const isPseudoEmailLike = (pseudo) => {
                 <button
                   type="button"
                   className="toggle-password"
-                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  onClick={() =>
+                    setShowConfirmPassword((prev) => !prev)
+                  }
+                  aria-label={
+                    showConfirmPassword
+                      ? "Masquer la confirmation de mot de passe"
+                      : "Afficher la confirmation de mot de passe"
+                  }
                 >
-                  {showConfirmPassword ? <span role="img" aria-label="eye-slash">🙈</span> : <span role="img" aria-label="eye">👁️</span>}
+                  <span
+                    className={`eye-icon ${
+                      showConfirmPassword ? "eye-open" : "eye-closed"
+                    }`}
+                  />
                 </button>
               </div>
 
               <div className="form-buttons">
-                <Button type="button" title="Suivant" onClick={() => validateStep() && nextStep()} color="var(--primary-color)" />
+                <Button
+                  type="button"
+                  title="Suivant"
+                  onClick={() => validateStep() && nextStep()}
+                  color="var(--primary-color)"
+                />
               </div>
             </>
           )}
@@ -395,8 +469,14 @@ const isPseudoEmailLike = (pseudo) => {
                     { value: "autre", label: "Autre" },
                   ]}
                   placeholder="Type de compte"
-                  value={form.type ? { value: form.type, label: typeLabel(form.type) } : null}
-                  onChange={(e) => setForm((prev) => ({ ...prev, type: e.value }))}
+                  value={
+                    form.type
+                      ? { value: form.type, label: typeLabel(form.type) }
+                      : null
+                  }
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, type: e.value }))
+                  }
                   styles={customSelectStyles}
                 />
               </div>
@@ -410,15 +490,37 @@ const isPseudoEmailLike = (pseudo) => {
                     { value: "ouvert", label: "Ouvert" },
                   ]}
                   placeholder="Orientation"
-                  value={form.orientation ? { value: form.orientation, label: orientationLabel(form.orientation) } : null}
-                  onChange={(e) => setForm((prev) => ({ ...prev, orientation: e.value }))}
+                  value={
+                    form.orientation
+                      ? {
+                          value: form.orientation,
+                          label: orientationLabel(form.orientation),
+                        }
+                      : null
+                  }
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      orientation: e.value,
+                    }))
+                  }
                   styles={customSelectStyles}
                 />
               </div>
 
               <div className="form-buttons">
-                <Button type="button" title="Retour" onClick={prevStep} color="#a2b9c1" />
-                <Button type="button" title="Suivant" onClick={() => validateStep() && nextStep()} color="#e0c084" />
+                <Button
+                  type="button"
+                  title="Retour"
+                  onClick={prevStep}
+                  color="#a2b9c1"
+                />
+                <Button
+                  type="button"
+                  title="Suivant"
+                  onClick={() => validateStep() && nextStep()}
+                  color="#e0c084"
+                />
               </div>
             </>
           )}
@@ -450,11 +552,18 @@ const isPseudoEmailLike = (pseudo) => {
                   </ul>
                 )}
               </div>
-              <input type="number" name="age" placeholder="Âge" onChange={handleChange} className="form-input" />
+              <input
+                type="number"
+                name="age"
+                placeholder="Âge"
+                onChange={handleChange}
+                className="form-input"
+              />
 
               <div className="form-group">
                 <label>
-                  Photo de profil <span style={{ color: "#e57c73" }}>*</span> :
+                  Photo de profil{" "}
+                  <span style={{ color: "#e57c73" }}>*</span> :
                 </label>
                 <br />
                 <input
@@ -466,13 +575,31 @@ const isPseudoEmailLike = (pseudo) => {
                 />
               </div>
               <label className="form-checkbox">
-                <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
+                <input
+                  type="checkbox"
+                  name="consent"
+                  checked={form.consent}
+                  onChange={handleChange}
+                />
                 J’accepte les CGU et j’ai plus de 18 ans.
               </label>
-              <ReCAPTCHA sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY} onChange={setCaptchaToken} />
+              <ReCAPTCHA
+                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                onChange={setCaptchaToken}
+              />
               <div className="form-buttons">
-                <Button type="button" title="Retour" onClick={prevStep} color="#888" />
-                <Button title="Créer mon compte" type="submit" color="#e0c084" disabled={loading} />
+                <Button
+                  type="button"
+                  title="Retour"
+                  onClick={prevStep}
+                  color="#888"
+                />
+                <Button
+                  title="Créer mon compte"
+                  type="submit"
+                  color="#e0c084"
+                  disabled={loading}
+                />
               </div>
             </>
           )}
@@ -481,8 +608,13 @@ const isPseudoEmailLike = (pseudo) => {
               <div className="modal-content">
                 <h3>🎉 Inscription réussie !</h3>
                 <p>Un email de confirmation vous a été envoyé.</p>
-                <p>Merci de cliquer sur le lien pour activer votre compte.</p>
-                <button onClick={handleModalConfirm} className="btn-modal">
+                <p>
+                  Merci de cliquer sur le lien pour activer votre compte.
+                </p>
+                <button
+                  onClick={handleModalConfirm}
+                  className="btn-modal"
+                >
                   OK
                 </button>
               </div>
