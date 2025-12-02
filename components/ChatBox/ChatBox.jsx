@@ -98,14 +98,19 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   };
 
   // 🔧 scrollToBottom : scrolle VRAIMENT en bas en utilisant le sentinel
-  const scrollToBottom = (smooth = true) => {
-    if (!messagesEndRef.current) return;
+const scrollToBottom = (smooth = true) => {
+  const container = messagesContainerRef.current;
+  if (!container) return;
 
-    messagesEndRef.current.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
-      block: "end",
+  if (smooth && container.scrollTo) {
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
     });
-  };
+  } else {
+    container.scrollTop = container.scrollHeight;
+  }
+};
 
   const {
     messages,
@@ -230,28 +235,26 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
-  // 🔨 SCROLL AGRESSIF À L’OUVERTURE DE LA CONVERSATION
-  // Dès que conversationId change, on essaie plusieurs fois de descendre tout en bas
-  useEffect(() => {
-    if (!conversationId) return;
+ useEffect(() => {
+  if (!conversationId) return;
 
-    let count = 0;
-    const maxTries = 12;
+  let count = 0;
+  const maxTries = 12;
 
-    const interval = setInterval(() => {
-      if (!messagesEndRef.current) return;
-      messagesEndRef.current.scrollIntoView({
-        behavior: "auto",
-        block: "end",
-      });
-      count++;
-      if (count >= maxTries) {
-        clearInterval(interval);
-      }
-    }, 80); // quelques rafraîchissements le temps que les messages arrivent
+  const interval = setInterval(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-    return () => clearInterval(interval);
-  }, [conversationId]);
+    container.scrollTop = container.scrollHeight;
+    count++;
+    if (count >= maxTries) {
+      clearInterval(interval);
+    }
+  }, 80);
+
+  return () => clearInterval(interval);
+}, [conversationId]);
+
 
   // ➜ À la PREMIÈRE fois où les messages sont chargés pour cette conversation,
   //    on force aussi un scroll tout en bas (sécurité)
@@ -721,17 +724,19 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
       {/* 🔹 Zone scrollable des messages */}
       <div className="chat-messages" ref={messagesContainerRef}>
-        <MessagesList
-          messages={messages}
-          utilisateur={utilisateur}
-          onReact={handleReaction}
-          lastReads={lastReads}
-          typingPseudo={isTyping ? typingPseudo : null}
-          hasMore={hasMore}
-          onLoadMore={loadMoreMessages}
-          onDelete={handleDelete}
-          prenomsCouple={prenomsCouple}
-        />
+      
+      <MessagesList
+        ref={messagesContainerRef}            
+        messages={messages}
+        utilisateur={utilisateur}
+        onReact={handleReaction}
+        lastReads={lastReads}
+        typingPseudo={isTyping ? typingPseudo : null}
+        hasMore={hasMore}
+        onLoadMore={loadMoreMessages}
+        onDelete={handleDelete}
+        prenomsCouple={prenomsCouple}
+      />
 
         <div ref={messagesEndRef} />
 
