@@ -77,10 +77,6 @@ const MessagesList = forwardRef(function MessagesList(
     return () => container.removeEventListener("scroll", handleScroll);
   }, [hasMore, onLoadMore]);
 
-  // ❌ On supprime l’auto-scroll "toujours en bas" ici.
-  // Le parent (ChatBox) est maintenant responsable du scroll bas
-  // via skipNextAutoScrollRef + lastMsgIdRef.
-
   let lastDate = null;
 
   return (
@@ -138,7 +134,7 @@ const MessagesList = forwardRef(function MessagesList(
         );
       })}
 
-      {/* Laisse ce "end" si tu veux une ancre, mais c'est le parent qui scrollera */}
+      {/* Ancre finale (au cas où tu en as besoin plus tard) */}
       <div ref={endRef} style={{ height: 1 }} />
       <div style={{ height: 20 }} />
     </div>

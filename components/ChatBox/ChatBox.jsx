@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useLayoutEffect } from "react"; // 🔧 ajouté useLayoutEffect
+import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { Realtime } from "ably";
 import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
@@ -73,10 +73,12 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const appelTimeoutRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunks = useRef([]);
-  const messagesEndRef = useRef(null);
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
-  const messagesContainerRef = useRef(null); // <- wrapper scrollable des messages
+
+  // ⚠️ C'est CE conteneur qui scrolle (le <div className="chat-messages"> dans MessagesList)
+  const messagesContainerRef = useRef(null);
+
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({ buffer: [], length: 0 });
@@ -84,8 +86,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   // Auto-scroll maîtrisé
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
-
-  // 🔁 pour savoir si on a déjà scrolé en bas à l'ouverture de cette conversation
   const hasScrolledInitialRef = useRef(false);
 
   // Helpers scroll
@@ -97,20 +97,20 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     return diff < SCROLL_TOLERANCE_PX;
   };
 
-  // 🔧 scrollToBottom : scrolle VRAIMENT en bas en utilisant le sentinel
-const scrollToBottom = (smooth = true) => {
-  const container = messagesContainerRef.current;
-  if (!container) return;
+  // 👉 Fonction qui scrolle VRAIMENT le conteneur de messages
+  const scrollToBottom = (smooth = true) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
 
-  if (smooth && container.scrollTo) {
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "smooth",
-    });
-  } else {
-    container.scrollTop = container.scrollHeight;
-  }
-};
+    if (smooth && container.scrollTo) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+  };
 
   const {
     messages,
@@ -228,52 +228,32 @@ const scrollToBottom = (smooth = true) => {
     setLoadingInitial(true);
     lastMsgIdRef.current = null;
     skipNextAutoScrollRef.current = false;
-  }, [conversationId]);
-
-  // ➜ Quand on change de conversation, on considère qu'on n'a pas encore scrolé en bas
-  useEffect(() => {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
- useEffect(() => {
-  if (!conversationId) return;
+  // 🔨 SCROLL AGRESSIF À L’OUVERTURE DE LA CONVERSATION (quelques essais)
+  useEffect(() => {
+    if (!conversationId) return;
 
-  let count = 0;
-  const maxTries = 12;
+    let count = 0;
+    const maxTries = 8;
 
-  const interval = setInterval(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
+    const interval = setInterval(() => {
+      scrollToBottom(false);
+      count++;
+      if (count >= maxTries) clearInterval(interval);
+    }, 80);
 
-    container.scrollTop = container.scrollHeight;
-    count++;
-    if (count >= maxTries) {
-      clearInterval(interval);
-    }
-  }, 80);
+    return () => clearInterval(interval);
+  }, [conversationId]);
 
-  return () => clearInterval(interval);
-}, [conversationId]);
-
-
-  // ➜ À la PREMIÈRE fois où les messages sont chargés pour cette conversation,
-  //    on force aussi un scroll tout en bas (sécurité)
+  // ➜ À la 1ère fois où les messages sont chargés → on force un scroll tout en bas
   useEffect(() => {
     if (!messages?.length) return;
     if (hasScrolledInitialRef.current) return;
 
     const timer = setTimeout(() => {
-      const container = messagesContainerRef.current;
-
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      } else if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({
-          behavior: "auto",
-          block: "end",
-        });
-      }
-
+      scrollToBottom(false);
       hasScrolledInitialRef.current = true;
     }, 50);
 
@@ -281,7 +261,6 @@ const scrollToBottom = (smooth = true) => {
   }, [messages?.length, conversationId]);
 
   // --------------------- Scroll initial quand les messages sont là ----------------------
-  // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage final
   useLayoutEffect(() => {
     if (!messages?.length || !loadingInitial) return;
 
@@ -722,11 +701,9 @@ const scrollToBottom = (smooth = true) => {
         />
       )}
 
-      {/* 🔹 Zone scrollable des messages */}
-      <div className="chat-messages" ref={messagesContainerRef}>
-      
+      {/* 🔹 ICI : le conteneur scrollable réel (ref branché ici) */}
       <MessagesList
-        ref={messagesContainerRef}            
+        ref={messagesContainerRef}
         messages={messages}
         utilisateur={utilisateur}
         onReact={handleReaction}
@@ -737,15 +714,6 @@ const scrollToBottom = (smooth = true) => {
         onDelete={handleDelete}
         prenomsCouple={prenomsCouple}
       />
-
-        <div ref={messagesEndRef} />
-
-        {isTyping && typingPseudo && (
-          <div className="typing-notif">
-            {typingPseudo} est en train d&apos;écrire...
-          </div>
-        )}
-      </div>
 
       <ChatInput
         utilisateur={utilisateur}

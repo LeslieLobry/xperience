@@ -84,6 +84,26 @@ export default function MessageBubble({
   const pickerRef = useRef(null);
   const triggerRef = useRef(null);
 
+  // Appui long (mobile + desktop)
+  const longPressTimerRef = useRef(null);
+  const LONG_PRESS_DELAY = 450; // ms
+
+  const startLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+    longPressTimerRef.current = setTimeout(() => {
+      setIsPickerOpen(true);
+    }, LONG_PRESS_DELAY);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   // Fermeture du picker quand on clique en dehors
   useEffect(() => {
     function handleClickOutside(event) {
@@ -99,8 +119,13 @@ export default function MessageBubble({
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
+    return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      // Cleanup du timer d'appui long
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
   }, [isPickerOpen]);
 
   /* ---------------------------------------------------------------------- */
@@ -222,18 +247,29 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* Contenu du message : image / audio / texte */}
-      {msg.type === "IMAGE" && msg.imageUrl ? (
-        <img
-          src={imageMsgUrl || "/default.jpg"}
-          alt="image envoyée"
-          className="message-image"
-        />
-      ) : msg.type === "AUDIO" && msg.audioUrl ? (
-        <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
-      ) : (
-        <p className="message-text">{msg.contenu}</p>
-      )}
+      {/* Zone d'appui long sur le contenu du message */}
+      <div
+        className="message-content-pressable"
+        onMouseDown={startLongPress}
+        onMouseUp={cancelLongPress}
+        onMouseLeave={cancelLongPress}
+        onTouchStart={startLongPress}
+        onTouchEnd={cancelLongPress}
+        onTouchCancel={cancelLongPress}
+      >
+        {/* Contenu du message : image / audio / texte */}
+        {msg.type === "IMAGE" && msg.imageUrl ? (
+          <img
+            src={imageMsgUrl || "/default.jpg"}
+            alt="image envoyée"
+            className="message-image"
+          />
+        ) : msg.type === "AUDIO" && msg.audioUrl ? (
+          <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
+        ) : (
+          <p className="message-text">{msg.contenu}</p>
+        )}
+      </div>
 
       {/* Bouton supprimer (uniquement pour ses propres messages) */}
       {isOwn && (
@@ -241,6 +277,7 @@ export default function MessageBubble({
           className="delete-message-button"
           onClick={() => onDelete?.(msg.id)}
           title="Supprimer ce message"
+          type="button"
         >
           🗑️
         </button>
@@ -280,7 +317,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* Bouton de réaction (style Messenger) */}
+      {/* Bouton de réaction (style Messenger, en plus de l'appui long) */}
       <button
         ref={triggerRef}
         className="message-react-btn"
