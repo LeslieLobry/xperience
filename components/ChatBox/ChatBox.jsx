@@ -85,6 +85,9 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
 
+  // 🔁 pour savoir si on a déjà scrolé en bas à l'ouverture de cette conversation
+  const hasScrolledInitialRef = useRef(false);
+
   // Helpers scroll
   const SCROLL_TOLERANCE_PX = 120;
   const isNearBottom = () => {
@@ -95,15 +98,15 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   };
 
   // 🔧 scrollToBottom : scrolle VRAIMENT en bas de la zone messages
-// 🔧 scroll tout en bas en utilisant le sentinel
-const scrollToBottom = (smooth = true) => {
-  if (!messagesEndRef.current) return;
+  // 🔧 scroll tout en bas en utilisant le sentinel
+  const scrollToBottom = (smooth = true) => {
+    if (!messagesEndRef.current) return;
 
-  messagesEndRef.current.scrollIntoView({
-    behavior: smooth ? "smooth" : "auto",
-    block: "end",
-  });
-};
+    messagesEndRef.current.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "end",
+    });
+  };
 
   const {
     messages,
@@ -223,28 +226,58 @@ const scrollToBottom = (smooth = true) => {
     skipNextAutoScrollRef.current = false;
   }, [conversationId]);
 
+  // ➜ Quand on change de conversation, on considère qu'on n'a pas encore scrolé en bas
+  useEffect(() => {
+    hasScrolledInitialRef.current = false;
+  }, [conversationId]);
+
+  // ➜ À la PREMIÈRE fois où les messages sont chargés pour cette conversation,
+  //    on force un scroll tout en bas (ouverture de conversation)
+  useEffect(() => {
+    if (!messages?.length) return;
+    if (hasScrolledInitialRef.current) return;
+
+    const timer = setTimeout(() => {
+      const container = messagesContainerRef.current;
+
+      if (container) {
+        // scroll "bourrin" tout en bas du conteneur scrollable
+        container.scrollTop = container.scrollHeight;
+      } else if (messagesEndRef.current) {
+        // fallback au cas où
+        messagesEndRef.current.scrollIntoView({
+          behavior: "auto",
+          block: "end",
+        });
+      }
+
+      hasScrolledInitialRef.current = true;
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [messages?.length, conversationId]);
+
   // --------------------- Scroll initial quand les messages sont là ----------------------
   // 🔧 useLayoutEffect pour fixer la position AVANT l'affichage final
-useLayoutEffect(() => {
-  if (!messages?.length || !loadingInitial) return;
+  useLayoutEffect(() => {
+    if (!messages?.length || !loadingInitial) return;
 
-  const lastMsg = messages[messages.length - 1];
+    const lastMsg = messages[messages.length - 1];
 
-  if (
-    lastMsg?.conversationId &&
-    Number(lastMsg.conversationId) !== Number(conversationId)
-  ) {
-    return;
-  }
+    if (
+      lastMsg?.conversationId &&
+      Number(lastMsg.conversationId) !== Number(conversationId)
+    ) {
+      return;
+    }
 
-  requestAnimationFrame(() => {
-    scrollToBottom(false);
-  });
+    requestAnimationFrame(() => {
+      scrollToBottom(false);
+    });
 
-  lastMsgIdRef.current = lastMsg?.id || null;
-  setLoadingInitial(false);
-}, [messages, loadingInitial, conversationId]);
-
+    lastMsgIdRef.current = lastMsg?.id || null;
+    setLoadingInitial(false);
+  }, [messages, loadingInitial, conversationId]);
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
