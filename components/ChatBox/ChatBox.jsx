@@ -97,8 +97,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     return diff < SCROLL_TOLERANCE_PX;
   };
 
-  // 🔧 scrollToBottom : scrolle VRAIMENT en bas de la zone messages
-  // 🔧 scroll tout en bas en utilisant le sentinel
+  // 🔧 scrollToBottom : scrolle VRAIMENT en bas en utilisant le sentinel
   const scrollToBottom = (smooth = true) => {
     if (!messagesEndRef.current) return;
 
@@ -231,8 +230,31 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
+  // 🔨 SCROLL AGRESSIF À L’OUVERTURE DE LA CONVERSATION
+  // Dès que conversationId change, on essaie plusieurs fois de descendre tout en bas
+  useEffect(() => {
+    if (!conversationId) return;
+
+    let count = 0;
+    const maxTries = 12;
+
+    const interval = setInterval(() => {
+      if (!messagesEndRef.current) return;
+      messagesEndRef.current.scrollIntoView({
+        behavior: "auto",
+        block: "end",
+      });
+      count++;
+      if (count >= maxTries) {
+        clearInterval(interval);
+      }
+    }, 80); // quelques rafraîchissements le temps que les messages arrivent
+
+    return () => clearInterval(interval);
+  }, [conversationId]);
+
   // ➜ À la PREMIÈRE fois où les messages sont chargés pour cette conversation,
-  //    on force un scroll tout en bas (ouverture de conversation)
+  //    on force aussi un scroll tout en bas (sécurité)
   useEffect(() => {
     if (!messages?.length) return;
     if (hasScrolledInitialRef.current) return;
@@ -241,10 +263,8 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       const container = messagesContainerRef.current;
 
       if (container) {
-        // scroll "bourrin" tout en bas du conteneur scrollable
         container.scrollTop = container.scrollHeight;
       } else if (messagesEndRef.current) {
-        // fallback au cas où
         messagesEndRef.current.scrollIntoView({
           behavior: "auto",
           block: "end",
