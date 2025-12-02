@@ -1,8 +1,7 @@
 // app/api/photos/presign/route.js
 import { NextResponse } from "next/server";
-import { getPresignedUrl } from "../../../../lib/s3";
 
-// éviter tout cache côté edge sur une URL signée
+// éviter tout cache côté edge sur une URL
 export const dynamic = "force-dynamic";
 
 const ALLOWED_ORIGINS = [
@@ -11,6 +10,12 @@ const ALLOWED_ORIGINS = [
   "https://www.x-periences.fr",
   "https://x-periences.fr",
 ];
+
+// Base publique de ton bucket S3
+// (tu peux renseigner NEXT_PUBLIC_S3_PUBLIC_BASE dans .env, sinon on prend le fallback)
+const S3_PUBLIC_BASE =
+  process.env.NEXT_PUBLIC_S3_PUBLIC_BASE ||
+  "https://x-perience-images2.s3.eu-west-3.amazonaws.com";
 
 function corsHeaders(origin = "") {
   // Sur RN, Origin peut être vide : on autorise "*"
@@ -52,27 +57,30 @@ export async function POST(req) {
 
     // 1) Déjà une URL absolue -> renvoyer telle quelle
     if (/^https?:\/\//i.test(raw)) {
-      return NextResponse.json({ url: raw }, { status: 200, headers: corsHeaders(origin) });
+      return NextResponse.json(
+        { url: raw },
+        { status: 200, headers: corsHeaders(origin) }
+      );
     }
 
     // 2) Chemin local /uploads/* -> renvoyer une URL absolue du site
     if (raw.startsWith("/uploads/") || raw.startsWith("uploads/")) {
       const rel = raw.startsWith("/") ? raw : `/${raw}`;
       const abs = `https://www.x-periences.fr${rel}`;
-      return NextResponse.json({ url: abs }, { status: 200, headers: corsHeaders(origin) });
-    }
-
-    // 3) Clé S3 -> présigner
-    const cleanKey = raw.replace(/^\/+/, "");
-    const url = await getPresignedUrl(cleanKey);
-    if (!url) {
       return NextResponse.json(
-        { error: "Impossible de générer l'URL signée" },
-        { status: 500, headers: corsHeaders(origin) }
+        { url: abs },
+        { status: 200, headers: corsHeaders(origin) }
       );
     }
 
-    return NextResponse.json({ url }, { status: 200, headers: corsHeaders(origin) });
+    // 3) Clé S3 -> URL S3 publique (sans presign)
+    const cleanKey = raw.replace(/^\/+/, "");
+    const url = `${S3_PUBLIC_BASE}/${cleanKey}`;
+
+    return NextResponse.json(
+      { url },
+      { status: 200, headers: corsHeaders(origin) }
+    );
   } catch (e) {
     console.error("Presign error:", e);
     return NextResponse.json(
