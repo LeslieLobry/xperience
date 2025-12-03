@@ -339,6 +339,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     handleVocalFiltres(filtres) {
       setForm((prev) => {
         let next = { ...prev };
+
         Object.entries(filtres).forEach(([k, v]) => {
           if (Array.isArray(next[k]) && Array.isArray(v)) {
             next[k] = [...new Set([...next[k], ...v])];
@@ -346,6 +347,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             next[k] = v;
           }
         });
+
+        // 🧹 Si des infos d'âge arrivent, on reset l'ancienne plage
+        if ("ageMin" in filtres || "ageMax" in filtres) {
+          next.ageMin = filtres.ageMin ?? "";
+          next.ageMax = filtres.ageMax ?? "";
+        }
 
         if (next.localisation) {
           delete next.latitude;
@@ -390,7 +397,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             try {
               filtres = extraireFiltresVocal(texte) || {};
             } catch {}
+
             let next = { ...form, ...filtres };
+
+            // 🧹 Si la voix a parlé d'âge, on remet à plat ageMin/ageMax
+            if ("ageMin" in filtres || "ageMax" in filtres) {
+              next.ageMin = filtres.ageMin ?? "";
+              next.ageMax = filtres.ageMax ?? "";
+            }
 
             const villeVoix =
               next.localisation || next.ville || next.city || next.commune;
