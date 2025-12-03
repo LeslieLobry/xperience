@@ -150,10 +150,10 @@ export default function ProfilDetailsForm({ onClose, onUpdate, profil, editable 
       >
         <option value="">Type de recherche</option>
         <option value="Je le garde pour moi">Je le garde pour moi</option>
-        <option value="Virtuel uniquement">Virtuel uniquement</option>
+        <option value="Virtuel seulement">Virtuel uniquement</option>
         <option value="Virtuel et peut-être plus">Virtuel et peut-être plus</option>
         <option value="Réel seulement">Réel seulement</option>
-        <option value="Réel & Virtuel">Réel & Virtuel</option>
+        <option value="Réel et Virtuel">Réel & Virtuel</option>
         <option value="Je ne sais pas, c’est à voir">Je ne sais pas, c’est à voir</option>
         <option value="Aventure d’un soir">Aventure d’un soir</option>
         <option value="Relation secrète">Relation secrète</option>
@@ -168,14 +168,14 @@ export default function ProfilDetailsForm({ onClose, onUpdate, profil, editable 
         onChange={handleChange}
         disabled={!editable}
       />
-      <input
+      {/* <input
         type="date"
         name="dateNaissance"
         placeholder="Date de naissance"
         value={form.dateNaissance}
         onChange={handleChange}
         disabled={!editable}
-      />
+      /> */}
       <label htmlFor="fumeur">Fumeur</label>
       <select
         id="fumeur"
@@ -247,6 +247,7 @@ export default function ProfilDetailsForm({ onClose, onUpdate, profil, editable 
         <option value="Verts">Verts</option>
         <option value="Bleus">Bleus</option>
         <option value="Noirs">Noirs</option>
+        <option value="Autre">Autre</option>
       </select>
       <label htmlFor="cheveux">Cheveux</label>
       <select
@@ -276,14 +277,14 @@ export default function ProfilDetailsForm({ onClose, onUpdate, profil, editable 
             onChange={handleChange}
             disabled={!editable}
           />
-          <input
+          {/* <input
             type="date"
             name="dateNaissance2"
             placeholder="Date de naissance partenaire"
             value={form.dateNaissance2}
             onChange={handleChange}
             disabled={!editable}
-          />
+          /> */}
           <label htmlFor="fumeur2">Fumeur(se)</label>
           <select
             id="fumeur2"
@@ -354,6 +355,8 @@ export default function ProfilDetailsForm({ onClose, onUpdate, profil, editable 
             <option value="Verts">Verts</option>
             <option value="Bleus">Bleus</option>
             <option value="Noirs">Noirs</option>
+            <option value="Autre">Autre</option>
+
           </select>
           <label htmlFor="cheveux2">Cheveux</label>
           <select
