@@ -1,7 +1,7 @@
 .PageRecherche .page-recherche {
   display: flex;
   gap: 2rem;
-  align-items: center;
+  /* align-items: center; */
 }
 
 .PageRecherche .recherche-resultats {
@@ -31,5 +31,7 @@
 @media (width <= 700px) {
   .PageRecherche .page-recherche {
     flex-direction: column;
+  align-items: center;
+
   }
 }
