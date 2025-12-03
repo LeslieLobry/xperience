@@ -1,7 +1,6 @@
 // app/api/logout/route.js
 import { NextResponse } from "next/server";
 
-// ——— mêmes origines que la route login ———
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -10,9 +9,11 @@ const ALLOWED_ORIGINS = [
   "https://x-periences.fr",
 ];
 
-// CORS unifié
 function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
@@ -24,26 +25,24 @@ function corsHeaders(origin = "") {
   };
 }
 
-// Même logique de domaine que pour login
 function getCookieDomainForOrigin(origin) {
   try {
     const { hostname } = new URL(origin);
-    // en prod : couvre apex + www
     if (hostname.endsWith("x-periences.fr")) return ".x-periences.fr";
-    // en dev (localhost/IP) : pas de domain
-    return undefined;
+    return undefined; // localhost / IP → host-only
   } catch {
     return undefined;
   }
 }
 
+// 🔧 IMPORTANT : path: "/" (comme pour login)
 function cookieBaseOptions(origin) {
   const domain = getCookieDomainForOrigin(origin);
   return {
     httpOnly: true,
-    secure: true,     // requis avec SameSite=None en prod
-    sameSite: "none", // cookie cross-site
-    path: "/connexion",
+    secure: true,
+    sameSite: "none",
+    path: "/", // ✅
     ...(domain ? { domain } : {}),
   };
 }
@@ -63,15 +62,14 @@ export async function POST(req) {
   const noDomainOpts = { ...baseOpts };
   delete noDomainOpts.domain;
 
-  // ❌ supprime cookie posé "avec domain"
+  // supprime cookie posé "avec domain"
   res.cookies.set("token", "", { ...baseOpts, maxAge: 0 });
-  // ❌ supprime cookie posé "sans domain" (host-only)
+  // supprime cookie posé "sans domain" (host-only)
   res.cookies.set("token", "", { ...noDomainOpts, maxAge: 0 });
 
   return res;
 }
 
-// Optionnel: supporter DELETE /api/logout
 export async function DELETE(req) {
   return POST(req);
 }

@@ -129,7 +129,10 @@ export default function Navbar() {
       if (isCancelled) return;
 
       // On évite de poller si onglet pas visible (optimisation)
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      ) {
         return;
       }
 
@@ -198,14 +201,11 @@ export default function Navbar() {
       document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ✅ version corrigée : on s'appuie sur logout() du contexte, une seule fois
   const handleLogout = async () => {
     try {
-      await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      logout();
-      router.push("/connexion");
+      await logout();          // fait /api/logout + reset des states
+      router.replace("/connexion");
     } catch (err) {
       console.error("❌ Erreur logout :", err);
     }
@@ -236,7 +236,6 @@ export default function Navbar() {
   };
 
   // 🔹 Badge du burger : même comportement pour message / visite / like
-  // → tu génères déjà une notification pour un nouveau message
   const burgerBadgeCount = notifCount || 0;
 
   return (
@@ -253,9 +252,7 @@ export default function Navbar() {
           />
         </Link>
         {localUser && (
-          <h3 className="navbar-pseudo">
-            Bienvenue, {localUser.pseudo}
-          </h3>
+          <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>
         )}
       </div>
 
@@ -272,10 +269,7 @@ export default function Navbar() {
         <div className="line bottom"></div>
       </div>
 
-      <ul
-        ref={menuRef}
-        className={`nav-links${menuOpen ? " active" : ""}`}
-      >
+      <ul ref={menuRef} className={`nav-links${menuOpen ? " active" : ""}`}>
         {navLinks.map((link) => (
           <li
             key={link.href}
@@ -306,10 +300,7 @@ export default function Navbar() {
 
         {localUser ? (
           <li className="nav-avatar-wrapper">
-            <div
-              className="nav-avatar-container"
-              onClick={handleAvatarClick}
-            >
+            <div className="nav-avatar-container" onClick={handleAvatarClick}>
               <Image
                 src={presignedPhoto}
                 alt="Photo de profil"
@@ -318,9 +309,7 @@ export default function Navbar() {
                 className="nav-avatar"
               />
               {notifCount > 0 && (
-                <span className="notif-badge-on-avatar">
-                  {notifCount}
-                </span>
+                <span className="notif-badge-on-avatar">{notifCount}</span>
               )}
             </div>
 
@@ -357,9 +346,7 @@ export default function Navbar() {
                             href={notif.lien || "#"}
                             target={notif.lien ? "_blank" : undefined}
                             rel={
-                              notif.lien
-                                ? "noopener noreferrer"
-                                : undefined
+                              notif.lien ? "noopener noreferrer" : undefined
                             }
                             onClick={() => {
                               markNotificationRead(notif.id);
@@ -413,10 +400,7 @@ export default function Navbar() {
             )}
           </li>
         ) : (
-          <li
-            onClick={() => setMenuOpen(false)}
-            title="Connexion"
-          >
+          <li onClick={() => setMenuOpen(false)} title="Connexion">
             <Link href="/connexion">
               <LogIn className="nav-icon" />
             </Link>

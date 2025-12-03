@@ -1,6 +1,12 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 
 const AuthContext = createContext();
 
@@ -16,7 +22,7 @@ export function AuthProvider({ children }) {
   const fetchUser = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/init', { credentials: 'include' });
+      const res = await fetch("/api/init", { credentials: "include" });
       const data = await res.json();
       if (data.success) {
         setUser(data.utilisateur);
@@ -24,7 +30,7 @@ export function AuthProvider({ children }) {
         setNotifications(data.notifications);
         setArticles(data.articles);
         setEvenements(data.evenements);
-        return data.utilisateur;  // optionnel, utile pour await
+        return data.utilisateur; // optionnel, utile pour await
       } else {
         setUser(null);
         return null;
@@ -37,36 +43,42 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, []);
-const refreshUser = useCallback(async () => {
-  try {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    const data = await res.json();
-    if (data.success && data.utilisateur) {
-      setUser(data.utilisateur);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/me", { credentials: "include" });
+      const data = await res.json();
+      if (data.success && data.utilisateur) {
+        setUser(data.utilisateur);
+      }
+    } catch (err) {
+      console.error("Erreur refreshUser:", err);
     }
-  } catch (err) {
-    console.error('Erreur refreshUser:', err);
-  }
-}, []);
+  }, []);
 
   const logout = async () => {
     try {
-      await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
       });
+    } catch (err) {
+      console.error("❌ Erreur logout :", err);
+    } finally {
+      // Toujours vider le state, même si l'API renvoie une erreur
       setUser(null);
       setConversations([]);
       setNotifications([]);
       setArticles([]);
       setEvenements([]);
-    } catch (err) {
-      console.error("❌ Erreur logout :", err);
     }
   };
 
   const updateUser = (updatedFields) => {
-    setUser((prevUser) => ({ ...prevUser, ...updatedFields }));
+    setUser((prevUser) => ({
+      ...(prevUser || {}),
+      ...updatedFields,
+    }));
   };
 
   useEffect(() => {
@@ -84,9 +96,9 @@ const refreshUser = useCallback(async () => {
         evenements,
         loading,
         logout,
-        fetchUser,  
+        fetchUser,
         updateUser,
-        refreshUser
+        refreshUser,
       }}
     >
       {children}
