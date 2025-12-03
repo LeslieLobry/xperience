@@ -515,7 +515,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             "Débutant",
             "Occasionnel",
             "Expérimenté",
-            "Je la garde pour moi",
+            "Je le garde pour moi",
           ])}
         </Section>
 
