@@ -83,6 +83,11 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({ buffer: [], length: 0 });
 
+  const roomRef = useRef(null);
+  const appelEntrantRef = useRef(null);
+  const inCallRef = useRef(false);
+  const participantsAutresRef = useRef(null);
+
   // Auto-scroll maîtrisé
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
@@ -131,6 +136,26 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   );
 
   /* ======================================================================= */
+  /*                        SYNC REFS AVEC LES STATES                        */
+  /* ======================================================================= */
+
+  useEffect(() => {
+    appelEntrantRef.current = appelEntrant;
+  }, [appelEntrant]);
+
+  useEffect(() => {
+    inCallRef.current = inCall;
+  }, [inCall]);
+
+  useEffect(() => {
+    participantsAutresRef.current = participantsAutres;
+  }, [participantsAutres]);
+
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
+
+  /* ======================================================================= */
   /*                              USE EFFECTS                                */
   /* ======================================================================= */
 
@@ -144,7 +169,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
     const handleIncomingCall = ({ data }) => {
       if (data.from?.id === utilisateur.id) return;
-      if (appelEntrant || inCall) return;
+      if (appelEntrantRef.current || inCallRef.current) return;
       setAppelEntrant(data);
       if (sonnerieRef.current) {
         sonnerieRef.current.currentTime = 0;
@@ -186,7 +211,8 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     };
 
     const handleCallHangup = () => {
-      if (participantsAutres && participantsAutres.length === 1) {
+      const others = participantsAutresRef.current;
+      if (others && others.length === 1) {
         hangupCall();
       }
     };
@@ -205,8 +231,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       channel.unsubscribe("call:hangup", handleCallHangup);
       clearTimeout(appelTimeoutRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [utilisateur?.id, appelEntrant, inCall, participantsAutres?.length]);
+  }, [utilisateur?.id]);
 
   /* --------------------- Prénoms couple ---------------------- */
   useEffect(() => {
@@ -316,11 +341,10 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     return () => {
       stopTimer();
       stopAllMediaStreams();
-      if (room) {
-        room.disconnect().catch(() => {});
+      if (roomRef.current) {
+        roomRef.current.disconnect().catch(() => {});
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ======================================================================= */
@@ -352,8 +376,8 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   /* ======================================================================= */
 
   const startCall = async (video = true, initiateur = true) => {
-    if (inCall) {
-      (participantsAutres || []).forEach((p) => {
+    if (inCallRef.current) {
+      (participantsAutresRef.current || []).forEach((p) => {
         if (p.id !== utilisateur.id) {
           publishNotification(p.id, "call:busy", {
             from: utilisateur,
@@ -371,7 +395,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     }
 
     if (initiateur) {
-      (participantsAutres || [])
+      (participantsAutresRef.current || [])
         .filter((p) => p.id !== utilisateur.id)
         .forEach((p) => {
           publishNotification(p.id, "call:incoming", {
@@ -400,6 +424,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     const token = data.token;
     const newRoom = new Room();
     setRoom(newRoom);
+    roomRef.current = newRoom;
 
     newRoom.on("participantConnected", (participant) => {
       console.log("[LiveKit] participantConnected", participant.identity);
@@ -436,13 +461,17 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     );
 
     setInCall(true);
+    inCallRef.current = true;
     startTimer();
   };
 
   const hangupCall = () => {
-    if (room) {
-      if (participantsAutres && participantsAutres.length === 1) {
-        const otherId = participantsAutres[0]?.id;
+    const currentRoom = roomRef.current;
+
+    if (currentRoom) {
+      const others = participantsAutresRef.current;
+      if (others && others.length === 1) {
+        const otherId = others[0]?.id;
         if (otherId && utilisateur.id !== otherId) {
           publishNotification(otherId, "call:hangup", {
             from: utilisateur,
@@ -451,17 +480,22 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         }
       }
 
-      room.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
+      currentRoom.localParticipant?.tracks?.forEach((pub) =>
+        pub.track?.stop()
+      );
 
-      room.disconnect().then(() => {
+      currentRoom.disconnect().then(() => {
+        roomRef.current = null;
         setRoom(null);
         setRemoteTracks([]);
         setInCall(false);
+        inCallRef.current = false;
         stopTimer();
         stopAllMediaStreams();
       });
     } else {
       setInCall(false);
+      inCallRef.current = false;
       stopTimer();
       stopAllMediaStreams();
     }
@@ -773,6 +807,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
             };
           }
 
+          // 🔥 Optimistic : ajout direct dans la liste sans refetch
           mutate(
             (old) => ({
               ...old,
@@ -784,15 +819,26 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           scrollToBottom(true);
 
           try {
-            let result;
             if (isImage && contenu instanceof FormData) {
               const res = await fetch("/api/messages", {
                 method: "POST",
                 body: contenu,
               });
-              result = await res.json();
-              if (result?.message?.id) {
-                mutate();
+              const result = await res.json();
+
+              if (res.ok && result?.message?.id) {
+                const finalMessage = result.message;
+                mutate(
+                  (old) => ({
+                    ...old,
+                    messages: (old?.messages || []).map((m) =>
+                      m.id === tmpId ? finalMessage : m
+                    ),
+                  }),
+                  false
+                );
+              } else {
+                throw new Error("Erreur enregistrement image");
               }
             } else {
               const message = await envoyerMessage(
@@ -800,11 +846,23 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
                 type,
                 membreParlant
               );
+
               if (message?.id) {
-                mutate();
+                mutate(
+                  (old) => ({
+                    ...old,
+                    messages: (old?.messages || []).map((m) =>
+                      m.id === tmpId ? message : m
+                    ),
+                  }),
+                  false
+                );
+              } else {
+                throw new Error("Message non créé");
               }
             }
           } catch (err) {
+            console.error("Erreur envoi message :", err);
             mutate(
               (old) => ({
                 ...old,
@@ -855,6 +913,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           }
           startCall(type === "video", false);
           setInCall(true);
+          inCallRef.current = true;
           startTimer();
         }}
         onRefuser={() => {
@@ -870,7 +929,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
               room: conversationId,
             });
           } else {
-            (participantsAutres || []).forEach((p) => {
+            (participantsAutresRef.current || []).forEach((p) => {
               publishNotification(p.id, "call:refused", {
                 from: utilisateur,
                 room: conversationId,
