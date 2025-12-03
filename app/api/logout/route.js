@@ -43,7 +43,7 @@ function cookieBaseOptions(origin) {
     httpOnly: true,
     secure: true,     // requis avec SameSite=None en prod
     sameSite: "none", // cookie cross-site
-    path: "/",
+    path: "/connexion",
     ...(domain ? { domain } : {}),
   };
 }
