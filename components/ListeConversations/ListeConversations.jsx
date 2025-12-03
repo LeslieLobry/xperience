@@ -9,20 +9,25 @@ import CreateConversationModal from "../CreateConversationModal/CreateConversati
 
 const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
 
+/* -------------------------------------------------------------------------- */
+/* 🔹 Fetcher allégé                                                          */
+/* -------------------------------------------------------------------------- */
 const safeFetcher = async (url) => {
   const res = await fetch(url, { credentials: "include" });
-  const txt = await res.text();
-  let data;
-  try {
-    data = JSON.parse(txt);
-  } catch {
-    data = { __raw: txt };
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      msg = data?.error || data?.message || msg;
+    } catch (_) {}
+    throw new Error(msg);
   }
-  if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
-  return data;
+  return res.json();
 };
 
-// --- mêmes initiales que tu avais avant ---
+/* -------------------------------------------------------------------------- */
+/* 🔹 Initiales                                                               */
+/* -------------------------------------------------------------------------- */
 function getInitials(name) {
   if (!name) return "?";
   const parts = name
@@ -33,9 +38,22 @@ function getInitials(name) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-// --- HOOK commun : presign des photos utilisateurs (clé S3 -> URL) ---
+/* -------------------------------------------------------------------------- */
+/* 🔹 HOOK: presign photos des utilisateurs (clé S3 -> URL)                   */
+/*      - déduplication                                                       */
+/*      - dépendance légère (id:photoUrl)                                     */
+/* -------------------------------------------------------------------------- */
 function usePresignedPhotos(users) {
   const [photoUrls, setPhotoUrls] = useState({});
+
+  // Clé compacte pour détecter un vrai changement utile
+  const usersKey = useMemo(
+    () =>
+      (users || [])
+        .map((u) => `${u.id}:${u.photoUrl || ""}`)
+        .join("|"),
+    [users]
+  );
 
   useEffect(() => {
     if (!users || users.length === 0) {
@@ -47,23 +65,30 @@ function usePresignedPhotos(users) {
 
     async function fetchAll() {
       const result = {};
-      await Promise.all(
-        users.map(async (u) => {
-          if (!u?.id) return;
+      const seen = new Set();
 
-          // pas de photo → on note default, on gère l'affichage ensuite
+      const uniqUsers = [];
+      for (const u of users) {
+        if (!u?.id) continue;
+        if (seen.has(u.id)) continue;
+        seen.add(u.id);
+        uniqUsers.push(u);
+      }
+
+      await Promise.all(
+        uniqUsers.map(async (u) => {
+          // Pas de photo → placeholder
           if (!u.photoUrl) {
             result[u.id] = "/default.jpg";
             return;
           }
 
-          // déjà une URL complète → on utilise directement
+          // URL déjà complète
           if (u.photoUrl.startsWith("http")) {
             result[u.id] = u.photoUrl;
             return;
           }
 
-          // sinon on demande une URL presignée
           try {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
@@ -78,7 +103,10 @@ function usePresignedPhotos(users) {
           }
         })
       );
-      if (!canceled) setPhotoUrls(result);
+
+      if (!canceled) {
+        setPhotoUrls(result);
+      }
     }
 
     fetchAll();
@@ -86,15 +114,18 @@ function usePresignedPhotos(users) {
     return () => {
       canceled = true;
     };
-  }, [JSON.stringify(users)]); // simple, comme dans ton ChatHeader
+  }, [usersKey]);
 
   return photoUrls;
 }
 
+/* -------------------------------------------------------------------------- */
+/* 🔹 Composant principal                                                     */
+/* -------------------------------------------------------------------------- */
 export default function ListeConversations({
   userId,
   onSelectConversation,
-  autoSelectFirst = true, // contrôle l’auto-ouverture
+  autoSelectFirst = true,
   className,
 }) {
   const router = useRouter();
@@ -105,20 +136,27 @@ export default function ListeConversations({
   const [renamingId, setRenamingId] = useState(null);
   const [newName, setNewName] = useState("");
 
-  const { data, error, isLoading, mutate } = useSWR(
-    userId ? "/api/conversations" : null,
-    safeFetcher,
-    { revalidateOnFocus: true }
-  );
+  const {
+    data,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(userId ? "/api/conversations" : null, safeFetcher, {
+    revalidateOnFocus: false,      // 🔥 évite les refetch automatiques en plus
+    dedupingInterval: 5000,       // évite les doublons rapprochés
+  });
 
   const rawConversations = data?.conversations || [];
+
   const conversations = useMemo(
     () =>
-      rawConversations.filter((c, i, arr) => arr.findIndex((cc) => cc.id === c.id) === i),
+      rawConversations.filter(
+        (c, i, arr) => arr.findIndex((cc) => cc.id === c.id) === i
+      ),
     [rawConversations]
   );
 
-  // 👉 on prépare une liste unique de tous les autres utilisateurs
+  // Tous les "autres" utilisateurs pour précharger leurs photos
   const allAutresUsers = useMemo(() => {
     const map = {};
     conversations.forEach((conv) => {
@@ -126,23 +164,22 @@ export default function ListeConversations({
         if (Number(p.utilisateurId) === Number(userId)) return;
         const u = p.utilisateur;
         if (!u) return;
-        map[u.id] = u; // dédoublonnage par id
+        map[u.id] = u;
       });
     });
     return Object.values(map);
   }, [conversations, userId]);
 
-  // 🔗 presigned URLs pour tous ces utilisateurs
   const photoUrls = usePresignedPhotos(allAutresUsers);
 
-  // 🔁 URL -> state
+  // URL -> state sélectionné
   useEffect(() => {
     const idParam = searchParams?.get("conversationId");
     const id = idParam ? Number(idParam) : null;
     setSelectedId(id || null);
   }, [searchParams]);
 
-  // 🧠 Auto-sélection 1er fil SEULEMENT si autorisé
+  // Auto-sélection 1ère conversation (optionnel)
   useEffect(() => {
     const hasParam = !!searchParams?.get("conversationId");
     if (!autoSelectFirst) return;
@@ -153,28 +190,63 @@ export default function ListeConversations({
     }
   }, [autoSelectFirst, conversations, router, searchParams]);
 
-  // Ably → refresh liste
+  // Ably → rafraîchir la liste de manière THROTTLÉE
   useEffect(() => {
     if (!userId) return;
     const channel = ably.channels.get(`notification-${userId}`);
-    const refresh = () => mutate();
-    channel.subscribe("message", refresh);
-    channel.subscribe("refresh-conversations", refresh);
+
+    let timeout = null;
+    const scheduleRefresh = () => {
+      if (timeout) return; // on regroupe plusieurs events
+      timeout = setTimeout(() => {
+        mutate();
+        timeout = null;
+      }, 400); // 0,4s → fluide sans spammer le backend
+    };
+
+    channel.subscribe("message", scheduleRefresh);
+    channel.subscribe("refresh-conversations", scheduleRefresh);
+
     return () => {
-      channel.unsubscribe("message", refresh);
-      channel.unsubscribe("refresh-conversations", refresh);
+      channel.unsubscribe("message", scheduleRefresh);
+      channel.unsubscribe("refresh-conversations", scheduleRefresh);
+      if (timeout) clearTimeout(timeout);
     };
   }, [userId, mutate]);
 
+  /* ---------------------------------------------------------------------- */
+  /* 🔹 Actions : delete / rename / select                                  */
+  /* ---------------------------------------------------------------------- */
+
   const handleDelete = async (id) => {
     if (!confirm("Supprimer cette conversation ?")) return;
-    await fetch(`/api/conversations/${id}`, { method: "DELETE", credentials: "include" }).catch(
-      () => {}
+
+    // 🔥 Optimistic : on enlève directement la conv de la liste
+    mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          conversations: (current.conversations || []).filter(
+            (c) => c.id !== id
+          ),
+        };
+      },
+      false // pas de refetch immédiat
     );
-    await mutate();
+
+    try {
+      await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch (_) {
+      // En cas d'erreur, Ably ou un refresh manuel remettra d'équerre
+    }
+
     const current = Number(searchParams?.get("conversationId") || 0);
     if (current === Number(id)) {
-      router.replace("/messagerie"); // nettoie l'URL si on supprime la conv affichée
+      router.replace("/messagerie");
     }
   };
 
@@ -188,29 +260,60 @@ export default function ListeConversations({
     if (res.ok) {
       setRenamingId(null);
       setNewName("");
-      await mutate();
+
+      // 🔥 Optimistic : met à jour localement sans attendre le refetch
+      mutate(
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            conversations: (current.conversations || []).map((c) =>
+              c.id === id ? { ...c, nom: newName } : c
+            ),
+          };
+        },
+        false
+      );
     } else {
       let msg = "Erreur lors du renommage";
       try {
         const j = await res.json();
         msg = j?.error || j?.message || msg;
-      } catch {}
+      } catch (_) {}
       alert(msg);
     }
   };
 
-  // 👉 Clic utilisateur : met l'ID dans l'URL (source de vérité) + marque lu
   const handleSelect = async (id) => {
     router.replace(`/messagerie?conversationId=${id}`);
-    await fetch(`/api/conversations/${id}/mark-as-read`, {
+    onSelectConversation?.(id);
+
+    // 🔥 Optimistic : passe le compteur non lus à 0 localement
+    mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          conversations: (current.conversations || []).map((c) =>
+            c.id === id ? { ...c, unreadCount: 0 } : c
+          ),
+        };
+      },
+      false
+    );
+
+    // On prévient le backend, mais on n'attend pas la réponse pour l'UI
+    fetch(`/api/conversations/${id}/mark-as-read`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
     }).catch(() => {});
-    onSelectConversation?.(id);
-    mutate();
   };
+
+  /* ---------------------------------------------------------------------- */
+  /* 🔹 UI                                                                  */
+  /* ---------------------------------------------------------------------- */
 
   if (error) {
     return (
@@ -229,7 +332,16 @@ export default function ListeConversations({
         </button>
       </div>
 
-      {conversations.length === 0 && (
+      {/* Petit état de chargement "rapide" pour le ressenti */}
+      {isLoading && conversations.length === 0 && (
+        <div className="conv-skeleton-list">
+          <div className="conv-skeleton-item" />
+          <div className="conv-skeleton-item" />
+          <div className="conv-skeleton-item" />
+        </div>
+      )}
+
+      {!isLoading && conversations.length === 0 && (
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
           <a href="/recherche" className="start-search-link">
@@ -248,7 +360,6 @@ export default function ListeConversations({
           autres.length === 1 ? autres[0].pseudo : autres.map((u) => u.pseudo).join(", ");
 
         const unreadCount = conv.unreadCount || 0;
-
         const avatarUsers = autres.slice(0, 2);
 
         return (
@@ -261,7 +372,7 @@ export default function ListeConversations({
             {/* Zone cliquable = ouvre la conversation */}
             <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-main">
-                {/* === Avatar / stack d’avatars === */}
+                {/* === Avatars === */}
                 <div className="conv-avatar">
                   {avatarUsers.length === 0 && (
                     <div className="conv-avatar-placeholder">
@@ -269,28 +380,27 @@ export default function ListeConversations({
                     </div>
                   )}
 
-                  {avatarUsers.length === 1 && (() => {
-                    const u = avatarUsers[0];
-                    const url = photoUrls[u.id];
+                  {avatarUsers.length === 1 &&
+                    (() => {
+                      const u = avatarUsers[0];
+                      const url = photoUrls[u.id];
 
-                    // si on a une vraie URL (pas juste /default.jpg), on affiche la photo,
-                    // sinon on garde les initiales comme avant
-                    return url && url !== "/default.jpg" ? (
-                      <img
-                        src={url}
-                        alt={u.pseudo || "Photo de profil"}
-                        className="conv-avatar-img"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = "/default.jpg";
-                        }}
-                      />
-                    ) : (
-                      <div className="conv-avatar-placeholder">
-                        {getInitials(u.pseudo)}
-                      </div>
-                    );
-                  })()}
+                      return url && url !== "/default.jpg" ? (
+                        <img
+                          src={url}
+                          alt={u.pseudo || "Photo de profil"}
+                          className="conv-avatar-img"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/default.jpg";
+                          }}
+                        />
+                      ) : (
+                        <div className="conv-avatar-placeholder">
+                          {getInitials(u.pseudo)}
+                        </div>
+                      );
+                    })()}
 
                   {avatarUsers.length > 1 && (
                     <div className="conv-avatar-stack">
@@ -320,13 +430,13 @@ export default function ListeConversations({
                   )}
                 </div>
 
-                {/* === Infos conversation (nom + badge) === */}
+                {/* === Infos conv === */}
                 <div className="conv-info">
                   <div className="conv-pseudo">
                     {renamingId === conv.id ? (
                       <div
                         className="rename-inline"
-                        onClick={(e) => e.stopPropagation()} // évite d'ouvrir la conv en renommant
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <input
                           value={newName}
@@ -353,18 +463,20 @@ export default function ListeConversations({
                     )}
                   </div>
 
-                  {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+                  {unreadCount > 0 && (
+                    <span className="notif-badge">{unreadCount}</span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Actions à droite = hors zone cliquable */}
+            {/* Actions à droite */}
             <div className="conv-actions">
               {renamingId !== conv.id && (
                 <button
                   className="rename-conv-button"
                   onClick={(e) => {
-                    e.stopPropagation(); // par sécurité
+                    e.stopPropagation();
                     setRenamingId(conv.id);
                     setNewName(conv.nom || "");
                   }}
@@ -390,6 +502,7 @@ export default function ListeConversations({
           currentUserId={userId}
           onClose={() => setShowModal(false)}
           onCreated={async (newConvId) => {
+            // ici, un vrai refetch ponctuel est OK
             await mutate();
             if (newConvId) {
               router.replace(`/messagerie?conversationId=${newConvId}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ListeConversations from "../ListeConversations/ListeConversations";
@@ -18,32 +18,43 @@ function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" && window.innerWidth < breakpoint
   );
+
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < breakpoint);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, [breakpoint]);
+
   return isMobile;
 }
 
 export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
-  const pathname = usePathname();
   const router = useRouter();
 
   const [conversationId, setConversationId] = useState(null);
 
   const { user: currentUser, refreshUser, loading } = useAuth();
 
-  // user courant (priorité au contexte)
+  // 🧍 user courant : priorité au contexte, sinon user passé par la page
   const displayedUser = currentUser ?? user;
 
-  useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+  const isMobile = useIsMobile(900);
 
-  // 🔴 ICI : quand on est dans la messagerie et qu'on connaît l'utilisateur,
-  // on marque tous les messages non lus comme lus
+  // ⚡ Ne rafraîchir l'user QUE si on n'en a vraiment pas encore
+  useEffect(() => {
+    if (!currentUser && !loading) {
+      refreshUser();
+    }
+  }, [currentUser, loading, refreshUser]);
+
+  // ⚡ Pré-chargement du bundle ChatBox en tâche de fond
+  useEffect(() => {
+    // pas de await, juste pour que le chunk soit chargé
+    import("../ChatBox/ChatBox").catch(() => {});
+  }, []);
+
+  // Marquer les messages non lus comme lus (en tâche de fond)
   useEffect(() => {
     if (!displayedUser?.id) return;
 
@@ -62,10 +73,6 @@ export default function MessagerieClient({ user }) {
     }
   }, [searchParams]);
 
-  // --- MOBILE/RESPONSIVE LOGIC ---
-  const isMobile = useIsMobile(900);
-
-  // Navigation = met à jour l'URL et le state
   const handleSelectConversation = (id) => {
     router.push(`/messagerie?conversationId=${id}`, { scroll: false });
     setConversationId(id);
@@ -76,10 +83,21 @@ export default function MessagerieClient({ user }) {
     setConversationId(null);
   };
 
-  if (loading || !displayedUser?.id) {
+  // 🟡 Cas où on n'a aucun user et que le contexte est encore en chargement
+  // => on affiche juste le spinner
+  if (!displayedUser?.id && loading) {
     return (
       <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
         Chargement messagerie...
+      </div>
+    );
+  }
+
+  // 🔴 Cas où on n'a pas d'user du tout (ni prop, ni contexte)
+  if (!displayedUser?.id) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
+        Tu dois être connecté pour accéder à la messagerie.
       </div>
     );
   }
