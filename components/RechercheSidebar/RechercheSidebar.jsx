@@ -363,10 +363,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       delete f.latitude;
       delete f.longitude;
       onSearch?.(f);
-      return;
+    } else {
+      onSearch?.(f);
     }
-
-    onSearch?.(f);
   };
 
   useImperativeHandle(ref, () => ({
@@ -641,19 +640,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 const v = cityText.trim();
                 if (v.length >= 2 && city.items.length) city.setOpen(true);
               }}
-              onBlur={(e) => {
+              onBlur={() => {
+                // on arrête juste de "suivre" form.localisation pour cityText
                 setIsCityFocused(false);
-                // Si le menu est ouvert, on NE commit PAS tout de suite (sinon course blur/click)
-                if (city.open) return;
-
-                const v = e.target.value.trim();
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -680,7 +669,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             {city.loading && <div className="city-hint">Recherche…</div>}
 
             {city.open && city.items.length > 0 && (
-              <ul className="city-dropdown" tabIndex={-1}>
+              <ul className="city-dropdown">
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
@@ -688,8 +677,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onMouseDown={(e) => {
-                      // clique ville → on sélectionne sans perdre le focus
+                    onClick={(e) => {
                       e.preventDefault();
                       selectCity(item);
                     }}
