@@ -844,3 +844,19 @@
   font-size: 0.9rem;
   color:#e0c084 ;
 }
+.chat-back-btn {
+  background: none;
+  border: none;
+  color: #e0c084;      /* doré */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;   /* taille de la flèche */
+  padding: 0;
+}
+
+.chat-back-btn:hover {
+  opacity: 0.8;
+  transform: translateX(-1px);
+}
