@@ -17,23 +17,18 @@ function usePresignedPhotos(participants) {
         (participants || []).map(async (p) => {
           if (!p || !p.id) return;
 
-          // 👀 log pour voir EXACTEMENT ce que tu as
+          // 👀 log pour vérifier les données
           console.log("ChatHeader participant:", p);
 
-          // On essaie plusieurs champs possibles, priorité à photoProfil
-          const key =
-            p.photoProfil || // ⭐ le plus courant chez toi
-            p.photoUrl ||
-            p.photo ||
-            p.photo_key ||
-            p.photoKey;
+          // On utilise photoUrl (c’est ce que tu as dans le log)
+          const key = p.photoUrl;
 
           if (!key) {
             result[p.id] = "/default.jpg";
             return;
           }
 
-          // Déjà une URL complète (ex: https://...)
+          // Si c'est déjà une URL complète -> direct
           if (typeof key === "string" && key.startsWith("http")) {
             result[p.id] = key;
             return;
@@ -46,15 +41,25 @@ function usePresignedPhotos(participants) {
               body: JSON.stringify({ key }),
             });
             const data = await res.json();
-            result[p.id] = data?.url || "/default.jpg";
+
+            // URL signée ou rien -> on met au moins quelque chose
+            if (data?.url) {
+              result[p.id] = data.url;
+            } else {
+              // 🔁 Fallback : si tes photos sont aussi accessibles en direct,
+              // adapte éventuellement le préfixe ici.
+              result[p.id] = `/uploads/${key}`;
+            }
           } catch (e) {
             console.error("Erreur presign photo header:", e);
-            result[p.id] = "/default.jpg";
+            // Fallback direct si possible
+            result[p.id] = `/uploads/${key}`;
           }
         })
       );
 
       if (!canceled) {
+        console.log("ChatHeader photoUrls calculés:", result);
         setPhotoUrls(result);
       }
     }
@@ -118,25 +123,35 @@ export default function ChatHeader({
         {participants.length === 0 ? (
           <p className="aucun-participant">Aucun participant trouvé</p>
         ) : (
-          participants.map((p) => (
-            <Link
-              key={p.id}
-              href={`/profil/${p.id}`}
-              className="participant-info"
-              passHref
-            >
-              <img
-                src={photoUrls[p.id] || "/default.jpg"}
-                alt={p.pseudo}
-                className="participant-avatar"
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/default.jpg";
-                }}
-              />
-              <span className="participant-name">{p.pseudo}</span>
-            </Link>
-          ))
+          participants.map((p) => {
+            const url =
+              photoUrls[p.id] ||
+              (p.photoUrl?.startsWith("http")
+                ? p.photoUrl
+                : p.photoUrl
+                ? `/uploads/${p.photoUrl}`
+                : "/default.jpg");
+
+            return (
+              <Link
+                key={p.id}
+                href={`/profil/${p.id}`}
+                className="participant-info"
+                passHref
+              >
+                <img
+                  src={url}
+                  alt={p.pseudo}
+                  className="participant-avatar"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/default.jpg";
+                  }}
+                />
+                <span className="participant-name">{p.pseudo}</span>
+              </Link>
+            );
+          })
         )}
       </div>
 

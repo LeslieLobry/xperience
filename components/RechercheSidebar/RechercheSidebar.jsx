@@ -23,8 +23,8 @@ function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", check);
     check();
+    window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, [breakpoint]);
   return isMobile;
@@ -42,7 +42,7 @@ function useCityAutocomplete() {
 
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
-  const composingRef = useRef(false); // IME
+  const composingRef = useRef(false);
 
   useEffect(() => {
     if (composingRef.current) return;
@@ -167,6 +167,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
+  // Texte affiché dans l'input "Ville"
+  const [cityText, setCityText] = useState("");
+  const [isCityFocused, setIsCityFocused] = useState(false);
+
   const city = useCityAutocomplete();
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
@@ -185,6 +189,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const toggleSection = (key) =>
     setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
+  // garder cityText sync si form.localisation change (via vocal)
+  useEffect(() => {
+    if (isCityFocused) return;
+    const next = form.localisation || "";
+    if (next !== cityText) setCityText(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.localisation, isCityFocused]);
+
   const closeCityMenu = () => {
     city.setOpen(false);
     justClosedRef.current = true;
@@ -193,7 +205,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }, 120);
   };
 
-  // Fermer le menu si clic dehors
+  // Fermer menu ville si clic dehors
   useEffect(() => {
     function onDocClick(e) {
       if (!dropdownRef.current) return;
@@ -207,7 +219,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function selectCity(item) {
     const label = `${item.nom} (${item.departement || "—"})`;
 
-    // Met à jour le state
+    setCityText(label);
     setForm((prev) => ({
       ...prev,
       localisation: label,
@@ -215,11 +227,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       latitude: undefined,
       longitude: undefined,
     }));
-
-    // Met à jour l'input DOM directement (uncontrolled)
-    if (cityInputRef.current) {
-      cityInputRef.current.value = label;
-    }
 
     city.setOpen(false);
     city.setHighlight(-1);
@@ -271,14 +278,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
     const f = cleanFormFilters(raw);
 
-    // Nettoyage des champs numériques au moment de la recherche
-    ["ageMin", "ageMax", "rayon"].forEach((key) => {
-      if (f[key] != null && f[key] !== "") {
-        const digits = String(f[key]).replace(/\D/g, "");
-        f[key] = digits;
-      }
-    });
-
     const normalizeArrayLocal = (arr) =>
       Array.isArray(arr) ? arr.map(normalizeToDb) : [];
     f.orientation = normalizeArrayLocal(f.orientation);
@@ -316,7 +315,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    const candidateCity = (f.localisation || "").trim();
+    const candidateCity = (f.localisation || cityText || "").trim();
     if (candidateCity) {
       f.localisation = candidateCity;
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
@@ -351,14 +350,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         if (next.localisation) {
           delete next.latitude;
           delete next.longitude;
-          next.autourDeMoi = false;
         }
-
-        // Sync input ville si la voix a donné une localisation
-        if (cityInputRef.current && next.localisation) {
-          cityInputRef.current.value = next.localisation;
-        }
-
+        setCityText(next.localisation || "");
         handleSearch(next);
         return next;
       });
@@ -383,16 +376,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
     e.preventDefault();
-
-    // On s'assure de lire la valeur réelle de l'input ville
-    const localisationValue = cityInputRef.current
-      ? cityInputRef.current.value
-      : form.localisation;
-
-    handleSearch({
-      ...form,
-      localisation: localisationValue,
-    });
+    handleSearch(form);
   }
 
   /* -------------------------------- Handlers -------------------------------- */
@@ -409,20 +393,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }));
       if (checked) {
         city.setOpen(false);
-        if (cityInputRef.current) cityInputRef.current.value = "";
+        setCityText("");
       }
       return;
     }
 
-    // Champs numériques : on stocke juste la valeur brute, sans contrôler l'input
-    if (name === "ageMin" || name === "ageMax" || name === "rayon") {
-      setForm((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-      return;
-    }
+    if (name === "localisation") return; // géré par l’input ville
 
+    // pas de magie ici : on laisse React faire son boulot
     if (type === "checkbox" && Array.isArray(form[name])) {
       setForm((prev) => ({
         ...prev,
@@ -498,12 +476,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               next.rayon = next.rayon || DEFAULT_RAYON;
             }
 
-            // Sync ville dans l'input DOM si vocal a trouvé une ville
-            if (cityInputRef.current && next.localisation) {
-              cityInputRef.current.value = next.localisation;
-            }
-
             setForm(next);
+            setCityText(next.localisation || "");
             handleSearch(next);
           }}
         />
@@ -534,6 +508,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Pseudo */}
         <input
           type="text"
           name="pseudo"
@@ -543,6 +518,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           onChange={handleChange}
         />
 
+        {/* Identité */}
         <Section
           title="Identité"
           open={openSections.identite}
@@ -574,6 +550,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           ])}
         </Section>
 
+        {/* Envies */}
         <Section
           title="Envies"
           open={openSections.envies}
@@ -607,6 +584,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           ])}
         </Section>
 
+        {/* Expérience */}
         <Section
           title="Expérience"
           open={openSections.experience}
@@ -621,30 +599,34 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           ])}
         </Section>
 
+        {/* Autres critères */}
         <Section
           title="Autres critères"
           open={openSections.autres}
           toggle={() => toggleSection("autres")}
         >
+          {/* Âge */}
           <div className="filters-group">
             <h4>Âge</h4>
             <input
-              type="text"
-              inputMode="numeric"
+              type="number"
               name="ageMin"
               placeholder="Min"
+              value={form.ageMin}
               onChange={handleChange}
+              min={18}
             />
             <input
-              type="text"
-              inputMode="numeric"
+              type="number"
               name="ageMax"
               placeholder="Max"
+              value={form.ageMax}
               onChange={handleChange}
+              min={18}
             />
           </div>
 
-          {/* --- Autocomplétion Ville (UNCONTROLLED) --- */}
+          {/* Ville */}
           <div
             className="filters-group"
             ref={dropdownRef}
@@ -656,14 +638,28 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               name="localisation"
               className="input-recherche"
               placeholder="Commune (ex: Paris)"
+              value={cityText}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
               ref={cityInputRef}
               onFocus={() => {
-                const v = (cityInputRef.current?.value || "").trim();
+                setIsCityFocused(true);
+                const v = cityText.trim();
                 if (v.length >= 2 && city.items.length) city.setOpen(true);
+              }}
+              onBlur={(e) => {
+                setIsCityFocused(false);
+                if (city.open) return;
+                const v = e.target.value.trim();
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -671,26 +667,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onCompositionEnd={(e) => {
                 city.composingRef.current = false;
                 const v = e.currentTarget.value;
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
+                setCityText(v);
                 city.setQuery(v);
                 if (v.trim().length >= 2 && city.items.length)
                   city.setOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
+                setCityText(v);
                 if (!city.composingRef.current) {
                   city.setQuery(v);
                 }
@@ -736,14 +720,18 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             )}
           </div>
 
+          {/* Rayon */}
           <input
-            type="text"
-            inputMode="numeric"
+            type="number"
             name="rayon"
             placeholder="Rayon (km)"
+            value={form.rayon}
+            min={1}
+            max={200}
             onChange={handleChange}
           />
 
+          {/* Autour de moi / photo / description */}
           <label>
             <input
               type="checkbox"
@@ -774,6 +762,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             Avec description
           </label>
 
+          {/* Statut */}
           <h4>Statut</h4>
           <label>
             <input
@@ -796,6 +785,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             En ligne
           </label>
 
+          {/* Silhouette / Taille / Origines / Yeux / Cheveux */}
           {renderCheckboxGroup("Silhouette", "silhouette", [
             "Mince",
             "Moyenne",

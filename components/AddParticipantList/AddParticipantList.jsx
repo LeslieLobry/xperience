@@ -1,7 +1,84 @@
 import { useEffect, useState } from "react";
 import "./AddParticipantList.css";
 
-export default function AddParticipantList({ conversationId, participants, onClose, onAdded }) {
+/* --------------------------------------------------------- */
+/* Hook : présigne une photo à partir d'une clé S3           */
+/* --------------------------------------------------------- */
+function usePresignedPhoto(photoLike) {
+  const [url, setUrl] = useState("/default-avatar.png");
+
+  useEffect(() => {
+    if (!photoLike) {
+      setUrl("/default-avatar.png");
+      return;
+    }
+
+    // Si c'est déjà une URL complète
+    if (typeof photoLike === "string" && photoLike.startsWith("http")) {
+      setUrl(photoLike);
+      return;
+    }
+
+    // Sinon : clé S3 → on présigne
+    fetch("/api/photos/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: photoLike }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setUrl(data?.url || "/default-avatar.png");
+      })
+      .catch((err) => {
+        console.error("Erreur presign AddParticipantList:", err);
+        setUrl("/default-avatar.png");
+      });
+  }, [photoLike]);
+
+  return url;
+}
+
+/* --------------------------------------------------------- */
+/* Ligne d'un utilisateur dans la liste de suggestions       */
+/* --------------------------------------------------------- */
+function UserSuggestion({ user, selected, onClick }) {
+  // On regarde plusieurs champs possibles, mais chez toi c'est surtout photoUrl
+  const photoKey =
+    user.photoUrl ||
+    user.photoProfil ||
+    user.photo ||
+    user.photo_key ||
+    user.photoKey;
+
+  const url = usePresignedPhoto(photoKey);
+
+  return (
+    <div
+      className={`add-participant-suggestion ${
+        selected ? "selected" : ""
+      }`}
+      onClick={onClick}
+    >
+      <img
+        src={url}
+        alt={user.pseudo}
+        className="add-participant-avatar"
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = "/default-avatar.png";
+        }}
+      />
+      <span>{user.pseudo}</span>
+    </div>
+  );
+}
+
+export default function AddParticipantList({
+  conversationId,
+  participants,
+  onClose,
+  onAdded,
+}) {
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [search, setSearch] = useState("");
   const [filtered, setFiltered] = useState([]);
@@ -10,21 +87,34 @@ export default function AddParticipantList({ conversationId, participants, onClo
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Chargement des utilisateurs, en excluant ceux déjà dans la conversation
   useEffect(() => {
-    fetch("/api/utilisateur")
-      .then(res => res.json())
-      .then(data => {
-        const idsInConversation = participants.map(p => p.id);
-        const users = (data.utilisateurs || []).filter(u => !idsInConversation.includes(u.id));
+    async function loadUsers() {
+      try {
+        const res = await fetch("/api/utilisateur");
+        const data = await res.json();
+
+        const idsInConversation = (participants || []).map((p) => p.id);
+        const users = (data.utilisateurs || []).filter(
+          (u) => !idsInConversation.includes(u.id)
+        );
+
         setUtilisateurs(users);
-        setFiltered(users);
-      });
+        setFiltered(users); // par défaut : tous
+      } catch (e) {
+        console.error("Erreur chargement utilisateurs:", e);
+      }
+    }
+
+    loadUsers();
   }, [participants]);
 
+  // Filtre sur le pseudo
   useEffect(() => {
+    const s = search.toLowerCase();
     setFiltered(
-      utilisateurs.filter(u =>
-        u.pseudo.toLowerCase().includes(search.toLowerCase())
+      utilisateurs.filter((u) =>
+        u.pseudo.toLowerCase().includes(s)
       )
     );
   }, [search, utilisateurs]);
@@ -34,11 +124,14 @@ export default function AddParticipantList({ conversationId, participants, onClo
     if (!selectedId) return setError("Sélectionne un utilisateur !");
     setLoading(true);
     try {
-      const res = await fetch(`/api/conversations/${conversationId}/add-participant`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userIdOrPseudo: selectedId }),
-      });
+      const res = await fetch(
+        `/api/conversations/${conversationId}/add-participant`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userIdOrPseudo: selectedId }),
+        }
+      );
       const data = await res.json();
       setLoading(false);
       if (data.success) {
@@ -48,6 +141,7 @@ export default function AddParticipantList({ conversationId, participants, onClo
         setError(data.error || "Erreur lors de l'ajout.");
       }
     } catch (err) {
+      console.error(err);
       setLoading(false);
       setError("Erreur réseau.");
     }
@@ -58,10 +152,10 @@ export default function AddParticipantList({ conversationId, participants, onClo
       <input
         type="text"
         value={search}
-        onChange={e => {
+        onChange={(e) => {
           setSearch(e.target.value);
-          setSelectedId(null); // reset sélection
-          setShowSuggestions(true); // toujours ouvrir la liste si on tape
+          setSelectedId(null);
+          setShowSuggestions(true);
         }}
         onFocus={() => setShowSuggestions(true)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
@@ -69,29 +163,31 @@ export default function AddParticipantList({ conversationId, participants, onClo
         className="add-participant-search"
         autoComplete="off"
       />
-      {/* SUGGESTIONS LIST */}
+
+      {/* LISTE DES UTILISATEURS (tous les filtrés, pas seulement 8) */}
       {showSuggestions && filtered.length > 0 && (
         <div className="add-participant-suggestions">
-          {filtered.slice(0, 8).map(u => (
-            <div
+          {filtered.map((u) => (
+            <UserSuggestion
               key={u.id}
-              className="add-participant-suggestion"
+              user={u}
+              selected={selectedId === u.id}
               onClick={() => {
                 setSelectedId(u.id);
                 setSearch(u.pseudo);
-                setShowSuggestions(false); // ferme la dropdown après sélection
+                setShowSuggestions(false);
               }}
-            >
-              <img src={u.photoUrl || "/default-avatar.png"} alt={u.pseudo} className="add-participant-avatar" />
-              <span>{u.pseudo}</span>
-            </div>
+            />
           ))}
         </div>
       )}
-      {/* SI PAS DE RESULTAT */}
+
       {showSuggestions && search && filtered.length === 0 && (
-        <div className="add-participant-empty">Aucun utilisateur trouvé</div>
+        <div className="add-participant-empty">
+          Aucun utilisateur trouvé
+        </div>
       )}
+
       <div className="add-participant-actions">
         <button
           className="btn-add-participant"
@@ -108,6 +204,7 @@ export default function AddParticipantList({ conversationId, participants, onClo
           Annuler
         </button>
       </div>
+
       {error && <div className="add-participant-error">{error}</div>}
     </div>
   );
