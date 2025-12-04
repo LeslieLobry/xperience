@@ -969,7 +969,7 @@ onMessageSent={async (
   scrollToBottom(true);
 
   try {
-    // On envoie VRAIMENT le message (API)
+    // Envoi réel
     if (isImage && contenu instanceof FormData) {
       const res = await fetch("/api/messages", {
         method: "POST",
@@ -986,22 +986,12 @@ onMessageSent={async (
       }
     }
 
-    // ✅ Succès : on SUPPRIME juste le message temporaire.
-    // Le vrai message sera ajouté par Ably / useMessages.
-    mutate(
-      (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          messages: (old.messages || []).filter((m) => m.id !== tmpId),
-        };
-      },
-      false
-    );
+    // ✅ Succès : on ne touche pas à la liste.
+    // Ably enverra le vrai message, et useMessages fera le "merge".
   } catch (err) {
     console.error("Erreur envoi message :", err);
 
-    // ❌ Erreur : on marque le message comme "failed"
+    // ❌ Erreur : on marque juste le temporaire en "failed"
     mutate(
       (old) => ({
         ...old,
@@ -1013,6 +1003,7 @@ onMessageSent={async (
     );
   }
 }}
+
 
         onTyping={envoyerTyping}
         startRecording={startRecording}

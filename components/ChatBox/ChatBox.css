@@ -796,11 +796,12 @@
 }
 
 .edit-prenoms-modal__content {
-  background: #111;
+  background: #2c3e50;
   border: 1px solid #e0c084;
   padding: 16px 20px;
   max-width: 320px;
   width: 100%;
+  border-radius: 20px;
 }
 
 .edit-prenoms-modal__label {
@@ -834,6 +835,7 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;
+  border-radius: 20px;
 }
 
 .edit-prenoms-modal__buttons button {

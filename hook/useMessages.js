@@ -39,6 +39,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     if (!conversationId) return;
     const channel = ably.channels.get(`conversation-${conversationId}`);
 
+    /* ------------------------ Nouveau onMessage ------------------------ */
     const onMessage = (msg) => {
       const newMsg = msg.data;
       if (!newMsg) return;
@@ -61,13 +62,43 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       mutate(
         (current) => {
           if (!current) return current;
-          const exists = (current.messages || []).some(
-            (m) => m.id === newMsg.id
-          );
+          const currentMessages = current.messages || [];
+
+          // 1️⃣ si on a déjà ce message par ID, on ne fait rien
+          const exists = currentMessages.some((m) => m.id === newMsg.id);
           if (exists) return current;
+
+          // 2️⃣ on cherche un message optimiste "pending" du même auteur / même type / même contenu
+          const pendingIndex = currentMessages.findIndex((m) => {
+            if (m.statut !== "pending") return false;
+            if (m.auteurId !== newMsg.auteurId) return false;
+            if (m.type !== newMsg.type) return false;
+
+            // comparaison du contenu selon le type
+            if (m.type === "IMAGE") {
+              return m.contenu === "[Image]";
+            }
+            if (m.type === "AUDIO") {
+              return m.contenu === "[Audio]";
+            }
+            // texte / EPHEMERE
+            return m.contenu === newMsg.contenu;
+          });
+
+          if (pendingIndex !== -1) {
+            // 🔁 on REMPLACE le temporaire par la vraie version
+            const updated = [...currentMessages];
+            updated[pendingIndex] = {
+              ...newMsg,
+              statut: "sent", // si tu veux gérer un statut propre
+            };
+            return { ...current, messages: updated };
+          }
+
+          // 3️⃣ sinon, c'est un message "normal" (autre utilisateur, historique, etc.)
           return {
             ...current,
-            messages: [...(current.messages || []), newMsg],
+            messages: [...currentMessages, newMsg],
           };
         },
         false // pas de revalidate réseau
@@ -183,7 +214,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
 
     if (result.success) {
       setTexte && setTexte("");
-      // ⚠️ on ne fait plus de mutate() ici : c’est ChatBox qui décide de resync
+      // ⚠️ on ne fait plus de mutate() ici : c’est Ably + onMessage qui gèrent la sync
       return result.message;
     }
     return null;
