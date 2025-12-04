@@ -180,6 +180,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
+  // 🔢 refs pour les champs numériques (hack focus)
+  const ageMinRef = useRef(null);
+  const ageMaxRef = useRef(null);
+  const rayonRef = useRef(null);
+
   const closeCityMenu = () => {
     city.setOpen(false);
     justClosedRef.current = true;
@@ -240,49 +245,50 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
- function onCityKeyDown(e) {
-  const hasMenu = city.open && city.items.length > 0;
+  function onCityKeyDown(e) {
+    const hasMenu = city.open && city.items.length > 0;
 
-  // Menu ouvert : navigation & validation
-  if (hasMenu) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      city.setHighlight((i) => (i + 1) % city.items.length);
-      return;
+    // Menu ouvert : navigation & validation
+    if (hasMenu) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        city.setHighlight((i) => (i + 1) % city.items.length);
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        city.setHighlight(
+          (i) => (i - 1 + city.items.length) % city.items.length
+        );
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeCityMenu();
+        return;
+      }
+
+      if (e.key === "Enter" || e.key === "NumpadEnter") {
+        // ↩️ Valider la ville sans submit le form
+        e.preventDefault();
+        const item = city.items[city.highlight] || city.items[0];
+        if (item) selectCity(item);
+        return;
+      }
+
+      if (e.key === "Tab") {
+        // ✅ Valide la ville PUIS laisse Tab passer au champ suivant
+        const item = city.items[city.highlight] || city.items[0];
+        if (item) selectCity(item);
+        // On NE fait PAS preventDefault -> Tab continue sa vie
+        return;
+      }
+
+      return; // autres touches : laisser faire le browser
     }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
-      return;
-    }
-
-    if (e.key === "Escape") {
-      e.preventDefault();
-      closeCityMenu();
-      return;
-    }
-
-    if (e.key === "Enter" || e.key === "NumpadEnter") {
-      // ↩️ Valider la ville sans submit le form
-      e.preventDefault();
-      const item = city.items[city.highlight] || city.items[0];
-      if (item) selectCity(item);
-      return;
-    }
-
-    if (e.key === "Tab") {
-      // ✅ Valide la ville PUIS laisse Tab passer au champ suivant
-      const item = city.items[city.highlight] || city.items[0];
-      if (item) selectCity(item);
-      // On NE fait PAS preventDefault -> Tab continue sa vie
-      return;
-    }
-
-    return; // autres touches : laisser faire le browser
   }
-}
-
 
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = async (formRaw) => {
@@ -315,16 +321,18 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     f.yeux = normalizeArrayLocal(f.yeux);
     f.cheveux = normalizeArrayLocal(f.cheveux);
     f.envies = normalizeArrayLocal(f.envies);
-// 🔢 Convertir proprement les nombres
-  if (f.ageMin !== "") f.ageMin = Number(f.ageMin);
-  else delete f.ageMin;
 
-  if (f.ageMax !== "") f.ageMax = Number(f.ageMax);
-  else delete f.ageMax;
+    // 🔢 Convertir proprement les nombres
+    if (f.ageMin !== "") f.ageMin = Number(f.ageMin);
+    else delete f.ageMin;
 
-  if (f.rayon !== "" && f.rayon != null) {
-    f.rayon = Number(f.rayon);
-  }
+    if (f.ageMax !== "") f.ageMax = Number(f.ageMax);
+    else delete f.ageMax;
+
+    if (f.rayon !== "" && f.rayon != null) {
+      f.rayon = Number(f.rayon);
+    }
+
     if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
@@ -412,6 +420,27 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     handleSearch(form);
   }
 
+  /* ------------------------ Hack focus champs numériques ------------------------ */
+  function refocusNumeric(name) {
+    setTimeout(() => {
+      let ref = null;
+      if (name === "ageMin") ref = ageMinRef;
+      else if (name === "ageMax") ref = ageMaxRef;
+      else if (name === "rayon") ref = rayonRef;
+
+      if (ref && ref.current) {
+        const el = ref.current;
+        el.focus();
+        const len = el.value.length;
+        try {
+          el.setSelectionRange(len, len);
+        } catch {
+          // ignore
+        }
+      }
+    }, 0);
+  }
+
   /* ---------------------------------- JSX ---------------------------------- */
   return (
     <aside className={`recherche-sidebar ${className || ""}`}>
@@ -460,7 +489,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               maxWidth: 700,
             }}
           >
-            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
+            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> «{" "}
+            {resumeVocal} »
           </div>
         )}
 
@@ -564,28 +594,29 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           open={openSections.autres}
           toggle={() => toggleSection("autres")}
         >
-      <div className="filters-group">
-  <h4>Âge</h4>
-  <input
-    type="text"
-    inputMode="numeric"
-    pattern="[0-9]*"
-    name="ageMin"
-    placeholder="Min"
-    value={form.ageMin}
-    onChange={handleChange}
-  />
-  <input
-    type="text"
-    inputMode="numeric"
-    pattern="[0-9]*"
-    name="ageMax"
-    placeholder="Max"
-    value={form.ageMax}
-    onChange={handleChange}
-  />
-</div>
-
+          <div className="filters-group">
+            <h4>Âge</h4>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              name="ageMin"
+              placeholder="Min"
+              value={form.ageMin}
+              onChange={handleChange}
+              ref={ageMinRef}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              name="ageMax"
+              placeholder="Max"
+              value={form.ageMax}
+              onChange={handleChange}
+              ref={ageMaxRef}
+            />
+          </div>
 
           {/* --- Autocomplétion Ville (CONTRÔLÉ) --- */}
           <div
@@ -632,7 +663,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 const v = e.currentTarget.value;
                 setCityText(v);
                 city.setQuery(v);
-                if (v.trim().length >= 2 && city.items.length) city.setOpen(true);
+                if (v.trim().length >= 2 && city.items.length)
+                  city.setOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
@@ -673,7 +705,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     <span className="city-name">{item.label}</span>
                     {item.latitude != null && item.longitude != null && (
                       <span className="city-geo">
-                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                        · {item.latitude.toFixed(3)},{" "}
+                        {item.longitude.toFixed(3)}
                       </span>
                     )}
                   </li>
@@ -682,16 +715,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             )}
           </div>
 
-<input
-  type="text"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  name="rayon"
-  placeholder="Rayon (km)"
-  value={form.rayon}
-  onChange={handleChange}
-/>
-
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            name="rayon"
+            placeholder="Rayon (km)"
+            value={form.rayon}
+            onChange={handleChange}
+            ref={rayonRef}
+          />
 
           <label>
             <input
@@ -800,57 +833,56 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   /* -------------------------------- Handlers -------------------------------- */
   function handleChange(e) {
-  const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target;
 
-  // Gestion spéciale "autour de moi"
-  if (name === "autourDeMoi") {
-    setForm((prev) => ({
-      ...prev,
-      autourDeMoi: checked,
-      localisation: checked ? "" : prev.localisation,
-      latitude: undefined,
-      longitude: undefined,
-    }));
-    if (checked) {
-      city.setOpen(false);
-      setCityText("");
+    // Gestion spéciale "autour de moi"
+    if (name === "autourDeMoi") {
+      setForm((prev) => ({
+        ...prev,
+        autourDeMoi: checked,
+        localisation: checked ? "" : prev.localisation,
+        latitude: undefined,
+        longitude: undefined,
+      }));
+      if (checked) {
+        city.setOpen(false);
+        setCityText("");
+      }
+      return;
     }
-    return;
+
+    // La ville est gérée par l’input custom + autocomplétion
+    if (name === "localisation") return;
+
+    // 🔢 Champs numériques : âge min / max / rayon
+    if (name === "ageMin" || name === "ageMax" || name === "rayon") {
+      const cleaned = value.replace(/[^\d]/g, "");
+      setForm((prev) => ({
+        ...prev,
+        [name]: cleaned,
+      }));
+      refocusNumeric(name);
+      return;
+    }
+
+    // ✅ Checkbox avec tableau (type, orientation, envies, etc.)
+    if (type === "checkbox" && Array.isArray(form[name])) {
+      setForm((prev) => ({
+        ...prev,
+        [name]: checked
+          ? [...prev[name], value]
+          : prev[name].filter((v) => v !== value),
+      }));
+    }
+    // ✅ Checkbox simple (photo, description, autourDeMoi déjà géré plus haut)
+    else if (type === "checkbox") {
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    }
+    // ✅ Tous les autres inputs texte / radio
+    else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
   }
-
-  // La ville est gérée par l’input custom + autocomplétion
-  if (name === "localisation") return;
-
-  // 🔢 Champs numériques : âge min / max / rayon
-  if (name === "ageMin" || name === "ageMax" || name === "rayon") {
-    // Autoriser vide ou chiffres uniquement
-    const cleaned = value.replace(/[^\d]/g, "");
-    setForm((prev) => ({
-      ...prev,
-      [name]: cleaned,
-    }));
-    return;
-  }
-
-  // ✅ Checkbox avec tableau (type, orientation, envies, etc.)
-  if (type === "checkbox" && Array.isArray(form[name])) {
-    setForm((prev) => ({
-      ...prev,
-      [name]: checked
-        ? [...prev[name], value]
-        : prev[name].filter((v) => v !== value),
-    }));
-  } 
-  // ✅ Checkbox simple (photo, description, autourDeMoi déjà géré plus haut)
-  else if (type === "checkbox") {
-    setForm((prev) => ({ ...prev, [name]: checked }));
-  } 
-  // ✅ Tous les autres inputs texte / radio
-  else {
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
-}
-
 
   function renderCheckboxGroup(title, name, options) {
     return (
