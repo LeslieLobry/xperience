@@ -240,32 +240,49 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
-  function onCityKeyDown(e) {
-    // Valider la suggestion avec Enter, NumpadEnter OU Tab
-    if (
-      (e.key === "Enter" || e.key === "NumpadEnter" || e.key === "Tab") &&
-      city.open &&
-      city.items.length
-    ) {
-      e.preventDefault(); // empêche le submit du form
+ function onCityKeyDown(e) {
+  const hasMenu = city.open && city.items.length > 0;
+
+  // Menu ouvert : navigation & validation
+  if (hasMenu) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      city.setHighlight((i) => (i + 1) % city.items.length);
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
+      return;
+    }
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeCityMenu();
+      return;
+    }
+
+    if (e.key === "Enter" || e.key === "NumpadEnter") {
+      // ↩️ Valider la ville sans submit le form
+      e.preventDefault();
       const item = city.items[city.highlight] || city.items[0];
       if (item) selectCity(item);
       return;
     }
 
-    if (!city.open || !city.items.length) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      city.setHighlight((i) => (i + 1) % city.items.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      city.setHighlight((i) => (i - 1 + city.items.length) % city.items.length);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      closeCityMenu();
+    if (e.key === "Tab") {
+      // ✅ Valide la ville PUIS laisse Tab passer au champ suivant
+      const item = city.items[city.highlight] || city.items[0];
+      if (item) selectCity(item);
+      // On NE fait PAS preventDefault -> Tab continue sa vie
+      return;
     }
+
+    return; // autres touches : laisser faire le browser
   }
+}
+
 
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = async (formRaw) => {
@@ -298,7 +315,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     f.yeux = normalizeArrayLocal(f.yeux);
     f.cheveux = normalizeArrayLocal(f.cheveux);
     f.envies = normalizeArrayLocal(f.envies);
+// 🔢 Convertir proprement les nombres
+  if (f.ageMin !== "") f.ageMin = Number(f.ageMin);
+  else delete f.ageMin;
 
+  if (f.ageMax !== "") f.ageMax = Number(f.ageMax);
+  else delete f.ageMax;
+
+  if (f.rayon !== "" && f.rayon != null) {
+    f.rayon = Number(f.rayon);
+  }
     if (f.autourDeMoi) {
       setLoadingGeo(true);
       navigator.geolocation.getCurrentPosition(
@@ -770,38 +796,57 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
   /* -------------------------------- Handlers -------------------------------- */
   function handleChange(e) {
-    const { name, value, type, checked } = e.target;
+  const { name, value, type, checked } = e.target;
 
-    if (name === "autourDeMoi") {
-      setForm((prev) => ({
-        ...prev,
-        autourDeMoi: checked,
-        localisation: checked ? "" : prev.localisation,
-        latitude: undefined,
-        longitude: undefined,
-      }));
-      if (checked) {
-        city.setOpen(false);
-        setCityText("");
-      }
-      return;
+  // Gestion spéciale "autour de moi"
+  if (name === "autourDeMoi") {
+    setForm((prev) => ({
+      ...prev,
+      autourDeMoi: checked,
+      localisation: checked ? "" : prev.localisation,
+      latitude: undefined,
+      longitude: undefined,
+    }));
+    if (checked) {
+      city.setOpen(false);
+      setCityText("");
     }
-
-    if (name === "localisation") return; // géré par l’input ville
-
-    if (type === "checkbox" && Array.isArray(form[name])) {
-      setForm((prev) => ({
-        ...prev,
-        [name]: checked
-          ? [...prev[name], value]
-          : prev[name].filter((v) => v !== value),
-      }));
-    } else if (type === "checkbox") {
-      setForm((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
+    return;
   }
+
+  // La ville est gérée par l’input custom + autocomplétion
+  if (name === "localisation") return;
+
+  // 🔢 Champs numériques : âge min / max / rayon
+  if (name === "ageMin" || name === "ageMax" || name === "rayon") {
+    // Autoriser vide ou chiffres uniquement
+    const cleaned = value.replace(/[^\d]/g, "");
+    setForm((prev) => ({
+      ...prev,
+      [name]: cleaned,
+    }));
+    return;
+  }
+
+  // ✅ Checkbox avec tableau (type, orientation, envies, etc.)
+  if (type === "checkbox" && Array.isArray(form[name])) {
+    setForm((prev) => ({
+      ...prev,
+      [name]: checked
+        ? [...prev[name], value]
+        : prev[name].filter((v) => v !== value),
+    }));
+  } 
+  // ✅ Checkbox simple (photo, description, autourDeMoi déjà géré plus haut)
+  else if (type === "checkbox") {
+    setForm((prev) => ({ ...prev, [name]: checked }));
+  } 
+  // ✅ Tous les autres inputs texte / radio
+  else {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
+}
+
 
   function renderCheckboxGroup(title, name, options) {
     return (

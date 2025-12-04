@@ -161,7 +161,7 @@
 /* stylelint-disable-next-line selector-class-pattern */
 .select-utilisateurs .select__menu {
   z-index: 100;
-  background-color: #050716;
+  background-color: #2c3e50;
   border: 1px solid #e0c084;
 }
 

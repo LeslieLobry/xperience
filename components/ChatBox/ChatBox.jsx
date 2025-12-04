@@ -907,124 +907,113 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         setTexte={setTexte}
         showEmojiPicker={showEmojiPicker}
         setShowEmojiPicker={setShowEmojiPicker}
-        onMessageSent={async (
-          contenu,
-          type = "TEXTE",
-          membreParlant,
-          isImage = false
-        ) => {
-          const tmpId =
-            "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+onMessageSent={async (
+  contenu,
+  type = "TEXTE",
+  membreParlant,
+  isImage = false
+) => {
+  const tmpId =
+    "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 
-          let optimisticMessage;
-          if (isImage && contenu instanceof FormData) {
-            optimisticMessage = {
-              id: tmpId,
-              auteurId: utilisateur.id,
-              auteur: utilisateur,
-              pseudo: utilisateur.pseudo,
-              type: contenu.get("type") || "IMAGE",
-              contenu: "[Image]",
-              createdAt: new Date().toISOString(),
-              statut: "pending",
-              ephemere:
-                !!contenu.get("type") &&
-                contenu.get("type").toUpperCase() === "EPHEMERE",
-            };
-          } else if (type === "AUDIO") {
-            optimisticMessage = {
-              id: tmpId,
-              auteurId: utilisateur.id,
-              auteur: utilisateur,
-              pseudo: utilisateur.pseudo,
-              type,
-              contenu: "[Audio]",
-              createdAt: new Date().toISOString(),
-              statut: "pending",
-              ephemere: false,
-            };
-          } else {
-            optimisticMessage = {
-              id: tmpId,
-              auteurId: utilisateur.id,
-              auteur: utilisateur,
-              pseudo: utilisateur.pseudo,
-              type: type || "TEXTE",
-              contenu:
-                typeof contenu === "string" ? contenu : contenu.contenu,
-              createdAt: new Date().toISOString(),
-              statut: "pending",
-              ephemere: type === "EPHEMERE",
-            };
-          }
+  let optimisticMessage;
+  if (isImage && contenu instanceof FormData) {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type: contenu.get("type") || "IMAGE",
+      contenu: "[Image]",
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere:
+        !!contenu.get("type") &&
+        contenu.get("type").toUpperCase() === "EPHEMERE",
+    };
+  } else if (type === "AUDIO") {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type,
+      contenu: "[Audio]",
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere: false,
+    };
+  } else {
+    optimisticMessage = {
+      id: tmpId,
+      auteurId: utilisateur.id,
+      auteur: utilisateur,
+      pseudo: utilisateur.pseudo,
+      type: type || "TEXTE",
+      contenu: typeof contenu === "string" ? contenu : contenu.contenu,
+      createdAt: new Date().toISOString(),
+      statut: "pending",
+      ephemere: type === "EPHEMERE",
+    };
+  }
 
-          // 🔥 Optimistic : ajout direct dans la liste sans refetch
-          mutate(
-            (old) => ({
-              ...old,
-              messages: [...(old?.messages || []), optimisticMessage],
-            }),
-            false
-          );
+  // 🔥 Optimistic : on ajoute juste le message temporaire
+  mutate(
+    (old) => ({
+      ...old,
+      messages: [...(old?.messages || []), optimisticMessage],
+    }),
+    false
+  );
 
-          scrollToBottom(true);
+  scrollToBottom(true);
 
-          try {
-            if (isImage && contenu instanceof FormData) {
-              const res = await fetch("/api/messages", {
-                method: "POST",
-                body: contenu,
-              });
-              const result = await res.json();
+  try {
+    // On envoie VRAIMENT le message (API)
+    if (isImage && contenu instanceof FormData) {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        body: contenu,
+      });
+      const result = await res.json();
+      if (!res.ok || !result?.message?.id) {
+        throw new Error("Erreur enregistrement image");
+      }
+    } else {
+      const message = await envoyerMessage(contenu, type, membreParlant);
+      if (!message?.id) {
+        throw new Error("Message non créé");
+      }
+    }
 
-              if (res.ok && result?.message?.id) {
-                const finalMessage = result.message;
-                mutate(
-                  (old) => ({
-                    ...old,
-                    messages: (old?.messages || []).map((m) =>
-                      m.id === tmpId ? finalMessage : m
-                    ),
-                  }),
-                  false
-                );
-              } else {
-                throw new Error("Erreur enregistrement image");
-              }
-            } else {
-              const message = await envoyerMessage(
-                contenu,
-                type,
-                membreParlant
-              );
+    // ✅ Succès : on SUPPRIME juste le message temporaire.
+    // Le vrai message sera ajouté par Ably / useMessages.
+    mutate(
+      (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          messages: (old.messages || []).filter((m) => m.id !== tmpId),
+        };
+      },
+      false
+    );
+  } catch (err) {
+    console.error("Erreur envoi message :", err);
 
-              if (message?.id) {
-                mutate(
-                  (old) => ({
-                    ...old,
-                    messages: (old?.messages || []).map((m) =>
-                      m.id === tmpId ? message : m
-                    ),
-                  }),
-                  false
-                );
-              } else {
-                throw new Error("Message non créé");
-              }
-            }
-          } catch (err) {
-            console.error("Erreur envoi message :", err);
-            mutate(
-              (old) => ({
-                ...old,
-                messages: (old?.messages || []).map((m) =>
-                  m.id === tmpId ? { ...m, statut: "failed" } : m
-                ),
-              }),
-              false
-            );
-          }
-        }}
+    // ❌ Erreur : on marque le message comme "failed"
+    mutate(
+      (old) => ({
+        ...old,
+        messages: (old?.messages || []).map((m) =>
+          m.id === tmpId ? { ...m, statut: "failed" } : m
+        ),
+      }),
+      false
+    );
+  }
+}}
+
         onTyping={envoyerTyping}
         startRecording={startRecording}
         stopRecording={stopRecording}
