@@ -170,10 +170,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // Texte brut tapé pour la ville (séparé de form.localisation)
-  const [cityText, setCityText] = useState("");
-  const [isCityFocused, setIsCityFocused] = useState(false);
-
   // Anti-submit juste après fermeture du menu (Escape/clic dehors)
   const justClosedRef = useRef(false);
   const city = useCityAutocomplete();
@@ -187,14 +183,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       justClosedRef.current = false;
     }, 120);
   };
-
-  // garde cityText aligné si form.localisation bouge ailleurs (ex: vocal)
-  useEffect(() => {
-    if (isCityFocused) return; // ne pas écraser la frappe
-    const next = form.localisation || "";
-    if (next !== cityText) setCityText(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.localisation, isCityFocused]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -222,10 +210,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function selectCity(item) {
     const label = `${item.nom} (${item.departement || "—"})`;
 
-    // 1) input contrôlé
-    setCityText(label);
-
-    // 2) form
     setForm((prev) => ({
       ...prev,
       localisation: label,
@@ -234,7 +218,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       longitude: undefined,
     }));
 
-    // 3) UI
     city.setOpen(false);
     city.setHighlight(-1);
     setTimeout(() => cityInputRef.current?.focus(), 0);
@@ -247,7 +230,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       city.open &&
       city.items.length
     ) {
-      e.preventDefault(); // empêche le submit du form
+      e.preventDefault();
       const item = city.items[city.highlight] || city.items[0];
       if (item) selectCity(item);
       return;
@@ -270,6 +253,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   /* ------------------------------ Recherche push ------------------------------ */
   const handleSearch = async (formRaw) => {
     const raw = { ...formRaw };
+
     if (raw.autourDeMoi) {
       raw.localisation = "";
       raw.latitude = undefined;
@@ -284,6 +268,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
 
     const f = cleanFormFilters(raw);
+
+    // 🧹 Nettoyage des champs numériques au moment de la recherche
+    ["ageMin", "ageMax", "rayon"].forEach((key) => {
+      if (f[key] != null && f[key] !== "") {
+        const digits = String(f[key]).replace(/\D/g, "");
+        f[key] = digits;
+      }
+    });
+
     const normalizeArrayLocal = (arr) =>
       Array.isArray(arr) ? arr.map(normalizeToDb) : [];
     f.orientation = normalizeArrayLocal(f.orientation);
@@ -321,7 +314,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    const candidateCity = (f.localisation || cityText || "").trim();
+    const candidateCity = (f.localisation || "").trim();
     if (candidateCity) {
       f.localisation = candidateCity;
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
@@ -357,8 +350,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         if (next.localisation) {
           delete next.latitude;
           delete next.longitude;
+          next.autourDeMoi = false;
         }
-        setCityText(next.localisation || "");
+
         handleSearch(next);
         return next;
       });
@@ -400,19 +394,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }));
       if (checked) {
         city.setOpen(false);
-        setCityText("");
       }
       return;
     }
 
-    if (name === "localisation") return; // géré par l’input ville
-
-    // 🔢 Champs numériques gérés "à la main"
+    // Champs numériques : on laisse la valeur telle quelle, on nettoiera au submit
     if (name === "ageMin" || name === "ageMax" || name === "rayon") {
-      const digitsOnly = value.replace(/\D/g, "");
       setForm((prev) => ({
         ...prev,
-        [name]: digitsOnly,
+        [name]: value,
       }));
       return;
     }
@@ -478,7 +468,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
             let next = { ...form, ...filtres };
 
-            // 🧹 Si la voix a parlé d'âge, on remet à plat ageMin/ageMax
             if ("ageMin" in filtres || "ageMax" in filtres) {
               next.ageMin = filtres.ageMin ?? "";
               next.ageMax = filtres.ageMax ?? "";
@@ -494,7 +483,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             }
 
             setForm(next);
-            setCityText(next.localisation || "");
             handleSearch(next);
           }}
         />
@@ -649,30 +637,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               name="localisation"
               className="input-recherche"
               placeholder="Commune (ex: Paris)"
-              value={cityText} // <-- contrôlé
+              value={form.localisation}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
               ref={cityInputRef}
               onFocus={() => {
-                setIsCityFocused(true);
-                const v = cityText.trim();
+                const v = (form.localisation || "").trim();
                 if (v.length >= 2 && city.items.length) city.setOpen(true);
-              }}
-              onBlur={(e) => {
-                setIsCityFocused(false);
-                // Si le menu est ouvert, on NE commit PAS tout de suite (sinon course blur/click)
-                if (city.open) return;
-
-                const v = e.target.value.trim();
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -680,17 +653,28 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onCompositionEnd={(e) => {
                 city.composingRef.current = false;
                 const v = e.currentTarget.value;
-                setCityText(v);
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
                 city.setQuery(v);
                 if (v.trim().length >= 2 && city.items.length)
                   city.setOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
-                setCityText(v);
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
                 if (!city.composingRef.current) {
-                  city.setQuery(v); // on déclenche la recherche
-                  // ne pas forcer open : l'effet l'ouvrira s'il y a des résultats
+                  city.setQuery(v);
                 }
               }}
               onKeyDown={onCityKeyDown}
@@ -712,11 +696,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
                     onPointerDown={(e) => {
-                      e.preventDefault(); // garde le focus dans l’input
+                      e.preventDefault();
                       selectCity(item);
                     }}
                     onClick={(e) => {
-                      e.preventDefault(); // ceinture + bretelles
+                      e.preventDefault();
                       selectCity(item);
                     }}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
