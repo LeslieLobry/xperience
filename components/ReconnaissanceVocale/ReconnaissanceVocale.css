@@ -1,0 +1,40 @@
+.voice-btn {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+
+  /* Pour que le texte ne fasse pas exploser la mise en page */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+
+  background: #222;
+  color: #e0c084;
+  box-shadow: none;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+
+.voice-btn--listening {
+  background: #e0c084;
+  color: #222;
+  box-shadow: 0 0 12px #e0c08488;
+}
+
+.voice-btn:active {
+  transform: scale(0.98);
+}
+
+/* Optionnel : léger ajustement sur mobile */
+@media (max-width: 480px) {
+  .voice-btn {
+    font-size: 0.95rem;
+    padding: 0.5rem 0.7rem;
+  }
+}

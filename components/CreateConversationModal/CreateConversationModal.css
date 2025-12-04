@@ -1,4 +1,18 @@
+/* ================== OVERLAY + CONTENU ================== */
+
 .modal-conversation {
+  /* overlay plein écran */
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+}
+
+/* carte de la modale */
+.modal-conversation-content {
   background-color: #0d0f2a;
   border-radius: 12px;
   padding: 2rem;
@@ -12,26 +26,163 @@
 }
 
 .modal-conversation h3 {
-  font-size: 2.5rem; /* !important supprimé */
+  font-size: 2rem;
   color: #e0c084;
   margin-bottom: 1rem;
   text-align: center;
 }
 
+/* ================== SELECT + AVATARS ================== */
+
 .select-utilisateurs {
-  color: #000;
+  font-size: 0.9rem;
+  /* texte global du select */
+  color: #f8f8f8;
+}
+
+/* Ligne de chaque option dans la liste */
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Avatar dans la liste des options */
+.select-option-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.select-option-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Texte de l'option */
+.select-option-label {
+  font-size: 0.9rem;
+}
+
+/* Valeurs sélectionnées (petit chip en haut) */
+.select-multi-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.select-multi-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.select-multi-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ================== THEME REACT-SELECT ================== */
+/* avec classNamePrefix="select" → classes .select__...     */
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__control {
+  border-radius: 6px;
+  border: 1px solid #e0c084;
+  background-color: #050716;
+  min-height: 42px;
+  box-shadow: none;
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
-.select-utilisateurs .react-select__control {
-  border-radius: 6px;
+.select-utilisateurs .select__control--is-focused {
+  border-color: #f0d8a0;
+  box-shadow: 0 0 0 1px rgb(224 192 132 / 40%);
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__value-container {
+  padding: 2px 8px;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__input-container {
+  color: #f8f8f8;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__placeholder {
+  color: rgba(248, 248, 248, 0.55);
+}
+
+/* Tags sélectionnés */
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__multi-value {
+  background-color: rgb(224 192 132 / 15%);
+  border-radius: 999px;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__multi-value__label {
+  color: #f8f8f8;
+  padding: 2px 4px;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__multi-value__remove {
+  color: #e0c084;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__multi-value__remove:hover {
+  background: transparent;
+  color: #f5e2b5;
+}
+
+/* Menu déroulant */
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__menu {
+  z-index: 100;
+  background-color: #050716;
   border: 1px solid #e0c084;
 }
 
 /* stylelint-disable-next-line selector-class-pattern */
-.select-utilisateurs .react-select__menu {
-  z-index: 100;
+.select-utilisateurs .select__option {
+  background-color: transparent;
+  color: #f8f8f8;
 }
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__option--is-focused {
+  background-color: rgb(224 192 132 / 12%);
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.select-utilisateurs .select__option--is-selected {
+  background-color: #e0c084;
+  color: #0d0f2a;
+}
+
+/* ================== ERREUR + BOUTONS ================== */
 
 .modal-conversation .erreur {
   color: #f44;
