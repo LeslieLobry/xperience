@@ -43,7 +43,12 @@ function useCityAutocomplete() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
+  // Pour éviter de lancer la recherche au milieu d’un accent (IME)
+  const composingRef = useRef(false);
+
   useEffect(() => {
+    if (composingRef.current) return;
+
     const q = (query || "").trim();
     if (q.length < 2) {
       setItems([]);
@@ -103,6 +108,7 @@ function useCityAutocomplete() {
     setOpen,
     highlight,
     setHighlight,
+    composingRef,
   };
 }
 
@@ -164,8 +170,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // Texte pour la ville (lié à form.localisation)
+  // Texte brut tapé pour la ville (séparé de form.localisation)
   const [cityText, setCityText] = useState("");
+  const [isCityFocused, setIsCityFocused] = useState(false);
 
   // Anti-submit juste après fermeture du menu (Escape/clic dehors)
   const justClosedRef = useRef(false);
@@ -173,7 +180,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
-  // 🔢 refs pour les champs numériques
+  // 🔢 refs pour les champs numériques (hack focus)
   const ageMinRef = useRef(null);
   const ageMaxRef = useRef(null);
   const rayonRef = useRef(null);
@@ -186,11 +193,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }, 120);
   };
 
-  // garder cityText synchronisé si form.localisation change ailleurs (ex: vocal)
+  // garde cityText aligné si form.localisation bouge ailleurs (ex: vocal)
   useEffect(() => {
+    if (isCityFocused) return; // ne pas écraser la frappe
     const next = form.localisation || "";
     if (next !== cityText) setCityText(next);
-  }, [form.localisation, cityText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.localisation, isCityFocused]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -218,7 +227,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function selectCity(item) {
     const label = `${item.nom} (${item.departement || "—"})`;
 
+    // 1) input contrôlé
     setCityText(label);
+
+    // 2) form
     setForm((prev) => ({
       ...prev,
       localisation: label,
@@ -227,6 +239,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       longitude: undefined,
     }));
 
+    // 3) UI
     city.setOpen(false);
     city.setHighlight(-1);
     setTimeout(() => cityInputRef.current?.focus(), 0);
@@ -235,6 +248,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function onCityKeyDown(e) {
     const hasMenu = city.open && city.items.length > 0;
 
+    // Menu ouvert : navigation & validation
     if (hasMenu) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -257,6 +271,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }
 
       if (e.key === "Enter" || e.key === "NumpadEnter") {
+        // ↩️ Valider la ville sans submit le form
         e.preventDefault();
         const item = city.items[city.highlight] || city.items[0];
         if (item) selectCity(item);
@@ -264,10 +279,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }
 
       if (e.key === "Tab") {
+        // ✅ Valide la ville PUIS laisse Tab passer au champ suivant
         const item = city.items[city.highlight] || city.items[0];
         if (item) selectCity(item);
+        // On NE fait PAS preventDefault -> Tab continue sa vie
         return;
       }
+
+      return; // autres touches : laisser faire le browser
     }
   }
 
@@ -303,6 +322,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     f.cheveux = normalizeArrayLocal(f.cheveux);
     f.envies = normalizeArrayLocal(f.envies);
 
+    // 🔢 Convertir proprement les nombres
     if (f.ageMin !== "") f.ageMin = Number(f.ageMin);
     else delete f.ageMin;
 
@@ -362,6 +382,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           }
         });
 
+        // 🧹 Si des infos d'âge arrivent, on reset l'ancienne plage
         if ("ageMin" in filtres || "ageMax" in filtres) {
           next.ageMin = filtres.ageMin ?? "";
           next.ageMax = filtres.ageMax ?? "";
@@ -399,6 +420,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     handleSearch(form);
   }
 
+  /* ------------------------ Hack focus champs numériques ------------------------ */
   function refocusNumeric(name) {
     setTimeout(() => {
       let ref = null;
@@ -433,6 +455,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
             let next = { ...form, ...filtres };
 
+            // 🧹 Si la voix a parlé d'âge, on remet à plat ageMin/ageMax
             if ("ageMin" in filtres || "ageMax" in filtres) {
               next.ageMin = filtres.ageMin ?? "";
               next.ageMax = filtres.ageMax ?? "";
@@ -595,7 +618,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             />
           </div>
 
-          {/* --- Autocomplétion Ville --- */}
+          {/* --- Autocomplétion Ville (CONTRÔLÉ) --- */}
           <div
             className="filters-group"
             ref={dropdownRef}
@@ -607,15 +630,23 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               name="localisation"
               className="input-recherche"
               placeholder="Commune (ex: Paris)"
-              value={cityText}
+              value={cityText} // <-- contrôlé
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
               ref={cityInputRef}
-              onChange={(e) => {
-                const v = e.target.value;
-                setCityText(v);
+              onFocus={() => {
+                setIsCityFocused(true);
+                const v = cityText.trim();
+                if (v.length >= 2 && city.items.length) city.setOpen(true);
+              }}
+              onBlur={(e) => {
+                setIsCityFocused(false);
+                // Si le menu est ouvert, on NE commit PAS tout de suite (sinon course blur/click)
+                if (city.open) return;
+
+                const v = e.target.value.trim();
                 setForm((prev) => ({
                   ...prev,
                   localisation: v,
@@ -623,11 +654,25 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                   latitude: undefined,
                   longitude: undefined,
                 }));
-                city.setQuery(v);
               }}
-              onFocus={() => {
-                const v = (cityText || "").trim();
-                if (v.length >= 2 && city.items.length) city.setOpen(true);
+              onCompositionStart={() => {
+                city.composingRef.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                city.composingRef.current = false;
+                const v = e.currentTarget.value;
+                setCityText(v);
+                city.setQuery(v);
+                if (v.trim().length >= 2 && city.items.length)
+                  city.setOpen(true);
+              }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setCityText(v);
+                if (!city.composingRef.current) {
+                  city.setQuery(v); // on déclenche la recherche
+                  // ne pas forcer open : l'effet l'ouvrira s'il y a des résultats
+                }
               }}
               onKeyDown={onCityKeyDown}
             />
@@ -635,7 +680,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             {city.loading && <div className="city-hint">Recherche…</div>}
 
             {city.open && city.items.length > 0 && (
-              <ul className="city-dropdown" tabIndex={-1}>
+              <ul
+                className="city-dropdown"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()} // garde le focus dans l’input
+              >
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
@@ -643,10 +692,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
+                    onPointerDown={(e) => {
+                      e.preventDefault(); // garde le focus dans l’input
                       selectCity(item);
                     }}
+                    onClick={(e) => {
+                      e.preventDefault(); // ceinture + bretelles
+                      selectCity(item);
+                    }}
+                    title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
                   >
                     <span className="city-name">{item.label}</span>
                     {item.latitude != null && item.longitude != null && (
@@ -781,6 +835,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
 
+    // Gestion spéciale "autour de moi"
     if (name === "autourDeMoi") {
       setForm((prev) => ({
         ...prev,
@@ -796,8 +851,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
+    // La ville est gérée par l’input custom + autocomplétion
     if (name === "localisation") return;
 
+    // 🔢 Champs numériques : âge min / max / rayon
     if (name === "ageMin" || name === "ageMax" || name === "rayon") {
       const cleaned = value.replace(/[^\d]/g, "");
       setForm((prev) => ({
@@ -808,6 +865,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
+    // ✅ Checkbox avec tableau (type, orientation, envies, etc.)
     if (type === "checkbox" && Array.isArray(form[name])) {
       setForm((prev) => ({
         ...prev,
@@ -815,9 +873,13 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           ? [...prev[name], value]
           : prev[name].filter((v) => v !== value),
       }));
-    } else if (type === "checkbox") {
+    }
+    // ✅ Checkbox simple (photo, description, autourDeMoi déjà géré plus haut)
+    else if (type === "checkbox") {
       setForm((prev) => ({ ...prev, [name]: checked }));
-    } else {
+    }
+    // ✅ Tous les autres inputs texte / radio
+    else {
       setForm((prev) => ({ ...prev, [name]: value }));
     }
   }
@@ -847,10 +909,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function Section({ title, open, toggle, children }) {
     return (
       <div className={`section-group ${open ? "open" : ""}`}>
-          <h3 onClick={toggle} className="section-toggle">
-            {open ? "−" : "+"} {title}
-          </h3>
-          {open && <div className="section-content">{children}</div>}
+        <h3 onClick={toggle} className="section-toggle">
+          {open ? "−" : "+"} {title}
+        </h3>
+        {open && <div className="section-content">{children}</div>}
       </div>
     );
   }
