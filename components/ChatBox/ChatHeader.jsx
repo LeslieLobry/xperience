@@ -17,10 +17,13 @@ function usePresignedPhotos(participants) {
         (participants || []).map(async (p) => {
           if (!p || !p.id) return;
 
-          // On essaie plusieurs champs possibles
+          // 👀 log pour voir EXACTEMENT ce que tu as
+          console.log("ChatHeader participant:", p);
+
+          // On essaie plusieurs champs possibles, priorité à photoProfil
           const key =
+            p.photoProfil || // ⭐ le plus courant chez toi
             p.photoUrl ||
-            p.photoProfil ||
             p.photo ||
             p.photo_key ||
             p.photoKey;
