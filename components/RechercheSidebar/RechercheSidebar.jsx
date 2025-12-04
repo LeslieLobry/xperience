@@ -680,11 +680,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             {city.loading && <div className="city-hint">Recherche…</div>}
 
             {city.open && city.items.length > 0 && (
-              <ul
-                className="city-dropdown"
-                tabIndex={-1}
-                onMouseDown={(e) => e.preventDefault()} // garde le focus dans l’input
-              >
+              <ul className="city-dropdown" tabIndex={-1}>
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
@@ -692,12 +688,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onPointerDown={(e) => {
-                      e.preventDefault(); // garde le focus dans l’input
-                      selectCity(item);
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault(); // ceinture + bretelles
+                    onMouseDown={(e) => {
+                      // clique ville → on sélectionne sans perdre le focus
+                      e.preventDefault();
                       selectCity(item);
                     }}
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
