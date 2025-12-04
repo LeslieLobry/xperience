@@ -674,9 +674,10 @@
   .chat-input {
     flex-direction: column;
   }
-
-  .participant-name {
-    display: none !important;
+.participant-name {
+    display: inline-block;
+    max-width: 80px;
+    font-size: 0.8rem;
   }
 }
 
@@ -775,6 +776,8 @@
   padding: 4px 8px;
   font-size: 0.8rem;
   cursor: pointer;
+  color: #e0c084;
+  border-radius: 20px;
 }
 
 .btn-edit-prenoms:hover {
@@ -806,6 +809,10 @@
   gap: 4px;
   margin-top: 10px;
   font-size: 0.9rem;
+  color: #e0c084;
+}
+.couple-prenoms-bar span {
+  color: #e0c084;
 }
 
 .edit-prenoms-modal__label input {
@@ -834,4 +841,5 @@
   background: transparent;
   cursor: pointer;
   font-size: 0.9rem;
+  color:#e0c084 ;
 }
