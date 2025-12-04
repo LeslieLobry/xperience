@@ -33,6 +33,8 @@ function useIsMobile(breakpoint = 768) {
 const DEFAULT_RAYON = 20;
 
 /* --------------------------- Autocomplétion ville --------------------------- */
+/* ⚠️ On garde le hook défini, mais on ne l'utilise plus.
+   Toute la logique d'autocomplétion est maintenant dans le composant. */
 function useCityAutocomplete() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
@@ -42,8 +44,6 @@ function useCityAutocomplete() {
 
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
-
-  // Pour éviter de lancer la recherche au milieu d’un accent (IME)
   const composingRef = useRef(false);
 
   useEffect(() => {
@@ -78,8 +78,6 @@ function useCityAutocomplete() {
           nom: c.nom,
           code: c.code,
           departement: c.departement?.code || "",
-          latitude: c.centre?.coordinates?.[1] ?? null,
-          longitude: c.centre?.coordinates?.[0] ?? null,
           population: c.population ?? 0,
         }));
 
@@ -170,9 +168,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // Texte affiché/tapé pour la ville
+  /* --------------------------- État pour la VILLE --------------------------- */
   const [cityText, setCityText] = useState("");
-  const city = useCityAutocomplete();
+  const [cityItems, setCityItems] = useState([]);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [cityHighlight, setCityHighlight] = useState(-1);
+  const [cityLoading, setCityLoading] = useState(false);
+  const cityDebounceRef = useRef(null);
+  const cityControllerRef = useRef(null);
+
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
@@ -193,8 +197,60 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const toggleSection = (key) =>
     setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
+  /* -------------------- Effet d'autocomplétion ville -------------------- */
+  useEffect(() => {
+    const q = (cityText || "").trim();
+
+    if (q.length < 2) {
+      setCityItems([]);
+      setCityOpen(false);
+      setCityHighlight(-1);
+      cityControllerRef.current?.abort?.();
+      return;
+    }
+
+    if (cityDebounceRef.current) clearTimeout(cityDebounceRef.current);
+    cityDebounceRef.current = setTimeout(async () => {
+      try {
+        setCityLoading(true);
+        cityControllerRef.current?.abort?.();
+        cityControllerRef.current = new AbortController();
+
+        const url =
+          `https://geo.api.gouv.fr/communes` +
+          `?nom=${encodeURIComponent(q)}` +
+          `&fields=nom,code,departement,population` +
+          `&boost=population&limit=8`;
+
+        const res = await fetch(url, { signal: cityControllerRef.current.signal });
+        const data = await res.json();
+
+        const mapped = (Array.isArray(data) ? data : []).map((c) => ({
+          label: `${c.nom} (${c.departement?.code || "—"})`,
+          nom: c.nom,
+          code: c.code,
+          departement: c.departement?.code || "",
+          population: c.population ?? 0,
+        }));
+
+        setCityItems(mapped);
+        setCityOpen(mapped.length > 0);
+        setCityHighlight(mapped.length ? 0 : -1);
+      } catch {
+        // ignore (abort entre autres)
+      } finally {
+        setCityLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      if (cityDebounceRef.current) clearTimeout(cityDebounceRef.current);
+      cityControllerRef.current?.abort?.();
+    };
+  }, [cityText]);
+
   const closeCityMenu = () => {
-    city.setOpen(false);
+    setCityOpen(false);
   };
 
   // Fermer le menu si clic dehors
@@ -224,50 +280,51 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }));
 
     // 3) UI
-    city.setOpen(false);
-    city.setHighlight(-1);
+    setCityOpen(false);
+    setCityHighlight(-1);
+    setCityItems([]);
 
-    // On garde le focus dans le champ
+    // garder le focus pour pouvoir retaper si besoin
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
-    const hasMenu = city.open && city.items.length > 0;
+    const hasMenu = cityOpen && cityItems.length > 0;
 
-    if (hasMenu) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        city.setHighlight((i) => (i + 1) % city.items.length);
-        return;
-      }
+    if (!hasMenu) return;
 
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        city.setHighlight(
-          (i) => (i - 1 + city.items.length) % city.items.length
-        );
-        return;
-      }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCityHighlight((i) =>
+        cityItems.length ? (i + 1) % cityItems.length : -1
+      );
+      return;
+    }
 
-      if (e.key === "Escape") {
-        e.preventDefault();
-        closeCityMenu();
-        return;
-      }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCityHighlight((i) =>
+        cityItems.length ? (i - 1 + cityItems.length) % cityItems.length : -1
+      );
+      return;
+    }
 
-      if (e.key === "Enter" || e.key === "NumpadEnter") {
-        e.preventDefault();
-        const item = city.items[city.highlight] || city.items[0];
-        if (item) selectCity(item);
-        return;
-      }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeCityMenu();
+      return;
+    }
 
-      if (e.key === "Tab") {
-        const item = city.items[city.highlight] || city.items[0];
-        if (item) selectCity(item);
-        return;
-      }
+    if (e.key === "Enter" || e.key === "NumpadEnter") {
+      e.preventDefault();
+      const item = cityItems[cityHighlight] || cityItems[0];
+      if (item) selectCity(item);
+      return;
+    }
 
+    if (e.key === "Tab") {
+      const item = cityItems[cityHighlight] || cityItems[0];
+      if (item) selectCity(item);
       return;
     }
   }
@@ -350,37 +407,35 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
   };
 
-  useImperativeHandle(ref, () => (
-    {
-      handleVocalFiltres(filtres) {
-        setForm((prev) => {
-          let next = { ...prev };
+  useImperativeHandle(ref, () => ({
+    handleVocalFiltres(filtres) {
+      setForm((prev) => {
+        let next = { ...prev };
 
-          Object.entries(filtres).forEach(([k, v]) => {
-            if (Array.isArray(next[k]) && Array.isArray(v)) {
-              next[k] = [...new Set([...next[k], ...v])];
-            } else {
-              next[k] = v;
-            }
-          });
-
-          if ("ageMin" in filtres || "ageMax" in filtres) {
-            next.ageMin = filtres.ageMin ?? "";
-            next.ageMax = filtres.ageMax ?? "";
+        Object.entries(filtres).forEach(([k, v]) => {
+          if (Array.isArray(next[k]) && Array.isArray(v)) {
+            next[k] = [...new Set([...next[k], ...v])];
+          } else {
+            next[k] = v;
           }
-
-          if (next.localisation) {
-            delete next.latitude;
-            delete next.longitude;
-          }
-
-          setCityText(next.localisation || "");
-          handleSearch(next);
-          return next;
         });
-      },
-    }
-  ));
+
+        // 🧹 Si des infos d'âge arrivent, on reset l'ancienne plage
+        if ("ageMin" in filtres || "ageMax" in filtres) {
+          next.ageMin = filtres.ageMin ?? "";
+          next.ageMax = filtres.ageMax ?? "";
+        }
+
+        if (next.localisation) {
+          delete next.latitude;
+          delete next.longitude;
+        }
+        setCityText(next.localisation || "");
+        handleSearch(next);
+        return next;
+      });
+    },
+  }));
 
   const isMobile = useIsMobile(768);
 
@@ -420,21 +475,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }, 0);
   }
 
-  function refocusCity() {
-    setTimeout(() => {
-      if (cityInputRef.current) {
-        const el = cityInputRef.current;
-        el.focus();
-        const len = el.value.length;
-        try {
-          el.setSelectionRange(len, len);
-        } catch {
-          // ignore
-        }
-      }
-    }, 0);
-  }
-
   /* ---------------------------------- JSX ---------------------------------- */
   return (
     <aside className={`recherche-sidebar ${className || ""}`}>
@@ -449,6 +489,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
             let next = { ...form, ...filtres };
 
+            // 🧹 Si la voix a parlé d'âge, on remet à plat ageMin/ageMax
             if ("ageMin" in filtres || "ageMax" in filtres) {
               next.ageMin = filtres.ageMin ?? "";
               next.ageMax = filtres.ageMax ?? "";
@@ -631,62 +672,32 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               ref={cityInputRef}
               onFocus={() => {
                 const v = (cityText || "").trim();
-                if (v.length >= 2 && city.items.length) city.setOpen(true);
-              }}
-              onBlur={() => {
-                // on ne casse rien : on laisse juste le texte tel quel
-              }}
-              onCompositionStart={() => {
-                city.composingRef.current = true;
-              }}
-              onCompositionEnd={(e) => {
-                city.composingRef.current = false;
-                const v = e.currentTarget.value;
-                setCityText(v);
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
-                if (v.trim().length >= 2 && city.items.length) {
-                  city.setOpen(true);
-                }
+                if (v.length >= 2 && cityItems.length) setCityOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
                 setCityText(v);
-                setForm((prev) => ({
-                  ...prev,
-                  localisation: v,
-                  autourDeMoi: false,
-                  latitude: undefined,
-                  longitude: undefined,
-                }));
-                if (!city.composingRef.current) {
-                  city.setQuery(v);
-                }
-                refocusCity();
+                // on ne met pas form.localisation à jour à chaque frappe,
+                // seulement au moment de la recherche ou de la sélection
               }}
               onKeyDown={onCityKeyDown}
             />
 
-            {city.loading && <div className="city-hint">Recherche…</div>}
+            {cityLoading && <div className="city-hint">Recherche…</div>}
 
-            {city.open && city.items.length > 0 && (
+            {cityOpen && cityItems.length > 0 && (
               <ul
                 className="city-dropdown"
                 tabIndex={-1}
-                onMouseDown={(e) => e.preventDefault()} // important : évite le blur
+                onMouseDown={(e) => e.preventDefault()} // garde le focus
               >
-                {city.items.map((item, idx) => (
+                {cityItems.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
                     className={`city-option ${
-                      idx === city.highlight ? "is-active" : ""
+                      idx === cityHighlight ? "is-active" : ""
                     }`}
-                    onMouseEnter={() => city.setHighlight(idx)}
+                    onMouseEnter={() => setCityHighlight(idx)}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       selectCity(item);
@@ -694,7 +705,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
                   >
                     <span className="city-name">{item.label}</span>
-                    {/* Plus d'affichage des coordonnées GPS ici */}
+                    {/* Plus de coordonnées GPS */}
                   </li>
                 ))}
               </ul>
@@ -821,23 +832,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
 
-    // Gestion spéciale "autour de moi"
-    if (name === "autourDeMoi") {
-      setForm((prev) => ({
-        ...prev,
-        autourDeMoi: checked,
-        localisation: checked ? "" : prev.localisation,
-        latitude: undefined,
-        longitude: undefined,
-      }));
-      if (checked) {
-        city.setOpen(false);
-        setCityText("");
-      }
-      return;
-    }
-
-    // La ville est gérée par l’input custom + autocomplétion
+    // La ville est gérée par cityText et l'autocomplétion
     if (name === "localisation") return;
 
     // 🔢 Champs numériques : âge min / max / rayon
@@ -860,7 +855,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           : prev[name].filter((v) => v !== value),
       }));
     }
-    // ✅ Checkbox simple (photo, description, autourDeMoi déjà géré plus haut)
+    // ✅ Checkbox simple (photo, description, autourDeMoi etc.)
     else if (type === "checkbox") {
       setForm((prev) => ({ ...prev, [name]: checked }));
     }
