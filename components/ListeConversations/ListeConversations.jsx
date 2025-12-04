@@ -142,8 +142,8 @@ export default function ListeConversations({
     isLoading,
     mutate,
   } = useSWR(userId ? "/api/conversations" : null, safeFetcher, {
-    revalidateOnFocus: false,      // 🔥 évite les refetch automatiques en plus
-    dedupingInterval: 5000,       // évite les doublons rapprochés
+    revalidateOnFocus: false, // 🔥 évite les refetch automatiques en plus
+    dedupingInterval: 5000, // évite les doublons rapprochés
   });
 
   const rawConversations = data?.conversations || [];
@@ -325,6 +325,22 @@ export default function ListeConversations({
 
   return (
     <aside className={className || "liste-conversations"}>
+      {/* ✅ 1) Le module d’ajout en tout premier quand il est ouvert */}
+      {showModal && (
+        <CreateConversationModal
+          currentUserId={userId}
+          onClose={() => setShowModal(false)}
+          onCreated={async (newConvId) => {
+            // ici, un vrai refetch ponctuel est OK
+            await mutate();
+            if (newConvId) {
+              router.replace(`/messagerie?conversationId=${newConvId}`);
+            }
+            setShowModal(false);
+          }}
+        />
+      )}
+
       <div className="conversation-header">
         <h3>Conversations</h3>
         <button onClick={() => setShowModal(true)} className="new-conv-button">
@@ -357,10 +373,15 @@ export default function ListeConversations({
           .filter(Boolean);
 
         const pseudo =
-          autres.length === 1 ? autres[0].pseudo : autres.map((u) => u.pseudo).join(", ");
+          autres.length === 1
+            ? autres[0].pseudo
+            : autres.map((u) => u.pseudo).join(", ");
 
         const unreadCount = conv.unreadCount || 0;
-        const avatarUsers = autres.slice(0, 2);
+
+        // ✅ 2) On prend plus de personnes pour les avatars
+        const avatarUsers = autres.slice(0, 4);
+        const extraCount = Math.max(0, autres.length - avatarUsers.length);
 
         return (
           <div
@@ -370,7 +391,10 @@ export default function ListeConversations({
             }`}
           >
             {/* Zone cliquable = ouvre la conversation */}
-            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
+            <div
+              className="conversation-clickable"
+              onClick={() => handleSelect(conv.id)}
+            >
               <div className="conv-main">
                 {/* === Avatars === */}
                 <div className="conv-avatar">
@@ -426,6 +450,11 @@ export default function ListeConversations({
                           </div>
                         );
                       })}
+
+                      {/* Petit badge +N si encore plus de monde */}
+                      {extraCount > 0 && (
+                        <div className="conv-avatar-extra">+{extraCount}</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -496,21 +525,6 @@ export default function ListeConversations({
           </div>
         );
       })}
-
-      {showModal && (
-        <CreateConversationModal
-          currentUserId={userId}
-          onClose={() => setShowModal(false)}
-          onCreated={async (newConvId) => {
-            // ici, un vrai refetch ponctuel est OK
-            await mutate();
-            if (newConvId) {
-              router.replace(`/messagerie?conversationId=${newConvId}`);
-            }
-            setShowModal(false);
-          }}
-        />
-      )}
     </aside>
   );
 }

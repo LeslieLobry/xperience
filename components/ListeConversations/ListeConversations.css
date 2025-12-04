@@ -224,6 +224,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.conv-avatar-stack {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.conv-avatar-extra {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 999px;
+  border: 1px solid #e0c084;
+  margin-left: 4px;
+}
 
 @media screen and (width <= 768px){
   .liste-conversations {
