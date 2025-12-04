@@ -564,25 +564,28 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           open={openSections.autres}
           toggle={() => toggleSection("autres")}
         >
-          <div className="filters-group">
-            <h4>Âge</h4>
-            <input
-              type="number"
-              name="ageMin"
-              placeholder="Min"
-              value={form.ageMin}
-              onChange={handleChange}
-              min={18}
-            />
-            <input
-              type="number"
-              name="ageMax"
-              placeholder="Max"
-              value={form.ageMax}
-              onChange={handleChange}
-              min={18}
-            />
-          </div>
+      <div className="filters-group">
+  <h4>Âge</h4>
+  <input
+    type="text"
+    inputMode="numeric"
+    pattern="[0-9]*"
+    name="ageMin"
+    placeholder="Min"
+    value={form.ageMin}
+    onChange={handleChange}
+  />
+  <input
+    type="text"
+    inputMode="numeric"
+    pattern="[0-9]*"
+    name="ageMax"
+    placeholder="Max"
+    value={form.ageMax}
+    onChange={handleChange}
+  />
+</div>
+
 
           {/* --- Autocomplétion Ville (CONTRÔLÉ) --- */}
           <div
@@ -679,15 +682,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             )}
           </div>
 
-          <input
-            type="number"
-            name="rayon"
-            placeholder="Rayon (km)"
-            value={form.rayon}
-            min={1}
-            max={200}
-            onChange={handleChange}
-          />
+<input
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  name="rayon"
+  placeholder="Rayon (km)"
+  value={form.rayon}
+  onChange={handleChange}
+/>
+
 
           <label>
             <input
