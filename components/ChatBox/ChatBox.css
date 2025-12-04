@@ -3,8 +3,10 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100vh;
+  min-height: 0;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* === Header === */
@@ -13,13 +15,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.8rem;
   min-height: 54px;
   position: relative;
-  background: transparent;
-  border: 1px #e0c084 solid;
+  background: radial-gradient(
+    circle at top left,
+    rgb(224 192 132 / 18%),
+    rgb(5 5 9 / 96%)
+  );
+  border: 1px solid rgba(224, 192, 132, 0.7);
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 
+/* Badge de timer d'appel */
 .call-timer-badge {
   position: absolute;
   left: 0;
@@ -39,27 +48,58 @@
   margin: 0 0 4px 8px;
 }
 
+/* === Participants header === */
 .chat-participants {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   flex: 1 1 auto;
   min-width: 0;
+  scrollbar-width: none;
 }
 
+.chat-participants::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bouton retour */
+.chat-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #e0c084;
+  cursor: pointer;
+  padding: 4px;
+  margin-right: 4px;
+  font-size: 1.3rem;
+}
+
+/* Chip participant */
 .participant-info {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgb(224 192 132 / 10%);
-  border-radius: 6px;
-  padding: 4px 8px;
+  background: rgb(0 0 0 / 55%);
+  border-radius: 999px;
+  padding: 3px 9px;
+  border: 1px solid rgb(224 192 132 / 35%);
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.participant-info:hover {
+  background: rgb(224 192 132 / 16%);
+  border-color: rgb(224 192 132 / 65%);
+  transform: translateY(-1px);
 }
 
 .participant-avatar {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   object-fit: cover;
   background-color: #444;
@@ -67,12 +107,34 @@
 
 .participant-name {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.83rem;
   color: #e0c084;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 90px;
+}
+
+/* Badge +X participants en plus */
+.participant-more {
+  border-radius: 999px;
+  border: 1px dashed rgba(224, 192, 132, 0.7);
+  background: transparent;
+  color: #e0c084;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.participant-more:hover {
+  background: rgb(224 192 132 / 10%);
+  transform: translateY(-1px);
 }
 
 /* === Appel entrant & Popups === */
@@ -106,7 +168,7 @@
 .chat-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   margin-left: 8px;
 }
@@ -116,25 +178,32 @@
   border: none;
   color: #e0c084;
   cursor: pointer;
-  font-size: 1.3rem;
-  padding: 0.5rem;
-  transition: opacity 0.2s;
+  font-size: 1.25rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s;
 }
 
 .chat-actions button:hover {
-  opacity: 0.8;
+  background: rgb(224 192 132 / 12%);
+  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
+/* Bouton + un peu plus visible */
+.chat-add-btn {
+  border: 1px solid rgb(224 192 132 / 55%);
+}
+
+/* === Conteneur messages === */
 .chat-messages {
   flex: 1 1 auto;
-  min-height: 0;                        /* ⚠️ indispensable pour que le scroll marche */
-  max-height: calc(100vh - 160px);      /* header + input (à ajuster si besoin) */
+  min-height: 0; /* indispensable pour que le scroll marche */
   overflow-y: auto;
   padding: 1rem;
   display: flex;
   flex-direction: column;
 }
-
 
 /* === Messages & Bubbles === */
 .message-bubble {
@@ -160,7 +229,7 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 16px;
   width: 50%;
-  margin-right: 30px;        /* ← espace pour le bouton emoji */
+  margin-right: 30px; /* espace pour le bouton emoji */
 }
 
 .message-bubble.other {
@@ -170,7 +239,7 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 16px;
   width: 50%;
-  margin-left: 30px;         /* ← espace pour le bouton emoji */
+  margin-left: 30px; /* espace pour le bouton emoji */
 }
 
 .message-class {
@@ -571,8 +640,8 @@
   background: #111;
   padding: 10px;
   border-radius: 8px;
-  height: 4000rem;
   margin-bottom: 10px;
+  height: auto; /* remplace l'ancienne valeur énorme */
 }
 
 .video-call-container video {
@@ -653,7 +722,7 @@
   pointer-events: none;
 }
 
-/* === Responsive === */
+/* === Responsive global === */
 @media (max-width: 600px) {
   .message-bubble {
     max-width: 94vw;
@@ -674,10 +743,21 @@
   .chat-input {
     flex-direction: column;
   }
-.participant-name {
+
+  .participant-name {
     display: inline-block;
-    max-width: 80px;
-    font-size: 0.8rem;
+    max-width: 70px;
+    font-size: 0.78rem;
+  }
+
+  .chat-header-mobile {
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: #050509;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
   }
 }
 
@@ -688,72 +768,7 @@
   border: none;
 }
 
-
-/* 🧷 Header toujours visible sur mobile */
-@media (max-width: 768px) {
-  .chatbox-container {
-    position: relative;
-    height: 100vh;     
-    box-sizing: border-box;
-  }
-
-  .chat-header-mobile {
-  
-    left: 0;
-    right: 0;
-    z-index: 50;
-    background: #050509;  
-    border-left: none;
-    border-right: none;
-  }
-}
-
-.chatbox-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-height: 100vh;   
-  min-height: 0;       
-  position: relative;
-  overflow: hidden;    
-}
-
-/* =================================================================== */
-/* 🔧 OVERRIDES pour que le scroll + visio ne cassent plus la mise en page */
-/* =================================================================== */
-
-/* On renforce le layout pour le scroll */
-.chatbox-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-height: 100vh;
-  min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Conteneur messages : scroll vertical propre */
-.chat-messages {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-}
-
-/* On annule la hauteur énorme de la visio tout en gardant le style */
-.video-call-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #111;
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  height: auto; /* 🔧 remplace 4000rem */
-}
+/* === Couple : barre prénoms === */
 .couple-prenoms-bar {
   display: flex;
   justify-content: space-between;
@@ -767,6 +782,10 @@
 }
 
 .couple-prenoms-bar strong {
+  color: #e0c084;
+}
+
+.couple-prenoms-bar span {
   color: #e0c084;
 }
 
@@ -811,9 +830,6 @@
   font-size: 0.9rem;
   color: #e0c084;
 }
-.couple-prenoms-bar span {
-  color: #e0c084;
-}
 
 .edit-prenoms-modal__label input {
   padding: 6px 8px;
@@ -841,5 +857,5 @@
   background: transparent;
   cursor: pointer;
   font-size: 0.9rem;
-  color:#e0c084 ;
+  color: #e0c084;
 }

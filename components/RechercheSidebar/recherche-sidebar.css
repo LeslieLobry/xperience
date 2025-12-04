@@ -2,33 +2,40 @@
   background: transparent;
   border-radius: 8px;
   padding: 1rem;
-  border: 1px solid #e0c084; 
+  border: 1px solid #e0c084;
   color: #f5ece0;
+  font-size: 0.95rem;
+  box-sizing: border-box;
 }
 
+/* Titre éventuel */
 .recherche-sidebar h2 {
   font-size: 1.2rem;
   margin-bottom: 1rem;
 }
-/* Autocomplétion commune */
+
+/* ---------------- Autocomplétion commune ---------------- */
+
 .city-hint {
   margin-top: 6px;
-  font-size: 0.9rem;
-  color: #888;
+  font-size: 0.85rem;
+  color: #aaa;
 }
 
 .city-dropdown {
   position: absolute;
   margin-top: 4px;
-  width: min(480px, 92%);
+  width: 100%;               /* 🔁 match la largeur du groupe, pas plus */
+  max-width: 480px;
   max-height: 280px;
   overflow: auto;
   background: #fff;
   border: 1px solid #e6e6e6;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 20;
   padding: 6px 0;
+  box-sizing: border-box;
 }
 
 .city-option {
@@ -38,11 +45,13 @@
   gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .city-option:hover,
 .city-option.is-active {
   background: #252427;
+  color: #f5ece0;
 }
 
 .city-name {
@@ -50,37 +59,46 @@
 }
 
 .city-geo {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #888;
 }
 
-/* Assure un bon positionnement sous l'input */
-.filters-group { position: relative; }
+/* Groupe générique (ville, âge, etc.) */
+.filters-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
 
+/* Input principal (pseudo + ville) */
 .input-recherche {
   background-color: transparent;
   border: 1px solid #e0c084;
 }
-.recherche-sidebar h4{
+
+/* Titres de blocs (Âge, Ville, etc.) */
+.recherche-sidebar h4 {
   color: #8c6a5d;
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
 }
+
+/* Formulaire vertical + spacing régulier */
 .recherche-sidebar form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.filters-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
+/* Alignement horizontal éventuel (non utilisé partout) */
 .age-inputs {
   display: flex;
   gap: 0.5rem;
 }
 
+/* Bouton de recherche */
 .recherche-button {
   background-color: #8c6a5d;
   color: white;
@@ -88,51 +106,86 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 0.95rem;
 }
 
 .recherche-button:hover {
   background-color: #74584a;
 }
 
-/* Section toggle : groupé pour éviter le duplicate */
-.section-toggle {
-  color: #e0c084;
-  cursor: pointer;
-  margin-bottom: 0.5rem;
-  font-weight: normal;
-  font-size: 26px;
-}
-
-.recherche-sidebar input[type="text"],
-.recherche-sidebar input[type="number"] {
-  width: 100%;
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  color: #e0c084;
-  background-color: transparent;
-}
-
-@media screen and (width <= 768px) {
-  .recherche-sidebar {
-    padding: 1rem;
-    color: white;
-    font-size: 26px;
-    border: none;
-  }
-}
+/* ---------------- Sections (Identité / Envies / ...) ---------------- */
 
 .section-group {
-  margin-bottom: 0;
+  margin-bottom: 0.5rem;       /* marge légère dans tous les cas */
 }
 
 .section-group.open {
-  margin-bottom: 1rem;
+  margin-bottom: 1rem;         /* un peu plus quand ouvert, mais doux */
 }
 
-/* Nommage kebab-case pour le mobile */
+/* Titre cliquable de section */
+.section-toggle {
+  color: #e0c084;
+  cursor: pointer;
+  margin-bottom: 0.35rem;
+  font-weight: normal;
+  font-size: 1rem;             /* 🔁 plus besoin du 26px qui faisait tout sauter */
+  display: flex;
+  align-items: center;
+}
+
+/* Inputs génériques */
+.recherche-sidebar input[type="text"],
+.recherche-sidebar input[type="number"],
+.recherche-sidebar input[type="email"],
+.recherche-sidebar input[type="password"] {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #e0c084;   /* cohérent avec .input-recherche */
+  color: #e0c084;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+/* Radio / checkbox alignés proprement */
+.recherche-sidebar input[type="checkbox"],
+.recherche-sidebar input[type="radio"] {
+  margin-right: 0.4rem;
+}
+
+/* ---------------- Mobile ---------------- */
+
+@media (max-width: 768px) {
+  .recherche-sidebar {
+    padding: 0.75rem;
+    color: white;
+    font-size: 0.9rem;         /* 🔁 plus de 26px global */
+    border: none;
+  }
+
+  .section-toggle {
+    font-size: 0.95rem;
+  }
+
+  .city-dropdown {
+    max-width: 100%;
+  }
+}
+
+/* Sidebar "mobile" qui ne montre que le lien vers /recherche
+   (classe utilisée dans le composant : recherche-sidebar--mobile) */
+.recherche-sidebar--mobile {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 120px;
+  border: none;
+  padding: 1rem;
+}
+
+/* Ancienne classe, gardée pour compat si tu l'as utilisée ailleurs */
 .recherche-sidebar-mobile {
-  /* Customise l'affichage mobile ici */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -140,19 +193,21 @@
   border: none;
 }
 
+/* Lien vers la page /recherche en mode mobile */
 .go-recherche-link {
   display: inline-block;
-  font-size: 1.1rem;
-  padding: 12px 20px;
+  font-size: 1rem;
+  padding: 10px 18px;
   border-radius: 20px;
   background: #e0c084;
-  color: #e2e2fa;
+  color: #1b1720;
   font-weight: normal;
   text-decoration: none;
   box-shadow: 0 2px 8px rgb(70 70 90 / 10%);
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .go-recherche-link:hover {
   background: #e2e2fa;
+  color: #1b1720;
 }

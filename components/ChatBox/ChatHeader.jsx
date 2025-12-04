@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Phone, Video, X, Plus, ArrowLeft } from "lucide-react";
 import "./ChatBox.css";
 
-// --- Ajoute ce hook ici ---
+// --- Hook pour les photos présignées ---
 function usePresignedPhotos(participants) {
   const [photoUrls, setPhotoUrls] = useState({});
   useEffect(() => {
@@ -11,9 +11,15 @@ function usePresignedPhotos(participants) {
     async function fetchAll() {
       const result = {};
       await Promise.all(
-        participants.map(async (p) => {
-          if (!p.photoUrl) { result[p.id] = "/default.jpg"; return; }
-          if (p.photoUrl.startsWith("http")) { result[p.id] = p.photoUrl; return; }
+        (participants || []).map(async (p) => {
+          if (!p?.photoUrl) {
+            result[p.id] = "/default.jpg";
+            return;
+          }
+          if (p.photoUrl.startsWith("http")) {
+            result[p.id] = p.photoUrl;
+            return;
+          }
           try {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
@@ -22,13 +28,21 @@ function usePresignedPhotos(participants) {
             });
             const data = await res.json();
             result[p.id] = data.url || "/default.jpg";
-          } catch { result[p.id] = "/default.jpg"; }
+          } catch {
+            result[p.id] = "/default.jpg";
+          }
         })
       );
       if (!canceled) setPhotoUrls(result);
     }
-    fetchAll();
-    return () => { canceled = true; };
+    if (participants && participants.length) {
+      fetchAll();
+    } else {
+      setPhotoUrls({});
+    }
+    return () => {
+      canceled = true;
+    };
   }, [JSON.stringify(participants)]);
   return photoUrls;
 }
@@ -43,7 +57,19 @@ export default function ChatHeader({
   onBack,
 }) {
   const photoUrls = usePresignedPhotos(participants);
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth <= 768;
+
+  const MAX_VISIBLE = isMobile ? 2 : 4;
+  const visibleParticipants = participants.slice(0, MAX_VISIBLE);
+  const hiddenCount = Math.max(0, participants.length - visibleParticipants.length);
+
+  const handleAddClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 🔹 on envoie TOUTE la liste des participants au parent
+    onAddParticipant?.(participants);
+  };
 
   return (
     <div className={`chat-header ${isMobile ? "chat-header-mobile" : ""}`}>
@@ -62,14 +88,6 @@ export default function ChatHeader({
             }}
             className="chat-back-btn"
             aria-label="Retour"
-            style={{
-              marginRight: 10,
-              fontSize: 24,
-              color: "#ad935e",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
           >
             <ArrowLeft />
           </button>
@@ -78,22 +96,38 @@ export default function ChatHeader({
         {participants.length === 0 ? (
           <p className="aucun-participant">Aucun participant trouvé</p>
         ) : (
-          participants.map((p) => (
-            <Link
-              key={p.id}
-              href={`/profil/${p.id}`}
-              className="participant-info"
-              passHref
-            >
-              <img
-                src={photoUrls[p.id] || "/default.jpg"}
-                alt={p.pseudo}
-                className="participant-avatar"
-                onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = "/default.jpg"; }}
-              />
-              <span className="participant-name">{p.pseudo}</span>
-            </Link>
-          ))
+          <>
+            {visibleParticipants.map((p) => (
+              <Link
+                key={p.id}
+                href={`/profil/${p.id}`}
+                className="participant-info"
+                passHref
+              >
+                <img
+                  src={photoUrls[p.id] || "/default.jpg"}
+                  alt={p.pseudo}
+                  className="participant-avatar"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/default.jpg";
+                  }}
+                />
+                <span className="participant-name">{p.pseudo}</span>
+              </Link>
+            ))}
+
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                className="participant-more"
+                onClick={handleAddClick}
+                title="Voir tous les membres / ajouter"
+              >
+                +{hiddenCount}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -101,18 +135,24 @@ export default function ChatHeader({
         {!inCall && onAddParticipant && (
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddParticipant?.(); }}
+            onClick={handleAddClick}
             title="Ajouter un membre"
             aria-label="Ajouter un membre"
+            className="chat-add-btn"
           >
             <Plus />
           </button>
         )}
+
         {!inCall && (
           <>
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCallAudio?.(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCallAudio?.();
+              }}
               title="Appel audio"
               aria-label="Appel audio"
             >
@@ -120,7 +160,11 @@ export default function ChatHeader({
             </button>
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCallVideo?.(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCallVideo?.();
+              }}
               title="Appel vidéo"
               aria-label="Appel vidéo"
             >
@@ -128,10 +172,15 @@ export default function ChatHeader({
             </button>
           </>
         )}
+
         {inCall && (
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose?.(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose?.();
+            }}
             title="Raccrocher"
             aria-label="Raccrocher"
           >

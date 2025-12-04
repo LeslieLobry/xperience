@@ -23,8 +23,8 @@ function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < breakpoint);
-    check();
     window.addEventListener("resize", check);
+    check();
     return () => window.removeEventListener("resize", check);
   }, [breakpoint]);
   return isMobile;
@@ -386,6 +386,84 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     handleSearch(form);
   }
 
+  /* -------------------------------- Handlers -------------------------------- */
+  function handleChange(e) {
+    const { name, value, type, checked } = e.target;
+
+    if (name === "autourDeMoi") {
+      setForm((prev) => ({
+        ...prev,
+        autourDeMoi: checked,
+        localisation: checked ? "" : prev.localisation,
+        latitude: undefined,
+        longitude: undefined,
+      }));
+      if (checked) {
+        city.setOpen(false);
+        setCityText("");
+      }
+      return;
+    }
+
+    if (name === "localisation") return; // géré par l’input ville
+
+    // 🔢 Champs numériques gérés "à la main"
+    if (name === "ageMin" || name === "ageMax" || name === "rayon") {
+      const digitsOnly = value.replace(/\D/g, "");
+      setForm((prev) => ({
+        ...prev,
+        [name]: digitsOnly,
+      }));
+      return;
+    }
+
+    if (type === "checkbox" && Array.isArray(form[name])) {
+      setForm((prev) => ({
+        ...prev,
+        [name]: checked
+          ? [...prev[name], value]
+          : prev[name].filter((v) => v !== value),
+      }));
+    } else if (type === "checkbox") {
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
+  }
+
+  function renderCheckboxGroup(title, name, options) {
+    return (
+      <div className="filters-group">
+        <h4>{title}</h4>
+        {options.map((opt) => (
+          <label key={opt}>
+            <input
+              type="checkbox"
+              name={name}
+              value={opt}
+              checked={
+                Array.isArray(form[name]) ? form[name]?.includes(opt) : false
+              }
+              onChange={handleChange}
+            />
+            {opt}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  function Section({ title, open, toggle, children }) {
+    return (
+      <div className={`section-group ${open ? "open" : ""}`}>
+        <h3 onClick={toggle} className="section-toggle">
+          {open ? "−" : "+"} {title}
+        </h3>
+        {open && <div className="section-content">{children}</div>}
+      </div>
+    );
+  }
+
   /* ---------------------------------- JSX ---------------------------------- */
   return (
     <aside className={`recherche-sidebar ${className || ""}`}>
@@ -434,7 +512,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               maxWidth: 700,
             }}
           >
-            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> « {resumeVocal} »
+            <span style={{ opacity: 0.7 }}>Recherche vocale :</span> «{" "}
+            {resumeVocal} »
           </div>
         )}
 
@@ -541,20 +620,20 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           <div className="filters-group">
             <h4>Âge</h4>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               name="ageMin"
               placeholder="Min"
               value={form.ageMin}
               onChange={handleChange}
-              min={18}
             />
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               name="ageMax"
               placeholder="Max"
               value={form.ageMax}
               onChange={handleChange}
-              min={18}
             />
           </div>
 
@@ -603,7 +682,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 const v = e.currentTarget.value;
                 setCityText(v);
                 city.setQuery(v);
-                if (v.trim().length >= 2 && city.items.length) city.setOpen(true);
+                if (v.trim().length >= 2 && city.items.length)
+                  city.setOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
@@ -644,7 +724,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                     <span className="city-name">{item.label}</span>
                     {item.latitude != null && item.longitude != null && (
                       <span className="city-geo">
-                        · {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                        · {item.latitude.toFixed(3)},{" "}
+                        {item.longitude.toFixed(3)}
                       </span>
                     )}
                   </li>
@@ -654,12 +735,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           </div>
 
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             name="rayon"
             placeholder="Rayon (km)"
             value={form.rayon}
-            min={1}
-            max={200}
             onChange={handleChange}
           />
 
@@ -767,74 +847,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       </form>
     </aside>
   );
-
-  /* -------------------------------- Handlers -------------------------------- */
-  function handleChange(e) {
-    const { name, value, type, checked } = e.target;
-
-    if (name === "autourDeMoi") {
-      setForm((prev) => ({
-        ...prev,
-        autourDeMoi: checked,
-        localisation: checked ? "" : prev.localisation,
-        latitude: undefined,
-        longitude: undefined,
-      }));
-      if (checked) {
-        city.setOpen(false);
-        setCityText("");
-      }
-      return;
-    }
-
-    if (name === "localisation") return; // géré par l’input ville
-
-    if (type === "checkbox" && Array.isArray(form[name])) {
-      setForm((prev) => ({
-        ...prev,
-        [name]: checked
-          ? [...prev[name], value]
-          : prev[name].filter((v) => v !== value),
-      }));
-    } else if (type === "checkbox") {
-      setForm((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
-  }
-
-  function renderCheckboxGroup(title, name, options) {
-    return (
-      <div className="filters-group">
-        <h4>{title}</h4>
-        {options.map((opt) => (
-          <label key={opt}>
-            <input
-              type="checkbox"
-              name={name}
-              value={opt}
-              checked={
-                Array.isArray(form[name]) ? form[name]?.includes(opt) : false
-              }
-              onChange={handleChange}
-            />
-            {opt}
-          </label>
-        ))}
-      </div>
-    );
-  }
-
-  function Section({ title, open, toggle, children }) {
-    return (
-      <div className={`section-group ${open ? "open" : ""}`}>
-        <h3 onClick={toggle} className="section-toggle">
-          {open ? "−" : "+"} {title}
-        </h3>
-        {open && <div className="section-content">{children}</div>}
-      </div>
-    );
-  }
 });
 
 export default RechercheSidebar;
