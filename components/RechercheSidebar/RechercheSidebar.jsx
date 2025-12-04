@@ -170,12 +170,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     longitude: undefined,
   });
 
-  // Texte brut tapé pour la ville (séparé de form.localisation)
+  // Texte affiché/tapé pour la ville
   const [cityText, setCityText] = useState("");
-  const [isCityFocused, setIsCityFocused] = useState(false);
-
-  // Anti-submit juste après fermeture du menu (Escape/clic dehors)
-  const justClosedRef = useRef(false);
   const city = useCityAutocomplete();
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
@@ -184,22 +180,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const ageMinRef = useRef(null);
   const ageMaxRef = useRef(null);
   const rayonRef = useRef(null);
-
-  const closeCityMenu = () => {
-    city.setOpen(false);
-    justClosedRef.current = true;
-    setTimeout(() => {
-      justClosedRef.current = false;
-    }, 120);
-  };
-
-  // garde cityText aligné si form.localisation bouge ailleurs (ex: vocal)
-  useEffect(() => {
-    if (isCityFocused) return; // ne pas écraser la frappe
-    const next = form.localisation || "";
-    if (next !== cityText) setCityText(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.localisation, isCityFocused]);
 
   const [resumeVocal, setResumeVocal] = useState("");
   const [loadingGeo, setLoadingGeo] = useState(false);
@@ -212,6 +192,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   });
   const toggleSection = (key) =>
     setOpenSections((p) => ({ ...p, [key]: !p[key] }));
+
+  const closeCityMenu = () => {
+    city.setOpen(false);
+  };
 
   // Fermer le menu si clic dehors
   useEffect(() => {
@@ -242,13 +226,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     // 3) UI
     city.setOpen(false);
     city.setHighlight(-1);
+
+    // On garde le focus dans le champ
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
     const hasMenu = city.open && city.items.length > 0;
 
-    // Menu ouvert : navigation & validation
     if (hasMenu) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -271,7 +256,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }
 
       if (e.key === "Enter" || e.key === "NumpadEnter") {
-        // ↩️ Valider la ville sans submit le form
         e.preventDefault();
         const item = city.items[city.highlight] || city.items[0];
         if (item) selectCity(item);
@@ -279,14 +263,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       }
 
       if (e.key === "Tab") {
-        // ✅ Valide la ville PUIS laisse Tab passer au champ suivant
         const item = city.items[city.highlight] || city.items[0];
         if (item) selectCity(item);
-        // On NE fait PAS preventDefault -> Tab continue sa vie
         return;
       }
 
-      return; // autres touches : laisser faire le browser
+      return;
     }
   }
 
@@ -368,35 +350,37 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }
   };
 
-  useImperativeHandle(ref, () => ({
-    handleVocalFiltres(filtres) {
-      setForm((prev) => {
-        let next = { ...prev };
+  useImperativeHandle(ref, () => (
+    {
+      handleVocalFiltres(filtres) {
+        setForm((prev) => {
+          let next = { ...prev };
 
-        Object.entries(filtres).forEach(([k, v]) => {
-          if (Array.isArray(next[k]) && Array.isArray(v)) {
-            next[k] = [...new Set([...next[k], ...v])];
-          } else {
-            next[k] = v;
+          Object.entries(filtres).forEach(([k, v]) => {
+            if (Array.isArray(next[k]) && Array.isArray(v)) {
+              next[k] = [...new Set([...next[k], ...v])];
+            } else {
+              next[k] = v;
+            }
+          });
+
+          if ("ageMin" in filtres || "ageMax" in filtres) {
+            next.ageMin = filtres.ageMin ?? "";
+            next.ageMax = filtres.ageMax ?? "";
           }
+
+          if (next.localisation) {
+            delete next.latitude;
+            delete next.longitude;
+          }
+
+          setCityText(next.localisation || "");
+          handleSearch(next);
+          return next;
         });
-
-        // 🧹 Si des infos d'âge arrivent, on reset l'ancienne plage
-        if ("ageMin" in filtres || "ageMax" in filtres) {
-          next.ageMin = filtres.ageMin ?? "";
-          next.ageMax = filtres.ageMax ?? "";
-        }
-
-        if (next.localisation) {
-          delete next.latitude;
-          delete next.longitude;
-        }
-        setCityText(next.localisation || "");
-        handleSearch(next);
-        return next;
-      });
-    },
-  }));
+      },
+    }
+  ));
 
   const isMobile = useIsMobile(768);
 
@@ -411,10 +395,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   }
 
   function handleSubmit(e) {
-    if (justClosedRef.current) {
-      e.preventDefault();
-      return;
-    }
     e.preventDefault();
     handleSearch(form);
   }
@@ -440,6 +420,21 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }, 0);
   }
 
+  function refocusCity() {
+    setTimeout(() => {
+      if (cityInputRef.current) {
+        const el = cityInputRef.current;
+        el.focus();
+        const len = el.value.length;
+        try {
+          el.setSelectionRange(len, len);
+        } catch {
+          // ignore
+        }
+      }
+    }, 0);
+  }
+
   /* ---------------------------------- JSX ---------------------------------- */
   return (
     <aside className={`recherche-sidebar ${className || ""}`}>
@@ -454,7 +449,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
             let next = { ...form, ...filtres };
 
-            // 🧹 Si la voix a parlé d'âge, on remet à plat ageMin/ageMax
             if ("ageMin" in filtres || "ageMax" in filtres) {
               next.ageMin = filtres.ageMin ?? "";
               next.ageMax = filtres.ageMax ?? "";
@@ -629,20 +623,18 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               name="localisation"
               className="input-recherche"
               placeholder="Commune (ex: Paris)"
-              value={cityText} // <-- contrôlé
+              value={cityText}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
               ref={cityInputRef}
               onFocus={() => {
-                setIsCityFocused(true);
-                const v = cityText.trim();
+                const v = (cityText || "").trim();
                 if (v.length >= 2 && city.items.length) city.setOpen(true);
               }}
               onBlur={() => {
-                // on arrête juste de "suivre" form.localisation pour cityText
-                setIsCityFocused(false);
+                // on ne casse rien : on laisse juste le texte tel quel
               }}
               onCompositionStart={() => {
                 city.composingRef.current = true;
@@ -651,17 +643,31 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 city.composingRef.current = false;
                 const v = e.currentTarget.value;
                 setCityText(v);
-                city.setQuery(v);
-                if (v.trim().length >= 2 && city.items.length)
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
+                if (v.trim().length >= 2 && city.items.length) {
                   city.setOpen(true);
+                }
               }}
               onChange={(e) => {
                 const v = e.target.value;
                 setCityText(v);
+                setForm((prev) => ({
+                  ...prev,
+                  localisation: v,
+                  autourDeMoi: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                }));
                 if (!city.composingRef.current) {
-                  city.setQuery(v); // on déclenche la recherche
-                  // ne pas forcer open : l'effet l'ouvrira s'il y a des résultats
+                  city.setQuery(v);
                 }
+                refocusCity();
               }}
               onKeyDown={onCityKeyDown}
             />
@@ -669,7 +675,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             {city.loading && <div className="city-hint">Recherche…</div>}
 
             {city.open && city.items.length > 0 && (
-              <ul className="city-dropdown">
+              <ul
+                className="city-dropdown"
+                tabIndex={-1}
+                onMouseDown={(e) => e.preventDefault()} // important : évite le blur
+              >
                 {city.items.map((item, idx) => (
                   <li
                     key={`${item.code}-${idx}`}
@@ -677,16 +687,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       idx === city.highlight ? "is-active" : ""
                     }`}
                     onMouseEnter={() => city.setHighlight(idx)}
-                    onClick={(e) => {
+                    onMouseDown={(e) => {
                       e.preventDefault();
                       selectCity(item);
                     }}
-                    title={`Population : ${item.population.toLocaleString(
-                      "fr-FR"
-                    )}`}
+                    title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
                   >
                     <span className="city-name">{item.label}</span>
-                    {/* plus de coordonnées GPS ici */}
+                    {/* Plus d'affichage des coordonnées GPS ici */}
                   </li>
                 ))}
               </ul>
