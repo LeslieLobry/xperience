@@ -60,6 +60,12 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const [appelOccupe, setAppelOccupe] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [prenomsCouple, setPrenomsCouple] = useState(null);
+  const [showEditPrenoms, setShowEditPrenoms] = useState(false);
+  const [prenom1, setPrenom1] = useState("");
+  const [prenom2, setPrenom2] = useState("");
+  const [savingPrenoms, setSavingPrenoms] = useState(false);
+  const [errorPrenoms, setErrorPrenoms] = useState("");
+
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addUserInput, setAddUserInput] = useState("");
   const [addUserError, setAddUserError] = useState("");
@@ -247,6 +253,17 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       })
       .catch(() => setPrenomsCouple(null));
   }, [conversationId, utilisateur.type]);
+    // Quand on reçoit / modifie les prénoms, on remplit les inputs
+  useEffect(() => {
+    if (prenomsCouple) {
+      setPrenom1(prenomsCouple.prenom1 || "");
+      setPrenom2(prenomsCouple.prenom2 || "");
+    } else {
+      setPrenom1("");
+      setPrenom2("");
+    }
+  }, [prenomsCouple]);
+
 
   // 🔁 Quand la conversation change, on reset l'état de scroll
   useEffect(() => {
@@ -691,6 +708,63 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     skipNextAutoScrollRef.current = true;
     onBack?.();
   };
+  const handleSavePrenomsCouple = async () => {
+    setErrorPrenoms("");
+
+    const p1 = (prenom1 || "").trim();
+    const p2 = (prenom2 || "").trim();
+
+    if (!p1 || !p2) {
+      setErrorPrenoms("Les deux prénoms sont obligatoires.");
+      return;
+    }
+
+    if (!conversationId) {
+      setErrorPrenoms("Conversation introuvable.");
+      return;
+    }
+
+    setSavingPrenoms(true);
+
+    try {
+      const res = await fetch("/api/prenoms-couple", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          prenom1: p1,
+          prenom2: p2,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        setErrorPrenoms(
+          data?.message || data?.error || "Erreur lors de l'enregistrement."
+        );
+        setSavingPrenoms(false);
+        return;
+      }
+
+      // On se cale sur ce que renvoie l'API (id, prenom1, prenom2, etc.)
+      setPrenomsCouple(data.prenoms);
+      setSavingPrenoms(false);
+      setShowEditPrenoms(false);
+    } catch (err) {
+      console.error("Erreur sauvegarde prénoms couple :", err);
+      setErrorPrenoms("Erreur réseau.");
+      setSavingPrenoms(false);
+    }
+  };
+  // On surcharge l'utilisateur avec les prénoms de couple pour l'UI
+  const userWithPrenoms = prenomsCouple
+    ? {
+        ...utilisateur,
+        prenom1: prenomsCouple.prenom1 || utilisateur.prenom1,
+        prenom2: prenomsCouple.prenom2 || utilisateur.prenom2,
+      }
+    : utilisateur;
 
   /* ======================================================================= */
   /*                                 RENDER                                  */
@@ -707,6 +781,83 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         onAddParticipant={() => setShowAddParticipant(true)}
         onBack={handleBackClick}
       />
+      {utilisateur?.type === "couple" && (
+        <div className="couple-prenoms-bar">
+          <span>
+            Prénoms du couple :{" "}
+            <strong>
+              {prenom1 ||
+                prenomsCouple?.prenom1 ||
+                utilisateur?.prenom1 ||
+                "Membre 1"}
+            </strong>{" "}
+            &{" "}
+            <strong>
+              {prenom2 ||
+                prenomsCouple?.prenom2 ||
+                utilisateur?.prenom2 ||
+                "Membre 2"}
+            </strong>
+          </span>
+          <button
+            type="button"
+            className="btn-edit-prenoms"
+            onClick={() => setShowEditPrenoms(true)}
+          >
+            Modifier
+          </button>
+        </div>
+      )}
+
+      {showEditPrenoms && utilisateur?.type === "couple" && (
+        <div className="edit-prenoms-modal">
+          <div className="edit-prenoms-modal__content">
+            <h3>Modifier les prénoms du couple</h3>
+
+            <label className="edit-prenoms-modal__label">
+              Prénom 1
+              <input
+                type="text"
+                value={prenom1}
+                onChange={(e) => setPrenom1(e.target.value)}
+              />
+            </label>
+
+            <label className="edit-prenoms-modal__label">
+              Prénom 2
+              <input
+                type="text"
+                value={prenom2}
+                onChange={(e) => setPrenom2(e.target.value)}
+              />
+            </label>
+
+            {errorPrenoms && (
+              <div className="edit-prenoms-modal__error">{errorPrenoms}</div>
+            )}
+
+            <div className="edit-prenoms-modal__buttons">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditPrenoms(false);
+                  setErrorPrenoms("");
+                }}
+                disabled={savingPrenoms}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePrenomsCouple}
+                disabled={savingPrenoms}
+              >
+                {savingPrenoms ? "Enregistrement..." : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {inCall && <div className="call-timer-badge">⏱️ {callDuration}</div>}
 
@@ -739,7 +890,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       <MessagesList
         ref={messagesContainerRef}
         messages={messages}
-        utilisateur={utilisateur}
+        utilisateur={userWithPrenoms}
         onReact={handleReaction}
         lastReads={lastReads}
         typingPseudo={isTyping ? typingPseudo : null}
