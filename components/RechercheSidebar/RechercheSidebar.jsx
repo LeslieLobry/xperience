@@ -441,6 +441,22 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     }, 0);
   }
 
+  /* ------------------------ Hack focus ville ------------------------ */
+  function refocusCity() {
+    setTimeout(() => {
+      if (cityInputRef.current) {
+        const el = cityInputRef.current;
+        el.focus();
+        const len = el.value.length;
+        try {
+          el.setSelectionRange(len, len);
+        } catch {
+          // ignore
+        }
+      }
+    }, 0);
+  }
+
   /* ---------------------------------- JSX ---------------------------------- */
   return (
     <aside className={`recherche-sidebar ${className || ""}`}>
@@ -665,14 +681,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 city.setQuery(v);
                 if (v.trim().length >= 2 && city.items.length)
                   city.setOpen(true);
+                refocusCity();
               }}
               onChange={(e) => {
                 const v = e.target.value;
                 setCityText(v);
                 if (!city.composingRef.current) {
                   city.setQuery(v); // on déclenche la recherche
-                  // ne pas forcer open : l'effet l'ouvrira s'il y a des résultats
                 }
+                refocusCity();
               }}
               onKeyDown={onCityKeyDown}
             />
@@ -856,6 +873,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
     // 🔢 Champs numériques : âge min / max / rayon
     if (name === "ageMin" || name === "ageMax" || name === "rayon") {
+      // Autoriser vide ou chiffres uniquement
       const cleaned = value.replace(/[^\d]/g, "");
       setForm((prev) => ({
         ...prev,
