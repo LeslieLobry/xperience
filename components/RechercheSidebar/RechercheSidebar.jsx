@@ -681,15 +681,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                       e.preventDefault();
                       selectCity(item);
                     }}
-                    title={`Pop. ${item.population.toLocaleString("fr-FR")}`}
+                    title={`Population : ${item.population.toLocaleString(
+                      "fr-FR"
+                    )}`}
                   >
                     <span className="city-name">{item.label}</span>
-                    {item.latitude != null && item.longitude != null && (
-                      <span className="city-geo">
-                        · {item.latitude.toFixed(3)},{" "}
-                        {item.longitude.toFixed(3)}
-                      </span>
-                    )}
+                    {/* plus de coordonnées GPS ici */}
                   </li>
                 ))}
               </ul>
