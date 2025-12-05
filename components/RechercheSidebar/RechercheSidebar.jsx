@@ -807,6 +807,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             "Noir",
             "Gris",
             "Noisette",
+            "autre",
           ])}
           {renderCheckboxGroup("Cheveux", "cheveux", [
             "Blond",
