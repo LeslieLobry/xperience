@@ -81,3 +81,46 @@ export async function POST(req) {
     );
   }
 }
+export async function DELETE(req) {
+  const url = new URL(req.url);
+  const key = url.searchParams.get("key");
+
+  if (!key || !key.trim()) {
+    return NextResponse.json(
+      { error: "Paramètre 'key' manquant" },
+      { status: 400 }
+    );
+  }
+
+  const raw = key.trim().replace(/^\/+/, "");
+  console.log("[DELETE /api/photos] key =", raw);
+
+  // 1) On cherche la photo en base par s3Key / key
+  const photo = await prisma.photo.findFirst({
+    where: {
+      OR: [{ s3Key: raw }, { key: raw }],
+    },
+  });
+
+  if (!photo) {
+    // Rien trouvé : on considère que c'est déjà supprimé
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
+  // 2) Suppression sur S3 (optionnelle mais recommandée)
+  try {
+    if (photo.s3Key) {
+      await deleteFromS3(photo.s3Key);
+    }
+  } catch (e) {
+    console.error("[DELETE /api/photos] erreur suppression S3", e);
+    // on continue quand même pour supprimer en base
+  }
+
+  // 3) Suppression en base
+  await prisma.photo.delete({
+    where: { id: photo.id },
+  });
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}
