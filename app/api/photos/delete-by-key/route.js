@@ -8,6 +8,7 @@ import path from "path";
 
 /* --------- config --------- */
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -51,13 +52,11 @@ async function getUserFromReq(req) {
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
 
-  // getUserFromToken ignore l’argument si ta version n’en prend pas → OK
   const bearerUser = await getUserFromToken(m[1]).catch(() => null);
   return bearerUser;
 }
 
 function normKey(input = "") {
-  // renvoie un pathname sans domaine ni query
   try {
     const u = new URL(input, "https://www.x-periences.fr");
     return u.pathname; // commence par /xxx
@@ -94,37 +93,50 @@ export async function POST(req) {
       );
     }
 
-    // normalisations
-    const key = normKey(rawKey);   // ex: "/photo_1_XXX.png" ou "/uploads/..."
-    const name = baseName(rawKey); // ex: "photo_1_XXX.png"
+    const key = normKey(rawKey);   // ex: "/photo_1_XXXX.png"
+    const name = baseName(rawKey); // ex: "photo_1_XXXX.png"
 
-    // 🔹 IMPORTANT : ne référencer que les champs qui existent vraiment
-    // dans ton modèle Prisma Photo : typiquement "url" et "s3Key"
-    const photo = await prisma.photo.findFirst({
-      where: {
-        utilisateurId: Number(user.id),
-        OR: [
-          { url: key },
-          { s3Key: key },
-          { url: { endsWith: name } },
-          { s3Key: { endsWith: name } },
-        ],
-      },
-    });
+    let photo = null;
+
+    // 1️⃣ tentative large (url + s3Key)
+    try {
+      photo = await prisma.photo.findFirst({
+        where: {
+          utilisateurId: Number(user.id),
+          OR: [
+            { url: key },
+            { s3Key: key },
+            { url: { endsWith: name } },
+            { s3Key: { endsWith: name } },
+          ],
+        },
+      });
+    } catch (e) {
+      console.error(
+        "delete-by-key: erreur Prisma sur url+s3Key, fallback url-only:",
+        e?.message
+      );
+      // 2️⃣ fallback ultra simple : url only
+      photo = await prisma.photo.findFirst({
+        where: {
+          utilisateurId: Number(user.id),
+          url: { endsWith: name },
+        },
+      });
+    }
 
     if (!photo) {
       return NextResponse.json(
-        { error: "Photo introuvable" },
+        { error: "Photo introuvable", debug: { key, name } },
         { status: 404, headers: corsHeaders(origin) }
       );
     }
 
-    // suppression fichier (S3 ou local)
     const urlOrKey = photo.url || photo.s3Key || "";
 
+    // suppression fichier (S3 ou local)
     try {
       if (photo.s3Key) {
-        // priorité : clé stockée en base
         await s3.send(
           new DeleteObjectCommand({ Bucket: BUCKET, Key: photo.s3Key })
         );
@@ -142,6 +154,7 @@ export async function POST(req) {
       }
     } catch (e) {
       console.warn("delete file warning:", e?.message);
+      // on ne jette pas l'erreur, on continue quand même
     }
 
     // suppression DB
@@ -154,7 +167,10 @@ export async function POST(req) {
   } catch (e) {
     console.error("POST /api/photos/delete-by-key error:", e);
     return NextResponse.json(
-      { error: "Erreur serveur" },
+      {
+        error: "Erreur serveur",
+        message: e?.message || "unknown",
+      },
       { status: 500, headers: corsHeaders(origin) }
     );
   }
