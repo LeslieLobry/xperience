@@ -95,6 +95,16 @@ export default function AdminUtilisateurs() {
       <h1>Utilisateurs</h1>
 
       <table>
+       <tfoot>
+          <tr>
+            <td
+              colSpan="4"
+              style={{ textAlign: "right", fontWeight: "bold" }}
+            >
+              Total utilisateurs : {utilisateurs.length}
+            </td>
+          </tr>
+        </tfoot>
         <thead>
           <tr>
             <th>Pseudo</th>
