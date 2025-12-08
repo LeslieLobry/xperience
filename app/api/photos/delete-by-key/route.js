@@ -51,7 +51,7 @@ async function getUserFromReq(req) {
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
 
-  // si besoin, adapte getUserFromToken pour accepter un token brut
+  // getUserFromToken ignore l’argument si ta version n’en prend pas → OK
   const bearerUser = await getUserFromToken(m[1]).catch(() => null);
   return bearerUser;
 }
@@ -60,11 +60,12 @@ function normKey(input = "") {
   // renvoie un pathname sans domaine ni query
   try {
     const u = new URL(input, "https://www.x-periences.fr");
-    return u.pathname; // commence par /
+    return u.pathname; // commence par /xxx
   } catch {
     return String(input).split("?")[0];
   }
 }
+
 function baseName(input = "") {
   const p = normKey(input);
   return p.split("/").pop()?.toLowerCase() || "";
@@ -73,9 +74,11 @@ function baseName(input = "") {
 /* --------- POST /api/photos/delete-by-key --------- */
 export async function POST(req) {
   const origin = req.headers.get("origin") || "";
+
   try {
     const body = await req.json().catch(() => ({}));
     const rawKey = body?.key || "";
+
     if (!rawKey) {
       return NextResponse.json(
         { error: "missing key" },
@@ -92,23 +95,19 @@ export async function POST(req) {
     }
 
     // normalisations
-    const key = normKey(rawKey);               // ex: /uploads/galerie/2025/10/xxx.jpg ou /xxx.jpg
-    const name = baseName(rawKey);             // ex: xxx.jpg
+    const key = normKey(rawKey);   // ex: "/photo_1_XXX.png" ou "/uploads/..."
+    const name = baseName(rawKey); // ex: "photo_1_XXX.png"
 
-    // retrouve l'enregistrement par URL/clé exactes ou par "se termine par le nom de fichier"
-    // + vérifie propriétaire
+    // 🔹 IMPORTANT : ne référencer que les champs qui existent vraiment
+    // dans ton modèle Prisma Photo : typiquement "url" et "s3Key"
     const photo = await prisma.photo.findFirst({
       where: {
         utilisateurId: Number(user.id),
         OR: [
           { url: key },
-          { key: key },
           { s3Key: key },
-          { path: key },
           { url: { endsWith: name } },
-          { key: { endsWith: name } },
           { s3Key: { endsWith: name } },
-          { path: { endsWith: name } },
         ],
       },
     });
@@ -120,16 +119,24 @@ export async function POST(req) {
       );
     }
 
-    // suppression fichier (S3 ou local), même logique que /api/photos/[id]
-    const url = photo.url || "";
+    // suppression fichier (S3 ou local)
+    const urlOrKey = photo.url || photo.s3Key || "";
+
     try {
-      if (/amazonaws\.com\//i.test(url)) {
-        const s3Key = url.split("amazonaws.com/")[1];
-        if (s3Key) {
-          await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: s3Key }));
+      if (photo.s3Key) {
+        // priorité : clé stockée en base
+        await s3.send(
+          new DeleteObjectCommand({ Bucket: BUCKET, Key: photo.s3Key })
+        );
+      } else if (/amazonaws\.com\//i.test(urlOrKey)) {
+        const s3KeyFromUrl = urlOrKey.split("amazonaws.com/")[1];
+        if (s3KeyFromUrl) {
+          await s3.send(
+            new DeleteObjectCommand({ Bucket: BUCKET, Key: s3KeyFromUrl })
+          );
         }
-      } else if (/^\/?uploads\//i.test(url)) {
-        const rel = url.startsWith("/") ? url.slice(1) : url;
+      } else if (/^\/?uploads\//i.test(urlOrKey)) {
+        const rel = urlOrKey.startsWith("/") ? urlOrKey.slice(1) : urlOrKey;
         const abs = path.join(process.cwd(), "public", rel);
         await fs.unlink(abs).catch(() => {});
       }
