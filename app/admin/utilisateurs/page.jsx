@@ -93,9 +93,7 @@ export default function AdminUtilisateurs() {
   return (
     <div className="admin-utilisateurs">
       <h1>Utilisateurs</h1>
-
-      <table>
-       <tfoot>
+   <tfoot>
           <tr>
             <td
               colSpan="4"
@@ -105,6 +103,8 @@ export default function AdminUtilisateurs() {
             </td>
           </tr>
         </tfoot>
+      <table>
+    
         <thead>
           <tr>
             <th>Pseudo</th>

@@ -11,12 +11,12 @@ const CONFIG = {
 
   // ✅ liens vers tes stores (À REMPLACER par les bons)
   storeUrlAndroid:
-    "https://play.google.com/store/apps/details?id=com.tonpackage.android",
+    "https://play.google.com/store/apps/details?id=fr.xperiences.app&hl=fr",
   storeUrlIos:
     "https://apps.apple.com/app/id1234567890",
 
   forceUpdateMessage:
-    "Une nouvelle version d’Xperiences est disponible. Mettez à jour l’application pour continuer à l’utiliser dans les meilleures conditions."
+    "Une nouvelle version d’X-periences est disponible. Mettez à jour l’application pour continuer à l’utiliser dans les meilleures conditions."
 };
 
 export async function GET() {
