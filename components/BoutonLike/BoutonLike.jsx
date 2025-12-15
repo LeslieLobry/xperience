@@ -1,76 +1,105 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import "./BoutonLike.css"
-export default function BoutonLike({ cibleId }) {
-  const [hasLiked, setHasLiked] = useState(false);
+import { useEffect, useState, useCallback } from "react";
+import "./BoutonLike.css";
+
+export default function BoutonLike({ cibleId, onChange }) {
+  const [hasLiked, setHasLiked] = useState(null); // null = on ne sait pas encore
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const checkLike = async () => {
-      try {
-        console.log("Checking like status for cibleId:", cibleId);
-        const res = await fetch(`/api/utilisateur/${cibleId}/has-liked`, {
-          credentials: "include",  // Pour envoyer les cookies HTTP-only
-          cache: "no-store",       // Pour éviter le cache
-        });
-        console.log("Response status:", res.status);
-        if (res.ok) {
-          const data = await res.json();
-          console.log("Like status received:", data.hasLiked);
-          setHasLiked(data.hasLiked);
-        } else {
-          console.error("Erreur fetch like status:", res.status);
-        }
-      } catch (err) {
-        console.error("Erreur checkLike", err);
-      }
-    };
+  const checkLike = useCallback(async () => {
+    if (!cibleId) return;
 
-    if (cibleId) {
-      checkLike();
-    }
-  }, [cibleId]);
-
-  const toggleLike = async () => {
-    setLoading(true);
     try {
-      const res = await fetch("/api/likes", {
-        method: hasLiked ? "DELETE" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cibleId: Number(cibleId) }),
+      const res = await fetch(`/api/utilisateur/${cibleId}/has-liked`, {
         credentials: "include",
+        cache: "no-store",
       });
 
       if (res.ok) {
-        setHasLiked(!hasLiked);
+        const data = await res.json();
+        setHasLiked(!!data.hasLiked);
       } else {
-        const errorData = await res.json();
-        console.error("Erreur API:", errorData);
+        console.error("Erreur fetch like status:", res.status);
+        setHasLiked(false);
       }
     } catch (err) {
+      console.error("Erreur checkLike", err);
+      setHasLiked(false);
+    }
+  }, [cibleId]);
+
+  useEffect(() => {
+    setHasLiked(null);
+    checkLike();
+  }, [checkLike]);
+
+  const toggleLike = async () => {
+    if (!cibleId || loading || hasLiked === null) return;
+
+    const prev = hasLiked;
+    const next = !prev;
+
+    // ✅ Optimistic UI : on update tout de suite
+    setHasLiked(next);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/likes", {
+        method: next ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cibleId: Number(cibleId) }),
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        // ❌ on revert si erreur API
+        setHasLiked(prev);
+
+        let errorData = null;
+        try {
+          errorData = await res.json();
+        } catch {}
+        console.error("Erreur API:", errorData || res.status);
+        return;
+      }
+
+      onChange?.(next); // optionnel : prévenir le parent
+    } catch (err) {
+      // ❌ on revert si crash réseau
+      setHasLiked(prev);
       console.error("Erreur toggleLike", err);
     } finally {
       setLoading(false);
     }
   };
 
-return (
-  <button onClick={toggleLike} disabled={loading} className="btn-like">
-  <div className="tooltip-container">
-    <img
-      src={hasLiked ? "/images/coeurnon.svg" : "/images/coeur.svg"}
-      alt={hasLiked ? "Je n'aime plus" : "J'aime"}
-      className="btn-like-icon"
-      style={{ width: "46px", height: "46px" }}
-    />
-    <span className="tooltip">
-      {hasLiked ? "Je n'aime plus" : "J'aime"}
-    </span>
-  </div>
-</button>
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleLike();
+  };
 
-);
+  const liked = hasLiked === true;
 
-
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading || hasLiked === null}
+      className="btn-like"
+      aria-busy={loading ? "true" : "false"}
+    >
+      <div className="tooltip-container">
+        <img
+          key={liked ? "liked" : "unliked"} // force un refresh DOM de l'image si besoin
+          src={liked ? "/images/coeurnon.svg" : "/images/coeur.svg"}
+          alt={liked ? "Je n'aime plus" : "J'aime"}
+          className="btn-like-icon"
+          style={{ width: "46px", height: "46px", opacity: loading ? 0.6 : 1 }}
+        />
+        <span className="tooltip">{liked ? "Je n'aime plus" : "J'aime"}</span>
+      </div>
+    </button>
+  );
 }
