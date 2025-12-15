@@ -10,8 +10,8 @@ const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
 /* ---------- CORS ---------- */
 const ALLOWED_ORIGINS = [
-  "http://localhost:8081",      // Expo web
-  "http://localhost:19006",     // Expo dev
+  "http://localhost:8081", // Expo web
+  "http://localhost:19006", // Expo dev
   "https://x-periences.fr",
   "https://www.x-periences.fr",
 ];
@@ -34,24 +34,46 @@ export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
+/* ---------- helpers ---------- */
+async function safeJson(req) {
+  try {
+    // si pas de body JSON => ça peut throw
+    return await req.json();
+  } catch {
+    return null;
+  }
+}
+
+function getCibleId(req, body) {
+  const url = new URL(req.url);
+
+  // 1) query ?cibleId=123
+  const q = url.searchParams.get("cibleId");
+  if (q && !isNaN(Number(q))) return Number(q);
+
+  // 2) body { cibleId }
+  const b = body?.cibleId;
+  if (b !== undefined && b !== null && !isNaN(Number(b))) return Number(b);
+
+  return null;
+}
+
 /* ---------- Auth (cookie 'token' OU Authorization: Bearer) ---------- */
 const JWT_SECRET = process.env.JWT_SECRET || "";
 
 async function getUserFromRequest(req) {
-  // Authorization header (Bearer)
   const auth = req.headers.get("authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
   const tokenHeader = match?.[1];
 
-  // Cookie
-  const cookieStore = await cookies();
+  const cookieStore = cookies(); // pas besoin de await
   const tokenCookie = cookieStore.get("token")?.value;
 
   const token = tokenHeader || tokenCookie;
   if (!token || !JWT_SECRET) return null;
 
   try {
-    return jwt.verify(token, JWT_SECRET); // ex: { id, email, ... }
+    return jwt.verify(token, JWT_SECRET);
   } catch {
     return null;
   }
@@ -62,9 +84,10 @@ export async function POST(req) {
   const headers = corsHeaders(req);
 
   try {
-    const body = await req.json();
-    const { cibleId } = body;
-    if (!cibleId || isNaN(cibleId)) {
+    const body = await safeJson(req);
+    const cibleIdNum = getCibleId(req, body);
+
+    if (!cibleIdNum) {
       return NextResponse.json(
         { error: "cibleId manquant ou invalide" },
         { status: 400, headers }
@@ -80,7 +103,6 @@ export async function POST(req) {
     }
 
     const auteurId = Number(user.id);
-    const cibleIdNum = Number(cibleId);
     if (auteurId === cibleIdNum) {
       return NextResponse.json(
         { message: "Auto-like ignoré" },
@@ -89,12 +111,21 @@ export async function POST(req) {
     }
 
     // Création du like
-    const like = await prisma.like.create({
-      data: {
-        auteurId,
-        cibleId: cibleIdNum,
-      },
-    });
+    let like = null;
+    try {
+      like = await prisma.like.create({
+        data: { auteurId, cibleId: cibleIdNum },
+      });
+    } catch (err) {
+      // ✅ si déjà existant, on répond OK (pas d’erreur côté app)
+      if (err?.code === "P2002") {
+        return NextResponse.json(
+          { success: true, alreadyExists: true },
+          { status: 200, headers }
+        );
+      }
+      throw err;
+    }
 
     // Notification interne (DB)
     await prisma.notification.create({
@@ -121,7 +152,7 @@ export async function POST(req) {
         await sendPush(cible.expoPushToken, {
           title: "Nouveau like ❤️",
           body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
-          data: { type: "LIKE", auteurId }, // deep-link côté app
+          data: { type: "LIKE", auteurId },
         });
       } catch (e) {
         console.warn("⚠️ Échec push LIKE:", e?.message || e);
@@ -137,7 +168,7 @@ export async function POST(req) {
       },
     });
 
-    // 🆕 Ably : notif temps réel pour bannière in-app (mobile)
+    // Ably temps réel
     try {
       const channelName = `user-${cibleIdNum}`;
       const channel = ably.channels.get(channelName);
@@ -146,7 +177,7 @@ export async function POST(req) {
         pseudo: auteur?.pseudo ?? "Un membre",
         likerId: auteurId,
         cibleId: cibleIdNum,
-        lien: `/profil/${auteurId}`, // ce qu'on ouvrira au clic sur la bannière
+        lien: `/profil/${auteurId}`,
       });
 
       console.log("📡 Ably new-like envoyé sur", channelName);
@@ -156,17 +187,8 @@ export async function POST(req) {
 
     return NextResponse.json(like, { headers });
   } catch (err) {
-    if (err?.code === "P2002") {
-      return NextResponse.json(
-        { error: "Like déjà existant" },
-        { status: 400, headers }
-      );
-    }
     console.error("Erreur POST /likes :", err);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500, headers });
   }
 }
 
@@ -175,9 +197,10 @@ export async function DELETE(req) {
   const headers = corsHeaders(req);
 
   try {
-    const body = await req.json();
-    const { cibleId } = body;
-    if (!cibleId || isNaN(cibleId)) {
+    const body = await safeJson(req); // ✅ ne plante pas si pas de body
+    const cibleIdNum = getCibleId(req, body); // ✅ query OU body
+
+    if (!cibleIdNum) {
       return NextResponse.json(
         { error: "cibleId manquant ou invalide" },
         { status: 400, headers }
@@ -192,19 +215,17 @@ export async function DELETE(req) {
       );
     }
 
+    // ✅ idempotent: si le like n'existe pas, deleteMany = ok (0 supprimé)
     await prisma.like.deleteMany({
       where: {
         auteurId: Number(user.id),
-        cibleId: Number(cibleId),
+        cibleId: Number(cibleIdNum),
       },
     });
 
     return NextResponse.json({ success: true }, { headers });
   } catch (err) {
     console.error("Erreur DELETE /likes :", err);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500, headers });
   }
 }
