@@ -159,15 +159,6 @@ export async function POST(req) {
       }
     }
 
-    // Ajout au digest
-    await prisma.digestNotification.create({
-      data: {
-        destinataireId: cibleIdNum,
-        likeId: like.id,
-        eventType: "LIKE",
-      },
-    });
-
     // Ably temps réel
     try {
       const channelName = `user-${cibleIdNum}`;
