@@ -31,7 +31,7 @@ export async function OPTIONS(req) {
 export async function GET(req) {
   const headers = corsHeaders(req);
   try {
-    const me = await getUserFromToken();
+    const me = await getUserFromToken(req); // ✅ IMPORTANT
     if (!me) return NextResponse.json({ error: "Non authentifié" }, { status: 401, headers });
 
     const u = await prisma.utilisateur.findUnique({
@@ -52,7 +52,7 @@ export async function GET(req) {
 export async function POST(req) {
   const headers = corsHeaders(req);
   try {
-    const me = await getUserFromToken();
+    const me = await getUserFromToken(req); // ✅ IMPORTANT
     if (!me) return NextResponse.json({ error: "Non authentifié" }, { status: 401, headers });
 
     const { enabled } = await req.json();
