@@ -19,7 +19,10 @@ export async function POST(req) {
       return NextResponse.json({ error: "Participants invalides" }, { status: 400 });
 
     if (!ids.includes(currentUser.id))
-      return NextResponse.json({ error: "Tu dois faire partie des participants." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Tu dois faire partie des participants." },
+        { status: 403 }
+      );
 
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = ids.filter((id) => id !== currentUser.id);
@@ -33,9 +36,7 @@ export async function POST(req) {
     const existingConv = await prisma.conversation.findFirst({
       where: {
         AND: [
-          // aucun participant en dehors de 'ids'
           { participants: { every: { utilisateurId: { in: ids } } } },
-          // chaque id demandé doit être présent
           ...ids.map((id) => ({ participants: { some: { utilisateurId: id } } })),
         ],
       },
@@ -47,7 +48,9 @@ export async function POST(req) {
 
     if (existingConv) {
       // Restaure si ce user avait "supprimé" la conv
-      const myParticipant = existingConv.participants.find(p => p.utilisateurId === currentUser.id);
+      const myParticipant = existingConv.participants.find(
+        (p) => p.utilisateurId === currentUser.id
+      );
       if (myParticipant?.supprimé) {
         await prisma.participant.update({
           where: { id: myParticipant.id },
@@ -61,12 +64,15 @@ export async function POST(req) {
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
-          // ids déjà dédoublonnés → pas de doublons
           create: ids.map((id) => ({ utilisateurId: id })),
         },
       },
       include: {
-        participants: { include: { utilisateur: { select: { id: true, pseudo: true, photoUrl: true } } } },
+        participants: {
+          include: {
+            utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
+          },
+        },
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
@@ -78,52 +84,65 @@ export async function POST(req) {
   }
 }
 
-
 // ----------- LISTE / UNREADS (GET) -----------
 export async function GET() {
   try {
     const currentUser = await getUserFromToken();
     if (!currentUser)
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
     const userId = currentUser.id;
 
     // On récupère toutes les conversations non supprimées pour ce user
     const convs = await prisma.conversation.findMany({
       where: {
-        participants: { some: { utilisateurId: userId, supprimé: false } }
+        participants: { some: { utilisateurId: userId, supprimé: false } },
       },
       include: {
-        participants: { include: { utilisateur: { select: { id: true, pseudo: true, photoUrl: true } } } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }
+        participants: {
+          include: {
+            utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
+          },
+        },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
     });
 
     // Pour bloquer l'affichage si un bloqué est présent
     const exclus = await getIdsUtilisateursExclus(userId);
-    const visibleConvs = convs.filter(conv =>
-      conv.participants.every(p => !exclus.includes(p.utilisateurId))
+    const visibleConvs = convs.filter((conv) =>
+      conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    // 1 requête groupBy pour tous les unreadCount d'un coup !
-    const unreadCountsRaw = await prisma.message.groupBy({
-      by: ["conversationId"],
-      where: {
-        lu: false,
-        auteurId: { not: userId },
-        conversationId: { in: visibleConvs.map(c => c.id) }
-      },
-      _count: { id: true }
-    });
-    const unreadCounts = Object.fromEntries(
-      unreadCountsRaw.map(row => [row.conversationId, row._count.id])
+    // ✅ unreadCount basé sur participant.lastReadAt (cohérent avec /messages/mark-as-read)
+    // (N requêtes message.count : safe et simple, on optimisera si besoin)
+    const unreadPairs = await Promise.all(
+      visibleConvs.map(async (conv) => {
+        const myParticipant = conv.participants.find((p) => p.utilisateurId === userId);
+
+        // Si jamais null => jamais lu => on compte tout
+        const lastReadAt = myParticipant?.lastReadAt ?? new Date(0);
+
+        const count = await prisma.message.count({
+          where: {
+            conversationId: conv.id,
+            auteurId: { not: userId },
+            createdAt: { gt: lastReadAt },
+          },
+        });
+
+        return [conv.id, count];
+      })
     );
 
-    // Formatage retour
-    const conversations = visibleConvs.map(conv => ({
+    const unreadCounts = Object.fromEntries(unreadPairs);
+
+    // Formatage retour (inchangé)
+    const conversations = visibleConvs.map((conv) => ({
       ...conv,
       unreadCount: unreadCounts[conv.id] || 0,
-      messages: conv.messages
+      messages: conv.messages,
     }));
 
     return NextResponse.json({ conversations });
