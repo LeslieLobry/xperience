@@ -1,0 +1,132 @@
+.page {
+  min-height: 100vh;
+  padding: 28px 16px;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 18px;
+}
+
+.title {
+  margin: 0 0 8px 0;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.subtitle {
+  margin: 0;
+  opacity: 0.85;
+  line-height: 1.55;
+}
+
+.card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px 16px;
+  margin-top: 14px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.p {
+  margin: 0 0 10px 0;
+  line-height: 1.6;
+}
+
+.ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.contactGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.contactItem {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.label {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.value {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.small {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.55;
+}
+
+.link {
+  text-decoration: underline;
+}
+
+.faq {
+  display: grid;
+  gap: 10px;
+}
+
+.details {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 10px 12px;
+}
+
+.summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.answer {
+  padding-top: 10px;
+  opacity: 0.92;
+  line-height: 1.6;
+}
+
+.footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  opacity: 0.75;
+}
+
+.footerText {
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (min-width: 720px) {
+  .contactGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
