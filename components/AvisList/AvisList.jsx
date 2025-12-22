@@ -1,38 +1,58 @@
 "use client";
 
 import AvisCard from "../AvisCard/AvisCard";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./AvisList.css";
 
-export default function AvisList({ cibleId, connectedUserId }) {
+export default function AvisList({ cibleId, connectedUserId, refreshKey = 0 }) {
   const [avisRecus, setAvisRecus] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const fetchAvis = async () => {
+  const fetchAvis = useCallback(async () => {
+    if (!cibleId) return;
+
     setError(null);
+    setLoading(true);
+
     try {
-      const res = await fetch(`/api/avis/utilisateur/${cibleId}`);
+      // ✅ no-store: évite que Next/Browser te serve une réponse cachée
+      const res = await fetch(`/api/avis/utilisateur/${cibleId}?type=recus`, {
+        method: "GET",
+        cache: "no-store",
+        headers: { "X-Platform": "web" },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        throw new Error(`Erreur HTTP ${res.status}`);
+        throw new Error(data?.error || `Erreur HTTP ${res.status}`);
       }
-      const data = await res.json();
-      if (data.avis) {
-        setAvisRecus(data.avis);
-      } else {
-        setAvisRecus([]);
-      }
+
+      // ✅ Ton API peut renvoyer "items" (nouveau) ou "avis" (ancien)
+      const list = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.avis)
+        ? data.avis
+        : [];
+
+      setAvisRecus(list);
     } catch (err) {
       console.error("Erreur lors du fetch des avis :", err);
       setError("Impossible de récupérer les avis.");
       setAvisRecus([]);
-    }
-  };
-
-  useEffect(() => {
-    if (cibleId) {
-      fetchAvis();
+    } finally {
+      setLoading(false);
     }
   }, [cibleId]);
+
+  useEffect(() => {
+    fetchAvis();
+  }, [fetchAvis, refreshKey]); // ✅ refreshKey force le reload après POST
+
+  if (loading) {
+    return <p className="avis-text-p">Chargement des avis...</p>;
+  }
 
   if (error) {
     return <p className="avis-text-p erreur">{error}</p>;
@@ -44,7 +64,8 @@ export default function AvisList({ cibleId, connectedUserId }) {
 
   return (
     <div className="avis-list">
-      <h2>Ils parlent de moi </h2>
+      <h2>Ils parlent de moi</h2>
+
       {avisRecus.map((avis) => (
         <AvisCard
           key={avis.id}
