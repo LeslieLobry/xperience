@@ -11,46 +11,77 @@ import {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  // ✅ undefined = "pas encore vérifié" (évite redirect au refresh)
+  const [user, setUser] = useState(undefined);
+
   const [conversations, setConversations] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [articles, setArticles] = useState([]);
   const [evenements, setEvenements] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  // ✅ devient true après le 1er check auth, et ne repasse jamais à false
+  const [authReady, setAuthReady] = useState(false);
+
+  // helper safe json (évite crash si API renvoie HTML/erreur)
+  const safeJson = async (res) => {
+    const text = await res.text();
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch {
+      return null;
+    }
+  };
 
   // Memoïser fetchUser (pas fetchInit)
   const fetchUser = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const res = await fetch("/api/init", { credentials: "include" });
-      const data = await res.json();
-      if (data.success) {
-        setUser(data.utilisateur);
-        setConversations(data.conversations);
-        setNotifications(data.notifications);
-        setArticles(data.articles);
-        setEvenements(data.evenements);
-        return data.utilisateur; // optionnel, utile pour await
-      } else {
+      const data = await safeJson(res);
+
+      // si non-OK → on considère non connecté (et on clean)
+      if (!res.ok || !data?.success) {
         setUser(null);
+        setConversations([]);
+        setNotifications([]);
+        setArticles([]);
+        setEvenements([]);
         return null;
       }
+
+      setUser(data.utilisateur ?? null);
+      setConversations(Array.isArray(data.conversations) ? data.conversations : []);
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+      setArticles(Array.isArray(data.articles) ? data.articles : []);
+      setEvenements(Array.isArray(data.evenements) ? data.evenements : []);
+
+      return data.utilisateur ?? null;
     } catch (err) {
       console.error("❌ fetchUser error :", err);
       setUser(null);
+      setConversations([]);
+      setNotifications([]);
+      setArticles([]);
+      setEvenements([]);
       return null;
     } finally {
       setLoading(false);
+      setAuthReady(true);
     }
   }, []);
 
   const refreshUser = useCallback(async () => {
     try {
       const res = await fetch("/api/me", { credentials: "include" });
-      const data = await res.json();
-      if (data.success && data.utilisateur) {
-        setUser(data.utilisateur);
+      const data = await safeJson(res);
+
+      if (!res.ok || !data?.success || !data?.utilisateur) {
+        // optionnel : si /api/me dit non connecté, on peut nettoyer
+        setUser(null);
+        return;
       }
+      setUser(data.utilisateur);
     } catch (err) {
       console.error("Erreur refreshUser:", err);
     }
@@ -65,7 +96,6 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error("❌ Erreur logout :", err);
     } finally {
-      // Toujours vider le state, même si l'API renvoie une erreur
       setUser(null);
       setConversations([]);
       setNotifications([]);
@@ -95,6 +125,7 @@ export function AuthProvider({ children }) {
         articles,
         evenements,
         loading,
+        authReady, // ✅ NOUVEAU
         logout,
         fetchUser,
         updateUser,
