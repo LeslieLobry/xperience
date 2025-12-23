@@ -7,7 +7,7 @@ import { useAuth } from "././context/AuthContext";
 import logo from "././public/images/logo.png";
 import { LogIn } from "lucide-react";
 import { Realtime } from "ably"; // ✅ Ably côté client
-import "./Nav/Navbar.css";
+import "./Navbar.css";
 
 const navLinks = [
   { label: "Accueil", href: "/accueil-page" },
