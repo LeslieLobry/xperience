@@ -180,6 +180,10 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const dropdownRef = useRef(null);
   const cityInputRef = useRef(null);
 
+  // ✅ FIX "1 lettre puis clic obligé" : on garde le focus sur l'input ville
+  const cityKeepFocusRef = useRef(false);
+  const cityCaretRef = useRef({ start: null, end: null });
+
   // 🔢 refs pour les champs numériques (hack focus)
   const ageMinRef = useRef(null);
   const ageMaxRef = useRef(null);
@@ -236,7 +240,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         }));
 
         setCityItems(mapped);
-        setCityOpen(true); // ✅ menu stable pendant la frappe
+        // ✅ garde le menu stable pendant la frappe
+        setCityOpen(mapped.length > 0 || q.length >= 2);
         setCityHighlight(mapped.length ? 0 : -1);
       } catch {
         // ignore (abort entre autres)
@@ -250,6 +255,36 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       cityControllerRef.current?.abort?.();
     };
   }, [cityText]);
+
+  // ✅ re-focus après rendu (corrige le "1 caractère puis blur")
+  useEffect(() => {
+    if (!cityKeepFocusRef.current) return;
+
+    requestAnimationFrame(() => {
+      const el = cityInputRef.current;
+      if (!el) return;
+
+      // si on a cliqué dehors, on ne refocus pas
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(document.activeElement)
+      ) {
+        // document.activeElement peut être <body> si blur "glitch"
+        // on refocus quand même si on est en train de taper (keepFocus=true)
+      }
+
+      el.focus();
+
+      const { start, end } = cityCaretRef.current || {};
+      if (typeof start === "number" && typeof end === "number") {
+        try {
+          el.setSelectionRange(start, end);
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }, [cityText, cityOpen, cityItems.length, cityLoading]);
 
   const closeCityMenu = () => {
     setCityOpen(false);
@@ -287,12 +322,14 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     setCityItems([]);
 
     // garder le focus pour pouvoir retaper si besoin
+    cityKeepFocusRef.current = true;
     setTimeout(() => cityInputRef.current?.focus(), 0);
   }
 
   function onCityKeyDown(e) {
     const hasMenu = cityOpen && cityItems.length > 0;
 
+    // ✅ si menu "ouvert" mais pas encore de résultats, on laisse taper
     if (!hasMenu) {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -679,28 +716,42 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               spellCheck={false}
               ref={cityInputRef}
               onFocus={() => {
+                cityKeepFocusRef.current = true;
                 const v = (cityText || "").trim();
                 if (v.length >= 2) setCityOpen(true);
               }}
+              onBlur={() => {
+                // ✅ si blur "glitch" (le bug que tu as), on ne coupe pas net.
+                // On ne désactive le keepFocus que si le focus est vraiment parti hors du bloc.
+                setTimeout(() => {
+                  if (!dropdownRef.current) return;
+                  const active = document.activeElement;
+                  if (!dropdownRef.current.contains(active)) {
+                    cityKeepFocusRef.current = false;
+                  }
+                }, 0);
+              }}
               onChange={(e) => {
                 const v = e.target.value;
+
+                // ✅ mémorise le caret (sinon ça peut perdre la position)
+                cityCaretRef.current = {
+                  start: e.target.selectionStart,
+                  end: e.target.selectionEnd,
+                };
+
+                cityKeepFocusRef.current = true;
                 setCityText(v);
 
-                // ✅ évite d'afficher des anciennes suggestions pendant qu'on tape
                 setCityHighlight(-1);
 
-                const q = (v || "").trim();
+                const q = v.trim();
                 if (q.length < 2) {
                   setCityItems([]);
                   setCityOpen(false);
-                  setCityHighlight(-1);
                 } else {
-                  // ✅ garde le menu "stable" pendant la frappe
                   setCityOpen(true);
                 }
-
-                // on ne met pas form.localisation à jour à chaque frappe,
-                // seulement au moment de la recherche ou de la sélection
               }}
               onKeyDown={onCityKeyDown}
             />

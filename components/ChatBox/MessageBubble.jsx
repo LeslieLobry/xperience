@@ -8,10 +8,8 @@ function usePresignedPhoto(photoKey) {
 
   useEffect(() => {
     if (!photoKey) return setUrl("/default.jpg");
-    if (photoKey.startsWith("http")) {
-      setUrl(photoKey);
-      return;
-    }
+    if (photoKey.startsWith("http")) return setUrl(photoKey);
+
     fetch("/api/photos/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,6 +23,10 @@ function usePresignedPhoto(photoKey) {
   return url;
 }
 
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
 export default function MessageBubble({
   msg,
   utilisateur,
@@ -32,18 +34,12 @@ export default function MessageBubble({
   lastReads,
   onReact,
   onDelete,
-  emojiPack = "app", // ✅ par défaut: mêmes emojis que l'app
+  emojiPack = "app",
   prenomsCouple = null,
 }) {
-  /* ---------------------------------------------------------------------- */
-  /*                             Packs d'emoji                              */
-  /* ---------------------------------------------------------------------- */
-
-  // ✅ Emojis "comme sur l'app"
+  /* --------------------- Pack emojis (comme l'app) --------------------- */
   const emojiPacks = {
     app: ["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"],
-
-    // (on garde tes packs existants au cas où)
     sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
     glamour: ["🖤", "🥂", "🥀", "🪩", "🎭", "🫣"],
     erotique: ["🫦", "🍆", "🍒", "🥵", "🛏️", "🧴"],
@@ -51,7 +47,6 @@ export default function MessageBubble({
   };
 
   const emojiTooltips = {
-    // ✅ Tooltips "app"
     "❤️": "J’adore",
     "😂": "Trop drôle",
     "😍": "J’aime",
@@ -64,53 +59,47 @@ export default function MessageBubble({
     "🙏": "Merci / stp",
     "🎉": "Yes !",
     "😉": "Clin d’œil",
-
-    // (on garde tes tooltips existants)
-    "😈": "Coquin",
-    "💋": "Un bisou",
-    "👀": "Je te mate",
-    "💦": "Excité(e)",
-    "🍑": "Belle paire",
-    "🖤": "Mystérieux",
-    "🥂": "Tentant",
-    "🥀": "Désir fané",
-    "🪩": "Ambiance chaude",
-    "🎭": "Jeu de rôle",
-    "🫣": "Gêné mais tenté",
-    "🫦": "Lèvres pulpeuses",
-    "🍆": "Bandant",
-    "🍒": "Tentante",
-    "🥵": "C’est chaud",
-    "🛏️": "Viens dans mon lit",
-    "🧴": "Massage sexy",
-    "🫶": "Connexion",
-    "🪶": "Sensuel",
-    "🎀": "À déballer",
-    "🤤": "J’en salive",
-    "😮‍💨": "Soupir de plaisir",
-    "👄": "Envie de t’embrasser",
   };
 
   const activePack = emojiPacks[emojiPack] || emojiPacks.app;
 
-  /* ---------------------------------------------------------------------- */
-  /*                        État & refs pour le picker                      */
-  /* ---------------------------------------------------------------------- */
-
+  /* ------------------------- Picker état / refs ------------------------- */
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const pickerRef = useRef(null);
-  const triggerRef = useRef(null);
+  const [pickerPos, setPickerPos] = useState(null); // { x, y }
 
-  // Appui long (mobile + desktop)
+  const pickerRef = useRef(null);
+  const pressableRef = useRef(null);
+
   const longPressTimerRef = useRef(null);
-  const LONG_PRESS_DELAY = 450; // ms
+  const LONG_PRESS_DELAY = 450;
+
+  const computeAndOpenPicker = (el) => {
+    try {
+      const rect = el?.getBoundingClientRect?.();
+      if (!rect) {
+        setPickerPos(null);
+        setIsPickerOpen(true);
+        return;
+      }
+
+      const x = rect.left + rect.width / 2;
+
+      // Essaye au-dessus, sinon en-dessous
+      const yAbove = rect.top - 62;
+      const y = yAbove >= 10 ? yAbove : rect.bottom + 10;
+
+      setPickerPos({ x, y });
+      setIsPickerOpen(true);
+    } catch {
+      setPickerPos(null);
+      setIsPickerOpen(true);
+    }
+  };
 
   const startLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-    }
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
-      setIsPickerOpen(true);
+      computeAndOpenPicker(pressableRef.current);
     }, LONG_PRESS_DELAY);
   };
 
@@ -121,15 +110,43 @@ export default function MessageBubble({
     }
   };
 
-  // Fermeture du picker quand on clique en dehors
+  // ✅ À l’ouverture: force le début (❤️…) et clamp position dans l’écran
   useEffect(() => {
-    function handleClickOutside(event) {
+    if (!isPickerOpen) return;
+
+    const raf = requestAnimationFrame(() => {
+      if (pickerRef.current) {
+        // ✅ important: en RTL, scrollLeft est inversé selon les navigateurs
+        // donc on force LTR sur le picker + on remet au début.
+        pickerRef.current.scrollTo?.({ left: 0 });
+        pickerRef.current.scrollLeft = 0;
+      }
+
+      if (pickerPos && pickerRef.current) {
+        const pr = pickerRef.current.getBoundingClientRect();
+        const margin = 8;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let x = clamp(pickerPos.x, margin + pr.width / 2, vw - margin - pr.width / 2);
+        let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
+
+        if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
+      }
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [isPickerOpen]);
+
+  // Fermeture click dehors + ESC
+  useEffect(() => {
+    function handleClickOutside(e) {
       if (!isPickerOpen) return;
       if (
         pickerRef.current &&
-        !pickerRef.current.contains(event.target) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target)
+        !pickerRef.current.contains(e.target) &&
+        pressableRef.current &&
+        !pressableRef.current.contains(e.target)
       ) {
         setIsPickerOpen(false);
       }
@@ -147,17 +164,11 @@ export default function MessageBubble({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleEsc);
-
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-      }
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     };
   }, [isPickerOpen]);
 
-  /* ---------------------------------------------------------------------- */
-  /*                    Infos message / auteur / status                     */
-  /* ---------------------------------------------------------------------- */
-
+  /* --------------------------- Infos message --------------------------- */
   const isOwn = msg.auteurId === utilisateur.id;
   const auteurIsCouple = msg.auteur?.type === "couple";
 
@@ -168,41 +179,24 @@ export default function MessageBubble({
     previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
 
   const heure = msg.createdAt
-    ? new Date(msg.createdAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
 
   let statutTexte = "";
   if (isOwn && lastReads) {
-    const autresLecteurs = lastReads.filter(
-      (r) => r.utilisateurId !== utilisateur.id
-    );
+    const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
     const lus = autresLecteurs.filter(
       (r) => r.lastReadAt && new Date(r.lastReadAt) > new Date(msg.createdAt)
     );
-    if (lus.length === autresLecteurs.length && lus.length > 0) {
-      statutTexte = "✔✔ Vu";
-    } else if (lus.length > 0) {
-      statutTexte = "✔✔ Reçu";
-    } else {
-      statutTexte = "✔ Envoyé";
-    }
+    if (lus.length === autresLecteurs.length && lus.length > 0) statutTexte = "✔✔ Vu";
+    else if (lus.length > 0) statutTexte = "✔✔ Reçu";
+    else statutTexte = "✔ Envoyé";
   }
 
-  // Avatar auteur
   const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
+  const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
+  const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
 
-  // Fichiers message
-  const imageMsgUrl = usePresignedPhoto(
-    msg.type === "IMAGE" ? msg.imageUrl : null
-  );
-  const audioMsgUrl = usePresignedPhoto(
-    msg.type === "AUDIO" ? msg.audioUrl : null
-  );
-
-  // Regroupement des réactions par emoji (emoji + total)
   const groupedReactions = Object.entries(
     (msg.reactions || []).reduce((acc, r) => {
       if (!acc[r.emoji]) acc[r.emoji] = new Set();
@@ -211,18 +205,9 @@ export default function MessageBubble({
     }, {})
   );
 
-  /* ---------------------------------------------------------------------- */
-  /*                    Types spéciaux : EPHEMERE / SYSTEME                 */
-  /* ---------------------------------------------------------------------- */
-
+  /* --------------------- Types spéciaux: EPHEMERE ---------------------- */
   if (msg.type === "EPHEMERE") {
-    return (
-      <MessageEphemere
-        msg={msg}
-        onDelete={onDelete}
-        utilisateurId={utilisateur.id}
-      />
-    );
+    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
   }
 
   if (msg.type === "SYSTEME") {
@@ -233,13 +218,9 @@ export default function MessageBubble({
     );
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*                                RENDER                                  */
-  /* ---------------------------------------------------------------------- */
-
+  /* -------------------------------- Render ----------------------------- */
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-      {/* Auteur (avatar + pseudo / prénom) */}
       {showAuthorInfo && (
         <div className="author-info">
           <img
@@ -251,19 +232,12 @@ export default function MessageBubble({
             {msg.prenomEnvoyeur ? (
               <span className="author-name">{msg.prenomEnvoyeur}</span>
             ) : (
-              <span className="author-name">
-                {msg.auteur?.pseudo || "Utilisateur"}
-              </span>
+              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
             )}
             {auteurIsCouple && prenomsCouple && (
               <span
                 className="author-couple-names"
-                style={{
-                  marginLeft: 4,
-                  color: "#b5a06c",
-                  fontSize: "0.95em",
-                  fontStyle: "italic",
-                }}
+                style={{ marginLeft: 4, color: "#b5a06c", fontSize: "0.95em", fontStyle: "italic" }}
               >
                 ({prenomsCouple})
               </span>
@@ -272,25 +246,21 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Zone d'appui long sur la bulle (comme l'app) */}
+      {/* ✅ Appui long UNIQUEMENT sur la bulle */}
       <div
+        ref={pressableRef}
         className="message-content-pressable"
         onMouseDown={startLongPress}
         onMouseUp={cancelLongPress}
         onMouseLeave={cancelLongPress}
-        onMouseMove={cancelLongPress} // ✅ évite ouverture si tu “glisses”
+        onMouseMove={cancelLongPress}
         onTouchStart={startLongPress}
         onTouchEnd={cancelLongPress}
         onTouchCancel={cancelLongPress}
-        onTouchMove={cancelLongPress} // ✅ évite ouverture pendant scroll
+        onTouchMove={cancelLongPress}
       >
-        {/* Contenu du message : image / audio / texte */}
         {msg.type === "IMAGE" && msg.imageUrl ? (
-          <img
-            src={imageMsgUrl || "/default.jpg"}
-            alt="image envoyée"
-            className="message-image"
-          />
+          <img src={imageMsgUrl || "/default.jpg"} alt="image envoyée" className="message-image" />
         ) : msg.type === "AUDIO" && msg.audioUrl ? (
           <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
         ) : (
@@ -298,7 +268,6 @@ export default function MessageBubble({
         )}
       </div>
 
-      {/* Bouton supprimer (uniquement pour ses propres messages) */}
       {isOwn && (
         <button
           className="delete-message-button"
@@ -310,7 +279,6 @@ export default function MessageBubble({
         </button>
       )}
 
-      {/* Réactions agrégées sous la bulle */}
       {groupedReactions.length > 0 && (
         <div className="message-reactions">
           {groupedReactions.map(([emoji, utilisateursSet]) => {
@@ -322,18 +290,9 @@ export default function MessageBubble({
             return (
               <span
                 key={emoji}
-                className={`reaction-item ${
-                  userHasReacted ? "user-reaction" : ""
-                }`}
-                title={
-                  (emojiTooltips[emoji] || "") +
-                  " — " +
-                  (nb > 1 ? `${nb} personnes` : "1 personne")
-                }
-                onClick={() => {
-                  // toggle possible côté backend si tu gères
-                  onReact?.(msg.id, emoji);
-                }}
+                className={`reaction-item ${userHasReacted ? "user-reaction" : ""}`}
+                title={(emojiTooltips[emoji] || "") + " — " + (nb > 1 ? `${nb} personnes` : "1 personne")}
+                onClick={() => onReact?.(msg.id, emoji)}
               >
                 <span>{emoji}</span>
                 <span>{nb}</span>
@@ -343,21 +302,34 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* (fallback) bouton réaction desktop */}
-      <button
-        ref={triggerRef}
-        className="message-react-btn"
-        type="button"
-        onClick={() => setIsPickerOpen((prev) => !prev)}
-        aria-label="Réagir à ce message"
-        title="Réagir"
-      >
-        😊
-      </button>
-
-      {/* Picker d’emoji */}
+      {/* ✅ Picker: fixed + LTR + scroll */}
       {isPickerOpen && (
-        <div ref={pickerRef} className="reaction-picker">
+        <div
+          ref={pickerRef}
+          className="reaction-picker"
+          style={
+            pickerPos
+              ? {
+                  position: "fixed",
+                  left: pickerPos.x,
+                  top: pickerPos.y,
+                  transform: "translateX(-50%)",
+                  maxWidth: "calc(100vw - 16px)",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  zIndex: 9999,
+                  WebkitOverflowScrolling: "touch",
+
+                  // ✅ crucial: ne pas hériter du RTL/row-reverse
+                  direction: "ltr",
+                  unicodeBidi: "isolate",
+                }
+              : {
+                  direction: "ltr",
+                  unicodeBidi: "isolate",
+                }
+          }
+        >
           {activePack.map((emo) => (
             <button
               key={emo}
@@ -375,7 +347,6 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* Heure + statut (vu / reçu / envoyé) */}
       <div className="message-meta">
         <span className="message-time">{heure}</span>
         {isOwn && <span className="message-status">{statutTexte}</span>}

@@ -877,11 +877,15 @@
 }
 
 /* On garde le style "pilule", mais on évite le débordement */
+/* ✅ Picker toujours en LTR (sinon tu vois la fin des emojis en premier) */
 .reaction-picker{
-  display: flex;
-  flex-wrap: nowrap;          /* ✅ une seule ligne + scroll */
-  gap: 4px;
+  direction: ltr;
+  unicode-bidi: isolate;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
+.reaction-picker::-webkit-scrollbar{ display:none; }
+.reaction-option{ flex: 0 0 auto; }
 
 /* ✅ Sur téléphone: on centre le picker au-dessus de la bulle
    (sinon left:-4 / right:-4 peut le sortir de l’écran) */
