@@ -929,3 +929,41 @@
 }
 .reaction-picker-fixed::-webkit-scrollbar{ display:none; }
 .reaction-picker-fixed .reaction-option{ flex: 0 0 auto; }
+/* ✅ bouton 😊: caché par défaut (mobile/touch) */
+.message-react-btn{
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ✅ bouton 😊: visible uniquement sur desktop (souris/trackpad) */
+@media (hover: hover) and (pointer: fine){
+  .message-react-btn{
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* ✅ Picker fixed + LTR (évite que ça démarre par la fin des emojis) */
+.reaction-picker-fixed{
+  position: fixed !important;
+  bottom: auto !important;
+  right: auto !important;
+
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  direction: ltr;
+  unicode-bidi: isolate;
+  -webkit-overflow-scrolling: touch;
+
+  z-index: 9999;
+  scrollbar-width: none;
+}
+.reaction-picker-fixed::-webkit-scrollbar{ display:none; }
+.reaction-picker-fixed .reaction-option{ flex: 0 0 auto; }
+
+/* (optionnel mais recommandé) évite les comportements bizarres sur mobile */
+.message-content-pressable{ touch-action: pan-y; }

@@ -63,11 +63,14 @@ export default function MessageBubble({
 
   const activePack = emojiPacks[emojiPack] || emojiPacks.app;
 
-  /* ---------------- Picker : UNIQUEMENT appui long ---------------- */
+  /* ---------------- Picker : mobile = appui long / desktop = bouton ---------------- */
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState(null); // { x, y }
   const pickerRef = useRef(null);
   const pressableRef = useRef(null);
+
+  // ✅ bouton desktop 😊
+  const triggerRef = useRef(null);
 
   const longPressTimerRef = useRef(null);
   const LONG_PRESS_DELAY = 450;
@@ -83,7 +86,7 @@ export default function MessageBubble({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // centre horizontal de la bulle
+    // centre horizontal de la bulle/bouton
     let x = rect.left + rect.width / 2;
 
     // au-dessus, sinon en-dessous
@@ -122,8 +125,9 @@ export default function MessageBubble({
     raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         const el = pickerRef.current;
+
         if (el) {
-          // toujours afficher le début (❤️ 😂 😍 ...)
+          // ✅ toujours afficher le début (❤️ 😂 😍 ...)
           el.scrollLeft = 0;
           el.scrollTo?.({ left: 0, behavior: "auto" });
         }
@@ -146,17 +150,20 @@ export default function MessageBubble({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isPickerOpen]); // on ne reclamp qu'à l'ouverture
+  }, [isPickerOpen]);
 
   // fermeture click dehors + ESC
   useEffect(() => {
     function handleClickOutside(e) {
       if (!isPickerOpen) return;
+
       if (
         pickerRef.current &&
         !pickerRef.current.contains(e.target) &&
         pressableRef.current &&
-        !pressableRef.current.contains(e.target)
+        !pressableRef.current.contains(e.target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target)
       ) {
         setIsPickerOpen(false);
       }
@@ -254,14 +261,10 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Appui long uniquement sur la bulle */}
+      {/* ✅ Mobile: appui long uniquement (touch events) */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
-        onMouseDown={startLongPress}
-        onMouseUp={cancelLongPress}
-        onMouseLeave={cancelLongPress}
-        onMouseMove={cancelLongPress}
         onTouchStart={startLongPress}
         onTouchEnd={cancelLongPress}
         onTouchCancel={cancelLongPress}
@@ -310,11 +313,28 @@ export default function MessageBubble({
         </div>
       )}
 
+      {/* ✅ Desktop: bouton 😊 (affiché uniquement via CSS) */}
+      <button
+        ref={triggerRef}
+        className="message-react-btn"
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isPickerOpen) setIsPickerOpen(false);
+          else openPickerFromEl(triggerRef.current);
+        }}
+        aria-label="Réagir"
+        title="Réagir"
+      >
+        😊
+      </button>
+
       {/* ✅ Picker (fixed, LTR, jamais coupé) */}
       {isPickerOpen && (
         <div
           ref={pickerRef}
-          className={`reaction-picker reaction-picker-fixed`}
+          className="reaction-picker reaction-picker-fixed"
           style={
             pickerPos
               ? {
