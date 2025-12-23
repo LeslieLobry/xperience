@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
@@ -37,7 +37,7 @@ export default function MessageBubble({
   emojiPack = "app",
   prenomsCouple = null,
 }) {
-  /* --------------------- Pack emojis (comme l'app) --------------------- */
+  /* ✅ Emojis "comme sur l'app" */
   const emojiPacks = {
     app: ["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"],
     sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
@@ -63,43 +63,45 @@ export default function MessageBubble({
 
   const activePack = emojiPacks[emojiPack] || emojiPacks.app;
 
-  /* ------------------------- Picker état / refs ------------------------- */
+  /* ---------------- Picker : UNIQUEMENT appui long ---------------- */
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState(null); // { x, y }
-
   const pickerRef = useRef(null);
   const pressableRef = useRef(null);
 
   const longPressTimerRef = useRef(null);
   const LONG_PRESS_DELAY = 450;
 
-  const computeAndOpenPicker = (el) => {
-    try {
-      const rect = el?.getBoundingClientRect?.();
-      if (!rect) {
-        setPickerPos(null);
-        setIsPickerOpen(true);
-        return;
-      }
-
-      const x = rect.left + rect.width / 2;
-
-      // Essaye au-dessus, sinon en-dessous
-      const yAbove = rect.top - 62;
-      const y = yAbove >= 10 ? yAbove : rect.bottom + 10;
-
-      setPickerPos({ x, y });
-      setIsPickerOpen(true);
-    } catch {
+  const openPickerFromEl = (el) => {
+    const rect = el?.getBoundingClientRect?.();
+    if (!rect) {
       setPickerPos(null);
       setIsPickerOpen(true);
+      return;
     }
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // centre horizontal de la bulle
+    let x = rect.left + rect.width / 2;
+
+    // au-dessus, sinon en-dessous
+    const yAbove = rect.top - 62;
+    let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
+
+    // clamp basique (on reclamp après mesure du picker)
+    x = clamp(x, 8, vw - 8);
+    y = clamp(y, 8, vh - 8);
+
+    setPickerPos({ x, y });
+    setIsPickerOpen(true);
   };
 
   const startLongPress = () => {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
-      computeAndOpenPicker(pressableRef.current);
+      openPickerFromEl(pressableRef.current);
     }, LONG_PRESS_DELAY);
   };
 
@@ -110,35 +112,43 @@ export default function MessageBubble({
     }
   };
 
-  // ✅ À l’ouverture: force le début (❤️…) et clamp position dans l’écran
-  useEffect(() => {
+  // ✅ Reset scroll + reclamp APRÈS rendu (plus fiable sur mobile)
+  useLayoutEffect(() => {
     if (!isPickerOpen) return;
 
-    const raf = requestAnimationFrame(() => {
-      if (pickerRef.current) {
-        // ✅ important: en RTL, scrollLeft est inversé selon les navigateurs
-        // donc on force LTR sur le picker + on remet au début.
-        pickerRef.current.scrollTo?.({ left: 0 });
-        pickerRef.current.scrollLeft = 0;
-      }
+    let raf1 = 0;
+    let raf2 = 0;
 
-      if (pickerPos && pickerRef.current) {
-        const pr = pickerRef.current.getBoundingClientRect();
-        const margin = 8;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = pickerRef.current;
+        if (el) {
+          // toujours afficher le début (❤️ 😂 😍 ...)
+          el.scrollLeft = 0;
+          el.scrollTo?.({ left: 0, behavior: "auto" });
+        }
 
-        let x = clamp(pickerPos.x, margin + pr.width / 2, vw - margin - pr.width / 2);
-        let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
+        if (pickerPos && el) {
+          const pr = el.getBoundingClientRect();
+          const margin = 8;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
 
-        if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
-      }
+          let x = clamp(pickerPos.x, margin + pr.width / 2, vw - margin - pr.width / 2);
+          let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
+
+          if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
+        }
+      });
     });
 
-    return () => cancelAnimationFrame(raf);
-  }, [isPickerOpen]);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [isPickerOpen]); // on ne reclamp qu'à l'ouverture
 
-  // Fermeture click dehors + ESC
+  // fermeture click dehors + ESC
   useEffect(() => {
     function handleClickOutside(e) {
       if (!isPickerOpen) return;
@@ -205,7 +215,6 @@ export default function MessageBubble({
     }, {})
   );
 
-  /* --------------------- Types spéciaux: EPHEMERE ---------------------- */
   if (msg.type === "EPHEMERE") {
     return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
   }
@@ -218,7 +227,6 @@ export default function MessageBubble({
     );
   }
 
-  /* -------------------------------- Render ----------------------------- */
   return (
     <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
       {showAuthorInfo && (
@@ -246,7 +254,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Appui long UNIQUEMENT sur la bulle */}
+      {/* ✅ Appui long uniquement sur la bulle */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -302,32 +310,19 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Picker: fixed + LTR + scroll */}
+      {/* ✅ Picker (fixed, LTR, jamais coupé) */}
       {isPickerOpen && (
         <div
           ref={pickerRef}
-          className="reaction-picker"
+          className={`reaction-picker reaction-picker-fixed`}
           style={
             pickerPos
               ? {
-                  position: "fixed",
                   left: pickerPos.x,
                   top: pickerPos.y,
                   transform: "translateX(-50%)",
-                  maxWidth: "calc(100vw - 16px)",
-                  overflowX: "auto",
-                  overflowY: "hidden",
-                  zIndex: 9999,
-                  WebkitOverflowScrolling: "touch",
-
-                  // ✅ crucial: ne pas hériter du RTL/row-reverse
-                  direction: "ltr",
-                  unicodeBidi: "isolate",
                 }
-              : {
-                  direction: "ltr",
-                  unicodeBidi: "isolate",
-                }
+              : undefined
           }
         >
           {activePack.map((emo) => (

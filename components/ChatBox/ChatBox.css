@@ -902,3 +902,30 @@
     padding: 3px 4px;
   }
 }
+/* ✅ On DÉSACTIVE totalement le bouton smiley (tu ne veux que l'appui long) */
+.message-react-btn{
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ✅ Picker en FIXED + on neutralise tes anciens bottom/right/left */
+.reaction-picker-fixed{
+  position: fixed !important;
+  bottom: auto !important;
+  right: auto !important;
+  left: 50%;
+
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  direction: ltr;
+  unicode-bidi: isolate;
+  -webkit-overflow-scrolling: touch;
+
+  z-index: 9999;
+  scrollbar-width: none;
+}
+.reaction-picker-fixed::-webkit-scrollbar{ display:none; }
+.reaction-picker-fixed .reaction-option{ flex: 0 0 auto; }
