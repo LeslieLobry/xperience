@@ -6,6 +6,9 @@
   color: #f5ece0;
   font-size: 0.95rem;
   box-sizing: border-box;
+
+  /* Bonus: évite micro-sauts de scrollbar quand le contenu change */
+  scrollbar-gutter: stable;
 }
 
 /* Titre éventuel */
@@ -15,26 +18,44 @@
 }
 
 /* ---------------- Autocomplétion commune ---------------- */
+/* IMPORTANT: hint + dropdown doivent être ABSOLUTE pour ne pas pousser la mise en page */
+
+.city-autocomplete {
+  position: relative;
+  overflow: visible;
+}
 
 .city-hint {
-  margin-top: 6px;
-  font-size: 0.85rem;
+  position: absolute;
+  right: 10px;
+  top: 44px; /* ajuste si besoin selon la hauteur de ton input */
+  font-size: 12px;
+  opacity: 0.85;
+  pointer-events: none;
+  margin: 0;
   color: #aaa;
 }
 
 .city-dropdown {
   position: absolute;
-  margin-top: 4px;
-  width: 100%;               /* 🔁 match la largeur du groupe, pas plus */
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 9999;
+
+  width: 100%;
   max-width: 480px;
   max-height: 280px;
   overflow: auto;
+
   background: #fff;
   border: 1px solid #e6e6e6;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 20;
+
   padding: 6px 0;
+  margin: 0;
+  list-style: none;
   box-sizing: border-box;
 }
 
@@ -116,11 +137,11 @@
 /* ---------------- Sections (Identité / Envies / ...) ---------------- */
 
 .section-group {
-  margin-bottom: 0.5rem;       /* marge légère dans tous les cas */
+  margin-bottom: 0.5rem;
 }
 
 .section-group.open {
-  margin-bottom: 1rem;         /* un peu plus quand ouvert, mais doux */
+  margin-bottom: 1rem;
 }
 
 /* Titre cliquable de section */
@@ -129,7 +150,7 @@
   cursor: pointer;
   margin-bottom: 0.35rem;
   font-weight: normal;
-  font-size: 1rem;             /* 🔁 plus besoin du 26px qui faisait tout sauter */
+  font-size: 1rem;
   display: flex;
   align-items: center;
 }
@@ -142,7 +163,7 @@
   width: 100%;
   padding: 0.45rem 0.6rem;
   border-radius: 4px;
-  border: 1px solid #e0c084;   /* cohérent avec .input-recherche */
+  border: 1px solid #e0c084;
   color: #e0c084;
   background-color: transparent;
   box-sizing: border-box;
@@ -160,7 +181,7 @@
   .recherche-sidebar {
     padding: 0.75rem;
     color: white;
-    font-size: 0.9rem;         /* 🔁 plus de 26px global */
+    font-size: 0.9rem;
     border: none;
   }
 
@@ -173,8 +194,7 @@
   }
 }
 
-/* Sidebar "mobile" qui ne montre que le lien vers /recherche
-   (classe utilisée dans le composant : recherche-sidebar--mobile) */
+/* Sidebar "mobile" qui ne montre que le lien vers /recherche */
 .recherche-sidebar--mobile {
   display: flex;
   justify-content: center;
@@ -184,7 +204,7 @@
   padding: 1rem;
 }
 
-/* Ancienne classe, gardée pour compat si tu l'as utilisée ailleurs */
+/* Ancienne classe, gardée pour compat */
 .recherche-sidebar-mobile {
   display: flex;
   justify-content: center;
@@ -210,53 +230,4 @@
 .go-recherche-link:hover {
   background: #e2e2fa;
   color: #1b1720;
-}
-/* ----------------- FIX saut autocomplete ville (ajouter en bas) ----------------- */
-.recherche-sidebar .city-autocomplete {
-  position: relative;
-  overflow: visible;
-}
-
-.recherche-sidebar .city-hint {
-  position: absolute;
-  right: 10px;
-  top: 44px; /* ajuste si besoin selon la hauteur de ton input */
-  font-size: 12px;
-  opacity: 0.85;
-  pointer-events: none;
-}
-
-.recherche-sidebar .city-dropdown {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 9999;
-
-  margin: 0;
-  padding: 6px 0;
-  list-style: none;
-
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-
-  max-height: 240px;
-  overflow: auto;
-}
-
-.recherche-sidebar .city-option {
-  padding: 10px 12px;
-  cursor: pointer;
-}
-
-.recherche-sidebar .city-option.is-active,
-.recherche-sidebar .city-option:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-/* Bonus: évite micro-sauts de scrollbar quand le contenu change */
-.recherche-sidebar {
-  scrollbar-gutter: stable;
 }

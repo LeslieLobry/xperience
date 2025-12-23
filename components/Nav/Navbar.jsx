@@ -3,11 +3,11 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "../../context/AuthContext";
-import logo from "../../public/images/logo.png";
+import { useAuth } from "././context/AuthContext";
+import logo from "././public/images/logo.png";
 import { LogIn } from "lucide-react";
 import { Realtime } from "ably"; // ✅ Ably côté client
-import "../Nav/Navbar.css";
+import "./Nav/Navbar.css";
 
 const navLinks = [
   { label: "Accueil", href: "/accueil-page" },
@@ -48,6 +48,9 @@ export default function Navbar() {
 
   const menuRef = useRef();
   const popupRef = useRef();
+
+  // ✅ anti-retour immédiat (même si l’API renvoie encore la notif)
+  const clickedNotifIdsRef = useRef(new Set());
 
   // ➡️ AVATAR PRESIGNED URL
   const [presignedPhoto, setPresignedPhoto] = useState("/default.jpg");
@@ -102,8 +105,17 @@ export default function Navbar() {
       });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
-        setNotifCount(data.length); // si l'API renvoie seulement les non lues
+
+        // accepte tableau direct OU { items: [...] }
+        const list = Array.isArray(data) ? data : data?.items || data?.notifications || [];
+
+        // ✅ n’affiche QUE les non lues (et jamais celles déjà cliquées côté front)
+        const unreadOnly = list
+          .filter((n) => n?.lu === false) // 👈 le but : qu’une notif "vue" ne revienne plus
+          .filter((n) => !clickedNotifIdsRef.current.has(n?.id));
+
+        setNotifications(unreadOnly);
+        setNotifCount(unreadOnly.length);
       }
     } catch (err) {
       console.error("Erreur fetch notifications", err);
@@ -157,10 +169,7 @@ export default function Navbar() {
       const client = getAblyClient();
       channel = client.channels.get(`notification-${localUser.id}`);
 
-      channel.subscribe((msg) => {
-        // Peu importe le type de message (nouveau message, like, visite...)
-        // → on resynchronise les compteurs
-        // console.log("📩 Ably notif reçue Navbar:", msg.name, msg.data);
+      channel.subscribe(() => {
         syncCounts();
       });
     } catch (e) {
@@ -197,32 +206,38 @@ export default function Navbar() {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // ✅ version corrigée : on s'appuie sur logout() du contexte, une seule fois
   const handleLogout = async () => {
     try {
-      await logout();          // fait /api/logout + reset des states
+      await logout(); // fait /api/logout + reset des states
       router.replace("/connexion");
     } catch (err) {
       console.error("❌ Erreur logout :", err);
     }
   };
 
-  // 🔹 Marquer UNE notification comme lue
+  // 🔹 Marquer UNE notification comme lue (✅ optimiste : elle disparaît immédiatement)
   const markNotificationRead = async (id) => {
+    if (!id) return;
+
+    // ✅ on mémorise l’ID pour éviter qu’elle revienne via un refresh immédiat
+    clickedNotifIdsRef.current.add(id);
+
+    // ✅ mise à jour locale immédiate
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifCount((prev) => Math.max(0, prev - 1));
+
     try {
       await fetch(`/api/notifications/${id}`, {
         method: "PATCH",
         credentials: "include",
       });
-      // mise à jour locale optimiste
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-      setNotifCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Erreur PATCH notification", err);
+      // on ne ré-affiche pas (tu voulais qu'elle disparaisse dès le clic)
     }
   };
 
@@ -280,9 +295,7 @@ export default function Navbar() {
           >
             <Link
               href={link.href}
-              className={
-                link.href === "/messagerie" ? "nav-messagerie-link" : ""
-              }
+              className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}
             >
               {link.label}
               {link.href === "/messagerie" && unreadCount > 0 && (
@@ -332,9 +345,9 @@ export default function Navbar() {
                         {notif.lien && notif.lien.startsWith("/") ? (
                           <span
                             className="notif-link"
-                            onClick={() => {
-                              // on marque cette notif comme lue puis on navigue
-                              markNotificationRead(notif.id);
+                            onClick={async () => {
+                              // ✅ on marque comme lue (elle disparaît) puis on navigue
+                              await markNotificationRead(notif.id);
                               setDropdownOpen(false);
                               router.push(notif.lien);
                             }}
@@ -345,20 +358,16 @@ export default function Navbar() {
                           <a
                             href={notif.lien || "#"}
                             target={notif.lien ? "_blank" : undefined}
-                            rel={
-                              notif.lien ? "noopener noreferrer" : undefined
-                            }
-                            onClick={() => {
-                              markNotificationRead(notif.id);
+                            rel={notif.lien ? "noopener noreferrer" : undefined}
+                            onClick={async () => {
+                              await markNotificationRead(notif.id);
                               setDropdownOpen(false);
                             }}
                           >
                             {notif.message}
                           </a>
                         )}
-                        <small>
-                          {new Date(notif.createdAt).toLocaleString()}
-                        </small>
+                        <small>{new Date(notif.createdAt).toLocaleString()}</small>
                       </li>
                     ))}
                   </ul>

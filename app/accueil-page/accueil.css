@@ -80,7 +80,6 @@ ease, box-shadow .2s
 ease;
 }
 .accueil-page :where(.profil-photo) {
-  width: 100%;
   object-fit: cover;
   border-radius: 50%;
 }
