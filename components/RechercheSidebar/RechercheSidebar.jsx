@@ -222,7 +222,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           `&fields=nom,code,departement,population` +
           `&boost=population&limit=8`;
 
-        const res = await fetch(url, { signal: cityControllerRef.current.signal });
+        const res = await fetch(url, {
+          signal: cityControllerRef.current.signal,
+        });
         const data = await res.json();
 
         const mapped = (Array.isArray(data) ? data : []).map((c) => ({
@@ -234,7 +236,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         }));
 
         setCityItems(mapped);
-        setCityOpen(mapped.length > 0 || q.length >= 2); // ✅ garde ouvert pendant la frappe (évite "saut"/clignotement)
+        setCityOpen(true); // ✅ menu stable pendant la frappe
         setCityHighlight(mapped.length ? 0 : -1);
       } catch {
         // ignore (abort entre autres)
@@ -291,8 +293,6 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function onCityKeyDown(e) {
     const hasMenu = cityOpen && cityItems.length > 0;
 
-    // ✅ si menu "ouvert" mais pas encore de résultats (loading),
-    // on laisse l'utilisateur taper sans bloquer
     if (!hasMenu) {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -680,7 +680,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               ref={cityInputRef}
               onFocus={() => {
                 const v = (cityText || "").trim();
-                if (v.length >= 2) setCityOpen(true); // ✅ ouvre sans pousser le layout (CSS)
+                if (v.length >= 2) setCityOpen(true);
               }}
               onChange={(e) => {
                 const v = e.target.value;
@@ -689,13 +689,16 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
                 // ✅ évite d'afficher des anciennes suggestions pendant qu'on tape
                 setCityHighlight(-1);
 
-                const q = v.trim();
+                const q = (v || "").trim();
                 if (q.length < 2) {
                   setCityItems([]);
                   setCityOpen(false);
+                  setCityHighlight(-1);
                 } else {
-                  setCityOpen(true); // ✅ le menu reste "stable" pendant la frappe
+                  // ✅ garde le menu "stable" pendant la frappe
+                  setCityOpen(true);
                 }
+
                 // on ne met pas form.localisation à jour à chaque frappe,
                 // seulement au moment de la recherche ou de la sélection
               }}

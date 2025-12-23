@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "././context/AuthContext";
-import logo from "././public/images/logo.png";
+import { useAuth } from "../../context/AuthContext";
+import logo from "../../public/logo.png";
 import { LogIn } from "lucide-react";
 import { Realtime } from "ably"; // ✅ Ably côté client
 import "./Navbar.css";

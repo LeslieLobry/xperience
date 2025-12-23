@@ -231,3 +231,62 @@
   background: #e2e2fa;
   color: #1b1720;
 }
+/* ================= FIX AUTOCOMPLETE VILLE (à coller en bas) ================= */
+
+/* évite que le dropdown soit coupé si un parent a overflow hidden */
+.section-group.open .section-content {
+  overflow: visible !important;
+}
+
+.city-autocomplete {
+  position: relative;
+  z-index: 20;
+}
+
+/* le "Recherche…" ne doit JAMAIS pousser le layout */
+.city-hint {
+  position: absolute !important;
+  right: 10px;
+  top: 44px;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+  color: #e0c084;
+  font-size: 12px;
+}
+
+/* dropdown visible (dark theme) */
+.city-dropdown {
+  position: absolute !important;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 9999;
+
+  background: #1b1720 !important;
+  border: 1px solid #e0c084 !important;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  max-height: 240px;
+  overflow: auto;
+
+  margin: 0 !important;
+  padding: 6px 0 !important;
+  list-style: none !important;
+}
+
+.city-option {
+  color: #f5ece0 !important;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.city-option:hover,
+.city-option.is-active {
+  background: rgba(224, 192, 132, 0.18) !important;
+}
+
+.city-name {
+  color: inherit !important;
+}
