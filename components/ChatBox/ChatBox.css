@@ -861,3 +861,40 @@
   opacity: 0.8;
   transform: translateX(-1px);
 }
+/* ✅ FIX MOBILE: picker réactions jamais coupé */
+.reaction-picker{
+  max-width: min(92vw, 360px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;      /* Firefox */
+  overscroll-behavior: contain;
+  white-space: nowrap;
+}
+
+.reaction-picker::-webkit-scrollbar{
+  display: none;              /* Chrome/Safari */
+}
+
+/* On garde le style "pilule", mais on évite le débordement */
+.reaction-picker{
+  display: flex;
+  flex-wrap: nowrap;          /* ✅ une seule ligne + scroll */
+  gap: 4px;
+}
+
+/* ✅ Sur téléphone: on centre le picker au-dessus de la bulle
+   (sinon left:-4 / right:-4 peut le sortir de l’écran) */
+@media (max-width: 600px){
+  .message-bubble.own .reaction-picker,
+  .message-bubble.other .reaction-picker{
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+  }
+
+  .reaction-option{
+    font-size: 20px;          /* un peu plus petit pour tenir */
+    padding: 3px 4px;
+  }
+}
