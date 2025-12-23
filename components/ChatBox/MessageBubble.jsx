@@ -32,14 +32,18 @@ export default function MessageBubble({
   lastReads,
   onReact,
   onDelete,
-  emojiPack = "sexy",
+  emojiPack = "app", // ✅ par défaut: mêmes emojis que l'app
   prenomsCouple = null,
 }) {
   /* ---------------------------------------------------------------------- */
   /*                             Packs d'emoji                              */
   /* ---------------------------------------------------------------------- */
 
+  // ✅ Emojis "comme sur l'app"
   const emojiPacks = {
+    app: ["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"],
+
+    // (on garde tes packs existants au cas où)
     sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
     glamour: ["🖤", "🥂", "🥀", "🪩", "🎭", "🫣"],
     erotique: ["🫦", "🍆", "🍒", "🥵", "🛏️", "🧴"],
@@ -47,7 +51,21 @@ export default function MessageBubble({
   };
 
   const emojiTooltips = {
-    "😍": "Je te veux",
+    // ✅ Tooltips "app"
+    "❤️": "J’adore",
+    "😂": "Trop drôle",
+    "😍": "J’aime",
+    "😮": "Oh wow",
+    "😢": "Triste",
+    "👍": "Top",
+    "👎": "Bof",
+    "🔥": "Ça chauffe",
+    "😡": "Pas content",
+    "🙏": "Merci / stp",
+    "🎉": "Yes !",
+    "😉": "Clin d’œil",
+
+    // (on garde tes tooltips existants)
     "😈": "Coquin",
     "💋": "Un bisou",
     "👀": "Je te mate",
@@ -73,8 +91,7 @@ export default function MessageBubble({
     "👄": "Envie de t’embrasser",
   };
 
-  // Pack actif : celui passé en prop, sinon "sexy"
-  const activePack = emojiPacks[emojiPack] || emojiPacks.sexy;
+  const activePack = emojiPacks[emojiPack] || emojiPacks.app;
 
   /* ---------------------------------------------------------------------- */
   /*                        État & refs pour le picker                      */
@@ -118,10 +135,19 @@ export default function MessageBubble({
       }
     }
 
+    function handleEsc(e) {
+      if (e.key === "Escape") setIsPickerOpen(false);
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside, { passive: true });
+    document.addEventListener("keydown", handleEsc);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      // Cleanup du timer d'appui long
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
       }
@@ -154,8 +180,7 @@ export default function MessageBubble({
       (r) => r.utilisateurId !== utilisateur.id
     );
     const lus = autresLecteurs.filter(
-      (r) =>
-        r.lastReadAt && new Date(r.lastReadAt) > new Date(msg.createdAt)
+      (r) => r.lastReadAt && new Date(r.lastReadAt) > new Date(msg.createdAt)
     );
     if (lus.length === autresLecteurs.length && lus.length > 0) {
       statutTexte = "✔✔ Vu";
@@ -247,15 +272,17 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* Zone d'appui long sur le contenu du message */}
+      {/* ✅ Zone d'appui long sur la bulle (comme l'app) */}
       <div
         className="message-content-pressable"
         onMouseDown={startLongPress}
         onMouseUp={cancelLongPress}
         onMouseLeave={cancelLongPress}
+        onMouseMove={cancelLongPress} // ✅ évite ouverture si tu “glisses”
         onTouchStart={startLongPress}
         onTouchEnd={cancelLongPress}
         onTouchCancel={cancelLongPress}
+        onTouchMove={cancelLongPress} // ✅ évite ouverture pendant scroll
       >
         {/* Contenu du message : image / audio / texte */}
         {msg.type === "IMAGE" && msg.imageUrl ? (
@@ -304,8 +331,7 @@ export default function MessageBubble({
                   (nb > 1 ? `${nb} personnes` : "1 personne")
                 }
                 onClick={() => {
-                  // 👉 Permet de re-caller onReact sur un emoji déjà présent
-                  // (pour que tu puisses gérer toggle côté backend)
+                  // toggle possible côté backend si tu gères
                   onReact?.(msg.id, emoji);
                 }}
               >
@@ -317,18 +343,19 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* Bouton de réaction (style Messenger, en plus de l'appui long) */}
+      {/* (fallback) bouton réaction desktop */}
       <button
         ref={triggerRef}
         className="message-react-btn"
         type="button"
         onClick={() => setIsPickerOpen((prev) => !prev)}
         aria-label="Réagir à ce message"
+        title="Réagir"
       >
         😊
       </button>
 
-      {/* Picker d’emoji (bulle au-dessus de la bulle du message) */}
+      {/* Picker d’emoji */}
       {isPickerOpen && (
         <div ref={pickerRef} className="reaction-picker">
           {activePack.map((emo) => (

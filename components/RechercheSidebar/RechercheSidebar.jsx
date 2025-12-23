@@ -234,7 +234,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         }));
 
         setCityItems(mapped);
-        setCityOpen(mapped.length > 0);
+        setCityOpen(mapped.length > 0 || q.length >= 2); // ✅ garde ouvert pendant la frappe (évite "saut"/clignotement)
         setCityHighlight(mapped.length ? 0 : -1);
       } catch {
         // ignore (abort entre autres)
@@ -291,7 +291,15 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   function onCityKeyDown(e) {
     const hasMenu = cityOpen && cityItems.length > 0;
 
-    if (!hasMenu) return;
+    // ✅ si menu "ouvert" mais pas encore de résultats (loading),
+    // on laisse l'utilisateur taper sans bloquer
+    if (!hasMenu) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeCityMenu();
+      }
+      return;
+    }
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -654,7 +662,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
 
           {/* --- Autocomplétion Ville (CONTRÔLÉ) --- */}
           <div
-            className="filters-group"
+            className="filters-group city-autocomplete"
             ref={dropdownRef}
             style={{ position: "relative" }}
           >
@@ -672,11 +680,22 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               ref={cityInputRef}
               onFocus={() => {
                 const v = (cityText || "").trim();
-                if (v.length >= 2 && cityItems.length) setCityOpen(true);
+                if (v.length >= 2) setCityOpen(true); // ✅ ouvre sans pousser le layout (CSS)
               }}
               onChange={(e) => {
                 const v = e.target.value;
                 setCityText(v);
+
+                // ✅ évite d'afficher des anciennes suggestions pendant qu'on tape
+                setCityHighlight(-1);
+
+                const q = v.trim();
+                if (q.length < 2) {
+                  setCityItems([]);
+                  setCityOpen(false);
+                } else {
+                  setCityOpen(true); // ✅ le menu reste "stable" pendant la frappe
+                }
                 // on ne met pas form.localisation à jour à chaque frappe,
                 // seulement au moment de la recherche ou de la sélection
               }}
