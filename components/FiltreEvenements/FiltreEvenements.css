@@ -4,6 +4,7 @@
   background: transparent;
   max-width: 500px;
   gap: 16px ;
+  padding: 10px;
 }
 
 .filtre-dates {
