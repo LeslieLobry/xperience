@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -42,6 +42,9 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([]);
   const [notifCount, setNotifCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // ✅ nouveau: loading mark-all
+  const [markAllLoading, setMarkAllLoading] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -102,8 +105,9 @@ export default function Navbar() {
       });
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
-        setNotifCount(data.length); // si l'API renvoie seulement les non lues
+        const arr = Array.isArray(data) ? data : [];
+        setNotifications(arr);
+        setNotifCount(arr.length); // API = seulement non lues
       }
     } catch (err) {
       console.error("Erreur fetch notifications", err);
@@ -129,16 +133,12 @@ export default function Navbar() {
       if (isCancelled) return;
 
       // On évite de poller si onglet pas visible (optimisation)
-      if (
-        typeof document !== "undefined" &&
-        document.visibilityState !== "visible"
-      ) {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         return;
       }
 
       try {
         if (pathname === "/messagerie") {
-          // On considère les messages comme "vus" côté front
           setUnreadCount(0);
         } else {
           await fetchUnreadMessages();
@@ -157,17 +157,14 @@ export default function Navbar() {
       const client = getAblyClient();
       channel = client.channels.get(`notification-${localUser.id}`);
 
-      channel.subscribe((msg) => {
-        // Peu importe le type de message (nouveau message, like, visite...)
-        // → on resynchronise les compteurs
-        // console.log("📩 Ably notif reçue Navbar:", msg.name, msg.data);
+      channel.subscribe(() => {
         syncCounts();
       });
     } catch (e) {
       console.error("Erreur Ably Navbar :", e);
     }
 
-    // 3️⃣ petit fallback : resync toutes les 60s au cas où
+    // 3️⃣ fallback
     intervalId = setInterval(syncCounts, 60000);
 
     // 4️⃣ quand on revient sur l'onglet → resync direct
@@ -197,19 +194,31 @@ export default function Navbar() {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ version corrigée : on s'appuie sur logout() du contexte, une seule fois
+  // ✅ logout
   const handleLogout = async () => {
     try {
-      await logout();          // fait /api/logout + reset des states
+      await logout();
       router.replace("/connexion");
     } catch (err) {
       console.error("❌ Erreur logout :", err);
     }
   };
+
+  // ✅ Affichage prénom/pseudo auteur (si l’API le renvoie)
+  const getNotifText = useCallback((notif) => {
+    const actor =
+      notif?.auteur?.prenom ||
+      notif?.auteur?.pseudo ||
+      notif?.acteur?.prenom ||
+      notif?.acteur?.pseudo ||
+      "";
+
+    // Si ton message est du style "a aimé votre profil" → on préfixe
+    return actor ? `${actor} ${notif.message}` : notif.message;
+  }, []);
 
   // 🔹 Marquer UNE notification comme lue
   const markNotificationRead = async (id) => {
@@ -226,6 +235,25 @@ export default function Navbar() {
     }
   };
 
+  // ✅ NOUVEAU : Tout marquer comme lu
+  const markAllNotificationsRead = async () => {
+    if (markAllLoading) return;
+    try {
+      setMarkAllLoading(true);
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        credentials: "include",
+      });
+      // optimiste
+      setNotifications([]);
+      setNotifCount(0);
+    } catch (err) {
+      console.error("Erreur PATCH notifications (mark all)", err);
+    } finally {
+      setMarkAllLoading(false);
+    }
+  };
+
   const handleAvatarClick = () => {
     setDropdownOpen((prev) => !prev);
   };
@@ -235,7 +263,7 @@ export default function Navbar() {
     router.push(href);
   };
 
-  // 🔹 Badge du burger : même comportement pour message / visite / like
+  // 🔹 Badge du burger
   const burgerBadgeCount = notifCount || 0;
 
   return (
@@ -251,19 +279,14 @@ export default function Navbar() {
             priority
           />
         </Link>
-        {localUser && (
-          <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>
-        )}
+        {localUser && <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>}
       </div>
 
       <div
         className={`burger${menuOpen ? " open" : ""}`}
         onClick={() => setMenuOpen(!menuOpen)}
       >
-        {/* 🔴 Badge sur le burger */}
-        {burgerBadgeCount > 0 && (
-          <span className="burger-badge">{burgerBadgeCount}</span>
-        )}
+        {burgerBadgeCount > 0 && <span className="burger-badge">{burgerBadgeCount}</span>}
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
@@ -280,9 +303,7 @@ export default function Navbar() {
           >
             <Link
               href={link.href}
-              className={
-                link.href === "/messagerie" ? "nav-messagerie-link" : ""
-              }
+              className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}
             >
               {link.label}
               {link.href === "/messagerie" && unreadCount > 0 && (
@@ -308,9 +329,7 @@ export default function Navbar() {
                 height={40}
                 className="nav-avatar"
               />
-              {notifCount > 0 && (
-                <span className="notif-badge-on-avatar">{notifCount}</span>
-              )}
+              {notifCount > 0 && <span className="notif-badge-on-avatar">{notifCount}</span>}
             </div>
 
             {dropdownOpen && (
@@ -322,48 +341,59 @@ export default function Navbar() {
                 <div className="notif-section">
                   <div className="notif-header-row">
                     <span className="notif-title">Notifications</span>
-                  </div>
-                  <ul>
-                    {notifications.length === 0 && (
-                      <li>Aucune notification</li>
+
+                    {/* ✅ NOUVEAU bouton "Tout lire" */}
+                    {notifications.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn-link"
+                        onClick={markAllNotificationsRead}
+                        disabled={markAllLoading}
+                        title="Tout marquer comme lu"
+                      >
+                        {markAllLoading ? "..." : "Tout lire"}
+                      </button>
                     )}
+                  </div>
+
+                  <ul>
+                    {notifications.length === 0 && <li>Aucune notification</li>}
+
                     {notifications.map((notif) => (
                       <li key={notif.id}>
                         {notif.lien && notif.lien.startsWith("/") ? (
                           <span
                             className="notif-link"
                             onClick={() => {
-                              // on marque cette notif comme lue puis on navigue
                               markNotificationRead(notif.id);
                               setDropdownOpen(false);
                               router.push(notif.lien);
                             }}
                           >
-                            {notif.message}
+                            {getNotifText(notif)}
                           </span>
                         ) : (
                           <a
                             href={notif.lien || "#"}
                             target={notif.lien ? "_blank" : undefined}
-                            rel={
-                              notif.lien ? "noopener noreferrer" : undefined
-                            }
+                            rel={notif.lien ? "noopener noreferrer" : undefined}
                             onClick={() => {
                               markNotificationRead(notif.id);
                               setDropdownOpen(false);
                             }}
                           >
-                            {notif.message}
+                            {getNotifText(notif)}
                           </a>
                         )}
-                        <small>
-                          {new Date(notif.createdAt).toLocaleString()}
-                        </small>
+
+                        <small>{new Date(notif.createdAt).toLocaleString()}</small>
                       </li>
                     ))}
                   </ul>
                 </div>
+
                 <hr />
+
                 <div className="profil-actions">
                   <button
                     onClick={() => {
