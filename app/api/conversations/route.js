@@ -2,7 +2,6 @@ import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
-import { Prisma } from "@prisma/client";
 
 // ----------- CRÉATION (POST) -----------
 export async function POST(req) {
@@ -25,15 +24,13 @@ export async function POST(req) {
         { status: 403 }
       );
 
-    // blocage si user bloqué
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = ids.filter((id) => id !== currentUser.id);
-    if (autres.some((id) => exclus.includes(id))) {
+    if (autres.some((id) => exclus.includes(id)))
       return NextResponse.json(
         { error: "Impossible de créer une conversation avec un utilisateur bloqué." },
         { status: 403 }
       );
-    }
 
     // 2) EXISTING: match EXACT du set de participants
     const existingConv = await prisma.conversation.findFirst({
@@ -44,17 +41,13 @@ export async function POST(req) {
         ],
       },
       include: {
-        participants: {
-          include: {
-            utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
-          },
-        },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
+        participants: { include: { utilisateur: true } },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
 
     if (existingConv) {
-      // restaure si ce user avait "supprimé"
+      // Restaure si ce user avait "supprimé" la conv
       const myParticipant = existingConv.participants.find(
         (p) => p.utilisateurId === currentUser.id
       );
@@ -64,7 +57,6 @@ export async function POST(req) {
           data: { supprimé: false },
         });
       }
-
       return NextResponse.json({ conversation: existingConv, existed: true });
     }
 
@@ -81,7 +73,7 @@ export async function POST(req) {
             utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
           },
         },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
 
@@ -93,6 +85,8 @@ export async function POST(req) {
 }
 
 // ----------- LISTE / UNREADS (GET) -----------
+// ----------- LISTE / UNREADS (GET) -----------
+
 export async function GET() {
   try {
     const currentUser = await getUserFromToken();
@@ -101,54 +95,72 @@ export async function GET() {
 
     const userId = currentUser.id;
 
-    // ✅ 1) Conversations non supprimées pour ce user (inchangé)
+    // 1) conversations + participants + dernier message (1 query)
     const convs = await prisma.conversation.findMany({
       where: {
         participants: { some: { utilisateurId: userId, supprimé: false } },
       },
       include: {
         participants: {
-          include: {
+          select: {
+            id: true,
+            utilisateurId: true,
+            supprimé: true,
+            lastReadAt: true,
             utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
           },
         },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    // ✅ 2) Filtre "bloqués" (inchangé)
+    // 2) filtrage blocages
     const exclus = await getIdsUtilisateursExclus(userId);
     const visibleConvs = convs.filter((conv) =>
       conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    // ✅ 3) unreadCount: une seule requête groupée (REMPLACE le N+1)
-    const convIds = visibleConvs.map((c) => c.id);
-    let unreadCounts = {};
-
-    if (convIds.length) {
-      const rows = await prisma.$queryRaw`
-        SELECT
-          m."conversationId" AS "conversationId",
-          COUNT(*)::int      AS "count"
-        FROM "Message" m
-        JOIN "Participant" p
-          ON p."conversationId" = m."conversationId"
-         AND p."utilisateurId" = ${userId}
-         AND p."supprimé" = false
-        WHERE m."conversationId" IN (${Prisma.join(convIds)})
-          AND m."auteurId" <> ${userId}
-          AND m."createdAt" > COALESCE(p."lastReadAt", to_timestamp(0))
-        GROUP BY m."conversationId"
-      `;
-
-      unreadCounts = Object.fromEntries(
-        (rows || []).map((r) => [Number(r.conversationId), Number(r.count)])
-      );
+    if (visibleConvs.length === 0) {
+      return NextResponse.json({ conversations: [] });
     }
 
-    // ✅ 4) Formatage retour (inchangé)
+    // 3) unreadCount en 1 seul passage:
+    // On récupère lastReadAt par conv, puis on fait un groupBy par conv
+    const lastReadByConv = new Map();
+    for (const conv of visibleConvs) {
+      const me = conv.participants.find((p) => p.utilisateurId === userId);
+      lastReadByConv.set(conv.id, me?.lastReadAt ?? new Date(0));
+    }
+
+    const convIds = visibleConvs.map((c) => c.id);
+
+    // ⚠️ Prisma ne permet pas "createdAt > lastReadAt" différent par convId en 1 WHERE.
+    // Donc on fait une stratégie FAST:
+    // - on prend le minLastRead (le plus ancien) pour limiter les messages scannés
+    // - puis on regroupe en mémoire (c’est très rapide et évite N requêtes)
+    let minLastRead = new Date();
+    for (const dt of lastReadByConv.values()) {
+      if (dt < minLastRead) minLastRead = dt;
+    }
+
+    const msgs = await prisma.message.findMany({
+      where: {
+        conversationId: { in: convIds },
+        auteurId: { not: userId },
+        createdAt: { gt: minLastRead },
+      },
+      select: { conversationId: true, createdAt: true },
+    });
+
+    const unreadCounts = {};
+    for (const m of msgs) {
+      const lastRead = lastReadByConv.get(m.conversationId) ?? new Date(0);
+      if (m.createdAt > lastRead) {
+        unreadCounts[m.conversationId] = (unreadCounts[m.conversationId] || 0) + 1;
+      }
+    }
+
     const conversations = visibleConvs.map((conv) => ({
       ...conv,
       unreadCount: unreadCounts[conv.id] || 0,

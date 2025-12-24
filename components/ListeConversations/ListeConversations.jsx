@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Realtime } from "ably";
+import { FixedSizeList as List } from "react-window";
 import "./ListeConversations.css";
 import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
@@ -126,12 +127,12 @@ function usePresignedPhotos(users, priorityCount = 12) {
       uniq.push(u);
     }
 
-    // split priorité / background
     const priority = uniq.slice(0, priorityCount);
     const background = uniq.slice(priorityCount);
 
     const hydrateFromCache = () => {
       const partial = {};
+      const now = Date.now();
       for (const u of uniq) {
         if (!u.photoUrl) {
           partial[u.id] = "/default.jpg";
@@ -142,7 +143,7 @@ function usePresignedPhotos(users, priorityCount = 12) {
           continue;
         }
         const cached = presignCache.get(u.photoUrl);
-        if (cached && cached.exp > Date.now()) {
+        if (cached && cached.exp > now) {
           partial[u.id] = cached.url;
         }
       }
@@ -152,15 +153,14 @@ function usePresignedPhotos(users, priorityCount = 12) {
     };
 
     const fetchGroup = async (group) => {
-      // hydrate d'abord avec cache (instant)
       hydrateFromCache();
 
-      // fetch seulement les clés manquantes
+      const now = Date.now();
       const toFetch = group.filter((u) => {
         if (!u.photoUrl) return false;
         if (u.photoUrl.startsWith("http")) return false;
         const cached = presignCache.get(u.photoUrl);
-        if (cached && cached.exp > Date.now()) return false;
+        if (cached && cached.exp > now) return false;
         return true;
       });
 
@@ -177,12 +177,10 @@ function usePresignedPhotos(users, priorityCount = 12) {
       setPhotoUrls((prev) => ({ ...prev, ...next }));
     };
 
-    // 1) priorité tout de suite (mais après le 1er paint)
     runIdle(() => {
       fetchGroup(priority).catch(() => {});
-    }, 800);
+    }, 600);
 
-    // 2) background plus tard
     runIdle(() => {
       fetchGroup(background).catch(() => {});
     }, 2000);
@@ -196,7 +194,7 @@ function usePresignedPhotos(users, priorityCount = 12) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Ably: lazy singleton (évite connexion au chargement du module)          */
+/* ✅ Ably: lazy singleton                                                     */
 /* -------------------------------------------------------------------------- */
 let ablySingleton = null;
 function getAbly() {
@@ -206,6 +204,201 @@ function getAbly() {
   ablySingleton = new Realtime(key);
   return ablySingleton;
 }
+
+/* -------------------------------------------------------------------------- */
+/* ✅ Détection “device lent” (réduit le coût des avatars)                     */
+/* -------------------------------------------------------------------------- */
+function useLowEndDevice() {
+  const [lowEnd, setLowEnd] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const cores = Number(navigator.hardwareConcurrency || 8);
+    const mem = Number(navigator.deviceMemory || 8);
+    const net = navigator.connection?.effectiveType || "";
+    const saveData = !!navigator.connection?.saveData;
+
+    // règles simples et agressives (tu veux le max perf)
+    const isLow =
+      cores <= 4 ||
+      mem <= 4 ||
+      saveData ||
+      net.includes("2g") ||
+      net.includes("slow-2g");
+
+    setLowEnd(isLow);
+  }, []);
+
+  return lowEnd;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ✅ Row memo (clé perf)                                                      */
+/* -------------------------------------------------------------------------- */
+const ConversationRow = React.memo(function ConversationRow({
+  conv,
+  userId,
+  selectedId,
+  photoUrls,
+  lowEnd,
+  onSelect,
+  onDelete,
+  onStartRename,
+  renamingId,
+  newName,
+  setNewName,
+  onConfirmRename,
+  onCancelRename,
+  style,
+}) {
+  const autres = (conv.participants || [])
+    .filter((p) => Number(p.utilisateurId) !== Number(userId))
+    .map((p) => p.utilisateur)
+    .filter(Boolean);
+
+  const pseudo =
+    autres.length === 1
+      ? autres[0].pseudo
+      : autres.map((u) => u.pseudo).join(", ");
+
+  const unreadCount = conv.unreadCount || 0;
+
+  // ✅ Sur device lent: 1 avatar max (gros gain)
+  const avatarUsers = lowEnd ? autres.slice(0, 1) : autres.slice(0, 4);
+  const extraCount = Math.max(0, autres.length - avatarUsers.length);
+
+  return (
+    <div style={style}>
+      <div
+        className={`conversation-item ${
+          Number(selectedId) === Number(conv.id) ? "active" : ""
+        }`}
+      >
+        <div className="conversation-clickable" onClick={() => onSelect(conv.id)}>
+          <div className="conv-main">
+            <div className="conv-avatar">
+              {avatarUsers.length === 0 && (
+                <div className="conv-avatar-placeholder">
+                  {getInitials(conv.nom || pseudo || "")}
+                </div>
+              )}
+
+              {avatarUsers.length === 1 &&
+                (() => {
+                  const u = avatarUsers[0];
+                  const url = photoUrls?.[u.id];
+
+                  return url && url !== "/default.jpg" ? (
+                    <img
+                      src={url}
+                      alt={u.pseudo || "Photo de profil"}
+                      className="conv-avatar-img"
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "/default.jpg";
+                      }}
+                    />
+                  ) : (
+                    <div className="conv-avatar-placeholder">
+                      {getInitials(u.pseudo)}
+                    </div>
+                  );
+                })()}
+
+              {avatarUsers.length > 1 && !lowEnd && (
+                <div className="conv-avatar-stack">
+                  {avatarUsers.map((u, index) => {
+                    const url = photoUrls?.[u.id];
+                    return url && url !== "/default.jpg" ? (
+                      <img
+                        key={u.id || index}
+                        src={url}
+                        alt={u.pseudo || "Photo de profil"}
+                        className={`conv-avatar-img stacked stacked-${index}`}
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/default.jpg";
+                        }}
+                      />
+                    ) : (
+                      <div
+                        key={u.id || index}
+                        className={`conv-avatar-placeholder stacked stacked-${index}`}
+                      >
+                        {getInitials(u.pseudo)}
+                      </div>
+                    );
+                  })}
+
+                  {extraCount > 0 && (
+                    <div className="conv-avatar-extra">+{extraCount}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="conv-info">
+              <div className="conv-pseudo">
+                {renamingId === conv.id ? (
+                  <div className="rename-inline" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") onConfirmRename(conv.id);
+                        if (e.key === "Escape") onCancelRename();
+                      }}
+                      autoFocus
+                      maxLength={40}
+                      style={{ width: 120, marginRight: 6 }}
+                    />
+                    <button onClick={() => onConfirmRename(conv.id)}>OK</button>
+                    <button onClick={onCancelRename}>Annuler</button>
+                  </div>
+                ) : (
+                  <>{conv.nom || pseudo}</>
+                )}
+              </div>
+
+              {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="conv-actions">
+          {renamingId !== conv.id && (
+            <button
+              className="rename-conv-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartRename(conv.id, conv.nom || "");
+              }}
+              title="Renommer cette conversation"
+            >
+              ✏️
+            </button>
+          )}
+          <button
+            className="delete-conv-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(conv.id);
+            }}
+            title="Supprimer cette conversation"
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 /* -------------------------------------------------------------------------- */
 /* 🔹 Composant principal                                                     */
@@ -218,35 +411,71 @@ export default function ListeConversations({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const lowEnd = useLowEndDevice();
 
   const [selectedId, setSelectedId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [renamingId, setRenamingId] = useState(null);
   const [newName, setNewName] = useState("");
 
+  // ✅ hauteur liste (pour virtualisation)
+  const containerRef = useRef(null);
+  const [listHeight, setListHeight] = useState(600);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+
+    const compute = () => {
+      // hauteur dispo = container - header (approx)
+      // si tu changes ton header, ajuste 64
+      const h = el.getBoundingClientRect().height - 64;
+      setListHeight(Math.max(240, Math.floor(h)));
+    };
+
+    compute();
+    const ro = new ResizeObserver(() => compute());
+    ro.observe(el);
+    window.addEventListener("resize", compute);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, []);
+
   const { data, error, isLoading, mutate } = useSWR(
     userId ? "/api/conversations" : null,
     safeFetcher,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 8000,
+      revalidateOnReconnect: false,
+      refreshInterval: 0,
+      dedupingInterval: 15000, // ✅ plus calme
     }
   );
 
   const rawConversations = data?.conversations || [];
 
-  const conversations = useMemo(
-    () =>
-      rawConversations.filter(
-        (c, i, arr) => arr.findIndex((cc) => cc.id === c.id) === i
-      ),
-    [rawConversations]
-  );
+  const conversations = useMemo(() => {
+    // uniq + stable
+    const seen = new Set();
+    const out = [];
+    for (const c of rawConversations) {
+      if (!c?.id) continue;
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      out.push(c);
+    }
+    return out;
+  }, [rawConversations]);
 
-  // Tous les "autres" utilisateurs pour précharger leurs photos
+  // ✅ presign seulement pour les gens qu’on va vraiment afficher vite
   const allAutresUsers = useMemo(() => {
     const map = {};
-    conversations.forEach((conv) => {
+    // On prend une fenêtre de conversations (max) pour éviter de préparer 500 users
+    const slice = conversations.slice(0, 80);
+    slice.forEach((conv) => {
       (conv.participants || []).forEach((p) => {
         if (Number(p.utilisateurId) === Number(userId)) return;
         const u = p.utilisateur;
@@ -257,8 +486,8 @@ export default function ListeConversations({
     return Object.values(map);
   }, [conversations, userId]);
 
-  // ✅ presign prioritaire sur les premières personnes
-  const photoUrls = usePresignedPhotos(allAutresUsers, 16);
+  // ✅ Sur low-end: moins de priorité, ça respire
+  const photoUrls = usePresignedPhotos(allAutresUsers, lowEnd ? 8 : 16);
 
   // URL -> state sélectionné
   useEffect(() => {
@@ -278,7 +507,7 @@ export default function ListeConversations({
     }
   }, [autoSelectFirst, conversations, router, searchParams]);
 
-  // ✅ Ably → rafraîchir la liste (lazy + throttled)
+  // ✅ Ably → rafraîchir la liste (throttle + idle)
   useEffect(() => {
     if (!userId) return;
 
@@ -292,7 +521,7 @@ export default function ListeConversations({
       timeout = setTimeout(() => {
         mutate();
         timeout = null;
-      }, 450);
+      }, 650); // ✅ un peu plus “calme” pour éviter rafales
     };
 
     runIdle(() => {
@@ -302,7 +531,7 @@ export default function ListeConversations({
       channel = ably.channels.get(`notification-${userId}`);
       channel.subscribe("message", scheduleRefresh);
       channel.subscribe("refresh-conversations", scheduleRefresh);
-    }, 1200);
+    }, 900);
 
     return () => {
       isMounted = false;
@@ -340,25 +569,37 @@ export default function ListeConversations({
         });
       } catch (_) {}
 
-      const current = Number(searchParams?.get("conversationId") || 0);
-      if (current === Number(id)) {
+      const currentId = Number(searchParams?.get("conversationId") || 0);
+      if (currentId === Number(id)) {
         router.replace("/messagerie");
       }
     },
     [mutate, router, searchParams]
   );
 
-  const handleRename = useCallback(
+  const handleStartRename = useCallback((id, currentName) => {
+    setRenamingId(id);
+    setNewName(currentName || "");
+  }, []);
+
+  const handleCancelRename = useCallback(() => {
+    setRenamingId(null);
+    setNewName("");
+  }, []);
+
+  const handleConfirmRename = useCallback(
     async (id) => {
+      const nameToApply = newName.trim();
+      if (!nameToApply.length) return;
+
       const res = await fetch(`/api/conversations/${id}/rename`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nom: newName }),
+        body: JSON.stringify({ nom: nameToApply }),
       });
 
       if (res.ok) {
-        const nameToApply = newName; // capture
         setRenamingId(null);
         setNewName("");
 
@@ -387,14 +628,11 @@ export default function ListeConversations({
   );
 
   const handleSelect = useCallback(
-    async (id) => {
-      // ✅ important: évite double navigation
-      if (onSelectConversation) {
-        onSelectConversation(id);
-      } else {
-        router.replace(`/messagerie?conversationId=${id}`);
-      }
+    (id) => {
+      if (onSelectConversation) onSelectConversation(id);
+      else router.replace(`/messagerie?conversationId=${id}`);
 
+      // ✅ Optimistic: unread à 0 SANS rerender global violent (row memo + virtual)
       mutate(
         (current) => {
           if (!current) return current;
@@ -432,16 +670,14 @@ export default function ListeConversations({
   }
 
   return (
-    <aside className={className || "liste-conversations"}>
+    <aside ref={containerRef} className={className || "liste-conversations"}>
       {showModal && (
         <CreateConversationModal
           currentUserId={userId}
           onClose={() => setShowModal(false)}
           onCreated={async (newConvId) => {
             await mutate();
-            if (newConvId) {
-              router.replace(`/messagerie?conversationId=${newConvId}`);
-            }
+            if (newConvId) router.replace(`/messagerie?conversationId=${newConvId}`);
             setShowModal(false);
           }}
         />
@@ -471,155 +707,39 @@ export default function ListeConversations({
         </div>
       )}
 
-      {conversations.map((conv) => {
-        const autres = (conv.participants || [])
-          .filter((p) => Number(p.utilisateurId) !== Number(userId))
-          .map((p) => p.utilisateur)
-          .filter(Boolean);
-
-        const pseudo =
-          autres.length === 1
-            ? autres[0].pseudo
-            : autres.map((u) => u.pseudo).join(", ");
-
-        const unreadCount = conv.unreadCount || 0;
-
-        const avatarUsers = autres.slice(0, 4);
-        const extraCount = Math.max(0, autres.length - avatarUsers.length);
-
-        return (
-          <div
-            key={conv.id}
-            className={`conversation-item ${
-              Number(selectedId) === Number(conv.id) ? "active" : ""
-            }`}
-          >
-            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
-              <div className="conv-main">
-                <div className="conv-avatar">
-                  {avatarUsers.length === 0 && (
-                    <div className="conv-avatar-placeholder">
-                      {getInitials(conv.nom || pseudo || "")}
-                    </div>
-                  )}
-
-                  {avatarUsers.length === 1 &&
-                    (() => {
-                      const u = avatarUsers[0];
-                      const url = photoUrls[u.id];
-
-                      return url && url !== "/default.jpg" ? (
-                        <img
-                          src={url}
-                          alt={u.pseudo || "Photo de profil"}
-                          className="conv-avatar-img"
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/default.jpg";
-                          }}
-                        />
-                      ) : (
-                        <div className="conv-avatar-placeholder">
-                          {getInitials(u.pseudo)}
-                        </div>
-                      );
-                    })()}
-
-                  {avatarUsers.length > 1 && (
-                    <div className="conv-avatar-stack">
-                      {avatarUsers.map((u, index) => {
-                        const url = photoUrls[u.id];
-                        return url && url !== "/default.jpg" ? (
-                          <img
-                            key={u.id || index}
-                            src={url}
-                            alt={u.pseudo || "Photo de profil"}
-                            className={`conv-avatar-img stacked stacked-${index}`}
-                            loading="lazy"
-                            decoding="async"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = "/default.jpg";
-                            }}
-                          />
-                        ) : (
-                          <div
-                            key={u.id || index}
-                            className={`conv-avatar-placeholder stacked stacked-${index}`}
-                          >
-                            {getInitials(u.pseudo)}
-                          </div>
-                        );
-                      })}
-
-                      {extraCount > 0 && (
-                        <div className="conv-avatar-extra">+{extraCount}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="conv-info">
-                  <div className="conv-pseudo">
-                    {renamingId === conv.id ? (
-                      <div className="rename-inline" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleRename(conv.id);
-                          }}
-                          autoFocus
-                          style={{ width: 120, marginRight: 6 }}
-                          maxLength={40}
-                        />
-                        <button onClick={() => handleRename(conv.id)}>OK</button>
-                        <button
-                          onClick={() => {
-                            setRenamingId(null);
-                            setNewName("");
-                          }}
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    ) : (
-                      <>{conv.nom || pseudo}</>
-                    )}
-                  </div>
-
-                  {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="conv-actions">
-              {renamingId !== conv.id && (
-                <button
-                  className="rename-conv-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRenamingId(conv.id);
-                    setNewName(conv.nom || "");
-                  }}
-                  title="Renommer cette conversation"
-                >
-                  ✏️
-                </button>
-              )}
-              <button
-                className="delete-conv-button"
-                onClick={() => handleDelete(conv.id)}
-                title="Supprimer cette conversation"
-              >
-                🗑️
-              </button>
-            </div>
-          </div>
-        );
-      })}
+      {/* ✅ VIRTUALISATION : la clé perf */}
+      {conversations.length > 0 && (
+        <List
+          height={listHeight}
+          itemCount={conversations.length}
+          itemSize={78} // ajuste si ton row est plus grand/petit
+          width="100%"
+          overscanCount={6} // un peu d'avance pour scroll fluide
+        >
+          {({ index, style }) => {
+            const conv = conversations[index];
+            return (
+              <ConversationRow
+                key={conv.id}
+                conv={conv}
+                userId={userId}
+                selectedId={selectedId}
+                photoUrls={photoUrls}
+                lowEnd={lowEnd}
+                onSelect={handleSelect}
+                onDelete={handleDelete}
+                onStartRename={handleStartRename}
+                renamingId={renamingId}
+                newName={newName}
+                setNewName={setNewName}
+                onConfirmRename={handleConfirmRename}
+                onCancelRename={handleCancelRename}
+                style={style}
+              />
+            );
+          }}
+        </List>
+      )}
     </aside>
   );
 }
