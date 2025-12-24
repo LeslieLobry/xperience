@@ -5,6 +5,8 @@ import { prisma } from "../../../lib/prisma";
 import { sendPush } from "../../../lib/push";
 import Ably from "ably";
 
+export const runtime = "nodejs";
+
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
 export async function POST(req) {
@@ -23,7 +25,7 @@ export async function POST(req) {
     console.log("📥 VISITE reçue :", { visiteur: user.id, visite: visiteIdNum });
 
     // auto-visite
-    if (user.id === visiteIdNum) {
+    if (Number(user.id) === visiteIdNum) {
       return NextResponse.json({ message: "Auto-visite ignorée" }, { status: 200 });
     }
 
@@ -33,7 +35,7 @@ export async function POST(req) {
 
     const dejaVu = await prisma.visiteProfil.findFirst({
       where: {
-        visiteurId: user.id,
+        visiteurId: Number(user.id),
         visiteId: visiteIdNum,
         date: { gte: startOfDay },
       },
@@ -41,16 +43,13 @@ export async function POST(req) {
     });
 
     if (dejaVu) {
-      return NextResponse.json(
-        { message: "Déjà visité aujourd'hui" },
-        { status: 200 }
-      );
+      return NextResponse.json({ message: "Déjà visité aujourd'hui" }, { status: 200 });
     }
 
     // création
     const created = await prisma.visiteProfil.create({
       data: {
-        visiteurId: user.id,
+        visiteurId: Number(user.id),
         visiteId: visiteIdNum,
       },
       select: { id: true, visiteId: true, visiteurId: true, date: true },
@@ -58,11 +57,12 @@ export async function POST(req) {
 
     console.log("✅ Visite enregistrée :", created);
 
-    // notif interne
+    // ✅ notif interne (FIX: auteurId + message sans "Quelqu'un")
     await prisma.notification.create({
       data: {
-        utilisateurId: visiteIdNum,
-        message: "Quelqu'un a visité ton profil",
+        utilisateurId: visiteIdNum,       // destinataire
+        auteurId: Number(user.id),        // ✅ auteur (visiteur)
+        message: "a visité ton profil",   // ✅ plus "Quelqu'un ..."
         lien: `/profil/${user.id}`,
         lu: false,
       },
@@ -75,7 +75,7 @@ export async function POST(req) {
         select: { expoPushToken: true, pushEnabled: true },
       }),
       prisma.utilisateur.findUnique({
-        where: { id: user.id },
+        where: { id: Number(user.id) },
         select: { pseudo: true },
       }),
     ]);
@@ -88,16 +88,14 @@ export async function POST(req) {
         await sendPush(cible.expoPushToken, {
           title: "Nouvelle visite 👀",
           body: `@${pseudoVisiteur} a visité ton profil`,
-          data: { type: "VISITE", visiteurId: user.id },
+          data: { type: "VISITE", visiteurId: Number(user.id) },
         });
         console.log("🔔 Push VISITE envoyée");
       } catch (e) {
         console.warn("⚠️ Échec push VISITE:", e?.message || e);
       }
     } else {
-      console.log(
-        "ℹ️ Aucun token/opt-in pour le visité — pas de push envoyée"
-      );
+      console.log("ℹ️ Aucun token/opt-in pour le visité — pas de push envoyée");
     }
 
     // 📡 Ably : event temps réel pour la bannière in-app
@@ -105,7 +103,7 @@ export async function POST(req) {
       const channelName = `user-${visiteIdNum}`;
       await ably.channels.get(channelName).publish("new-visit", {
         pseudo: pseudoVisiteur,
-        visiteurId: user.id,
+        visiteurId: Number(user.id),
         lien: `/profil/${user.id}`,
       });
       console.log("📡 Ably new-visit envoyé sur", channelName);
