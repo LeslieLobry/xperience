@@ -85,8 +85,6 @@ export async function POST(req) {
 }
 
 // ----------- LISTE / UNREADS (GET) -----------
-// ----------- LISTE / UNREADS (GET) -----------
-
 export async function GET() {
   try {
     const currentUser = await getUserFromToken();
@@ -95,18 +93,14 @@ export async function GET() {
 
     const userId = currentUser.id;
 
-    // 1) conversations + participants + dernier message (1 query)
+    // On récupère toutes les conversations non supprimées pour ce user
     const convs = await prisma.conversation.findMany({
       where: {
         participants: { some: { utilisateurId: userId, supprimé: false } },
       },
       include: {
         participants: {
-          select: {
-            id: true,
-            utilisateurId: true,
-            supprimé: true,
-            lastReadAt: true,
+          include: {
             utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
           },
         },
@@ -115,52 +109,36 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
     });
 
-    // 2) filtrage blocages
+    // Pour bloquer l'affichage si un bloqué est présent
     const exclus = await getIdsUtilisateursExclus(userId);
     const visibleConvs = convs.filter((conv) =>
       conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    if (visibleConvs.length === 0) {
-      return NextResponse.json({ conversations: [] });
-    }
+    // ✅ unreadCount basé sur participant.lastReadAt (cohérent avec /messages/mark-as-read)
+    // (N requêtes message.count : safe et simple, on optimisera si besoin)
+    const unreadPairs = await Promise.all(
+      visibleConvs.map(async (conv) => {
+        const myParticipant = conv.participants.find((p) => p.utilisateurId === userId);
 
-    // 3) unreadCount en 1 seul passage:
-    // On récupère lastReadAt par conv, puis on fait un groupBy par conv
-    const lastReadByConv = new Map();
-    for (const conv of visibleConvs) {
-      const me = conv.participants.find((p) => p.utilisateurId === userId);
-      lastReadByConv.set(conv.id, me?.lastReadAt ?? new Date(0));
-    }
+        // Si jamais null => jamais lu => on compte tout
+        const lastReadAt = myParticipant?.lastReadAt ?? new Date(0);
 
-    const convIds = visibleConvs.map((c) => c.id);
+        const count = await prisma.message.count({
+          where: {
+            conversationId: conv.id,
+            auteurId: { not: userId },
+            createdAt: { gt: lastReadAt },
+          },
+        });
 
-    // ⚠️ Prisma ne permet pas "createdAt > lastReadAt" différent par convId en 1 WHERE.
-    // Donc on fait une stratégie FAST:
-    // - on prend le minLastRead (le plus ancien) pour limiter les messages scannés
-    // - puis on regroupe en mémoire (c’est très rapide et évite N requêtes)
-    let minLastRead = new Date();
-    for (const dt of lastReadByConv.values()) {
-      if (dt < minLastRead) minLastRead = dt;
-    }
+        return [conv.id, count];
+      })
+    );
 
-    const msgs = await prisma.message.findMany({
-      where: {
-        conversationId: { in: convIds },
-        auteurId: { not: userId },
-        createdAt: { gt: minLastRead },
-      },
-      select: { conversationId: true, createdAt: true },
-    });
+    const unreadCounts = Object.fromEntries(unreadPairs);
 
-    const unreadCounts = {};
-    for (const m of msgs) {
-      const lastRead = lastReadByConv.get(m.conversationId) ?? new Date(0);
-      if (m.createdAt > lastRead) {
-        unreadCounts[m.conversationId] = (unreadCounts[m.conversationId] || 0) + 1;
-      }
-    }
-
+    // Formatage retour (inchangé)
     const conversations = visibleConvs.map((conv) => ({
       ...conv,
       unreadCount: unreadCounts[conv.id] || 0,

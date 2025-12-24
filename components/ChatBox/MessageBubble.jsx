@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
@@ -83,24 +83,27 @@ export default function MessageBubble({
   // ✅ blocage scroll pendant armement
   const unblockTouchMoveRef = useRef(null);
 
-  const LONG_PRESS_DELAY = 450;
-  const MOVE_TOLERANCE = 18; // plus permissif sur mobile
+  // ✅ évite double déclenchement pointer+touch
+  const inputModeRef = useRef(null); // "pointer" | "touch"
+  const inputModeTsRef = useRef(0);
+
+  const LONG_PRESS_DELAY = 380; // ⬅️ un poil plus rapide
+  const MOVE_TOLERANCE = 28;    // ⬅️ plus permissif (micro-mouvements doigt)
 
   const isCoarsePointer = () =>
     typeof window !== "undefined" &&
     window.matchMedia &&
     window.matchMedia("(pointer: coarse)").matches;
 
-  const cancelLongPress = () => {
+  const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
     pointerIdRef.current = null;
-  };
+  }, []);
 
-  const blockScrollWhilePressing = () => {
-    // évite doublons
+  const blockScrollWhilePressing = useCallback(() => {
     if (unblockTouchMoveRef.current) return;
 
     const handler = (ev) => {
@@ -116,13 +119,13 @@ export default function MessageBubble({
       document.removeEventListener("touchmove", handler);
       unblockTouchMoveRef.current = null;
     };
-  };
+  }, []);
 
-  const unblockScroll = () => {
+  const unblockScroll = useCallback(() => {
     if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
-  };
+  }, []);
 
-  const openPickerFromEl = (el) => {
+  const openPickerFromEl = useCallback((el) => {
     const rect = el?.getBoundingClientRect?.();
     if (!rect) {
       setPickerPos(null);
@@ -140,60 +143,88 @@ export default function MessageBubble({
     const yAbove = rect.top - 62;
     let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
 
-    // clamp basique (reclamp ensuite après mesure du picker)
     x = clamp(x, 8, vw - 8);
     y = clamp(y, 8, vh - 8);
 
     setPickerPos({ x, y });
     setIsPickerOpen(true);
+  }, []);
+
+  const rememberInputMode = (mode) => {
+    inputModeRef.current = mode;
+    inputModeTsRef.current = Date.now();
   };
 
+  const shouldIgnoreBecauseOtherMode = (mode) => {
+    // si on vient de déclencher touch, on ignore pointer pendant 800ms (et inversement)
+    const last = inputModeRef.current;
+    const dt = Date.now() - (inputModeTsRef.current || 0);
+    return last && last !== mode && dt < 800;
+  };
+
+  const armLongPress = useCallback((el, x, y) => {
+    didLongPressRef.current = false;
+
+    cancelLongPress();
+    blockScrollWhilePressing();
+
+    pressStartRef.current = { x, y };
+
+    longPressTimerRef.current = setTimeout(() => {
+      didLongPressRef.current = true;
+      openPickerFromEl(el);
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_DELAY);
+  }, [cancelLongPress, blockScrollWhilePressing, openPickerFromEl]);
+
+  const checkMoveCancel = useCallback((x, y) => {
+    if (!longPressTimerRef.current) return;
+
+    const dx = x - pressStartRef.current.x;
+    const dy = y - pressStartRef.current.y;
+    const dist2 = dx * dx + dy * dy;
+
+    // ✅ annule seulement si on bouge "vraiment"
+    if (dist2 > MOVE_TOLERANCE * MOVE_TOLERANCE) {
+      cancelLongPress();
+      unblockScroll();
+    }
+  }, [cancelLongPress, unblockScroll]);
+
+  const disarmLongPress = useCallback(() => {
+    cancelLongPress();
+    unblockScroll();
+  }, [cancelLongPress, unblockScroll]);
+
+  /* ---------------- POINTER (quand dispo) ---------------- */
   const handlePointerDown = (e) => {
     // long-press uniquement sur touch
     if (e.pointerType && e.pointerType !== "touch") return;
 
-    didLongPressRef.current = false;
+    if (shouldIgnoreBecauseOtherMode("pointer")) return;
+    rememberInputMode("pointer");
 
     // évite le menu contextuel (iOS/Android)
     if (isCoarsePointer()) e.preventDefault?.();
 
-    cancelLongPress();
-
-    // ✅ bloque le scroll pendant l'armement du long-press
-    blockScrollWhilePressing();
-
-    pressStartRef.current = { x: e.clientX, y: e.clientY };
     pointerIdRef.current = e.pointerId;
 
     // capture = on garde move/up même si ça glisse un peu
-    e.currentTarget?.setPointerCapture?.(e.pointerId);
+    try {
+      e.currentTarget?.setPointerCapture?.(e.pointerId);
+    } catch {}
 
-    longPressTimerRef.current = setTimeout(() => {
-      didLongPressRef.current = true;
-      openPickerFromEl(e.currentTarget);
-      longPressTimerRef.current = null;
-      // (on laisse le blocage scroll jusqu’au pointerup : plus robuste)
-    }, LONG_PRESS_DELAY);
+    armLongPress(e.currentTarget, e.clientX, e.clientY);
   };
 
   const handlePointerMove = (e) => {
     if (e.pointerType && e.pointerType !== "touch") return;
-    if (!longPressTimerRef.current) return;
-
-    const dx = Math.abs(e.clientX - pressStartRef.current.x);
-    const dy = Math.abs(e.clientY - pressStartRef.current.y);
-
-    // ✅ annule seulement si le geste devient un scroll/glisser réel
-    if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
-      cancelLongPress();
-      unblockScroll();
-    }
+    checkMoveCancel(e.clientX, e.clientY);
   };
 
   const handlePointerUp = (e) => {
     if (e.pointerType && e.pointerType !== "touch") return;
-    cancelLongPress();
-    unblockScroll();
+    disarmLongPress();
     try {
       e.currentTarget?.releasePointerCapture?.(e.pointerId);
     } catch {}
@@ -201,11 +232,35 @@ export default function MessageBubble({
 
   const handlePointerCancel = (e) => {
     if (e.pointerType && e.pointerType !== "touch") return;
-    cancelLongPress();
-    unblockScroll();
+    disarmLongPress();
     try {
       e.currentTarget?.releasePointerCapture?.(e.pointerId);
     } catch {}
+  };
+
+  /* ---------------- TOUCH FALLBACK (Safari/Android capricieux) ---------------- */
+  const handleTouchStart = (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+
+    if (shouldIgnoreBecauseOtherMode("touch")) return;
+    rememberInputMode("touch");
+
+    const t = e.touches[0];
+    armLongPress(e.currentTarget, t.clientX, t.clientY);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    checkMoveCancel(t.clientX, t.clientY);
+  };
+
+  const handleTouchEnd = () => {
+    disarmLongPress();
+  };
+
+  const handleTouchCancel = () => {
+    disarmLongPress();
   };
 
   const handleContextMenu = (e) => {
@@ -251,7 +306,7 @@ export default function MessageBubble({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isPickerOpen]); // on garde le comportement simple
+  }, [isPickerOpen]); // simple
 
   // fermeture click dehors + ESC
   useEffect(() => {
@@ -285,7 +340,7 @@ export default function MessageBubble({
       cancelLongPress();
       unblockScroll();
     };
-  }, [isPickerOpen]);
+  }, [isPickerOpen, cancelLongPress, unblockScroll]);
 
   /* --------------------------- Infos message --------------------------- */
   const isOwn = msg.auteurId === utilisateur.id;
@@ -371,7 +426,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Mobile: appui long ultra fiable */}
+      {/* ✅ Mobile: appui long ultra fiable (pointer + touch fallback) */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -379,6 +434,10 @@ export default function MessageBubble({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         onContextMenu={handleContextMenu}
         onClickCapture={(e) => {
           // ✅ évite que le tap final ferme le picker via "click outside"
