@@ -105,7 +105,8 @@ model Utilisateur {
   likesEnvoyes         Like[]          @relation("LikesEnvoyes")
   likesRecus           Like[]          @relation("LikesRecus")
   messages             Message[]       @relation("MessageAuteur")
-  notifications        Notification[]
+  notifications Notification[] @relation("NotificationDestinataire")
+  notificationsEnvoyees Notification[] @relation("NotificationAuteur")
   participants         Participant[]
   photos               Photo[]
   recherches           Recherche[]
@@ -334,13 +335,24 @@ model Like {
 model Notification {
   id            Int         @id @default(autoincrement())
   utilisateurId Int
+  auteurId      Int?        // ✅ celui qui déclenche (like/visite)
   message       String
   lien          String?
   lu            Boolean     @default(false)
   createdAt     DateTime    @default(now())
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+
+  // ✅ destinataire (inchangé, mais on nomme la relation)
+  utilisateur   Utilisateur @relation("NotificationDestinataire", fields: [utilisateurId], references: [id])
+
+  // ✅ auteur (nouveau)
+  auteur        Utilisateur? @relation("NotificationAuteur", fields: [auteurId], references: [id])
+
+  @@index([utilisateurId, lu, createdAt])
+  @@index([auteurId])
+
   @@map("Notification")
 }
+
 
 model AbonneNewsletter {
   id        Int      @id @default(autoincrement())

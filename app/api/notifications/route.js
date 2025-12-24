@@ -2,23 +2,34 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { getUserFromToken } from "../../../lib/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-export async function GET(req) {
+export async function GET() {
   try {
     const user = await getUserFromToken();
-    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-const notifications = await prisma.notification.findMany({
-  where: { utilisateurId: user.id, lu: false },
-  orderBy: { createdAt: "desc" },
-  take: 20,
-  select: {
-    id: true,
-    message: true,
-    lien: true,
-    createdAt: true,
-  },
-});
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: { utilisateurId: user.id, lu: false },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        message: true,
+        lien: true,
+        createdAt: true,
+        // ✅ NOUVEAU : infos de la personne qui like/visite
+        auteur: {
+          select: {
+            id: true,
+            prenom: true,
+            pseudo: true,
+            photoUrl: true,
+          },
+        },
+      },
+    });
+
     return NextResponse.json(notifications);
   } catch (error) {
     console.error("Erreur GET notifications:", error);
@@ -26,10 +37,12 @@ const notifications = await prisma.notification.findMany({
   }
 }
 
-export async function PATCH(req) {
+export async function PATCH() {
   try {
     const user = await getUserFromToken();
-    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
     await prisma.notification.updateMany({
       where: { utilisateurId: user.id, lu: false },

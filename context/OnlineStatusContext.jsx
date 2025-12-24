@@ -44,7 +44,15 @@ export function OnlineStatusProvider({ user, children }) {
       console.log("[Presence] Ably failed", stateChange?.reason || stateChange);
     };
 
-    ably.connection.on("connected", onConnected);
+    ably.connection.on("connected", () => {
+  enterPresence();
+
+  // 🔥 FIX CRUCIAL : sync retardée pour récupérer les membres déjà présents
+  setTimeout(() => {
+    syncFromGet();
+  }, 500);
+});
+
     ably.connection.on("disconnected", onDisconnected);
     ably.connection.on("suspended", onSuspended);
     ably.connection.on("failed", onFailed);
@@ -143,11 +151,17 @@ export function OnlineStatusProvider({ user, children }) {
         console.log("[Presence] update throw:", e);
       }
     }, 30000);
+    const periodicSync = setInterval(() => {
+  syncFromGet();
+}, 10000);
+
 
     // ✅ Clean : leave + close
     const cleanup = () => {
       console.log("[Presence] cleanup…");
       clearInterval(heartbeat);
+      clearInterval(periodicSync);
+
 
       try {
         channel.presence.leave((err) => {
