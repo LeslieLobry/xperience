@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Rest as AblyRest } from "ably";
-import { getUserFromToken } from "../../../lib/auth"; // adapte si ton helper est ailleurs
+import { getUserFromToken } from "../../../../lib/auth"; // adapte si ton helper est ailleurs
 
 export const runtime = "nodejs";
 
