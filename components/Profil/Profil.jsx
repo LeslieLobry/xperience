@@ -13,6 +13,7 @@ import Image from "next/image";
 import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
+import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ AJOUT
 
 const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
   ssr: false,
@@ -136,6 +137,10 @@ export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
+  // ✅ Online Presence (fiable)
+  const { isOnline } = useOnlineStatus();
+  const online = !isOwnProfile && isOnline?.(user?.id);
+
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
   const [presignedPhotoUrl, setPresignedPhotoUrl] = useState("/default.jpg");
   const [statut, setStatut] = useState(user.statut);
@@ -144,8 +149,7 @@ export default function Profil({ user, connectedUser }) {
 
   // États modals d’édition
   const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
-  const [openProfilDetailsModal, setOpenProfilDetailsModal] =
-    useState(false);
+  const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
 
   // Uploader photo de profil
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
@@ -154,10 +158,7 @@ export default function Profil({ user, connectedUser }) {
   // Anti double-clic & UX bouton message
   const [startingConv, setStartingConv] = useState(false);
 
-  const completion = useMemo(
-    () => calculateProfileCompletion(user),
-    [user]
-  );
+  const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
   // Parse JSON “safe” (gère HTML/texte en cas de redirection côté API)
   async function parseJsonSafe(res) {
@@ -248,8 +249,7 @@ export default function Profil({ user, connectedUser }) {
 
   function handleEditField(champ) {
     if (champ === "Description") setOpenDescriptionModal(true);
-    else if (profilDetailsFields.includes(champ))
-      setOpenProfilDetailsModal(true);
+    else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
     else if (champ === "Photo de profil") {
       setUploaderKey(Date.now()); // Force un composant neuf à chaque ouverture
       setOpenPhotoUploader(true);
@@ -275,9 +275,7 @@ export default function Profil({ user, connectedUser }) {
 
       // Non-auth / redirections
       if (res.status === 401 || res.status === 403) {
-        router.push(
-          `/connexion?next=${encodeURIComponent(`/messagerie`)}`
-        );
+        router.push(`/connexion?next=${encodeURIComponent(`/messagerie`)}`);
         return;
       }
       if (res.redirected) {
@@ -298,22 +296,15 @@ export default function Profil({ user, connectedUser }) {
         const msg =
           data?.error ||
           data?.message ||
-          (typeof data?.__raw === "string"
-            ? data.__raw.slice(0, 200)
-            : "") ||
+          (typeof data?.__raw === "string" ? data.__raw.slice(0, 200) : "") ||
           `HTTP ${res.status}`;
-        throw new Error(
-          `Création/lookup conversation échouée: ${msg}`
-        );
+        throw new Error(`Création/lookup conversation échouée: ${msg}`);
       }
 
       router.push(`/messagerie?conversationId=${convId}`);
     } catch (err) {
       console.error("handleStartConversation error:", err);
-      alert(
-        "Impossible de démarrer la conversation. " +
-          (err?.message || "")
-      );
+      alert("Impossible de démarrer la conversation. " + (err?.message || ""));
     } finally {
       setStartingConv(false);
     }
@@ -344,10 +335,7 @@ export default function Profil({ user, connectedUser }) {
         <div className="profil-header-row">
           <div className="profil-avatar-horizontal">
             {/* Clique = ouvre la lightbox plein écran */}
-            <div
-              style={{ cursor: "zoom-in" }}
-              onClick={() => setModalOpen(true)}
-            >
+            <div style={{ cursor: "zoom-in" }} onClick={() => setModalOpen(true)}>
               <PhotoUploader
                 priority
                 currentUrl={photoUrl}
@@ -360,10 +348,7 @@ export default function Profil({ user, connectedUser }) {
             </div>
 
             {/* Affichage modal photo grand => aucun offset, recouvre tout */}
-            <SimpleModal
-              open={modalOpen}
-              onClose={() => setModalOpen(false)}
-            >
+            <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
               <img
                 src={presignedPhotoUrl || "/default.jpg"}
                 alt="Photo de profil"
@@ -380,8 +365,7 @@ export default function Profil({ user, connectedUser }) {
 
           <div className="profil-name-like">
             <h1 className="profil-name">
-              {user.pseudo.charAt(0).toUpperCase() +
-                user.pseudo.slice(1).toLowerCase()}
+              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
               {user.verificationIdentiteStatut && (
                 <img
                   src="/Profilverif.png"
@@ -419,11 +403,21 @@ export default function Profil({ user, connectedUser }) {
           </div>
 
           <div>
-            <StatutToggle
-              statut={statut}
-              statutAuto={statutAuto}
-              editable={isOwnProfile}
-            />
+            {/* ✅ ICI : statut fiable */}
+            {isOwnProfile ? (
+              <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
+            ) : (
+              <div className="profil-statut-presence">
+                <span
+                  className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
+                  title={online ? "En ligne" : "Hors ligne"}
+                />
+                <span className="profil-statut-text">
+                  {online ? "En ligne" : "Hors ligne"}
+                </span>
+              </div>
+            )}
+
             <div className="profil-badge">
               {user.type} {user.orientation}
             </div>
@@ -432,11 +426,7 @@ export default function Profil({ user, connectedUser }) {
       </div>
 
       {isOwnProfile && (
-        <ProfilCompletionBox
-          user={user}
-          completion={completion}
-          onEditField={handleEditField}
-        />
+        <ProfilCompletionBox user={user} completion={completion} onEditField={handleEditField} />
       )}
 
       <div className="grid">
@@ -455,9 +445,7 @@ export default function Profil({ user, connectedUser }) {
           visiteurId={connectedUser.id}
         />
 
-        {isOwnProfile && (
-          <DemandesAccesGalerie isOwnProfile={isOwnProfile} />
-        )}
+        {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
 
         <PreferencesSummary editable={isOwnProfile} user={user} />
 
@@ -468,17 +456,11 @@ export default function Profil({ user, connectedUser }) {
           setIsModalOpen={setOpenProfilDetailsModal}
         />
 
-        <AvisList
-          cibleId={user.id}
-          connectedUserId={connectedUser.id}
-        />
+        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
 
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
 
-        <AProposCard
-          createdAt={user.createdAt}
-          lastLogin={user.lastLogin}
-        />
+        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
     </div>
   );

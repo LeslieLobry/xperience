@@ -1,7 +1,9 @@
 "use client";
-import { useState, useMemo, useEffect } from 'react';
-import Link from 'next/link';
-import './ProfilsDisplay.css';
+
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import "./ProfilsDisplay.css";
+import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ ajuste le chemin si besoin
 
 function melangerProfils(array) {
   return array
@@ -10,20 +12,22 @@ function melangerProfils(array) {
     .map(({ val }) => val);
 }
 
-// ✅ calcule un statut cohérent avec lastSeenAt/statutAuto
+// (fallback) ton ancien calcul basé lastSeenAt/statutAuto — on le garde, mais on ne s’en sert plus pour "En ligne"
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
   if (u?.statutAuto && u?.lastSeenAt) {
     const seen = new Date(u.lastSeenAt).getTime();
     if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) {
-      return 'en_ligne';
+      return "en_ligne";
     }
-    return 'hors_ligne';
+    return "hors_ligne";
   }
-  return u?.statut || 'hors_ligne';
+  return u?.statut || "hors_ligne";
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
+  const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel
+
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
   const [loading, setLoading] = useState(false);
@@ -40,29 +44,26 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // Quand la liste à afficher change, on (re)charge les presigned urls
+  // ✅ Profils filtrés : "En ligne" = Presence (isOnline), pas lastSeenAt
   const profilsFiltres = useMemo(() => {
-    // on injecte un statut calculé (sans muter l’objet d’origine)
-    const withComputed = (profilsAffiches || []).map((p) => ({
-      ...p,
-      _statutComputed: computeStatut(p),
-    }));
+    const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    const base = filtrerEnLigne
-      ? withComputed.filter((p) => p._statutComputed === 'en_ligne')
-      : withComputed;
+    const filtered = filtrerEnLigne
+      ? base.filter((p) => isOnline?.(p?.id))
+      : base;
 
-    return melangerProfils(base);
-  }, [filtrerEnLigne, profilsAffiches]);
+    return melangerProfils(filtered);
+  }, [filtrerEnLigne, profilsAffiches, isOnline]);
 
+  // Quand la liste à afficher change, on (re)charge les presigned urls
   useEffect(() => {
     let canceled = false;
-    // On va chercher toutes les presigned urls en parallèle !
+
     const loadAllUrls = async () => {
       const newUrls = {};
       await Promise.all(
         profilsFiltres.map(async (user) => {
-          if (!user.photoUrl) {
+          if (!user?.photoUrl) {
             newUrls[user.id] = "/default.jpg";
             return;
           }
@@ -79,7 +80,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              credentials: "include", // ← utile si ton endpoint demande auth
+              credentials: "include",
               body: JSON.stringify({ key: user.photoUrl }),
             });
             const data = await res.json();
@@ -89,11 +90,17 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           }
         })
       );
-      if (!canceled) setPhotoUrls(newUrls);
+
+      if (!canceled) {
+        setPhotoUrls((prev) => ({ ...prev, ...newUrls }));
+      }
     };
+
     loadAllUrls();
-    return () => { canceled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      canceled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(profilsFiltres)]);
 
   const handleToggleProches = async (active, customDistance) => {
@@ -101,7 +108,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     if (active) {
       setLoading(true);
       if (!navigator.geolocation) {
-        console.error('Géolocalisation non supportée');
+        console.error("Géolocalisation non supportée");
         setLoading(false);
         return;
       }
@@ -109,9 +116,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         async (position) => {
           const { latitude, longitude } = position.coords;
           try {
-            const res = await fetch('/api/profils-proches', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const res = await fetch("/api/profils-proches", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 latitude,
                 longitude,
@@ -121,13 +128,13 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             const data = await res.json();
             setProfilsAffiches(data);
           } catch (err) {
-            console.error('Erreur chargement profils proches :', err);
+            console.error("Erreur chargement profils proches :", err);
           } finally {
             setLoading(false);
           }
         },
         (error) => {
-          console.error('Erreur géolocalisation :', error);
+          console.error("Erreur géolocalisation :", error);
           setLoading(false);
         }
       );
@@ -147,22 +154,24 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   return (
     <div className="profil-list1">
       <h1 className="profil-list1-title">Profils</h1>
+
       <div className="profil-toggle-wrapper">
         <div className="toggle-box">
-          <label className={`toggle-label ${filtrerEnLigne ? 'active' : '' }`}>
+          <label className={`toggle-label ${filtrerEnLigne ? "active" : ""}`}>
             <input
               type="checkbox"
               checked={filtrerEnLigne}
-              onChange={()=> setFiltrerEnLigne((prev) => !prev)}
+              onChange={() => setFiltrerEnLigne((prev) => !prev)}
             />
             <span className="slider"></span>
             En ligne
           </label>
+
           <label className="toggle-label" style={{ alignItems: "center", gap: 8 }}>
             <input
               type="checkbox"
               checked={filtrerProches}
-              onChange={(e)=> handleToggleProches(e.target.checked)}
+              onChange={(e) => handleToggleProches(e.target.checked)}
             />
             <span className="slider"></span>
             Près de moi
@@ -180,7 +189,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                 width: 120,
                 verticalAlign: "middle",
                 opacity: filtrerProches ? 1 : 0.5,
-                pointerEvents: filtrerProches ? "auto" : "none"
+                pointerEvents: filtrerProches ? "auto" : "none",
               }}
             />
             <span style={{ minWidth: 32, display: "inline-block" }}>{distance} km</span>
@@ -196,24 +205,29 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
-              const statutEff = user._statutComputed ?? computeStatut(user);
+              // ✅ statut final : Presence d’abord, fallback lastSeen/statut ensuite
+              const online = isOnline?.(user?.id);
+              const statutEff = online ? "en_ligne" : computeStatut(user);
+
               return (
                 <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${statutEff==='en_ligne' ? 'en-ligne' : 'hors-ligne' }`}
-                      title={statutEff==='en_ligne' ? 'En ligne' : 'Hors ligne' }
+                      className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
+                      title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
+
                     <div className="profil-photo-wrapper">
                       <img
-                        src={photoUrls[user.id] || "/default.jpg" }
+                        src={photoUrls[user.id] || "/default.jpg"}
                         alt={user.pseudo}
                         className="profil-photo"
-                        onError={(e)=> {
+                        onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = '/default.jpg';
+                          e.target.src = "/default.jpg";
                         }}
                       />
+
                       {user.verificationIdentiteStatut && (
                         <img
                           src="/Profilverif.png"
@@ -227,14 +241,15 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     <h2 className="profil-card-title">
                       {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
                     </h2>
+
                     <p className="profil-card-details">
                       {user.age} ans - {user.localisation}
                     </p>
-                    <p className="profil-card-details-type">
-                      {user.type}
-                    </p>
+
+                    <p className="profil-card-details-type">{user.type}</p>
+
                     {user.distance && (
-                      <p className="profil-card-details" style={{ color: '#999' }}>
+                      <p className="profil-card-details" style={{ color: "#999" }}>
                         {user.distance.toFixed(1)} km de vous
                       </p>
                     )}

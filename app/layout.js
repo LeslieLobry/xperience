@@ -12,6 +12,7 @@ import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
 import ToastProvider from "../components/ToastProvider"; 
+import OnlinePresenceRoot from "../components/OnlinePresenceRoot/OnlinePresenceRoot"; // ✅ AJOUT
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -42,6 +43,7 @@ export default function RootLayout({ children }) {
       <body className="font-raleway">
         <AuthProvider>
           <ClientWrapper>
+           <OnlinePresenceRoot>
             <ConditionalNavbar />
             <HeartbeatClient intervalMs={60_000} />
 
@@ -54,6 +56,7 @@ export default function RootLayout({ children }) {
 
             {/* 🔔 Notifications toast (dans un composant client dédié) */}
             <ToastProvider />
+            </OnlinePresenceRoot>
           </ClientWrapper>
         </AuthProvider>
 

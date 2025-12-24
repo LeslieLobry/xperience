@@ -63,7 +63,7 @@ export default function MessageBubble({
 
   const activePack = emojiPacks[emojiPack] || emojiPacks.app;
 
-  /* ---------------- Picker : mobile = appui long / desktop = bouton ---------------- */
+  /* ---------------- Picker ---------------- */
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState(null); // { x, y }
   const pickerRef = useRef(null);
@@ -72,13 +72,55 @@ export default function MessageBubble({
   // ✅ bouton desktop 😊
   const triggerRef = useRef(null);
 
-  /* ---------- Long press (FIABLE) ---------- */
+  /* ---------- Long press (ULTRA FIABLE) ---------- */
   const longPressTimerRef = useRef(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
   const pointerIdRef = useRef(null);
 
+  // ✅ pour empêcher le "tap" final de fermer le picker
+  const didLongPressRef = useRef(false);
+
+  // ✅ blocage scroll pendant armement
+  const unblockTouchMoveRef = useRef(null);
+
   const LONG_PRESS_DELAY = 450;
-  const MOVE_TOLERANCE = 12; // ✅ tolérance micro-mouvements (sinon 1/10)
+  const MOVE_TOLERANCE = 18; // plus permissif sur mobile
+
+  const isCoarsePointer = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(pointer: coarse)").matches;
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pointerIdRef.current = null;
+  };
+
+  const blockScrollWhilePressing = () => {
+    // évite doublons
+    if (unblockTouchMoveRef.current) return;
+
+    const handler = (ev) => {
+      // on bloque le scroll uniquement tant que le long-press est "armé"
+      if (longPressTimerRef.current) {
+        ev.preventDefault();
+      }
+    };
+
+    document.addEventListener("touchmove", handler, { passive: false });
+
+    unblockTouchMoveRef.current = () => {
+      document.removeEventListener("touchmove", handler);
+      unblockTouchMoveRef.current = null;
+    };
+  };
+
+  const unblockScroll = () => {
+    if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
+  };
 
   const openPickerFromEl = (el) => {
     const rect = el?.getBoundingClientRect?.();
@@ -91,14 +133,14 @@ export default function MessageBubble({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // centre horizontal de la bulle/bouton
+    // centre horizontal
     let x = rect.left + rect.width / 2;
 
-    // au-dessus, sinon en-dessous
+    // au-dessus sinon en-dessous
     const yAbove = rect.top - 62;
     let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
 
-    // clamp basique (on reclamp après mesure du picker)
+    // clamp basique (reclamp ensuite après mesure du picker)
     x = clamp(x, 8, vw - 8);
     y = clamp(y, 8, vh - 8);
 
@@ -106,37 +148,31 @@ export default function MessageBubble({
     setIsPickerOpen(true);
   };
 
-  const cancelLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    pointerIdRef.current = null;
-  };
-
-  const isCoarsePointer = () =>
-    typeof window !== "undefined" &&
-    window.matchMedia &&
-    window.matchMedia("(pointer: coarse)").matches;
-
   const handlePointerDown = (e) => {
-    // ✅ On veut le long-press uniquement au touch (pas souris)
+    // long-press uniquement sur touch
     if (e.pointerType && e.pointerType !== "touch") return;
 
-    // évite le menu contextuel iOS/Android qui flingue le long press
+    didLongPressRef.current = false;
+
+    // évite le menu contextuel (iOS/Android)
     if (isCoarsePointer()) e.preventDefault?.();
 
     cancelLongPress();
 
+    // ✅ bloque le scroll pendant l'armement du long-press
+    blockScrollWhilePressing();
+
     pressStartRef.current = { x: e.clientX, y: e.clientY };
     pointerIdRef.current = e.pointerId;
 
-    // ✅ capture: on continue de recevoir move/up même si le doigt glisse légèrement
+    // capture = on garde move/up même si ça glisse un peu
     e.currentTarget?.setPointerCapture?.(e.pointerId);
 
     longPressTimerRef.current = setTimeout(() => {
+      didLongPressRef.current = true;
       openPickerFromEl(e.currentTarget);
       longPressTimerRef.current = null;
+      // (on laisse le blocage scroll jusqu’au pointerup : plus robuste)
     }, LONG_PRESS_DELAY);
   };
 
@@ -147,13 +183,17 @@ export default function MessageBubble({
     const dx = Math.abs(e.clientX - pressStartRef.current.x);
     const dy = Math.abs(e.clientY - pressStartRef.current.y);
 
-    // ✅ on n’annule QUE si ça bouge vraiment (scroll / glisser)
-    if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cancelLongPress();
+    // ✅ annule seulement si le geste devient un scroll/glisser réel
+    if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+      cancelLongPress();
+      unblockScroll();
+    }
   };
 
   const handlePointerUp = (e) => {
     if (e.pointerType && e.pointerType !== "touch") return;
     cancelLongPress();
+    unblockScroll();
     try {
       e.currentTarget?.releasePointerCapture?.(e.pointerId);
     } catch {}
@@ -162,17 +202,18 @@ export default function MessageBubble({
   const handlePointerCancel = (e) => {
     if (e.pointerType && e.pointerType !== "touch") return;
     cancelLongPress();
+    unblockScroll();
     try {
       e.currentTarget?.releasePointerCapture?.(e.pointerId);
     } catch {}
   };
 
   const handleContextMenu = (e) => {
-    // ✅ empêche le menu “copier/partager” qui casse le long press sur mobile
+    // empêche menu copier/partager sur long press mobile
     if (isCoarsePointer()) e.preventDefault();
   };
 
-  // ✅ Reset scroll + reclamp APRÈS rendu (plus fiable sur mobile)
+  /* ✅ Reposition + reset scroll du picker (évite “emoji coupés”) */
   useLayoutEffect(() => {
     if (!isPickerOpen) return;
 
@@ -184,7 +225,6 @@ export default function MessageBubble({
         const el = pickerRef.current;
 
         if (el) {
-          // ✅ toujours afficher le début (❤️ 😂 😍 ...)
           el.scrollLeft = 0;
           el.scrollTo?.({ left: 0, behavior: "auto" });
         }
@@ -211,7 +251,7 @@ export default function MessageBubble({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isPickerOpen]); // (on garde ton comportement)
+  }, [isPickerOpen]); // on garde le comportement simple
 
   // fermeture click dehors + ESC
   useEffect(() => {
@@ -243,6 +283,7 @@ export default function MessageBubble({
       document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleEsc);
       cancelLongPress();
+      unblockScroll();
     };
   }, [isPickerOpen]);
 
@@ -330,7 +371,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Mobile: appui long fiable via Pointer Events */}
+      {/* ✅ Mobile: appui long ultra fiable */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -339,6 +380,14 @@ export default function MessageBubble({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onContextMenu={handleContextMenu}
+        onClickCapture={(e) => {
+          // ✅ évite que le tap final ferme le picker via "click outside"
+          if (didLongPressRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            didLongPressRef.current = false;
+          }
+        }}
       >
         {msg.type === "IMAGE" && msg.imageUrl ? (
           <img
@@ -392,7 +441,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Desktop: bouton 😊 (affiché uniquement via CSS) */}
+      {/* ✅ Desktop: bouton 😊 */}
       <button
         ref={triggerRef}
         className="message-react-btn"
