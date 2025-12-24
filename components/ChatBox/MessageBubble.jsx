@@ -72,8 +72,13 @@ export default function MessageBubble({
   // ✅ bouton desktop 😊
   const triggerRef = useRef(null);
 
+  /* ---------- Long press (FIABLE) ---------- */
   const longPressTimerRef = useRef(null);
+  const pressStartRef = useRef({ x: 0, y: 0 });
+  const pointerIdRef = useRef(null);
+
   const LONG_PRESS_DELAY = 450;
+  const MOVE_TOLERANCE = 12; // ✅ tolérance micro-mouvements (sinon 1/10)
 
   const openPickerFromEl = (el) => {
     const rect = el?.getBoundingClientRect?.();
@@ -101,18 +106,70 @@ export default function MessageBubble({
     setIsPickerOpen(true);
   };
 
-  const startLongPress = () => {
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => {
-      openPickerFromEl(pressableRef.current);
-    }, LONG_PRESS_DELAY);
-  };
-
   const cancelLongPress = () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    pointerIdRef.current = null;
+  };
+
+  const isCoarsePointer = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(pointer: coarse)").matches;
+
+  const handlePointerDown = (e) => {
+    // ✅ On veut le long-press uniquement au touch (pas souris)
+    if (e.pointerType && e.pointerType !== "touch") return;
+
+    // évite le menu contextuel iOS/Android qui flingue le long press
+    if (isCoarsePointer()) e.preventDefault?.();
+
+    cancelLongPress();
+
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    pointerIdRef.current = e.pointerId;
+
+    // ✅ capture: on continue de recevoir move/up même si le doigt glisse légèrement
+    e.currentTarget?.setPointerCapture?.(e.pointerId);
+
+    longPressTimerRef.current = setTimeout(() => {
+      openPickerFromEl(e.currentTarget);
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_DELAY);
+  };
+
+  const handlePointerMove = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
+    if (!longPressTimerRef.current) return;
+
+    const dx = Math.abs(e.clientX - pressStartRef.current.x);
+    const dy = Math.abs(e.clientY - pressStartRef.current.y);
+
+    // ✅ on n’annule QUE si ça bouge vraiment (scroll / glisser)
+    if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cancelLongPress();
+  };
+
+  const handlePointerUp = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
+    cancelLongPress();
+    try {
+      e.currentTarget?.releasePointerCapture?.(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerCancel = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
+    cancelLongPress();
+    try {
+      e.currentTarget?.releasePointerCapture?.(e.pointerId);
+    } catch {}
+  };
+
+  const handleContextMenu = (e) => {
+    // ✅ empêche le menu “copier/partager” qui casse le long press sur mobile
+    if (isCoarsePointer()) e.preventDefault();
   };
 
   // ✅ Reset scroll + reclamp APRÈS rendu (plus fiable sur mobile)
@@ -138,7 +195,11 @@ export default function MessageBubble({
           const vw = window.innerWidth;
           const vh = window.innerHeight;
 
-          let x = clamp(pickerPos.x, margin + pr.width / 2, vw - margin - pr.width / 2);
+          let x = clamp(
+            pickerPos.x,
+            margin + pr.width / 2,
+            vw - margin - pr.width / 2
+          );
           let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
 
           if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
@@ -150,7 +211,7 @@ export default function MessageBubble({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isPickerOpen]);
+  }, [isPickerOpen]); // (on garde ton comportement)
 
   // fermeture click dehors + ESC
   useEffect(() => {
@@ -181,7 +242,7 @@ export default function MessageBubble({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleEsc);
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      cancelLongPress();
     };
   }, [isPickerOpen]);
 
@@ -196,7 +257,10 @@ export default function MessageBubble({
     previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
 
   const heure = msg.createdAt
-    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? new Date(msg.createdAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
 
   let statutTexte = "";
@@ -252,7 +316,12 @@ export default function MessageBubble({
             {auteurIsCouple && prenomsCouple && (
               <span
                 className="author-couple-names"
-                style={{ marginLeft: 4, color: "#b5a06c", fontSize: "0.95em", fontStyle: "italic" }}
+                style={{
+                  marginLeft: 4,
+                  color: "#b5a06c",
+                  fontSize: "0.95em",
+                  fontStyle: "italic",
+                }}
               >
                 ({prenomsCouple})
               </span>
@@ -261,17 +330,23 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Mobile: appui long uniquement (touch events) */}
+      {/* ✅ Mobile: appui long fiable via Pointer Events */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
-        onTouchStart={startLongPress}
-        onTouchEnd={cancelLongPress}
-        onTouchCancel={cancelLongPress}
-        onTouchMove={cancelLongPress}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onContextMenu={handleContextMenu}
       >
         {msg.type === "IMAGE" && msg.imageUrl ? (
-          <img src={imageMsgUrl || "/default.jpg"} alt="image envoyée" className="message-image" />
+          <img
+            src={imageMsgUrl || "/default.jpg"}
+            alt="image envoyée"
+            className="message-image"
+            draggable={false}
+          />
         ) : msg.type === "AUDIO" && msg.audioUrl ? (
           <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
         ) : (
@@ -302,7 +377,11 @@ export default function MessageBubble({
               <span
                 key={emoji}
                 className={`reaction-item ${userHasReacted ? "user-reaction" : ""}`}
-                title={(emojiTooltips[emoji] || "") + " — " + (nb > 1 ? `${nb} personnes` : "1 personne")}
+                title={
+                  (emojiTooltips[emoji] || "") +
+                  " — " +
+                  (nb > 1 ? `${nb} personnes` : "1 personne")
+                }
                 onClick={() => onReact?.(msg.id, emoji)}
               >
                 <span>{emoji}</span>

@@ -19,6 +19,24 @@
   background: transparent;
   border: 1px #e0c084 solid;
 }
+.message-content-pressable {
+  /* laisse le scroll vertical du chat fonctionner */
+  touch-action: pan-y;
+}
+
+@media (pointer: coarse) {
+  .message-content-pressable {
+    /* empêche le “menu” long press iOS/Android qui casse ton timer */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .message-image {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+}
 
 .call-timer-badge {
   position: absolute;
