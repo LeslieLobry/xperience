@@ -13,10 +13,7 @@ import Ably from "ably";
 const OnlineStatusContext = createContext(null);
 
 export function OnlineStatusProvider({ user, children }) {
-  // counts = { "12": 2, "55": 1 } => user 12 online via 2 connexions (onglet + tel)
   const [counts, setCounts] = useState({});
-  const ablyRef = useRef(null);
-  const channelRef = useRef(null);
   const enteredRef = useRef(false);
 
   useEffect(() => {
@@ -32,38 +29,17 @@ export function OnlineStatusProvider({ user, children }) {
     });
 
     const channel = ably.channels.get("presence:online");
-    ablyRef.current = ably;
-    channelRef.current = channel;
     enteredRef.current = false;
 
-    // ✅ logs connexion
-    const onConnected = () => console.log("[Presence] Ably connected");
-    const onDisconnected = () => console.log("[Presence] Ably disconnected");
-    const onSuspended = () => console.log("[Presence] Ably suspended");
-    const onFailed = (stateChange) => {
-      console.log("[Presence] Ably failed", stateChange?.reason || stateChange);
+    // ----- helpers -----
+    const memberToUserId = (m) => {
+      const id = Number(m?.clientId);
+      return Number.isFinite(id) ? id : null;
     };
-
-    ably.connection.on("connected", () => {
-  enterPresence();
-
-  // 🔥 FIX CRUCIAL : sync retardée pour récupérer les membres déjà présents
-  setTimeout(() => {
-    syncFromGet();
-  }, 500);
-});
-
-    ably.connection.on("disconnected", onDisconnected);
-    ably.connection.on("suspended", onSuspended);
-    ably.connection.on("failed", onFailed);
 
     const addOne = (id) => {
       const key = String(id);
-      setCounts((prev) => {
-        const next = { ...prev };
-        next[key] = (next[key] || 0) + 1;
-        return next;
-      });
+      setCounts((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
     };
 
     const removeOne = (id) => {
@@ -77,17 +53,13 @@ export function OnlineStatusProvider({ user, children }) {
       });
     };
 
-    const memberToUserId = (m) => {
-      const id = Number(m?.clientId);
-      return Number.isFinite(id) ? id : null;
-    };
-
     const syncFromGet = () => {
       channel.presence.get((err, members) => {
         if (err) {
           console.log("[Presence] presence.get error:", err);
           return;
         }
+
         const ids = (members || []).map((m) => m?.clientId).filter(Boolean);
         console.log("[Presence] members:", ids);
 
@@ -111,14 +83,37 @@ export function OnlineStatusProvider({ user, children }) {
       channel.presence.enter({ pseudo: user.pseudo || "", t: Date.now() }, (err) => {
         console.log("[Presence] enter callback err?:", err || null);
         if (err) {
-          enteredRef.current = false; // retentera plus tard
+          enteredRef.current = false;
           return;
         }
+
+        // sync direct + sync retardée (fix “arrive après”)
         syncFromGet();
+        setTimeout(syncFromGet, 500);
       });
     };
 
-    // ✅ Events présence (logs + counts)
+    // ----- logs connexion (utile debug) -----
+    const onConnected = () => console.log("[Presence] Ably connected");
+    const onDisconnected = () => console.log("[Presence] Ably disconnected");
+    const onSuspended = () => console.log("[Presence] Ably suspended");
+    const onFailed = (stateChange) =>
+      console.log("[Presence] Ably failed", stateChange?.reason || stateChange);
+
+    ably.connection.on("connected", onConnected);
+    ably.connection.on("disconnected", onDisconnected);
+    ably.connection.on("suspended", onSuspended);
+    ably.connection.on("failed", onFailed);
+
+    // ✅ UN SEUL handler connected
+    const onConnectedDo = () => {
+      enterPresence();
+      // sync retardée pour récupérer les membres déjà présents
+      setTimeout(syncFromGet, 500);
+    };
+    ably.connection.on("connected", onConnectedDo);
+
+    // ----- events présence -----
     const onEnter = (m) => {
       const id = memberToUserId(m);
       console.log("[Presence] enter event:", m?.clientId, m?.data || null);
@@ -134,14 +129,7 @@ export function OnlineStatusProvider({ user, children }) {
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
 
-    // ✅ Quand la connexion Ably est OK → on entre + sync
-    const onConnectedDo = () => {
-      enterPresence();
-      syncFromGet();
-    };
-    ably.connection.on("connected", onConnectedDo);
-
-    // ✅ Heartbeat
+    // ----- heartbeat + periodic sync -----
     const heartbeat = setInterval(() => {
       try {
         channel.presence.update({ t: Date.now() }, (err) => {
@@ -151,17 +139,16 @@ export function OnlineStatusProvider({ user, children }) {
         console.log("[Presence] update throw:", e);
       }
     }, 30000);
+
     const periodicSync = setInterval(() => {
-  syncFromGet();
-}, 10000);
+      syncFromGet();
+    }, 10000);
 
-
-    // ✅ Clean : leave + close
+    // ----- cleanup -----
     const cleanup = () => {
       console.log("[Presence] cleanup…");
       clearInterval(heartbeat);
       clearInterval(periodicSync);
-
 
       try {
         channel.presence.leave((err) => {
@@ -216,8 +203,6 @@ export function OnlineStatusProvider({ user, children }) {
 
 export function useOnlineStatus() {
   const ctx = useContext(OnlineStatusContext);
-  if (!ctx) {
-    return { isOnline: () => false, onlineCount: () => 0, counts: {} };
-  }
+  if (!ctx) return { isOnline: () => false, onlineCount: () => 0, counts: {} };
   return ctx;
 }
