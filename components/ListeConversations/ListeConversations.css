@@ -4,7 +4,7 @@
   width: 100%;
   max-width: 350px;
   border-right: 1px solid #e0c084;
-
+  gap: 10px;
   /* ✅ IMPORTANT pour react-window */
   height: 100%;
   min-height: 0;
@@ -31,7 +31,10 @@
   /* ✅ header fixe */
   flex: 0 0 auto;
 }
-
+.delete-conv-button{
+  border: none;
+  background: none;
+}
 /* ✅ le "body" (la list react-window) doit pouvoir prendre la place */
 .conv-skeleton-list,
 .no-conversation-message {
