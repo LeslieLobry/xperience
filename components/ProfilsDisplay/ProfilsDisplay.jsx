@@ -206,8 +206,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           ) : (
             profilsFiltres.map((user) => {
               // ✅ statut final : Presence d’abord, fallback lastSeen/statut ensuite
-              const online = isOnline?.(user?.id);
-              const statutEff = online ? "en_ligne" : computeStatut(user);
+             const online = isOnline?.(user?.id);
+const statutEff = online ? "en_ligne" : "hors_ligne";
+
+console.log("Presence online?", user.id, isOnline?.(user?.id));
 
               return (
                 <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">

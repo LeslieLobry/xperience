@@ -1,13 +1,23 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Realtime } from "ably";
 import "./ListeConversations.css";
 import CreateConversationModal from "../CreateConversationModal/CreateConversationModal";
 
-const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+/* -------------------------------------------------------------------------- */
+/* ✅ Idle helper                                                             */
+/* -------------------------------------------------------------------------- */
+function runIdle(fn, timeout = 1200) {
+  if (typeof window === "undefined") return;
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(() => fn(), { timeout });
+  } else {
+    setTimeout(fn, 0);
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /* 🔹 Fetcher allégé                                                          */
@@ -30,28 +40,71 @@ const safeFetcher = async (url) => {
 /* -------------------------------------------------------------------------- */
 function getInitials(name) {
   if (!name) return "?";
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
 /* -------------------------------------------------------------------------- */
-/* 🔹 HOOK: presign photos des utilisateurs (clé S3 -> URL)                   */
-/*      - déduplication                                                       */
-/*      - dépendance légère (id:photoUrl)                                     */
+/* ✅ Presign cache global (évite 50 requêtes)                                */
 /* -------------------------------------------------------------------------- */
-function usePresignedPhotos(users) {
+const PRESIGN_TTL_MS = 50 * 60 * 1000; // 50 min (si tes URLs durent 1h)
+const presignCache = new Map(); // key -> { url, exp }
+const presignInflight = new Map(); // key -> Promise
+
+async function getPresignedUrl(key) {
+  if (!key) return "/default.jpg";
+  if (key.startsWith("http")) return key;
+
+  const now = Date.now();
+  const cached = presignCache.get(key);
+  if (cached && cached.exp > now) return cached.url;
+
+  if (presignInflight.has(key)) return presignInflight.get(key);
+
+  const p = fetch("/api/photos/presign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+    credentials: "include",
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      const url = data?.url || "/default.jpg";
+      presignCache.set(key, { url, exp: now + PRESIGN_TTL_MS });
+      return url;
+    })
+    .catch(() => "/default.jpg")
+    .finally(() => presignInflight.delete(key));
+
+  presignInflight.set(key, p);
+  return p;
+}
+
+/* Limiteur de concurrence (évite de spammer le navigateur) */
+async function mapWithConcurrency(items, limit, mapper) {
+  const ret = new Array(items.length);
+  let i = 0;
+
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (i < items.length) {
+      const idx = i++;
+      ret[idx] = await mapper(items[idx], idx);
+    }
+  });
+
+  await Promise.all(workers);
+  return ret;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ✅ HOOK: presign photos (priorité aux visibles + background)               */
+/* -------------------------------------------------------------------------- */
+function usePresignedPhotos(users, priorityCount = 12) {
   const [photoUrls, setPhotoUrls] = useState({});
 
-  // Clé compacte pour détecter un vrai changement utile
   const usersKey = useMemo(
-    () =>
-      (users || [])
-        .map((u) => `${u.id}:${u.photoUrl || ""}`)
-        .join("|"),
+    () => (users || []).map((u) => `${u.id}:${u.photoUrl || ""}`).join("|"),
     [users]
   );
 
@@ -63,60 +116,95 @@ function usePresignedPhotos(users) {
 
     let canceled = false;
 
-    async function fetchAll() {
-      const result = {};
-      const seen = new Set();
-
-      const uniqUsers = [];
-      for (const u of users) {
-        if (!u?.id) continue;
-        if (seen.has(u.id)) continue;
-        seen.add(u.id);
-        uniqUsers.push(u);
-      }
-
-      await Promise.all(
-        uniqUsers.map(async (u) => {
-          // Pas de photo → placeholder
-          if (!u.photoUrl) {
-            result[u.id] = "/default.jpg";
-            return;
-          }
-
-          // URL déjà complète
-          if (u.photoUrl.startsWith("http")) {
-            result[u.id] = u.photoUrl;
-            return;
-          }
-
-          try {
-            const res = await fetch("/api/photos/presign", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ key: u.photoUrl }),
-            });
-            const data = await res.json();
-            result[u.id] = data.url || "/default.jpg";
-          } catch (e) {
-            console.error("Erreur presign photo pour user", u.id, e);
-            result[u.id] = "/default.jpg";
-          }
-        })
-      );
-
-      if (!canceled) {
-        setPhotoUrls(result);
-      }
+    // uniq users
+    const seen = new Set();
+    const uniq = [];
+    for (const u of users) {
+      if (!u?.id) continue;
+      if (seen.has(u.id)) continue;
+      seen.add(u.id);
+      uniq.push(u);
     }
 
-    fetchAll();
+    // split priorité / background
+    const priority = uniq.slice(0, priorityCount);
+    const background = uniq.slice(priorityCount);
+
+    const hydrateFromCache = () => {
+      const partial = {};
+      for (const u of uniq) {
+        if (!u.photoUrl) {
+          partial[u.id] = "/default.jpg";
+          continue;
+        }
+        if (u.photoUrl.startsWith("http")) {
+          partial[u.id] = u.photoUrl;
+          continue;
+        }
+        const cached = presignCache.get(u.photoUrl);
+        if (cached && cached.exp > Date.now()) {
+          partial[u.id] = cached.url;
+        }
+      }
+      if (!canceled && Object.keys(partial).length) {
+        setPhotoUrls((prev) => ({ ...prev, ...partial }));
+      }
+    };
+
+    const fetchGroup = async (group) => {
+      // hydrate d'abord avec cache (instant)
+      hydrateFromCache();
+
+      // fetch seulement les clés manquantes
+      const toFetch = group.filter((u) => {
+        if (!u.photoUrl) return false;
+        if (u.photoUrl.startsWith("http")) return false;
+        const cached = presignCache.get(u.photoUrl);
+        if (cached && cached.exp > Date.now()) return false;
+        return true;
+      });
+
+      if (toFetch.length === 0) return;
+
+      const results = await mapWithConcurrency(toFetch, 6, async (u) => {
+        const url = await getPresignedUrl(u.photoUrl);
+        return { id: u.id, url };
+      });
+
+      if (canceled) return;
+      const next = {};
+      for (const r of results) next[r.id] = r.url || "/default.jpg";
+      setPhotoUrls((prev) => ({ ...prev, ...next }));
+    };
+
+    // 1) priorité tout de suite (mais après le 1er paint)
+    runIdle(() => {
+      fetchGroup(priority).catch(() => {});
+    }, 800);
+
+    // 2) background plus tard
+    runIdle(() => {
+      fetchGroup(background).catch(() => {});
+    }, 2000);
 
     return () => {
       canceled = true;
     };
-  }, [usersKey]);
+  }, [usersKey, priorityCount]);
 
   return photoUrls;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ✅ Ably: lazy singleton (évite connexion au chargement du module)          */
+/* -------------------------------------------------------------------------- */
+let ablySingleton = null;
+function getAbly() {
+  if (ablySingleton) return ablySingleton;
+  const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
+  if (!key) return null;
+  ablySingleton = new Realtime(key);
+  return ablySingleton;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -136,15 +224,14 @@ export default function ListeConversations({
   const [renamingId, setRenamingId] = useState(null);
   const [newName, setNewName] = useState("");
 
-  const {
-    data,
-    error,
-    isLoading,
-    mutate,
-  } = useSWR(userId ? "/api/conversations" : null, safeFetcher, {
-    revalidateOnFocus: false, // 🔥 évite les refetch automatiques en plus
-    dedupingInterval: 5000, // évite les doublons rapprochés
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    userId ? "/api/conversations" : null,
+    safeFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 8000,
+    }
+  );
 
   const rawConversations = data?.conversations || [];
 
@@ -170,7 +257,8 @@ export default function ListeConversations({
     return Object.values(map);
   }, [conversations, userId]);
 
-  const photoUrls = usePresignedPhotos(allAutresUsers);
+  // ✅ presign prioritaire sur les premières personnes
+  const photoUrls = usePresignedPhotos(allAutresUsers, 16);
 
   // URL -> state sélectionné
   useEffect(() => {
@@ -190,129 +278,149 @@ export default function ListeConversations({
     }
   }, [autoSelectFirst, conversations, router, searchParams]);
 
-  // Ably → rafraîchir la liste de manière THROTTLÉE
+  // ✅ Ably → rafraîchir la liste (lazy + throttled)
   useEffect(() => {
     if (!userId) return;
-    const channel = ably.channels.get(`notification-${userId}`);
 
+    let channel = null;
     let timeout = null;
+    let isMounted = true;
+
     const scheduleRefresh = () => {
-      if (timeout) return; // on regroupe plusieurs events
+      if (!isMounted) return;
+      if (timeout) return;
       timeout = setTimeout(() => {
         mutate();
         timeout = null;
-      }, 400); // 0,4s → fluide sans spammer le backend
+      }, 450);
     };
 
-    channel.subscribe("message", scheduleRefresh);
-    channel.subscribe("refresh-conversations", scheduleRefresh);
+    runIdle(() => {
+      const ably = getAbly();
+      if (!ably || !isMounted) return;
+
+      channel = ably.channels.get(`notification-${userId}`);
+      channel.subscribe("message", scheduleRefresh);
+      channel.subscribe("refresh-conversations", scheduleRefresh);
+    }, 1200);
 
     return () => {
-      channel.unsubscribe("message", scheduleRefresh);
-      channel.unsubscribe("refresh-conversations", scheduleRefresh);
+      isMounted = false;
+      if (channel) {
+        channel.unsubscribe("message", scheduleRefresh);
+        channel.unsubscribe("refresh-conversations", scheduleRefresh);
+      }
       if (timeout) clearTimeout(timeout);
     };
   }, [userId, mutate]);
 
   /* ---------------------------------------------------------------------- */
-  /* 🔹 Actions : delete / rename / select                                  */
+  /* 🔹 Actions                                                              */
   /* ---------------------------------------------------------------------- */
 
-  const handleDelete = async (id) => {
-    if (!confirm("Supprimer cette conversation ?")) return;
+  const handleDelete = useCallback(
+    async (id) => {
+      if (!confirm("Supprimer cette conversation ?")) return;
 
-    // 🔥 Optimistic : on enlève directement la conv de la liste
-    mutate(
-      (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          conversations: (current.conversations || []).filter(
-            (c) => c.id !== id
-          ),
-        };
-      },
-      false // pas de refetch immédiat
-    );
+      mutate(
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            conversations: (current.conversations || []).filter((c) => c.id !== id),
+          };
+        },
+        false
+      );
 
-    try {
-      await fetch(`/api/conversations/${id}`, {
-        method: "DELETE",
+      try {
+        await fetch(`/api/conversations/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+      } catch (_) {}
+
+      const current = Number(searchParams?.get("conversationId") || 0);
+      if (current === Number(id)) {
+        router.replace("/messagerie");
+      }
+    },
+    [mutate, router, searchParams]
+  );
+
+  const handleRename = useCallback(
+    async (id) => {
+      const res = await fetch(`/api/conversations/${id}/rename`, {
+        method: "PATCH",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: newName }),
       });
-    } catch (_) {
-      // En cas d'erreur, Ably ou un refresh manuel remettra d'équerre
-    }
 
-    const current = Number(searchParams?.get("conversationId") || 0);
-    if (current === Number(id)) {
-      router.replace("/messagerie");
-    }
-  };
+      if (res.ok) {
+        const nameToApply = newName; // capture
+        setRenamingId(null);
+        setNewName("");
 
-  const handleRename = async (id) => {
-    const res = await fetch(`/api/conversations/${id}/rename`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom: newName }),
-    });
-    if (res.ok) {
-      setRenamingId(null);
-      setNewName("");
+        mutate(
+          (current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              conversations: (current.conversations || []).map((c) =>
+                c.id === id ? { ...c, nom: nameToApply } : c
+              ),
+            };
+          },
+          false
+        );
+      } else {
+        let msg = "Erreur lors du renommage";
+        try {
+          const j = await res.json();
+          msg = j?.error || j?.message || msg;
+        } catch (_) {}
+        alert(msg);
+      }
+    },
+    [mutate, newName]
+  );
 
-      // 🔥 Optimistic : met à jour localement sans attendre le refetch
+  const handleSelect = useCallback(
+    async (id) => {
+      // ✅ important: évite double navigation
+      if (onSelectConversation) {
+        onSelectConversation(id);
+      } else {
+        router.replace(`/messagerie?conversationId=${id}`);
+      }
+
       mutate(
         (current) => {
           if (!current) return current;
           return {
             ...current,
             conversations: (current.conversations || []).map((c) =>
-              c.id === id ? { ...c, nom: newName } : c
+              c.id === id ? { ...c, unreadCount: 0 } : c
             ),
           };
         },
         false
       );
-    } else {
-      let msg = "Erreur lors du renommage";
-      try {
-        const j = await res.json();
-        msg = j?.error || j?.message || msg;
-      } catch (_) {}
-      alert(msg);
-    }
-  };
 
-  const handleSelect = async (id) => {
-    router.replace(`/messagerie?conversationId=${id}`);
-    onSelectConversation?.(id);
-
-    // 🔥 Optimistic : passe le compteur non lus à 0 localement
-    mutate(
-      (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          conversations: (current.conversations || []).map((c) =>
-            c.id === id ? { ...c, unreadCount: 0 } : c
-          ),
-        };
-      },
-      false
-    );
-
-    // On prévient le backend, mais on n'attend pas la réponse pour l'UI
-    fetch(`/api/conversations/${id}/mark-as-read`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    }).catch(() => {});
-  };
+      fetch(`/api/conversations/${id}/mark-as-read`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+        keepalive: true,
+      }).catch(() => {});
+    },
+    [mutate, onSelectConversation, router, userId]
+  );
 
   /* ---------------------------------------------------------------------- */
-  /* 🔹 UI                                                                  */
+  /* 🔹 UI                                                                   */
   /* ---------------------------------------------------------------------- */
 
   if (error) {
@@ -325,13 +433,11 @@ export default function ListeConversations({
 
   return (
     <aside className={className || "liste-conversations"}>
-      {/* ✅ 1) Le module d’ajout en tout premier quand il est ouvert */}
       {showModal && (
         <CreateConversationModal
           currentUserId={userId}
           onClose={() => setShowModal(false)}
           onCreated={async (newConvId) => {
-            // ici, un vrai refetch ponctuel est OK
             await mutate();
             if (newConvId) {
               router.replace(`/messagerie?conversationId=${newConvId}`);
@@ -348,7 +454,6 @@ export default function ListeConversations({
         </button>
       </div>
 
-      {/* Petit état de chargement "rapide" pour le ressenti */}
       {isLoading && conversations.length === 0 && (
         <div className="conv-skeleton-list">
           <div className="conv-skeleton-item" />
@@ -379,7 +484,6 @@ export default function ListeConversations({
 
         const unreadCount = conv.unreadCount || 0;
 
-        // ✅ 2) On prend plus de personnes pour les avatars
         const avatarUsers = autres.slice(0, 4);
         const extraCount = Math.max(0, autres.length - avatarUsers.length);
 
@@ -390,13 +494,8 @@ export default function ListeConversations({
               Number(selectedId) === Number(conv.id) ? "active" : ""
             }`}
           >
-            {/* Zone cliquable = ouvre la conversation */}
-            <div
-              className="conversation-clickable"
-              onClick={() => handleSelect(conv.id)}
-            >
+            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
               <div className="conv-main">
-                {/* === Avatars === */}
                 <div className="conv-avatar">
                   {avatarUsers.length === 0 && (
                     <div className="conv-avatar-placeholder">
@@ -414,6 +513,8 @@ export default function ListeConversations({
                           src={url}
                           alt={u.pseudo || "Photo de profil"}
                           className="conv-avatar-img"
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
                             e.currentTarget.src = "/default.jpg";
@@ -436,6 +537,8 @@ export default function ListeConversations({
                             src={url}
                             alt={u.pseudo || "Photo de profil"}
                             className={`conv-avatar-img stacked stacked-${index}`}
+                            loading="lazy"
+                            decoding="async"
                             onError={(e) => {
                               e.currentTarget.onerror = null;
                               e.currentTarget.src = "/default.jpg";
@@ -451,7 +554,6 @@ export default function ListeConversations({
                         );
                       })}
 
-                      {/* Petit badge +N si encore plus de monde */}
                       {extraCount > 0 && (
                         <div className="conv-avatar-extra">+{extraCount}</div>
                       )}
@@ -459,14 +561,10 @@ export default function ListeConversations({
                   )}
                 </div>
 
-                {/* === Infos conv === */}
                 <div className="conv-info">
                   <div className="conv-pseudo">
                     {renamingId === conv.id ? (
-                      <div
-                        className="rename-inline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="rename-inline" onClick={(e) => e.stopPropagation()}>
                         <input
                           value={newName}
                           onChange={(e) => setNewName(e.target.value)}
@@ -492,14 +590,11 @@ export default function ListeConversations({
                     )}
                   </div>
 
-                  {unreadCount > 0 && (
-                    <span className="notif-badge">{unreadCount}</span>
-                  )}
+                  {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
                 </div>
               </div>
             </div>
 
-            {/* Actions à droite */}
             <div className="conv-actions">
               {renamingId !== conv.id && (
                 <button

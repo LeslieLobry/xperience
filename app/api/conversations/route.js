@@ -2,6 +2,7 @@ import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
+import { Prisma } from "@prisma/client";
 
 // ----------- CRÉATION (POST) -----------
 export async function POST(req) {
@@ -24,13 +25,15 @@ export async function POST(req) {
         { status: 403 }
       );
 
+    // blocage si user bloqué
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = ids.filter((id) => id !== currentUser.id);
-    if (autres.some((id) => exclus.includes(id)))
+    if (autres.some((id) => exclus.includes(id))) {
       return NextResponse.json(
         { error: "Impossible de créer une conversation avec un utilisateur bloqué." },
         { status: 403 }
       );
+    }
 
     // 2) EXISTING: match EXACT du set de participants
     const existingConv = await prisma.conversation.findFirst({
@@ -41,13 +44,17 @@ export async function POST(req) {
         ],
       },
       include: {
-        participants: { include: { utilisateur: true } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+        participants: {
+          include: {
+            utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
+          },
+        },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
       },
     });
 
     if (existingConv) {
-      // Restaure si ce user avait "supprimé" la conv
+      // restaure si ce user avait "supprimé"
       const myParticipant = existingConv.participants.find(
         (p) => p.utilisateurId === currentUser.id
       );
@@ -57,6 +64,7 @@ export async function POST(req) {
           data: { supprimé: false },
         });
       }
+
       return NextResponse.json({ conversation: existingConv, existed: true });
     }
 
@@ -73,7 +81,7 @@ export async function POST(req) {
             utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
           },
         },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
       },
     });
 
@@ -93,7 +101,7 @@ export async function GET() {
 
     const userId = currentUser.id;
 
-    // On récupère toutes les conversations non supprimées pour ce user
+    // ✅ 1) Conversations non supprimées pour ce user (inchangé)
     const convs = await prisma.conversation.findMany({
       where: {
         participants: { some: { utilisateurId: userId, supprimé: false } },
@@ -104,41 +112,43 @@ export async function GET() {
             utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
           },
         },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 }, // ✅ identique (full)
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    // Pour bloquer l'affichage si un bloqué est présent
+    // ✅ 2) Filtre "bloqués" (inchangé)
     const exclus = await getIdsUtilisateursExclus(userId);
     const visibleConvs = convs.filter((conv) =>
       conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    // ✅ unreadCount basé sur participant.lastReadAt (cohérent avec /messages/mark-as-read)
-    // (N requêtes message.count : safe et simple, on optimisera si besoin)
-    const unreadPairs = await Promise.all(
-      visibleConvs.map(async (conv) => {
-        const myParticipant = conv.participants.find((p) => p.utilisateurId === userId);
+    // ✅ 3) unreadCount: une seule requête groupée (REMPLACE le N+1)
+    const convIds = visibleConvs.map((c) => c.id);
+    let unreadCounts = {};
 
-        // Si jamais null => jamais lu => on compte tout
-        const lastReadAt = myParticipant?.lastReadAt ?? new Date(0);
+    if (convIds.length) {
+      const rows = await prisma.$queryRaw`
+        SELECT
+          m."conversationId" AS "conversationId",
+          COUNT(*)::int      AS "count"
+        FROM "Message" m
+        JOIN "Participant" p
+          ON p."conversationId" = m."conversationId"
+         AND p."utilisateurId" = ${userId}
+         AND p."supprimé" = false
+        WHERE m."conversationId" IN (${Prisma.join(convIds)})
+          AND m."auteurId" <> ${userId}
+          AND m."createdAt" > COALESCE(p."lastReadAt", to_timestamp(0))
+        GROUP BY m."conversationId"
+      `;
 
-        const count = await prisma.message.count({
-          where: {
-            conversationId: conv.id,
-            auteurId: { not: userId },
-            createdAt: { gt: lastReadAt },
-          },
-        });
+      unreadCounts = Object.fromEntries(
+        (rows || []).map((r) => [Number(r.conversationId), Number(r.count)])
+      );
+    }
 
-        return [conv.id, count];
-      })
-    );
-
-    const unreadCounts = Object.fromEntries(unreadPairs);
-
-    // Formatage retour (inchangé)
+    // ✅ 4) Formatage retour (inchangé)
     const conversations = visibleConvs.map((conv) => ({
       ...conv,
       unreadCount: unreadCounts[conv.id] || 0,
