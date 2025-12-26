@@ -926,3 +926,34 @@
     padding: 2px 5px !important;
   }
 }
+/* =========================
+   FIX: bouton réaction ne doit jamais chevaucher le texte
+   (override final)
+   ========================= */
+
+/* réserve + d’espace pour le bouton à l’extérieur */
+.message-bubble.own { margin-right: 44px !important; }
+.message-bubble.other { margin-left: 44px !important; }
+
+/* bouton “comme Messenger”, mais plus loin (hors de la bulle) */
+.message-bubble.own .message-react-btn{
+  right: -34px !important;
+  left: auto !important;
+  bottom: 10px !important;
+}
+
+.message-bubble.other .message-react-btn{
+  left: -34px !important;
+  right: auto !important;
+  bottom: 10px !important;
+}
+
+/* optionnel: si tu veux qu’il soit un poil plus petit sur mobile */
+@media (max-width: 600px){
+  .message-react-btn{
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .message-bubble.own .message-react-btn{ right: -32px !important; }
+  .message-bubble.other .message-react-btn{ left: -32px !important; }
+}
