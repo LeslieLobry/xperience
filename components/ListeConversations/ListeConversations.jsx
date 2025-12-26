@@ -50,35 +50,15 @@ function getInitials(name) {
 /* -------------------------------------------------------------------------- */
 const PRESIGN_TTL_MS = 50 * 60 * 1000;
 const presignCache = new Map(); // key -> { url, exp }
-const presignInflight = new Map(); // key -> Promise (unitaire)
-const presignBatchInflight = new Map(); // signature -> Promise (batch)
+const presignInflight = new Map(); // key -> Promise
 
-function isHttp(u) {
-  return typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"));
-}
-
-function getCachedUrl(key) {
-  if (!key) return null;
-  const cached = presignCache.get(key);
-  if (cached && cached.exp > Date.now()) return cached.url;
-  if (cached) presignCache.delete(key);
-  return null;
-}
-
-function setCachedUrl(key, url) {
-  if (!key || !url) return;
-  presignCache.set(key, { url, exp: Date.now() + PRESIGN_TTL_MS });
-}
-
-/* -------------------------------------------------------------------------- */
-/* ✅ Presign unitaire (fallback)                                             */
-/* -------------------------------------------------------------------------- */
 async function getPresignedUrl(key) {
   if (!key) return "/default.jpg";
-  if (isHttp(key)) return key;
+  if (key.startsWith("http")) return key;
 
-  const cached = getCachedUrl(key);
-  if (cached) return cached;
+  const now = Date.now();
+  const cached = presignCache.get(key);
+  if (cached && cached.exp > now) return cached.url;
 
   if (presignInflight.has(key)) return presignInflight.get(key);
 
@@ -91,7 +71,7 @@ async function getPresignedUrl(key) {
     .then((r) => r.json())
     .then((data) => {
       const url = data?.url || "/default.jpg";
-      setCachedUrl(key, url);
+      presignCache.set(key, { url, exp: now + PRESIGN_TTL_MS });
       return url;
     })
     .catch(() => "/default.jpg")
@@ -101,63 +81,23 @@ async function getPresignedUrl(key) {
   return p;
 }
 
-/* -------------------------------------------------------------------------- */
-/* ✅ Presign batch (principal)                                               */
-/* -------------------------------------------------------------------------- */
-async function getPresignedUrlsBatch(keys) {
-  const normalized = (keys || [])
-    .filter(Boolean)
-    .map((k) => (typeof k === "string" ? k.trim() : ""))
-    .filter((k) => k.length > 0)
-    .filter((k) => !isHttp(k));
+async function mapWithConcurrency(items, limit, mapper) {
+  const ret = new Array(items.length);
+  let i = 0;
 
-  const unique = [...new Set(normalized)];
-  if (unique.length === 0) return {};
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (i < items.length) {
+      const idx = i++;
+      ret[idx] = await mapper(items[idx], idx);
+    }
+  });
 
-  // Hydrate depuis cache global
-  const urls = {};
-  const toFetch = [];
-  for (const k of unique) {
-    const cached = getCachedUrl(k);
-    if (cached) urls[k] = cached;
-    else toFetch.push(k);
-  }
-  if (toFetch.length === 0) return urls;
-
-  // Dédup inflight batch (signature)
-  const signature = toFetch.join("|");
-  if (presignBatchInflight.has(signature)) {
-    const fromInflight = await presignBatchInflight.get(signature);
-    return { ...urls, ...fromInflight };
-  }
-
-  const p = fetch("/api/photos/presign-batch", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keys: toFetch }),
-    credentials: "include",
-    keepalive: true,
-  })
-    .then((r) => r.json())
-    .then((data) => {
-      const got = data?.urls || {};
-      // hydrate cache global
-      for (const [k, url] of Object.entries(got)) {
-        if (url) setCachedUrl(k, url);
-      }
-      return got;
-    })
-    .catch(() => ({}))
-    .finally(() => presignBatchInflight.delete(signature));
-
-  presignBatchInflight.set(signature, p);
-
-  const fetched = await p;
-  return { ...urls, ...fetched };
+  await Promise.all(workers);
+  return ret;
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ HOOK: presign photos (BATCH)                                            */
+/* ✅ HOOK: presign photos                                                    */
 /* -------------------------------------------------------------------------- */
 function usePresignedPhotos(users, priorityCount = 12) {
   const [photoUrls, setPhotoUrls] = useState({});
@@ -196,7 +136,7 @@ function usePresignedPhotos(users, priorityCount = 12) {
           partial[u.id] = "/default.jpg";
           continue;
         }
-        if (isHttp(u.photoUrl)) {
+        if (u.photoUrl.startsWith("http")) {
           partial[u.id] = u.photoUrl;
           continue;
         }
@@ -214,43 +154,30 @@ function usePresignedPhotos(users, priorityCount = 12) {
     const fetchGroup = async (group) => {
       hydrateFromCache();
 
-      // keys à signer (S3 keys)
-      const keys = [];
-      const idByKey = new Map();
+      const now = Date.now();
+      const toFetch = group.filter((u) => {
+        if (!u.photoUrl) return false;
+        if (u.photoUrl.startsWith("http")) return false;
+        const cached = presignCache.get(u.photoUrl);
+        if (cached && cached.exp > now) return false;
+        return true;
+      });
 
-      for (const u of group) {
-        if (!u?.id) continue;
-        if (!u.photoUrl) continue;
-        if (isHttp(u.photoUrl)) continue;
+      if (toFetch.length === 0) return;
 
-        const cached = getCachedUrl(u.photoUrl);
-        if (cached) continue;
-
-        keys.push(u.photoUrl);
-        idByKey.set(u.photoUrl, u.id);
-      }
-
-      if (keys.length === 0) return;
-
-      // ✅ 1 seule requête batch
-      const urlsByKey = await getPresignedUrlsBatch(keys);
+      const results = await mapWithConcurrency(toFetch, 6, async (u) => {
+        const url = await getPresignedUrl(u.photoUrl);
+        return { id: u.id, url };
+      });
 
       if (canceled) return;
-
       const next = {};
-      for (const k of keys) {
-        const userId = idByKey.get(k);
-        const url = urlsByKey?.[k];
-        if (userId) next[userId] = url || "/default.jpg";
-      }
-
-      if (Object.keys(next).length) {
-        setPhotoUrls((prev) => ({ ...prev, ...next }));
-      }
+      for (const r of results) next[r.id] = r.url || "/default.jpg";
+      setPhotoUrls((prev) => ({ ...prev, ...next }));
     };
 
-    runIdle(() => fetchGroup(priority).catch(() => {}), 600);
-    runIdle(() => fetchGroup(background).catch(() => {}), 1600);
+    runIdle(() => fetchGroup(priority).catch(() => {}), 800);
+    runIdle(() => fetchGroup(background).catch(() => {}), 2000);
 
     return () => {
       canceled = true;
@@ -314,6 +241,7 @@ function writeConvCache(data) {
 /* ✅ Warm fetch messages (accélère l’ouverture d’une conversation)           */
 /* -------------------------------------------------------------------------- */
 function warmMessages(conversationId) {
+  // aucune attente / aucun blocage : juste "chauffe" cache navigateur / CDN
   fetch(`/api/messages?conversationId=${conversationId}&limit=30`, {
     credentials: "include",
     cache: "no-store",
@@ -346,7 +274,11 @@ export default function ListeConversations({
     {
       revalidateOnFocus: false,
       dedupingInterval: 8000,
+
+      // ✅ affichage instantané
       fallbackData: cached || undefined,
+
+      // ✅ évite un écran vide si réseau lent
       keepPreviousData: true,
     }
   );
@@ -382,7 +314,6 @@ export default function ListeConversations({
     return Object.values(map);
   }, [conversations, userId]);
 
-  // ✅ maintenant batch (au lieu de plein de /presign)
   const photoUrls = usePresignedPhotos(allAutresUsers, 16);
 
   // URL -> state sélectionné
@@ -633,12 +564,15 @@ export default function ListeConversations({
               className="conversation-clickable"
               data-id={conv.id}
               onClick={handleClickItem}
+              // ✅ NEW: précharge la route dès qu’on survole (desktop)
               onMouseEnter={() => {
                 router.prefetch(`/messagerie?conversationId=${conv.id}`);
               }}
+              // ✅ NEW: pareil au focus clavier
               onFocus={() => {
                 router.prefetch(`/messagerie?conversationId=${conv.id}`);
               }}
+              // ✅ NEW: warm fetch des messages AVANT le click (mobile/desktop)
               onPointerDown={() => {
                 warmMessages(conv.id);
               }}
@@ -669,7 +603,9 @@ export default function ListeConversations({
                           }}
                         />
                       ) : (
-                        <div className="conv-avatar-placeholder">{getInitials(u.pseudo)}</div>
+                        <div className="conv-avatar-placeholder">
+                          {getInitials(u.pseudo)}
+                        </div>
                       );
                     })()}
 
@@ -700,7 +636,9 @@ export default function ListeConversations({
                         );
                       })}
 
-                      {extraCount > 0 && <div className="conv-avatar-extra">+{extraCount}</div>}
+                      {extraCount > 0 && (
+                        <div className="conv-avatar-extra">+{extraCount}</div>
+                      )}
                     </div>
                   )}
                 </div>
