@@ -875,3 +875,54 @@
   position: fixed !important;
   z-index: 9999 !important;
 }
+/* =========================================================
+   ✅ FIX: voir TOUS les emojis dans le picker (mobile + desktop)
+   À COLLER TOUT EN BAS
+   ========================================================= */
+
+/* le picker doit pouvoir défiler et ne jamais être coupé */
+.reaction-picker-fixed{
+  max-width: calc(100vw - 12px) !important;
+  padding: 8px 10px !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+}
+.reaction-picker-fixed::-webkit-scrollbar{ display:none; }
+
+/* boutons un peu plus compacts pour en afficher + */
+.reaction-picker-fixed .reaction-option{
+  flex: 0 0 auto !important;
+  font-size: 20px !important;     /* ↓ un poil plus petit = plus d’emojis visibles */
+  padding: 3px 6px !important;
+  line-height: 1 !important;
+}
+
+/* petit “fade” à droite/gauche pour montrer qu’on peut scroller */
+.reaction-picker-fixed{
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0px,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0px,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+}
+
+/* sur très petits écrans, on compacte encore */
+@media (max-width: 360px){
+  .reaction-picker-fixed .reaction-option{
+    font-size: 18px !important;
+    padding: 2px 5px !important;
+  }
+}
