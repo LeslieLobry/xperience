@@ -99,12 +99,6 @@
 }
 
 /* header (bouton créer) */
-.evenements-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-}
 
 /* ---------- Bouton créer ---------- */
 .btn-create {
@@ -118,7 +112,7 @@
 
   text-decoration: none;
   background: linear-gradient(180deg, var(--gold), #d7b36f);
-  color: #2b2b2b;
+  color: white;
 
   font-weight: 900;
   font-size: 16px;
