@@ -2,20 +2,44 @@ import { useEffect, useCallback, useRef } from "react";
 import useSWR from "swr";
 import { Realtime } from "ably";
 
-const ably = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
+/* -------------------------------------------------------------------------- */
+/* ✅ Ably singleton (authUrl si dispo, fallback clé publique)                */
+/* -------------------------------------------------------------------------- */
+let ablyClient = null;
+function getAbly() {
+  if (ablyClient) return ablyClient;
+
+  // ✅ si tu as /api/ably/token : plus stable en prod
+  try {
+    ablyClient = new Realtime({
+      authUrl: "/api/ably/token",
+      authMethod: "GET",
+      echoMessages: false,
+      closeOnUnload: false,
+    });
+    return ablyClient;
+  } catch (_) {}
+
+  // fallback clé publique
+  const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
+  if (!key) return null;
+  ablyClient = new Realtime(key);
+  return ablyClient;
+}
 
 const MESSAGES_LIMIT = 30;
-const fetcher = (url) => fetch(url).then((res) => res.json());
+const fetcher = (url) => fetch(url, { credentials: "include" }).then((res) => res.json());
 
 export function useMessages(conversationId, utilisateur, setTexte) {
-  // 1. SWR pour messages/participants
+  /* ---------------------------------------------------------------------- */
+  /* 1) SWR                                                                  */
+  /* ---------------------------------------------------------------------- */
   const { data, error, isLoading, mutate } = useSWR(
     conversationId
       ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
       : null,
     fetcher,
     {
-      // ⚡ évite des refetch partout dès que tu changes d’onglet / réseau
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       dedupingInterval: 5000,
@@ -26,92 +50,113 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   const participantsAutres = (data?.participants || []).filter(
     (u) => u.id !== utilisateur.id
   );
-  const hasMore = data?.hasMore ?? false; // ✅ basé sur l’API, pas sur la longueur
+  const hasMore = data?.hasMore ?? false;
   const lastReads = data?.lastReads || [];
 
-  // Référence pour timers d'effacement messages éphémères
+  /* ---------------------------------------------------------------------- */
+  /* 2) Refs                                                                 */
+  /* ---------------------------------------------------------------------- */
   const ephemeralTimers = useRef({});
-  // Pour éviter plusieurs loadMore en même temps
   const loadingMoreRef = useRef(false);
 
-  // 2. Abonnement temps réel Ably pour cette conversation
+  // ✅ batch read (évite 1 request/message)
+  const lastIncomingIdRef = useRef(null);
+  const markReadTimerRef = useRef(null);
+
+  // ✅ throttle refetch on "read"
+  const readRefetchTimerRef = useRef(null);
+
+  /* ---------------------------------------------------------------------- */
+  /* Helpers: ACK + READ                                                     */
+  /* ---------------------------------------------------------------------- */
+  const postJSON = (url, body) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {});
+
+  const acknowledge = (messageId) => {
+    if (!messageId) return;
+    postJSON("/api/messages/acknowledge", { messageId });
+  };
+
+  // ✅ READ groupé: on envoie le dernier id reçu après 600ms sans nouveau msg
+  const scheduleMarkAsRead = (messageId) => {
+    if (!messageId) return;
+    lastIncomingIdRef.current = messageId;
+
+    if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+    markReadTimerRef.current = setTimeout(() => {
+      const lastId = lastIncomingIdRef.current;
+      if (!lastId) return;
+      postJSON("/api/messages/mark-as-read", { messageId: lastId });
+    }, 600);
+  };
+
+  /* ---------------------------------------------------------------------- */
+  /* 3) Ably subscription                                                    */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     if (!conversationId) return;
-    const channel = ably.channels.get(`conversation-${conversationId}`);
 
-    /* ------------------------ Nouveau onMessage ------------------------ */
+    const client = getAbly();
+    if (!client) return;
+
+    const channel = client.channels.get(`conversation-${conversationId}`);
+
     const onMessage = (msg) => {
       const newMsg = msg.data;
       if (!newMsg) return;
 
-      // ACK + LU uniquement si ce n'est pas moi
+      // ✅ ACK + READ uniquement si ce n'est pas moi
       if (newMsg.auteurId !== utilisateur.id) {
-        fetch("/api/messages/acknowledge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId: newMsg.id }),
-        });
-        fetch("/api/messages/mark-as-read", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageId: newMsg.id }),
-        });
+        acknowledge(newMsg.id);
+        scheduleMarkAsRead(newMsg.id);
       }
 
-      // ⚡ mise à jour locale sans refetch global
+      // ✅ patch local sans refetch global
       mutate(
         (current) => {
           if (!current) return current;
           const currentMessages = current.messages || [];
 
-          // 1️⃣ si on a déjà ce message par ID, on ne fait rien
-          const exists = currentMessages.some((m) => m.id === newMsg.id);
-          if (exists) return current;
+          // 1) déjà présent
+          if (currentMessages.some((m) => m.id === newMsg.id)) return current;
 
-          // 2️⃣ on cherche un message optimiste "pending" du même auteur / même type / même contenu
+          // 2) remplacement du message optimiste pending
           const pendingIndex = currentMessages.findIndex((m) => {
             if (m.statut !== "pending") return false;
             if (m.auteurId !== newMsg.auteurId) return false;
             if (m.type !== newMsg.type) return false;
 
-            // comparaison du contenu selon le type
-            if (m.type === "IMAGE") {
-              return m.contenu === "[Image]";
-            }
-            if (m.type === "AUDIO") {
-              return m.contenu === "[Audio]";
-            }
-            // texte / EPHEMERE
+            if (m.type === "IMAGE") return m.contenu === "[Image]";
+            if (m.type === "AUDIO") return m.contenu === "[Audio]";
             return m.contenu === newMsg.contenu;
           });
 
           if (pendingIndex !== -1) {
-            // 🔁 on REMPLACE le temporaire par la vraie version
             const updated = [...currentMessages];
-            updated[pendingIndex] = {
-              ...newMsg,
-              statut: "sent", // si tu veux gérer un statut propre
-            };
+            updated[pendingIndex] = { ...newMsg, statut: "sent" };
             return { ...current, messages: updated };
           }
 
-          // 3️⃣ sinon, c'est un message "normal" (autre utilisateur, historique, etc.)
-          return {
-            ...current,
-            messages: [...currentMessages, newMsg],
-          };
+          // 3) append normal
+          return { ...current, messages: [...currentMessages, newMsg] };
         },
-        false // pas de revalidate réseau
+        false
       );
     };
 
     const onReaction = (msg) => {
       const { messageId, reactions } = msg.data || {};
       if (!messageId) {
+        // garde ton comportement : si donnée invalide => refetch
         mutate();
         return;
       }
-      // ⚡ on patch juste les réactions localement
       mutate(
         (current) => {
           if (!current?.messages) return current;
@@ -127,8 +172,13 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     };
 
     const onRead = () => {
-      // les "read" sont moins fréquents, on peut se permettre un petit refetch
-      mutate();
+      // 🔥 Avant: mutate() direct => refetch souvent
+      // ✅ Maintenant: throttle léger
+      if (readRefetchTimerRef.current) return;
+      readRefetchTimerRef.current = setTimeout(() => {
+        mutate();
+        readRefetchTimerRef.current = null;
+      }, 600);
     };
 
     channel.subscribe("message", onMessage);
@@ -139,10 +189,14 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       channel.unsubscribe("message", onMessage);
       channel.unsubscribe("reaction", onReaction);
       channel.unsubscribe("read", onRead);
+      if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+      if (readRefetchTimerRef.current) clearTimeout(readRefetchTimerRef.current);
     };
   }, [conversationId, utilisateur.id, mutate]);
 
-  // 3. Chargement des anciens messages (lazy loading)
+  /* ---------------------------------------------------------------------- */
+  /* 4) Lazy loading anciens messages                                         */
+  /* ---------------------------------------------------------------------- */
   const loadMoreMessages = useCallback(async () => {
     if (!conversationId || !hasMore || messages.length === 0) return;
     if (loadingMoreRef.current) return;
@@ -151,7 +205,8 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     try {
       const oldestMessageId = messages[0]?.id;
       const res = await fetch(
-        `/api/messages?conversationId=${conversationId}&beforeId=${oldestMessageId}&limit=${MESSAGES_LIMIT}`
+        `/api/messages?conversationId=${conversationId}&beforeId=${oldestMessageId}&limit=${MESSAGES_LIMIT}`,
+        { credentials: "include" }
       );
       const more = await res.json();
 
@@ -159,10 +214,14 @@ export function useMessages(conversationId, utilisateur, setTexte) {
         mutate(
           (current) => {
             if (!current) return current;
+
+            // ✅ évite doublons (si Ably arrive en même temps)
+            const existingIds = new Set((current.messages || []).map((m) => m.id));
+            const cleanedMore = more.messages.filter((m) => !existingIds.has(m.id));
+
             return {
               ...current,
-              // anciens + actuels
-              messages: [...more.messages, ...(current.messages || [])],
+              messages: [...cleanedMore, ...(current.messages || [])],
               hasMore: more.hasMore ?? false,
             };
           },
@@ -174,7 +233,9 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     }
   }, [conversationId, messages, hasMore, mutate]);
 
-  // 4. Envoi d'un message
+  /* ---------------------------------------------------------------------- */
+  /* 5) Envoi message                                                         */
+  /* ---------------------------------------------------------------------- */
   const envoyerMessage = async (
     dataToSend,
     type = "TEXTE",
@@ -189,9 +250,11 @@ export function useMessages(conversationId, utilisateur, setTexte) {
       res = await fetch("/api/messages", {
         method: "POST",
         body: dataToSend,
+        credentials: "include",
       });
     } else {
       let payloadData = dataToSend;
+
       if (typeof payloadData === "string") {
         if (!payloadData.trim()) return null;
         payloadData = { contenu: payloadData, type };
@@ -207,6 +270,7 @@ export function useMessages(conversationId, utilisateur, setTexte) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        credentials: "include",
       });
     }
 
@@ -214,38 +278,46 @@ export function useMessages(conversationId, utilisateur, setTexte) {
 
     if (result.success) {
       setTexte && setTexte("");
-      // ⚠️ on ne fait plus de mutate() ici : c’est Ably + onMessage qui gèrent la sync
+      // ✅ garde ton choix : pas de mutate ici (Ably gère)
       return result.message;
     }
     return null;
   };
 
-  // 5. Réaction à un message
+  /* ---------------------------------------------------------------------- */
+  /* 6) Réaction                                                              */
+  /* ---------------------------------------------------------------------- */
   const handleReaction = async (messageId, emoji) => {
     const res = await fetch(`/api/messages/${messageId}/react`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emoji }),
+      credentials: "include",
     });
+
     const dataRes = await res.json();
     if (dataRes.success) {
-      const channel = ably.channels.get(`conversation-${conversationId}`);
-      channel.publish("reaction", {
-        messageId,
-        reactions: dataRes.reactions,
-      });
-      // pas besoin de mutate ici, on se met à jour via l’event Ably "reaction"
+      const client = getAbly();
+      if (client) {
+        const channel = client.channels.get(`conversation-${conversationId}`);
+        channel.publish("reaction", {
+          messageId,
+          reactions: dataRes.reactions,
+        });
+      }
+      // ✅ pas de mutate ici (tu es déjà sync via Ably)
     }
   };
 
-  // 6. Gestion des timers (éphémères)
+  /* ---------------------------------------------------------------------- */
+  /* 7) Timers éphémères                                                      */
+  /* ---------------------------------------------------------------------- */
   const lancerSuppressionAvecDelai = (messageId) => {
-    if (ephemeralTimers.current[messageId]) {
-      return;
-    }
+    if (ephemeralTimers.current[messageId]) return;
+
     ephemeralTimers.current[messageId] = setTimeout(() => {
       delete ephemeralTimers.current[messageId];
-      // côté serveur ça supprime, et via Ably / mutate global tu seras sync
+      // côté serveur supprime, Ably/refresh te resync
     }, 5000);
   };
 
@@ -253,6 +325,8 @@ export function useMessages(conversationId, utilisateur, setTexte) {
     return () => {
       Object.values(ephemeralTimers.current).forEach(clearTimeout);
       ephemeralTimers.current = {};
+      if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+      if (readRefetchTimerRef.current) clearTimeout(readRefetchTimerRef.current);
     };
   }, []);
 

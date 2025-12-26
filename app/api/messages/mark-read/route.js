@@ -4,12 +4,10 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { Rest as AblyRest } from "ably";
 
-export const runtime = "nodejs"; // explicite
+export const runtime = "nodejs";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// ✅ Ne casse pas l’existant : on garde NEXT_PUBLIC en fallback,
-// mais idéalement mets une clé serveur ABLY_API_KEY_SERVER
 const ABLY_API_KEY =
   process.env.ABLY_API_KEY_SERVER ||
   process.env.ABLY_API_KEY ||
@@ -23,11 +21,9 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// ✅ Cookie (site) OU Bearer (mobile)
 async function getUserFromToken(req) {
   if (!JWT_SECRET) return null;
 
-  // 1) Mobile: Authorization: Bearer xxx
   const auth = req?.headers?.get?.("authorization") || "";
   if (auth.startsWith("Bearer ")) {
     const token = auth.slice(7);
@@ -38,7 +34,6 @@ async function getUserFromToken(req) {
     }
   }
 
-  // 2) Web: cookie "token"
   const token = (await cookies()).get("token")?.value;
   if (!token) return null;
   try {
@@ -69,44 +64,78 @@ export async function POST(req) {
       body = {};
     }
 
-    const { messageId } = body;
-    if (!messageId) {
+    // ✅ compat: messageId toujours accepté
+    const messageId = body?.messageId ? Number(body.messageId) : null;
+
+    // ✅ nouveau: conversationId direct (évite 1 requête DB)
+    const conversationId = body?.conversationId ? Number(body.conversationId) : null;
+
+    if (!messageId && !conversationId) {
       return NextResponse.json(
-        { error: "ID manquant" },
+        { error: "messageId ou conversationId manquant" },
         { status: 400, headers: CORS }
       );
     }
 
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-      select: { conversationId: true },
+    let convId = conversationId;
+
+    // Si on n'a pas conversationId, on le récupère via messageId (comportement actuel)
+    if (!convId) {
+      const msg = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { conversationId: true },
+      });
+
+      if (!msg) {
+        return NextResponse.json(
+          { error: "Message non trouvé" },
+          { status: 404, headers: CORS }
+        );
+      }
+      convId = msg.conversationId;
+    }
+
+    // ✅ sécurité: l'utilisateur doit être participant
+    const isParticipant = await prisma.participant.findFirst({
+      where: { conversationId: convId, utilisateurId: user.id },
+      select: { id: true },
     });
 
-    if (!message) {
+    if (!isParticipant) {
       return NextResponse.json(
-        { error: "Message non trouvé" },
-        { status: 404, headers: CORS }
+        { error: "Accès refusé" },
+        { status: 403, headers: CORS }
       );
     }
 
+    const now = new Date();
+
+    // ✅ update lastReadAt
     await prisma.participant.updateMany({
-      where: { conversationId: message.conversationId, utilisateurId: user.id },
-      data: { lastReadAt: new Date() },
+      where: { conversationId: convId, utilisateurId: user.id },
+      data: { lastReadAt: now },
     });
 
-    // ✅ Publish via Ably REST (si configuré)
+    // ✅ Ably: best-effort (ne bloque pas la réponse si Ably est lent)
     if (ably) {
-      const channel = ably.channels.get(`conversation-${message.conversationId}`);
-      await channel.publish("read", {
-        utilisateurId: user.id,
-        lastReadAt: new Date().toISOString(),
-      });
+      try {
+        const channel = ably.channels.get(`conversation-${convId}`);
+        // pas besoin d'attendre pour répondre vite
+        channel.publish("read", {
+          utilisateurId: user.id,
+          lastReadAt: now.toISOString(),
+          conversationId: convId,
+        });
+      } catch (e) {
+        // on log, mais on ne casse pas l’API
+        console.warn("Ably publish read failed:", e?.message || e);
+      }
     }
 
-    return new NextResponse(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { ...CORS, "Content-Type": "application/json" },
-    });
+    return NextResponse.json(
+      { success: true },
+      { status: 200, headers: CORS }
+    );
   } catch (error) {
     console.error("mark-as-read error:", error);
     return NextResponse.json(
