@@ -1,662 +1,753 @@
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
-import MessageAudio from "../MessageAudio/MessageAudio";
-import MessageEphemere from "../MessageEphemere/MessageEphemere";
-import "./MessageBubble.css";
+/* =========================================================
+   MessageBubble.css (FULL CLEAN)
+   - bouton 😊 fiable (mobile toujours visible, desktop au survol)
+   - picker en fixed (jamais coupé)
+   - suppression des doublons/conflicts
+   ========================================================= */
+
+/* === Layout principal === */
+.chatbox-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  overflow: visible;
+}
+
+/* === Header === */
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0.5rem 1rem;
+  min-height: 54px;
+  position: relative;
+  background: transparent;
+  border: 1px #e0c084 solid;
+}
+
+.call-timer-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 25px;
+  text-align: center;
+  font-weight: 500;
+  color: #7d5d2a;
+  font-size: 1.1em;
+  z-index: 20;
+  letter-spacing: 1px;
+}
+
+.typing-notif {
+  color: #888;
+  font-style: italic;
+  margin: 0 0 4px 8px;
+}
+
+.chat-participants {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.participant-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgb(224 192 132 / 10%);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.participant-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: #444;
+}
+
+.participant-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #e0c084;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* === Appel entrant & Popups === */
+.appel-entrant-box button {
+  margin: 6px;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.appel-popup-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.appel-popup-actions button:first-child {
+  background-color: #4caf50;
+  color: white;
+}
+
+.appel-popup-actions button:last-child {
+  background-color: #f44336;
+  color: white;
+}
+
+/* === Header actions génériques === */
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.chat-actions button {
+  background: none;
+  border: none;
+  color: #e0c084;
+  cursor: pointer;
+  font-size: 1.3rem;
+  padding: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.chat-actions button:hover {
+  opacity: 0.8;
+}
+
+/* === Messages container === */
+.chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
 
 /* =========================================================
-   ✅ PERF: cache global + inflight + TTL pour presign
+   Messages & Bubbles
    ========================================================= */
-const PRESIGN_TTL_MS = 50 * 60 * 1000;
-const PRESIGN_CACHE = new Map();     // key -> { url, exp }
-const PRESIGN_INFLIGHT = new Map();  // key -> Promise
-
-function getCachedPresign(key) {
-  if (!key) return null;
-  const entry = PRESIGN_CACHE.get(key);
-  if (!entry) return null;
-  if (entry.exp && entry.exp > Date.now()) return entry.url;
-  PRESIGN_CACHE.delete(key);
-  return null;
+.message-bubble {
+  position: relative;
+  max-width: 75%;
+  margin: 8px 0;
+  padding: 13px 18px 10px 14px;
+  border-radius: 16px;
+  overflow-wrap: break-word;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  transition: background 0.2s;
+  z-index: 1;
 }
 
-function setCachedPresign(key, url) {
-  if (!key) return;
-  PRESIGN_CACHE.set(key, { url, exp: Date.now() + PRESIGN_TTL_MS });
-}
-
-function usePresignedPhoto(photoKey) {
-  const [url, setUrl] = useState(() => {
-    if (!photoKey) return "/default.jpg";
-    if (typeof photoKey === "string" && photoKey.startsWith("http")) return photoKey;
-    return getCachedPresign(photoKey) || null;
-  });
-
-  useEffect(() => {
-    if (!photoKey) {
-      if (url !== "/default.jpg") setUrl("/default.jpg");
-      return;
-    }
-
-    if (typeof photoKey === "string" && photoKey.startsWith("http")) {
-      if (url !== photoKey) setUrl(photoKey);
-      return;
-    }
-
-    const cached = getCachedPresign(photoKey);
-    if (cached) {
-      if (url !== cached) setUrl(cached);
-      return;
-    }
-
-    let p = PRESIGN_INFLIGHT.get(photoKey);
-    if (!p) {
-      p = fetch("/api/photos/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: photoKey }),
-        credentials: "include",
-        keepalive: true,
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          const finalUrl = data?.url || "/default.jpg";
-          setCachedPresign(photoKey, finalUrl);
-          return finalUrl;
-        })
-        .catch(() => "/default.jpg")
-        .finally(() => {
-          PRESIGN_INFLIGHT.delete(photoKey);
-        });
-
-      PRESIGN_INFLIGHT.set(photoKey, p);
-    }
-
-    let cancelled = false;
-    p.then((finalUrl) => {
-      if (!cancelled && url !== finalUrl) setUrl(finalUrl);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photoKey]);
-
-  return url;
-}
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function MessageBubble({
-  msg,
-  utilisateur,
-  previousMsg,
-  lastReads,
-  onReact,
-  onDelete,
-  emojiPack = "app",
-  prenomsCouple = null,
-}) {
-  /* ✅ Emojis "comme sur l'app" */
-  const emojiPacks = {
-    app: ["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"],
-    sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
-    glamour: ["🖤", "🥂", "🥀", "🪩", "🎭", "🫣"],
-    erotique: ["🫦", "🍆", "🍒", "🥵", "🛏️", "🧴"],
-    sensuel: ["🫶", "🪶", "🎀", "🤤", "😮‍💨", "👄"],
-  };
-
-  const emojiTooltips = {
-    "❤️": "J’adore",
-    "😂": "Trop drôle",
-    "😍": "J’aime",
-    "😮": "Oh wow",
-    "😢": "Triste",
-    "👍": "Top",
-    "👎": "Bof",
-    "🔥": "Ça chauffe",
-    "😡": "Pas content",
-    "🙏": "Merci / stp",
-    "🎉": "Yes !",
-    "😉": "Clin d’œil",
-  };
-
-  const activePack = emojiPacks[emojiPack] || emojiPacks.app;
-
-  /* ---------------- Picker ---------------- */
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [pickerPos, setPickerPos] = useState(null); // { x, y }
-  const pickerRef = useRef(null);
-  const pressableRef = useRef(null);
-
-  // ✅ bouton "comme sur l'app" : petite icône emoji toujours dispo
-  const triggerRef = useRef(null);
-
-  /* ---------- Long press (on le garde en bonus) ---------- */
-  const longPressTimerRef = useRef(null);
-  const pressStartRef = useRef({ x: 0, y: 0 });
-  const pointerIdRef = useRef(null);
-  const didLongPressRef = useRef(false);
-  const unblockTouchMoveRef = useRef(null);
-
-  const inputModeRef = useRef(null); // "pointer" | "touch"
-  const inputModeTsRef = useRef(0);
-
-  const LONG_PRESS_DELAY = 380;
-  const MOVE_TOLERANCE = 28;
-
-  const isCoarsePointer = () =>
-    typeof window !== "undefined" &&
-    window.matchMedia &&
-    window.matchMedia("(pointer: coarse)").matches;
-
-  const cancelLongPress = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    pointerIdRef.current = null;
-  }, []);
-
-  const blockScrollWhilePressing = useCallback(() => {
-    if (unblockTouchMoveRef.current) return;
-
-    const handler = (ev) => {
-      if (longPressTimerRef.current) {
-        ev.preventDefault();
-      }
-    };
-
-    document.addEventListener("touchmove", handler, { passive: false });
-
-    unblockTouchMoveRef.current = () => {
-      document.removeEventListener("touchmove", handler);
-      unblockTouchMoveRef.current = null;
-    };
-  }, []);
-
-  const unblockScroll = useCallback(() => {
-    if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
-  }, [blockScrollWhilePressing]);
-
-  const openPickerFromEl = useCallback((el) => {
-    const rect = el?.getBoundingClientRect?.();
-    if (!rect) {
-      setPickerPos(null);
-      setIsPickerOpen(true);
-      return;
-    }
-
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    let x = rect.left + rect.width / 2;
-
-    const yAbove = rect.top - 62;
-    let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
-
-    x = clamp(x, 8, vw - 8);
-    y = clamp(y, 8, vh - 8);
-
-    setPickerPos({ x, y });
-    setIsPickerOpen(true);
-  }, []);
-
-  // ✅ ouverture "fiable" depuis un event (clic/tap)
-  const openPickerFromEvent = useCallback((e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (!e) {
-      openPickerFromEl(triggerRef.current || pressableRef.current);
-      return;
-    }
-
-    // On place le picker proche du doigt/clic
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    const clientX = e.clientX ?? (e.touches?.[0]?.clientX);
-    const clientY = e.clientY ?? (e.touches?.[0]?.clientY);
-
-    if (typeof clientX === "number" && typeof clientY === "number") {
-      const x = clamp(clientX, 8, vw - 8);
-      const y = clamp(clientY - 70, 8, vh - 8); // un peu au-dessus
-      setPickerPos({ x, y });
-      setIsPickerOpen(true);
-    } else {
-      openPickerFromEl(triggerRef.current || pressableRef.current);
-    }
-  }, [openPickerFromEl]);
-
-  const rememberInputMode = (mode) => {
-    inputModeRef.current = mode;
-    inputModeTsRef.current = Date.now();
-  };
-
-  const shouldIgnoreBecauseOtherMode = (mode) => {
-    const last = inputModeRef.current;
-    const dt = Date.now() - (inputModeTsRef.current || 0);
-    return last && last !== mode && dt < 800;
-  };
-
-  const armLongPress = useCallback(
-    (el, x, y) => {
-      didLongPressRef.current = false;
-
-      cancelLongPress();
-      blockScrollWhilePressing();
-
-      pressStartRef.current = { x, y };
-
-      longPressTimerRef.current = setTimeout(() => {
-        didLongPressRef.current = true;
-        openPickerFromEl(el);
-        longPressTimerRef.current = null;
-      }, LONG_PRESS_DELAY);
-    },
-    [cancelLongPress, blockScrollWhilePressing, openPickerFromEl]
+.message-bubble.own {
+  background: linear-gradient(
+    100deg,
+    rgb(198 132 10 / 28%) 92%,
+    rgb(221 169 87 / 17%) 100%
   );
+  color: white;
+  align-self: flex-end;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 16px;
 
-  const checkMoveCancel = useCallback(
-    (x, y) => {
-      if (!longPressTimerRef.current) return;
+  width: 50%;
+  margin-right: 30px; /* espace pour bouton */
+}
 
-      const dx = x - pressStartRef.current.x;
-      const dy = y - pressStartRef.current.y;
-      const dist2 = dx * dx + dy * dy;
+.message-bubble.other {
+  background: rgb(30 20 7 / 72%);
+  color: #f7f6f4;
+  align-self: flex-start;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 16px;
 
-      if (dist2 > MOVE_TOLERANCE * MOVE_TOLERANCE) {
-        cancelLongPress();
-        unblockScroll();
-      }
-    },
-    [cancelLongPress, unblockScroll]
-  );
+  width: 50%;
+  margin-left: 30px; /* espace pour bouton */
+}
 
-  const disarmLongPress = useCallback(() => {
-    cancelLongPress();
-    unblockScroll();
-  }, [cancelLongPress, unblockScroll]);
+.message-class {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 
-  const handlePointerDown = (e) => {
-    if (e.pointerType && e.pointerType !== "touch") return;
+.message-text {
+  white-space: pre-line;
+}
 
-    if (shouldIgnoreBecauseOtherMode("pointer")) return;
-    rememberInputMode("pointer");
+/* === Auteur (avatar + nom) === */
+.author-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px;
+  gap: 6px;
+  border-bottom: 1px solid #e0c084;
+}
 
-    if (isCoarsePointer()) e.preventDefault?.();
+.author-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff5;
+  object-fit: cover;
+  box-shadow: 0 0 2px #ddd8;
+  margin-bottom: 6px;
+}
 
-    pointerIdRef.current = e.pointerId;
-    try {
-      e.currentTarget?.setPointerCapture?.(e.pointerId);
-    } catch {}
+.author-name {
+  font-size: 0.97em;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.03em;
+}
 
-    armLongPress(e.currentTarget, e.clientX, e.clientY);
-  };
+/* === Nom inline pour les couples === */
+.author-inline-name {
+  font-size: 0.87em;
+  color: black;
+  margin-top: 3px;
+  text-align: left;
+  opacity: 0.9;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 
-  const handlePointerMove = (e) => {
-    if (e.pointerType && e.pointerType !== "touch") return;
-    checkMoveCancel(e.clientX, e.clientY);
-  };
+/* === Contenu du message === */
+.message-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 8px;
+  box-shadow: 0 1px 5px #0001;
+}
 
-  const handlePointerUp = (e) => {
-    if (e.pointerType && e.pointerType !== "touch") return;
-    disarmLongPress();
-    try {
-      e.currentTarget?.releasePointerCapture?.(e.pointerId);
-    } catch {}
-  };
+/* Zone pressable : laisse le scroll vertical fonctionner + évite callouts */
+.message-content-pressable {
+  touch-action: pan-y;
+}
 
-  const handlePointerCancel = (e) => {
-    if (e.pointerType && e.pointerType !== "touch") return;
-    disarmLongPress();
-    try {
-      e.currentTarget?.releasePointerCapture?.(e.pointerId);
-    } catch {}
-  };
-
-  const handleTouchStart = (e) => {
-    if (!e.touches || e.touches.length !== 1) return;
-
-    if (shouldIgnoreBecauseOtherMode("touch")) return;
-    rememberInputMode("touch");
-
-    const t = e.touches[0];
-    armLongPress(e.currentTarget, t.clientX, t.clientY);
-  };
-
-  const handleTouchMove = (e) => {
-    if (!e.touches || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    checkMoveCancel(t.clientX, t.clientY);
-  };
-
-  const handleTouchEnd = () => {
-    disarmLongPress();
-  };
-
-  const handleTouchCancel = () => {
-    disarmLongPress();
-  };
-
-  const handleContextMenu = (e) => {
-    if (isCoarsePointer()) e.preventDefault();
-  };
-
-  useLayoutEffect(() => {
-    if (!isPickerOpen) return;
-
-    let raf1 = 0;
-    let raf2 = 0;
-
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        const el = pickerRef.current;
-
-        if (el) {
-          el.scrollLeft = 0;
-          el.scrollTo?.({ left: 0, behavior: "auto" });
-        }
-
-        if (pickerPos && el) {
-          const pr = el.getBoundingClientRect();
-          const margin = 8;
-          const vw = window.innerWidth;
-          const vh = window.innerHeight;
-
-          let x = clamp(
-            pickerPos.x,
-            margin + pr.width / 2,
-            vw - margin - pr.width / 2
-          );
-          let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
-
-          if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
-        }
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [isPickerOpen, pickerPos]);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (!isPickerOpen) return;
-
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(e.target) &&
-        pressableRef.current &&
-        !pressableRef.current.contains(e.target) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(e.target)
-      ) {
-        setIsPickerOpen(false);
-      }
-    }
-
-    function handleEsc(e) {
-      if (e.key === "Escape") setIsPickerOpen(false);
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside, { passive: true });
-    document.addEventListener("keydown", handleEsc);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleEsc);
-      cancelLongPress();
-      unblockScroll();
-    };
-  }, [isPickerOpen, cancelLongPress, unblockScroll]);
-
-  /* --------------------------- Infos message --------------------------- */
-  const isOwn = msg.auteurId === utilisateur.id;
-  const auteurIsCouple = msg.auteur?.type === "couple";
-
-  const showAuthorInfo =
-    auteurIsCouple ||
-    !previousMsg ||
-    previousMsg.auteurId !== msg.auteurId ||
-    previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
-
-  const heure = msg.createdAt
-    ? new Date(msg.createdAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
-
-  const statutTexte = useMemo(() => {
-    if (!isOwn || !lastReads || !msg.createdAt) return "";
-    const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
-    if (!autresLecteurs.length) return "✔ Envoyé";
-
-    const msgTime = new Date(msg.createdAt).getTime();
-    let lus = 0;
-
-    for (const r of autresLecteurs) {
-      if (!r?.lastReadAt) continue;
-      if (new Date(r.lastReadAt).getTime() > msgTime) lus++;
-    }
-
-    if (lus === autresLecteurs.length && lus > 0) return "✔✔ Vu";
-    if (lus > 0) return "✔✔ Reçu";
-    return "✔ Envoyé";
-  }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
-
-  const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
-  const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
-  const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
-
-  const groupedReactions = useMemo(() => {
-    const rx = msg.reactions || [];
-    if (!rx.length) return [];
-    return Object.entries(
-      rx.reduce((acc, r) => {
-        if (!acc[r.emoji]) acc[r.emoji] = new Set();
-        acc[r.emoji].add(r.utilisateurId);
-        return acc;
-      }, {})
-    );
-  }, [msg.reactions]);
-
-  if (msg.type === "EPHEMERE") {
-    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
+@media (pointer: coarse) {
+  .message-content-pressable {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
-  if (msg.type === "SYSTEME") {
-    return (
-      <div className="message-systeme">
-        <span>📝 {msg.texte || msg.contenu}</span>
-      </div>
-    );
+  .message-image {
+    -webkit-user-drag: none;
+    user-drag: none;
   }
-
-  return (
-    <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
-      {showAuthorInfo && (
-        <div className="author-info">
-          <img
-            src={auteurPhotoUrl || "/default.jpg"}
-            alt={msg.auteur?.pseudo || "Utilisateur"}
-            className="author-avatar"
-            loading="lazy"
-            decoding="async"
-          />
-          <div>
-            {msg.prenomEnvoyeur ? (
-              <span className="author-name">{msg.prenomEnvoyeur}</span>
-            ) : (
-              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
-            )}
-            {auteurIsCouple && prenomsCouple && (
-              <span
-                className="author-couple-names"
-                style={{
-                  marginLeft: 4,
-                  color: "#b5a06c",
-                  fontSize: "0.95em",
-                  fontStyle: "italic",
-                }}
-              >
-                ({prenomsCouple})
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ✅ Le message (on garde ton long-press, mais ce n'est PLUS la méthode principale) */}
-      <div
-        ref={pressableRef}
-        className="message-content-pressable"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
-        onContextMenu={handleContextMenu}
-        onClickCapture={(e) => {
-          // si long-press a ouvert → on stoppe le click fantôme
-          if (didLongPressRef.current) {
-            e.preventDefault();
-            e.stopPropagation();
-            didLongPressRef.current = false;
-          }
-        }}
-      >
-        {msg.type === "IMAGE" && msg.imageUrl ? (
-          <img
-            src={imageMsgUrl || "/default.jpg"}
-            alt="image envoyée"
-            className="message-image"
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-          />
-        ) : msg.type === "AUDIO" && msg.audioUrl ? (
-          <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
-        ) : (
-          <p className="message-text">{msg.contenu}</p>
-        )}
-      </div>
-
-      {/* ✅ Bouton "comme sur l'app" pour déclencher les réactions (FIABLE) */}
-      <button
-        ref={triggerRef}
-        className="message-react-btn"
-        type="button"
-        onMouseDown={(e) => {
-          // desktop: on évite de perdre le focus / déclencher des sélections
-          e.preventDefault();
-        }}
-        onClick={(e) => {
-          if (isPickerOpen) {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsPickerOpen(false);
-            return;
-          }
-          openPickerFromEvent(e);
-        }}
-        onTouchStart={(e) => {
-          // mobile: ouverture immédiate au tap (plus fiable que long press)
-          if (isPickerOpen) return;
-          openPickerFromEvent(e);
-        }}
-        aria-label="Réagir"
-        title="Réagir"
-      >
-        😊
-      </button>
-
-      {isOwn && (
-        <button
-          className="delete-message-button"
-          onClick={() => onDelete?.(msg.id)}
-          title="Supprimer ce message"
-          type="button"
-        >
-          🗑️
-        </button>
-      )}
-
-      {groupedReactions.length > 0 && (
-        <div className="message-reactions">
-          {groupedReactions.map(([emoji, utilisateursSet]) => {
-            const nb = utilisateursSet.size;
-            const userHasReacted = msg.reactions?.some(
-              (r) => r.emoji === emoji && r.utilisateurId === utilisateur.id
-            );
-
-            return (
-              <span
-                key={emoji}
-                className={`reaction-item ${userHasReacted ? "user-reaction" : ""}`}
-                title={
-                  (emojiTooltips[emoji] || "") +
-                  " — " +
-                  (nb > 1 ? `${nb} personnes` : "1 personne")
-                }
-                onClick={() => onReact?.(msg.id, emoji)}
-              >
-                <span>{emoji}</span>
-                <span>{nb}</span>
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {isPickerOpen && (
-        <div
-          ref={pickerRef}
-          className="reaction-picker reaction-picker-fixed"
-          style={
-            pickerPos
-              ? {
-                  left: pickerPos.x,
-                  top: pickerPos.y,
-                  transform: "translateX(-50%)",
-                }
-              : undefined
-          }
-        >
-          {activePack.map((emo) => (
-            <button
-              key={emo}
-              type="button"
-              className="reaction-option"
-              title={emojiTooltips[emo] || ""}
-              onClick={() => {
-                onReact?.(msg.id, emo);
-                setIsPickerOpen(false);
-              }}
-            >
-              {emo}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="message-meta">
-        <span className="message-time">{heure}</span>
-        {isOwn && <span className="message-status">{statutTexte}</span>}
-      </div>
-    </div>
-  );
 }
 
-export default React.memo(MessageBubble);
+/* === Infos meta (heure, statut) === */
+.message-meta {
+  display: flex;
+  gap: 12px;
+}
+
+.message-time {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* =========================================================
+   ✅ Réactions / Emojis (PROPRE + FIABLE)
+   ========================================================= */
+
+/* Bouton 😊 (toujours le même, plus de doublons) */
+.message-react-btn{
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(10,10,12,0.55);
+  color: #f7f6f4;
+
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 6;
+
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+/* Position en dehors de la bulle */
+.message-bubble.own .message-react-btn{
+  right: -18px;
+}
+.message-bubble.other .message-react-btn{
+  left: -18px;
+}
+
+/* Desktop : visible au survol */
+@media (hover: hover) and (pointer: fine){
+  .message-react-btn{
+    opacity: 0;
+    pointer-events: none;
+  }
+  .message-bubble:hover .message-react-btn{
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Mobile : toujours visible */
+@media (hover: none){
+  .message-react-btn{
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.message-react-btn:hover{
+  transform: translateY(-50%) scale(1.06);
+  background: rgba(10,10,12,0.7);
+}
+
+/* Picker en FIXED (ne sera jamais coupé par un overflow parent) */
+.reaction-picker-fixed{
+  position: fixed !important;
+  z-index: 9999;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  background: rgba(5,5,9,0.95);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+
+  display: flex;
+  gap: 6px;
+
+  max-width: min(92vw, 360px);
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  direction: ltr;
+  unicode-bidi: isolate;
+
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  white-space: nowrap;
+}
+
+.reaction-picker-fixed::-webkit-scrollbar{ display:none; }
+
+.reaction-option{
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  padding: 4px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+.reaction-option:hover{
+  transform: scale(1.22);
+}
+
+/* Réactions affichées sous le message */
+.message-reactions {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: rgb(0 0 0 / 25%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  font-size: 0.8rem;
+}
+
+.reaction-item {
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b96c21;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.reaction-item.user-reaction {
+  background: #f8e7cc;
+  color: #4d3314;
+}
+
+.reaction-item:hover {
+  transform: translateY(-1px);
+  background: #e9dbbd;
+}
+
+/* Tooltip */
+.reaction-item:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+/* =========================================================
+   Bouton supprimer
+   ========================================================= */
+.delete-message-button {
+  background: transparent;
+  border: none;
+  color: #b4b4b4;
+  cursor: pointer;
+  margin-left: 10px;
+  font-size: 1em;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  opacity: 0.4;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.delete-message-button:hover {
+  color: #e66;
+  opacity: 1;
+}
+
+.message-bubble.own .delete-message-button {
+  color: white;
+}
+
+/* === Zone saisie message === */
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.input-wrapper {
+  flex: 1;
+}
+
+.input-text {
+  flex: 6 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: rgb(255 255 255 / 5%);
+  color: #e0c084;
+  font-family: inherit;
+  line-height: 1.4;
+  width: 100%;
+}
+
+.input-text:focus {
+  outline: none;
+  box-shadow: 0 0 3px #e0c084;
+}
+
+.message-btn,
+.audio-btn,
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.message-btn {
+  color: white;
+}
+
+.audio-btn.recording {
+  color: red;
+}
+
+/* === Typing Indicator === */
+.typing-indicator {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin: 4px 14px;
+  font-style: italic;
+}
+
+/* === Audio message === */
+.audio-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.playpause-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #e0c084;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, opacity 0.2s, transform 0.2s;
+  opacity: 1;
+}
+
+.playpause-button:hover {
+  color: #fff;
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+.audio-progress {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #eee;
+  margin: 0 8px;
+  cursor: pointer;
+  position: relative;
+  min-width: 60px;
+  overflow: hidden;
+}
+
+.audio-progress-bar {
+  height: 100%;
+  background: #e0c084;
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+.duration {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  min-width: 55px;
+  text-align: right;
+  color: #fff3ce;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .audio-bubble { font-size: 16px; }
+  .playpause-button { font-size: 20px; }
+  .duration { font-size: 9px; }
+
+  .message-bubble.own,
+  .message-bubble.other {
+    width: 60%;
+  }
+
+  .input-wrapper {
+    display: flex;
+    gap: 16px;
+  }
+
+  .message-btn {
+    padding: 0.7rem 2rem !important;
+  }
+
+  .message-bubble {
+    max-width: 94vw;
+    padding: 10px 10px 6px;
+  }
+
+  .author-info { gap: 4px; }
+  .author-avatar { width: 22px; height: 22px; }
+}
+
+/* === Webcam / Visio === */
+.mini-webcam {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 160px;
+  height: 120px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: #000;
+  z-index: 1000;
+  object-fit: cover;
+}
+
+.mini-webcam.remote {
+  right: 200px;
+}
+
+.video-call-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #111;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  height: auto;
+}
+
+.video-call-container video {
+  width: 100%;
+  border-radius: 8px;
+  margin: 5px;
+  background: #000;
+}
+
+.video-box {
+  position: relative;
+  display: inline-block;
+  margin: 0.5rem;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 40%);
+}
+
+.video-box video {
+  width: 240px;
+  height: 180px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.video-label {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  background: rgb(0 0 0 / 60%);
+  color: white;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+.hangup-button {
+  background: red;
+  color: white;
+  padding: 6px 12px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* === Modal ajout === */
+.add-participant-modal {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 3000;
+  background: #2c3e50;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #0002;
+  min-width: 290px;
+}
+
+.add-participant-modal h3 {
+  margin-top: 0;
+  text-align: center;
+}
+
+/* === Message système === */
+.message-systeme {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  font-size: 0.99em;
+  opacity: 0.92;
+  margin: 10px 0;
+  letter-spacing: 0.01em;
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+
+/* === Responsive === */
+@media screen and (max-width: 768px) {
+  .chat-input { flex-direction: column; }
+
+  .participant-name {
+    display: inline-block;
+    max-width: 80px;
+    font-size: 0.8rem;
+  }
+}
+
+.chat-input-ephemere-btn,
+.chat-input-mic-btn,
+.chat-input-emoji-btn {
+  background-color: transparent;
+  border: none;
+}
+
+/* 🧷 Header toujours visible sur mobile */
+@media (max-width: 768px) {
+  .chatbox-container {
+    position: relative;
+    height: 100vh;
+    box-sizing: border-box;
+  }
+
+  .chat-header-mobile {
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: #050509;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+/* Back button header */
+.chat-back-btn {
+  background: none;
+  border: none;
+  color: #e0c084;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  padding: 0;
+}
+
+.chat-back-btn:hover {
+  opacity: 0.8;
+  transform: translateX(-1px);
+}
