@@ -161,6 +161,44 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       container.scrollTop = container.scrollHeight;
     }
   }, []);
+// ✅ Re-scroll si la hauteur change (images/presign/etc.)
+// ➜ on le garde actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
+useEffect(() => {
+  if (!conversationId) return;
+  if (typeof ResizeObserver === "undefined") return;
+
+  const el = messagesContainerRef.current;
+  if (!el) return;
+
+  let raf1 = null;
+  let raf2 = null;
+
+  const reScroll = () => {
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        // ✅ si on est en ouverture OU si l’utilisateur est déjà en bas, on recolle
+        if (loadingInitial || atBottomRef.current) {
+          scrollToBottom(false);
+        }
+      });
+    });
+  };
+
+  // 1er scroll dès qu'on peut
+  reScroll();
+
+  const ro = new ResizeObserver(() => {
+    reScroll();
+  });
+
+  ro.observe(el);
+
+  return () => {
+    ro.disconnect();
+    if (raf1) cancelAnimationFrame(raf1);
+    if (raf2) cancelAnimationFrame(raf2);
+  };
+}, [conversationId, loadingInitial, scrollToBottom]);
 
   const {
     messages,
@@ -363,18 +401,38 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
-  // ✅ Ouverture conversation : scroll 1 seule fois quand messages dispo
-  useLayoutEffect(() => {
-    if (!conversationId) return;
-    if (loadingInitial && messages?.length) {
+
+ // ✅ Ouverture conversation : scroll 1 seule fois quand messages OK (et pas ceux de l’ancienne conv)
+useLayoutEffect(() => {
+  if (!conversationId) return;
+  if (!loadingInitial) return;
+  if (isLoading) return;
+  if (!messages?.length) return;
+
+  let tries = 0;
+  const maxTries = 6;
+
+  const attempt = () => {
+    tries += 1;
+
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        if (!messagesContainerRef.current) {
+          if (tries < maxTries) setTimeout(attempt, 50);
+          return;
+        }
+
         scrollToBottom(false);
         hasScrolledInitialRef.current = true;
         lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
         setLoadingInitial(false);
       });
-    }
-  }, [conversationId, loadingInitial, messages?.length, scrollToBottom, messages]);
+    });
+  };
+
+  attempt();
+}, [conversationId, loadingInitial, isLoading, messages?.length, scrollToBottom, messages]);
+
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
