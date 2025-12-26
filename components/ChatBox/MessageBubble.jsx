@@ -1,23 +1,60 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
 
+/* =========================================================
+   ✅ PERF: cache global + inflight pour presign (1 requête/key)
+   ========================================================= */
+const PRESIGN_CACHE = new Map();     // key -> url
+const PRESIGN_INFLIGHT = new Map();  // key -> Promise
+
 function usePresignedPhoto(photoKey) {
-  const [url, setUrl] = useState(null);
+  const [url, setUrl] = useState(() => {
+    if (!photoKey) return "/default.jpg";
+    if (typeof photoKey === "string" && photoKey.startsWith("http")) return photoKey;
+    return PRESIGN_CACHE.get(photoKey) || null;
+  });
 
   useEffect(() => {
-    if (!photoKey) return setUrl("/default.jpg");
-    if (photoKey.startsWith("http")) return setUrl(photoKey);
+    if (!photoKey) {
+      setUrl("/default.jpg");
+      return;
+    }
 
-    fetch("/api/photos/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: photoKey }),
-    })
-      .then((res) => res.json())
-      .then((data) => setUrl(data.url || "/default.jpg"))
-      .catch(() => setUrl("/default.jpg"));
+    if (typeof photoKey === "string" && photoKey.startsWith("http")) {
+      setUrl(photoKey);
+      return;
+    }
+
+    const cached = PRESIGN_CACHE.get(photoKey);
+    if (cached) {
+      setUrl(cached);
+      return;
+    }
+
+    let p = PRESIGN_INFLIGHT.get(photoKey);
+    if (!p) {
+      p = fetch("/api/photos/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: photoKey }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          const finalUrl = data?.url || "/default.jpg";
+          PRESIGN_CACHE.set(photoKey, finalUrl);
+          return finalUrl;
+        })
+        .catch(() => "/default.jpg")
+        .finally(() => {
+          PRESIGN_INFLIGHT.delete(photoKey);
+        });
+
+      PRESIGN_INFLIGHT.set(photoKey, p);
+    }
+
+    p.then((finalUrl) => setUrl(finalUrl));
   }, [photoKey]);
 
   return url;
@@ -27,7 +64,7 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-export default function MessageBubble({
+function MessageBubble({
   msg,
   utilisateur,
   previousMsg,
@@ -306,7 +343,7 @@ export default function MessageBubble({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isPickerOpen]); // simple
+  }, [isPickerOpen, pickerPos]);
 
   // fermeture click dehors + ESC
   useEffect(() => {
@@ -359,28 +396,39 @@ export default function MessageBubble({
       })
     : "";
 
-  let statutTexte = "";
-  if (isOwn && lastReads) {
+  // ✅ PERF: calc statut via useMemo
+  const statutTexte = useMemo(() => {
+    if (!isOwn || !lastReads || !msg.createdAt) return "";
     const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
-    const lus = autresLecteurs.filter(
-      (r) => r.lastReadAt && new Date(r.lastReadAt) > new Date(msg.createdAt)
-    );
-    if (lus.length === autresLecteurs.length && lus.length > 0) statutTexte = "✔✔ Vu";
-    else if (lus.length > 0) statutTexte = "✔✔ Reçu";
-    else statutTexte = "✔ Envoyé";
-  }
+    if (!autresLecteurs.length) return "✔ Envoyé";
+
+    const msgTime = new Date(msg.createdAt).getTime();
+    let lus = 0;
+
+    for (const r of autresLecteurs) {
+      if (!r?.lastReadAt) continue;
+      if (new Date(r.lastReadAt).getTime() > msgTime) lus++;
+    }
+
+    if (lus === autresLecteurs.length && lus > 0) return "✔✔ Vu";
+    if (lus > 0) return "✔✔ Reçu";
+    return "✔ Envoyé";
+  }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
 
   const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
   const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
   const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
 
-  const groupedReactions = Object.entries(
-    (msg.reactions || []).reduce((acc, r) => {
-      if (!acc[r.emoji]) acc[r.emoji] = new Set();
-      acc[r.emoji].add(r.utilisateurId);
-      return acc;
-    }, {})
-  );
+  // ✅ PERF: groupedReactions en memo
+  const groupedReactions = useMemo(() => {
+    return Object.entries(
+      (msg.reactions || []).reduce((acc, r) => {
+        if (!acc[r.emoji]) acc[r.emoji] = new Set();
+        acc[r.emoji].add(r.utilisateurId);
+        return acc;
+      }, {})
+    );
+  }, [msg.reactions]);
 
   if (msg.type === "EPHEMERE") {
     return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
@@ -556,3 +604,5 @@ export default function MessageBubble({
     </div>
   );
 }
+
+export default React.memo(MessageBubble);

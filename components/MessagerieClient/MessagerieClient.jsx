@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ListeConversations from "../ListeConversations/ListeConversations";
 import dynamic from "next/dynamic";
@@ -13,16 +13,29 @@ const ChatBox = dynamic(() => import("../ChatBox/ChatBox"), {
   loading: () => <p>Chargement du chat...</p>,
 });
 
-// HOOK pour détecter le mobile
+// ✅ Hook mobile optimisé : throttle RAF + pas de setState si inchangé
 function useIsMobile(breakpoint = 900) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" && window.innerWidth < breakpoint
-  );
+  const get = () =>
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false;
+
+  const [isMobile, setIsMobile] = useState(get);
 
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
+    let raf = 0;
+
+    const handler = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const next = get();
+        setIsMobile((prev) => (prev === next ? prev : next));
+      });
+    };
+
+    window.addEventListener("resize", handler, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", handler);
+    };
   }, [breakpoint]);
 
   return isMobile;
@@ -32,14 +45,19 @@ export default function MessagerieClient({ user }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [conversationId, setConversationId] = useState(null);
-
   const { user: currentUser, refreshUser, loading } = useAuth();
 
   // 🧍 user courant : priorité au contexte, sinon user passé par la page
   const displayedUser = currentUser ?? user;
 
   const isMobile = useIsMobile(900);
+
+  // ✅ Source de vérité : URL
+  const conversationId = useMemo(() => {
+    const id = searchParams.get("conversationId");
+    const n = Number(id);
+    return id && !isNaN(n) ? n : null;
+  }, [searchParams]);
 
   // ⚡ Ne rafraîchir l'user QUE si on n'en a vraiment pas encore
   useEffect(() => {
@@ -48,43 +66,45 @@ export default function MessagerieClient({ user }) {
     }
   }, [currentUser, loading, refreshUser]);
 
-  // ⚡ Pré-chargement du bundle ChatBox en tâche de fond
+  // ⚡ Pré-chargement ChatBox en idle (moins impact au chargement)
   useEffect(() => {
-    // pas de await, juste pour que le chunk soit chargé
-    import("../ChatBox/ChatBox").catch(() => {});
+    const run = () => import("../ChatBox/ChatBox").catch(() => {});
+    if (typeof window === "undefined") return;
+
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(run, { timeout: 1200 });
+      return () => window.cancelIdleCallback(id);
+    } else {
+      const t = setTimeout(run, 300);
+      return () => clearTimeout(t);
+    }
   }, []);
 
-  // Marquer les messages non lus comme lus (en tâche de fond)
+  // ✅ Patch non lus : une fois par user (pas à chaque re-render)
+  const patchedNonLusRef = useRef(null);
   useEffect(() => {
     if (!displayedUser?.id) return;
 
-    fetch("/api/messages/nonlus", {
-      method: "PATCH",
-    }).catch(() => {});
+    if (patchedNonLusRef.current === displayedUser.id) return;
+    patchedNonLusRef.current = displayedUser.id;
+
+    // tâche de fond, non bloquante
+    fetch("/api/messages/nonlus", { method: "PATCH" }).catch(() => {});
   }, [displayedUser?.id]);
 
-  // ✅ Source de vérité = query `conversationId`
-  useEffect(() => {
-    const id = searchParams.get("conversationId");
-    if (id && !isNaN(Number(id))) {
-      setConversationId(Number(id));
-    } else {
-      setConversationId(null);
-    }
-  }, [searchParams]);
+  const handleSelectConversation = useCallback(
+    (id) => {
+      router.push(`/messagerie?conversationId=${id}`, { scroll: false });
+      // ❌ plus besoin de setState: l’URL pilote le render
+    },
+    [router]
+  );
 
-  const handleSelectConversation = (id) => {
-    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
-    setConversationId(id);
-  };
-
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     router.push(`/messagerie`, { scroll: false });
-    setConversationId(null);
-  };
+  }, [router]);
 
   // 🟡 Cas où on n'a aucun user et que le contexte est encore en chargement
-  // => on affiche juste le spinner
   if (!displayedUser?.id && loading) {
     return (
       <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
@@ -93,7 +113,7 @@ export default function MessagerieClient({ user }) {
     );
   }
 
-  // 🔴 Cas où on n'a pas d'user du tout (ni prop, ni contexte)
+  // 🔴 Cas où on n'a pas d'user du tout
   if (!displayedUser?.id) {
     return (
       <div style={{ textAlign: "center", marginTop: 40, color: "#b89760" }}>
@@ -115,17 +135,17 @@ export default function MessagerieClient({ user }) {
           />
         </div>
       );
-    } else {
-      return (
-        <div className="messagerie-mobile-chat">
-          <ChatBox
-            conversationId={conversationId}
-            utilisateur={displayedUser}
-            onBack={handleBack}
-          />
-        </div>
-      );
     }
+
+    return (
+      <div className="messagerie-mobile-chat">
+        <ChatBox
+          conversationId={conversationId}
+          utilisateur={displayedUser}
+          onBack={handleBack}
+        />
+      </div>
+    );
   }
 
   // --- DESKTOP VIEW ---
