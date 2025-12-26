@@ -89,10 +89,6 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function isHttp(u) {
-  return typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"));
-}
-
 function MessageBubble({
   msg,
   utilisateur,
@@ -134,6 +130,8 @@ function MessageBubble({
   const [pickerPos, setPickerPos] = useState(null); // { x, y }
   const pickerRef = useRef(null);
   const pressableRef = useRef(null);
+
+  // ✅ bouton desktop 😊
   const triggerRef = useRef(null);
 
   /* ---------- Long press (ULTRA FIABLE) ---------- */
@@ -142,6 +140,7 @@ function MessageBubble({
   const pointerIdRef = useRef(null);
 
   const didLongPressRef = useRef(false);
+
   const unblockTouchMoveRef = useRef(null);
 
   const inputModeRef = useRef(null); // "pointer" | "touch"
@@ -429,20 +428,10 @@ function MessageBubble({
     return "✔ Envoyé";
   }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
 
-  /* ✅ PERF: si MessagesList a déjà injecté une URL http, on la prend DIRECT.
-     Sinon fallback sur usePresignedPhoto.
-   */
-  const auteurPhotoUrl = isHttp(msg.auteur?.photoUrl)
-    ? msg.auteur.photoUrl
-    : usePresignedPhoto(msg.auteur?.photoUrl);
-
-  const imageMsgUrl = isHttp(msg.imageUrl)
-    ? msg.imageUrl
-    : usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
-
-  const audioMsgUrl = isHttp(msg.audioUrl)
-    ? msg.audioUrl
-    : usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
+  // ✅ Important : on garde tes presign, mais optimisés (TTL + no double setState)
+  const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
+  const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
+  const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
 
   const groupedReactions = useMemo(() => {
     const rx = msg.reactions || [];
