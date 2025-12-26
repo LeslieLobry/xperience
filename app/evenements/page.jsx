@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
 import FiltreEvenements from "../../components/FiltreEvenements/FiltreEvenements";
 import { useRouter } from "next/navigation";
+import "./evenements.css"
 
 // --- Composant pour gérer les images S3 privées ou publiques ---
 function PresignedImage({ s3Key, alt, ...props }) {
