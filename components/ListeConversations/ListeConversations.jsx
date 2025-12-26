@@ -238,6 +238,17 @@ function writeConvCache(data) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* ✅ Warm fetch messages (accélère l’ouverture d’une conversation)           */
+/* -------------------------------------------------------------------------- */
+function warmMessages(conversationId) {
+  // aucune attente / aucun blocage : juste "chauffe" cache navigateur / CDN
+  fetch(`/api/messages?conversationId=${conversationId}&limit=30`, {
+    credentials: "include",
+    cache: "no-store",
+  }).catch(() => {});
+}
+
+/* -------------------------------------------------------------------------- */
 /* 🔹 Composant principal                                                     */
 /* -------------------------------------------------------------------------- */
 export default function ListeConversations({
@@ -553,6 +564,18 @@ export default function ListeConversations({
               className="conversation-clickable"
               data-id={conv.id}
               onClick={handleClickItem}
+              // ✅ NEW: précharge la route dès qu’on survole (desktop)
+              onMouseEnter={() => {
+                router.prefetch(`/messagerie?conversationId=${conv.id}`);
+              }}
+              // ✅ NEW: pareil au focus clavier
+              onFocus={() => {
+                router.prefetch(`/messagerie?conversationId=${conv.id}`);
+              }}
+              // ✅ NEW: warm fetch des messages AVANT le click (mobile/desktop)
+              onPointerDown={() => {
+                warmMessages(conv.id);
+              }}
             >
               <div className="conv-main">
                 <div className="conv-avatar">

@@ -266,6 +266,16 @@ model Message {
   duree          String?
   type           MessageType  @default(TEXTE)
   lu             Boolean      @default(false)
+
+  // ✅ EPHEMERE : expiration + suppression logique
+  expiresAt      DateTime?
+  deletedAt      DateTime?
+
+  // ✅ (reco S3) clés de stockage pour deleteObject
+  imageKey       String?
+  videoKey       String?
+  audioKey       String?
+
   createdAt      DateTime     @default(now())
   openedAt       DateTime?    @map("opened_at")
   auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
@@ -274,11 +284,17 @@ model Message {
   envoyeur       String?
   prenomEnvoyeur String?
   digestNotifications DigestNotification[] @relation("DigestToMessage")
+
   @@index([conversationId, id])
   @@index([conversationId, createdAt])
 
+  // ✅ utile pour cleanup
+  @@index([type, expiresAt])
+  @@index([deletedAt])
+
   @@map("Message")
 }
+
 
 model Photo {
   id              Int            @id @default(autoincrement())

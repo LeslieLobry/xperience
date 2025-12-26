@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// ✅ TTL après "vu" (en secondes) — défaut 30s
+const EPHEMERE_TTL_SECONDS = Number(process.env.EPHEMERE_TTL_SECONDS || 30);
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST,OPTIONS",
@@ -73,10 +76,16 @@ export async function POST(req) {
 
     const ids = messageIds?.length ? messageIds : [messageId];
 
-    // ✅ on récupère conversationId pour vérifier les droits
+    // ✅ on récupère conversationId + infos EPHEMERE
     const messages = await prisma.message.findMany({
       where: { id: { in: ids } },
-      select: { id: true, conversationId: true },
+      select: {
+        id: true,
+        conversationId: true,
+        auteurId: true,
+        type: true,
+        openedAt: true,
+      },
     });
 
     if (!messages.length) {
@@ -103,10 +112,31 @@ export async function POST(req) {
       );
     }
 
-    // ✅ update en une seule requête
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + EPHEMERE_TTL_SECONDS * 1000);
+
+    // ✅ 1) Marquer comme lu (tout)
+    // (on garde ton updateMany, performant)
     await prisma.message.updateMany({
       where: { id: { in: messages.map((m) => m.id) } },
       data: { lu: true },
+    });
+
+    // ✅ 2) Si EPHEMERE : démarrer le compte à rebours au 1er "vu" du destinataire
+    // - uniquement si c'est le destinataire (auteurId != user.id)
+    // - uniquement si pas déjà opened
+    // ⚠️ nécessite la colonne expiresAt en DB
+    await prisma.message.updateMany({
+      where: {
+        id: { in: messages.map((m) => m.id) },
+        type: "EPHEMERE",
+        openedAt: null,
+        auteurId: { not: user.id },
+      },
+      data: {
+        openedAt: now,
+        expiresAt,
+      },
     });
 
     return NextResponse.json(
