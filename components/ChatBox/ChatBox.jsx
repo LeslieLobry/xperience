@@ -559,7 +559,8 @@ useLayoutEffect(() => {
     if (atBottomRef.current) {
       scrollToBottom(true);
     }
-  }, [messages, utilisateur?.id, scrollToBottom]);
+  }, [messages?.length, utilisateur?.id, scrollToBottom]);
+
 
   /* --------------------- Cleanup global à l’unmount ---------------------- */
   useEffect(() => {
