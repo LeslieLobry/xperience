@@ -160,7 +160,7 @@ export async function POST(req) {
         })
       );
 
-      // Stocke la clé S3
+      // Stocke la clé S3 (tu utilises imageUrl/audioUrl comme storageKey, on garde)
       if (file.type.startsWith("audio/")) {
         body.audioUrl = fileName;
       } else {
@@ -216,6 +216,10 @@ export async function POST(req) {
 
     let prenomEnvoyeur = body.prenomEnvoyeur || null;
 
+    // ✅ EPHEMERE: doit expirer uniquement après "vu"
+    // => openedAt = null, expiresAt = null à la création
+    const isEphemere = type === "EPHEMERE";
+
     console.log("[LOG][POST] création message…");
     const message = await prisma.message.create({
       data: {
@@ -230,7 +234,12 @@ export async function POST(req) {
         lu: false,
         envoyeur: envoyeur || null,
         prenomEnvoyeur: prenomEnvoyeur || null,
+
         openedAt: null,
+        // ✅ nouveau champ (doit exister en DB)
+        expiresAt: isEphemere ? null : null,
+        // ✅ optionnel si tu l’ajoutes en DB plus tard
+        // deletedAt: null,
       },
       include: {
         auteur: {
@@ -375,18 +384,13 @@ export async function POST(req) {
     );
   }
 }
+
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const conversationId = parseInt(
-      searchParams.get("conversationId") || "",
-      10
-    );
+    const conversationId = parseInt(searchParams.get("conversationId") || "", 10);
     const beforeId = searchParams.get("beforeId");
-    const limit = Math.min(
-      parseInt(searchParams.get("limit") || "30", 10),
-      50
-    );
+    const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 50);
 
     console.log("[LOG][GET] params:", { conversationId, beforeId, limit });
 
@@ -440,10 +444,25 @@ export async function GET(req) {
       );
     }
 
+    // ✅ Filtrage EPHEMERE expirés
+    const now = new Date();
+
     // 🔥 Pagination : on prend limit + 1 pour savoir s'il reste des messages
     const where = {
       conversationId,
       ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
+
+      // ✅ cache les ephemères expirés (et deleted si tu l’ajoutes)
+      AND: [
+        // { deletedAt: null }, // si tu ajoutes deletedAt en DB + Prisma
+        {
+          OR: [
+            { type: { not: "EPHEMERE" } },
+            { type: "EPHEMERE", expiresAt: null }, // pas encore vu => visible
+            { type: "EPHEMERE", expiresAt: { gt: now } }, // vu mais pas encore expiré => visible
+          ],
+        },
+      ],
     };
 
     const rows = await prisma.message.findMany({
@@ -461,6 +480,11 @@ export async function GET(req) {
         createdAt: true,
         auteurId: true,
         lu: true,
+
+        // ✅ utile si tu veux afficher un timer côté front
+        openedAt: true,
+        expiresAt: true,
+
         auteur: {
           select: { id: true, pseudo: true, photoUrl: true, type: true },
         },
@@ -496,6 +520,7 @@ export async function GET(req) {
         imageUrl: m.imageUrl,
         audioUrl: m.audioUrl,
         createdAt: m.createdAt,
+        expiresAt: m.expiresAt,
       }))
     );
 
