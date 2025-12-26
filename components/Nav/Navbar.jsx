@@ -209,12 +209,13 @@ export default function Navbar() {
 
   // ✅ Affichage prénom/pseudo auteur (si l’API le renvoie)
   const getNotifText = useCallback((notif) => {
-    const actor =
-      notif?.auteur?.prenom ||
-      notif?.auteur?.pseudo ||
-      notif?.acteur?.prenom ||
-      notif?.acteur?.pseudo ||
-      "";
+   const actor =
+  notif?.auteur?.pseudo ||
+  notif?.auteur?.prenom ||
+  notif?.acteur?.pseudo ||
+  notif?.acteur?.prenom ||
+  "";
+
 
     // Si ton message est du style "a aimé votre profil" → on préfixe
     return actor ? `${actor} ${notif.message}` : notif.message;
