@@ -711,7 +711,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               </ul>
             )}
           </div>
-
+{/* 
           <input
             type="text"
             inputMode="numeric"
@@ -731,9 +731,9 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onChange={handleChange}
             />
             Autour de moi
-          </label>
+          </label> */}
 
-          <label>
+          {/* <label>
             <input
               type="checkbox"
               name="photo"
@@ -741,8 +741,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onChange={handleChange}
             />
             Avec photo
-          </label>
-
+          </label> */}
+{/* 
           <label>
             <input
               type="checkbox"
@@ -751,7 +751,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onChange={handleChange}
             />
             Avec description
-          </label>
+          </label> */}
 
           <h4>Statut</h4>
           <label>
