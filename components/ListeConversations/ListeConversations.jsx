@@ -46,9 +46,9 @@ function getInitials(name) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Presign cache global (évite 50 requêtes)                                */
+/* ✅ Presign cache global                                                    */
 /* -------------------------------------------------------------------------- */
-const PRESIGN_TTL_MS = 50 * 60 * 1000; // 50 min (si tes URLs durent 1h)
+const PRESIGN_TTL_MS = 50 * 60 * 1000;
 const presignCache = new Map(); // key -> { url, exp }
 const presignInflight = new Map(); // key -> Promise
 
@@ -81,7 +81,6 @@ async function getPresignedUrl(key) {
   return p;
 }
 
-/* Limiteur de concurrence (évite de spammer le navigateur) */
 async function mapWithConcurrency(items, limit, mapper) {
   const ret = new Array(items.length);
   let i = 0;
@@ -98,7 +97,7 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ HOOK: presign photos (priorité aux visibles + background)               */
+/* ✅ HOOK: presign photos                                                    */
 /* -------------------------------------------------------------------------- */
 function usePresignedPhotos(users, priorityCount = 12) {
   const [photoUrls, setPhotoUrls] = useState({});
@@ -116,7 +115,6 @@ function usePresignedPhotos(users, priorityCount = 12) {
 
     let canceled = false;
 
-    // uniq users
     const seen = new Set();
     const uniq = [];
     for (const u of users) {
@@ -126,12 +124,13 @@ function usePresignedPhotos(users, priorityCount = 12) {
       uniq.push(u);
     }
 
-    // split priorité / background
     const priority = uniq.slice(0, priorityCount);
     const background = uniq.slice(priorityCount);
 
     const hydrateFromCache = () => {
       const partial = {};
+      const now = Date.now();
+
       for (const u of uniq) {
         if (!u.photoUrl) {
           partial[u.id] = "/default.jpg";
@@ -142,25 +141,25 @@ function usePresignedPhotos(users, priorityCount = 12) {
           continue;
         }
         const cached = presignCache.get(u.photoUrl);
-        if (cached && cached.exp > Date.now()) {
+        if (cached && cached.exp > now) {
           partial[u.id] = cached.url;
         }
       }
+
       if (!canceled && Object.keys(partial).length) {
         setPhotoUrls((prev) => ({ ...prev, ...partial }));
       }
     };
 
     const fetchGroup = async (group) => {
-      // hydrate d'abord avec cache (instant)
       hydrateFromCache();
 
-      // fetch seulement les clés manquantes
+      const now = Date.now();
       const toFetch = group.filter((u) => {
         if (!u.photoUrl) return false;
         if (u.photoUrl.startsWith("http")) return false;
         const cached = presignCache.get(u.photoUrl);
-        if (cached && cached.exp > Date.now()) return false;
+        if (cached && cached.exp > now) return false;
         return true;
       });
 
@@ -177,15 +176,8 @@ function usePresignedPhotos(users, priorityCount = 12) {
       setPhotoUrls((prev) => ({ ...prev, ...next }));
     };
 
-    // 1) priorité tout de suite (mais après le 1er paint)
-    runIdle(() => {
-      fetchGroup(priority).catch(() => {});
-    }, 800);
-
-    // 2) background plus tard
-    runIdle(() => {
-      fetchGroup(background).catch(() => {});
-    }, 2000);
+    runIdle(() => fetchGroup(priority).catch(() => {}), 800);
+    runIdle(() => fetchGroup(background).catch(() => {}), 2000);
 
     return () => {
       canceled = true;
@@ -196,11 +188,24 @@ function usePresignedPhotos(users, priorityCount = 12) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Ably: lazy singleton (évite connexion au chargement du module)          */
+/* ✅ Ably singleton + authUrl (plus fiable)                                  */
 /* -------------------------------------------------------------------------- */
 let ablySingleton = null;
 function getAbly() {
   if (ablySingleton) return ablySingleton;
+
+  // ✅ si tu as une route token, c’est le mieux
+  try {
+    ablySingleton = new Realtime({
+      authUrl: "/api/ably/token",
+      authMethod: "GET",
+      echoMessages: false,
+      closeOnUnload: false,
+    });
+    return ablySingleton;
+  } catch (_) {}
+
+  // fallback clé publique si nécessaire
   const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
   if (!key) return null;
   ablySingleton = new Realtime(key);
@@ -243,7 +248,7 @@ export default function ListeConversations({
     [rawConversations]
   );
 
-  // Tous les "autres" utilisateurs pour précharger leurs photos
+  // Tous les "autres" utilisateurs pour presign
   const allAutresUsers = useMemo(() => {
     const map = {};
     conversations.forEach((conv) => {
@@ -257,7 +262,6 @@ export default function ListeConversations({
     return Object.values(map);
   }, [conversations, userId]);
 
-  // ✅ presign prioritaire sur les premières personnes
   const photoUrls = usePresignedPhotos(allAutresUsers, 16);
 
   // URL -> state sélectionné
@@ -267,7 +271,7 @@ export default function ListeConversations({
     setSelectedId(id || null);
   }, [searchParams]);
 
-  // Auto-sélection 1ère conversation (optionnel)
+  // Auto-sélection 1ère conversation
   useEffect(() => {
     const hasParam = !!searchParams?.get("conversationId");
     if (!autoSelectFirst) return;
@@ -358,7 +362,7 @@ export default function ListeConversations({
       });
 
       if (res.ok) {
-        const nameToApply = newName; // capture
+        const nameToApply = newName;
         setRenamingId(null);
         setNewName("");
 
@@ -388,12 +392,8 @@ export default function ListeConversations({
 
   const handleSelect = useCallback(
     async (id) => {
-      // ✅ important: évite double navigation
-      if (onSelectConversation) {
-        onSelectConversation(id);
-      } else {
-        router.replace(`/messagerie?conversationId=${id}`);
-      }
+      if (onSelectConversation) onSelectConversation(id);
+      else router.replace(`/messagerie?conversationId=${id}`);
 
       mutate(
         (current) => {
@@ -418,6 +418,45 @@ export default function ListeConversations({
     },
     [mutate, onSelectConversation, router, userId]
   );
+
+  // ✅ Handler unique (évite 1 fonction par item)
+  const handleClickItem = useCallback(
+    (e) => {
+      const id = e.currentTarget?.dataset?.id;
+      if (!id) return;
+      handleSelect(Number(id));
+    },
+    [handleSelect]
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* ✅ ViewModels memo (moins de calcul dans le render)                      */
+  /* ---------------------------------------------------------------------- */
+  const viewModels = useMemo(() => {
+    return conversations.map((conv) => {
+      const autres = (conv.participants || [])
+        .filter((p) => Number(p.utilisateurId) !== Number(userId))
+        .map((p) => p.utilisateur)
+        .filter(Boolean);
+
+      const pseudo =
+        autres.length === 1
+          ? autres[0].pseudo
+          : autres.map((u) => u.pseudo).join(", ");
+
+      const avatarUsers = autres.slice(0, 4);
+      const extraCount = Math.max(0, autres.length - avatarUsers.length);
+
+      return {
+        conv,
+        pseudo,
+        unreadCount: conv.unreadCount || 0,
+        avatarUsers,
+        extraCount,
+        isActive: Number(selectedId) === Number(conv.id),
+      };
+    });
+  }, [conversations, userId, selectedId]);
 
   /* ---------------------------------------------------------------------- */
   /* 🔹 UI                                                                   */
@@ -454,7 +493,7 @@ export default function ListeConversations({
         </button>
       </div>
 
-      {isLoading && conversations.length === 0 && (
+      {isLoading && viewModels.length === 0 && (
         <div className="conv-skeleton-list">
           <div className="conv-skeleton-item" />
           <div className="conv-skeleton-item" />
@@ -462,7 +501,7 @@ export default function ListeConversations({
         </div>
       )}
 
-      {!isLoading && conversations.length === 0 && (
+      {!isLoading && viewModels.length === 0 && (
         <div className="no-conversation-message">
           <p>Aucune conversation pour l’instant.</p>
           <a href="/recherche" className="start-search-link">
@@ -471,30 +510,14 @@ export default function ListeConversations({
         </div>
       )}
 
-      {conversations.map((conv) => {
-        const autres = (conv.participants || [])
-          .filter((p) => Number(p.utilisateurId) !== Number(userId))
-          .map((p) => p.utilisateur)
-          .filter(Boolean);
-
-        const pseudo =
-          autres.length === 1
-            ? autres[0].pseudo
-            : autres.map((u) => u.pseudo).join(", ");
-
-        const unreadCount = conv.unreadCount || 0;
-
-        const avatarUsers = autres.slice(0, 4);
-        const extraCount = Math.max(0, autres.length - avatarUsers.length);
-
+      {viewModels.map(({ conv, pseudo, unreadCount, avatarUsers, extraCount, isActive }) => {
         return (
-          <div
-            key={conv.id}
-            className={`conversation-item ${
-              Number(selectedId) === Number(conv.id) ? "active" : ""
-            }`}
-          >
-            <div className="conversation-clickable" onClick={() => handleSelect(conv.id)}>
+          <div key={conv.id} className={`conversation-item ${isActive ? "active" : ""}`}>
+            <div
+              className="conversation-clickable"
+              data-id={conv.id}
+              onClick={handleClickItem}
+            >
               <div className="conv-main">
                 <div className="conv-avatar">
                   {avatarUsers.length === 0 && (
