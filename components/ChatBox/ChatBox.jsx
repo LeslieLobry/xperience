@@ -87,7 +87,8 @@ function runIdle(fn, timeout = 1200) {
   return () => clearTimeout(t);
 }
 
-export default function ChatBox({ conversationId, utilisateur, onBack }) {
+export default function ChatBox({ conversationId, utilisateur, onBack, initialParticipants = [] }) {
+
   // --------------------- STATES ----------------------
   const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -219,7 +220,13 @@ useEffect(() => {
     mutate,
     isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
-  const lastNonEmptyParticipantsRef = useRef([]);
+  const lastNonEmptyParticipantsRef = useRef(initialParticipants);
+useEffect(() => {
+  if (Array.isArray(initialParticipants) && initialParticipants.length > 0) {
+    lastNonEmptyParticipantsRef.current = initialParticipants;
+  }
+}, [initialParticipants]);
+
 
 useEffect(() => {
   if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {

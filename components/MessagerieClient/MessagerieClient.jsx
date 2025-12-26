@@ -58,6 +58,7 @@ export default function MessagerieClient({ user }) {
     const n = Number(id);
     return id && !isNaN(n) ? n : null;
   }, [searchParams]);
+const [initialParticipants, setInitialParticipants] = useState([]);
 
   // ⚡ Ne rafraîchir l'user QUE si on n'en a vraiment pas encore
   useEffect(() => {
@@ -92,13 +93,19 @@ export default function MessagerieClient({ user }) {
     fetch("/api/messages/nonlus", { method: "PATCH" }).catch(() => {});
   }, [displayedUser?.id]);
 
-  const handleSelectConversation = useCallback(
-    (id) => {
-      router.push(`/messagerie?conversationId=${id}`, { scroll: false });
-      // ❌ plus besoin de setState: l’URL pilote le render
-    },
-    [router]
-  );
+ const handleSelectConversation = useCallback(
+  (payload) => {
+    const id = typeof payload === "object" ? payload?.id : payload;
+    const initP = typeof payload === "object" ? payload?.initialParticipants : null;
+
+        if (Array.isArray(initP)) setInitialParticipants(initP);
+else setInitialParticipants([]);
+
+    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
+  },
+  [router]
+);
+
 
   const handleBack = useCallback(() => {
     router.push(`/messagerie`, { scroll: false });
@@ -139,11 +146,14 @@ export default function MessagerieClient({ user }) {
 
     return (
       <div className="messagerie-mobile-chat">
-        <ChatBox
-          conversationId={conversationId}
-          utilisateur={displayedUser}
-          onBack={handleBack}
-        />
+<ChatBox
+  conversationId={conversationId}
+  utilisateur={displayedUser}
+  initialParticipants={initialParticipants}
+  onBack={handleBack}
+/>
+
+
       </div>
     );
   }

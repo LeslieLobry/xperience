@@ -442,34 +442,50 @@ export default function ListeConversations({
     [mutate, newName]
   );
 
-  const handleSelect = useCallback(
-    async (id) => {
-      if (onSelectConversation) onSelectConversation(id);
-      else router.replace(`/messagerie?conversationId=${id}`);
+ const handleSelect = useCallback(
+  async (id) => {
+    const conv = conversations.find((c) => Number(c.id) === Number(id));
 
-      mutate(
-        (current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            conversations: (current.conversations || []).map((c) =>
-              c.id === id ? { ...c, unreadCount: 0 } : c
-            ),
-          };
-        },
-        false
-      );
+    const initialParticipants =
+      (conv?.participants || [])
+        .filter((p) => Number(p.utilisateurId) !== Number(userId))
+        .map((p) => p.utilisateur)
+        .filter(Boolean);
 
-      fetch(`/api/conversations/${id}/mark-as-read`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-        keepalive: true,
-      }).catch(() => {});
-    },
-    [mutate, onSelectConversation, router, userId]
-  );
+    if (onSelectConversation) {
+      onSelectConversation({
+        id: Number(id),
+        initialParticipants,
+      });
+    } else {
+      router.replace(`/messagerie?conversationId=${id}`);
+    }
+
+    // optimistic unread badge
+    mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          conversations: (current.conversations || []).map((c) =>
+            c.id === id ? { ...c, unreadCount: 0 } : c
+          ),
+        };
+      },
+      false
+    );
+
+    fetch(`/api/conversations/${id}/mark-as-read`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+      keepalive: true,
+    }).catch(() => {});
+  },
+  [conversations, mutate, onSelectConversation, router, userId]
+);
+
 
   const handleClickItem = useCallback(
     (e) => {
