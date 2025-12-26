@@ -188,13 +188,12 @@ function usePresignedPhotos(users, priorityCount = 12) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Ably singleton + authUrl (plus fiable)                                  */
+/* ✅ Ably singleton + authUrl                                                */
 /* -------------------------------------------------------------------------- */
 let ablySingleton = null;
 function getAbly() {
   if (ablySingleton) return ablySingleton;
 
-  // ✅ si tu as une route token, c’est le mieux
   try {
     ablySingleton = new Realtime({
       authUrl: "/api/ably/token",
@@ -205,11 +204,37 @@ function getAbly() {
     return ablySingleton;
   } catch (_) {}
 
-  // fallback clé publique si nécessaire
   const key = process.env.NEXT_PUBLIC_ABLY_API_KEY;
   if (!key) return null;
   ablySingleton = new Realtime(key);
   return ablySingleton;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ✅ Cache conversations (cold start)                                        */
+/* -------------------------------------------------------------------------- */
+const CONV_CACHE_KEY = "conv_cache_v1";
+const CONV_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readConvCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CONV_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.ts || !parsed?.data) return null;
+    if (Date.now() - parsed.ts > CONV_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeConvCache(data) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CONV_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
 }
 
 /* -------------------------------------------------------------------------- */
@@ -229,14 +254,30 @@ export default function ListeConversations({
   const [renamingId, setRenamingId] = useState(null);
   const [newName, setNewName] = useState("");
 
+  // ✅ on lit le cache une seule fois
+  const cached = useMemo(() => readConvCache(), []);
+
   const { data, error, isLoading, mutate } = useSWR(
     userId ? "/api/conversations" : null,
     safeFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 8000,
+
+      // ✅ affichage instantané
+      fallbackData: cached || undefined,
+
+      // ✅ évite un écran vide si réseau lent
+      keepPreviousData: true,
     }
   );
+
+  // ✅ dès qu'on reçoit les vraies données, on met à jour le cache
+  useEffect(() => {
+    if (data?.conversations && Array.isArray(data.conversations)) {
+      writeConvCache(data);
+    }
+  }, [data]);
 
   const rawConversations = data?.conversations || [];
 
@@ -419,7 +460,6 @@ export default function ListeConversations({
     [mutate, onSelectConversation, router, userId]
   );
 
-  // ✅ Handler unique (évite 1 fonction par item)
   const handleClickItem = useCallback(
     (e) => {
       const id = e.currentTarget?.dataset?.id;
@@ -430,7 +470,7 @@ export default function ListeConversations({
   );
 
   /* ---------------------------------------------------------------------- */
-  /* ✅ ViewModels memo (moins de calcul dans le render)                      */
+  /* ✅ ViewModels memo                                                      */
   /* ---------------------------------------------------------------------- */
   const viewModels = useMemo(() => {
     return conversations.map((conv) => {
@@ -457,10 +497,6 @@ export default function ListeConversations({
       };
     });
   }, [conversations, userId, selectedId]);
-
-  /* ---------------------------------------------------------------------- */
-  /* 🔹 UI                                                                   */
-  /* ---------------------------------------------------------------------- */
 
   if (error) {
     return (
