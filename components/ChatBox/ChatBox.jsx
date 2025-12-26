@@ -16,7 +16,8 @@ import { useTyping } from "../../hook/useTyping";
 import AddParticipantList from "../AddParticipantList/AddParticipantList";
 import "./ChatBox.css";
 
-const ChatHeader = dynamic(() => import("./ChatHeader"), { ssr: false });
+import ChatHeader from "./ChatHeader";
+
 
 // ✅ PERF: MessagesList en dynamic pour éviter le gros freeze au clic
 const MessagesList = dynamic(() => import("../MessagesList"), {
@@ -199,6 +200,8 @@ useEffect(() => {
     if (raf2) cancelAnimationFrame(raf2);
   };
 }, [conversationId, loadingInitial, scrollToBottom]);
+  // ✅ Garde les derniers participants non vides pour éviter "0 participant" pendant le fetch
+ 
 
   const {
     messages,
@@ -212,6 +215,20 @@ useEffect(() => {
     mutate,
     isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
+  const lastNonEmptyParticipantsRef = useRef([]);
+
+useEffect(() => {
+  if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
+    lastNonEmptyParticipantsRef.current = participantsAutres;
+  }
+}, [participantsAutres]);
+
+const displayParticipantsAutres = useMemo(() => {
+  if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
+    return participantsAutres;
+  }
+  return lastNonEmptyParticipantsRef.current || [];
+}, [participantsAutres]);
 // ✅ Optimistic UI: afficher la réaction immédiatement (sans refresh)
 const toggleReactionLocal = useCallback((reactions = [], emoji, userId) => {
   const rx = Array.isArray(reactions) ? [...reactions] : [];
@@ -295,9 +312,12 @@ const handleReactionOptimistic = useCallback(
 
   // ✅ memo (évite recréer concat à chaque render)
   const participantsWithMe = useMemo(() => {
-    const others = Array.isArray(participantsAutres) ? participantsAutres : [];
+    const others = Array.isArray(displayParticipantsAutres)
+      ? displayParticipantsAutres
+      : [];
     return others.concat(utilisateur);
-  }, [participantsAutres, utilisateur]);
+  }, [displayParticipantsAutres, utilisateur]);
+
 
   /* ======================================================================= */
   /*                        SYNC REFS AVEC LES STATES                        */
@@ -1041,8 +1061,8 @@ useLayoutEffect(() => {
 
   return (
     <div className="chatbox-container">
-      <ChatHeader
-        participants={participantsAutres}
+        <ChatHeader
+        participants={displayParticipantsAutres}
         inCall={inCall}
         onCallAudio={() => startCall(false)}
         onCallVideo={() => startCall(true)}
@@ -1050,6 +1070,7 @@ useLayoutEffect(() => {
         onAddParticipant={() => setShowAddParticipant(true)}
         onBack={handleBackClick}
       />
+
 
       {utilisateur?.type === "couple" && (
         <div className="couple-prenoms-bar">

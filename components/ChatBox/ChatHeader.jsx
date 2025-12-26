@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Phone, Video, X, Plus, ArrowLeft } from "lucide-react";
 import "./ChatBox.css";
@@ -16,64 +16,92 @@ function runIdle(fn, timeout = 900) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Presign cache global + inflight                                         */
+/* ✅ Presign cache global + inflight (batch)                                 */
 /* -------------------------------------------------------------------------- */
 const PRESIGN_TTL_MS = 50 * 60 * 1000;
 const presignCache = new Map(); // key -> { url, exp }
-const presignInflight = new Map(); // key -> Promise
+const presignBatchInflight = new Map(); // batchKey -> Promise<{[key]: url}>
 
-async function getPresignedUrl(key) {
+function isHttpUrl(v) {
+  return typeof v === "string" && v.startsWith("http");
+}
+
+function guessFastUrlFromKey(key) {
+  // fallback immédiat (sans attendre le presign)
   if (!key) return "/default.jpg";
-  if (typeof key === "string" && key.startsWith("http")) return key;
+  if (isHttpUrl(key)) return key;
+  return `/uploads/${key}`;
+}
 
+async function getPresignedUrlsBatch(keys) {
+  const cleaned = Array.from(new Set((keys || []).filter(Boolean)));
+
+  if (!cleaned.length) return {};
+
+  // si tout est déjà en cache => pas de fetch
   const now = Date.now();
-  const cached = presignCache.get(key);
-  if (cached && cached.exp > now) return cached.url;
+  let allCached = true;
+  for (const k of cleaned) {
+    const c = presignCache.get(k);
+    if (!c || c.exp <= now) {
+      allCached = false;
+      break;
+    }
+  }
+  if (allCached) {
+    const out = {};
+    for (const k of cleaned) out[k] = presignCache.get(k).url;
+    return out;
+  }
 
-  if (presignInflight.has(key)) return presignInflight.get(key);
+  const batchKey = cleaned.join("|");
+  if (presignBatchInflight.has(batchKey)) return presignBatchInflight.get(batchKey);
 
-  const p = fetch("/api/photos/presign", {
+  const p = fetch("/api/photos/presign-batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key }),
+    body: JSON.stringify({ keys: cleaned }),
     credentials: "include",
     keepalive: true,
   })
     .then((r) => r.json())
     .then((data) => {
-      const url = data?.url || `/uploads/${key}`;
-      presignCache.set(key, { url, exp: now + PRESIGN_TTL_MS });
-      return url;
-    })
-    .catch(() => `/uploads/${key}`)
-    .finally(() => presignInflight.delete(key));
+      const urls = data?.urls || {};
+      const now2 = Date.now();
 
-  presignInflight.set(key, p);
+      // hydrate cache
+      for (const k of cleaned) {
+        const url = urls[k];
+        if (url && typeof url === "string") {
+          presignCache.set(k, { url, exp: now2 + PRESIGN_TTL_MS });
+        }
+      }
+
+      // retourne une map key->url (avec fallback si absent)
+      const out = {};
+      for (const k of cleaned) out[k] = urls[k] || guessFastUrlFromKey(k);
+      return out;
+    })
+    .catch(() => {
+      // fallback : tout en /uploads
+      const out = {};
+      for (const k of cleaned) out[k] = guessFastUrlFromKey(k);
+      return out;
+    })
+    .finally(() => presignBatchInflight.delete(batchKey));
+
+  presignBatchInflight.set(batchKey, p);
   return p;
 }
 
-async function mapWithConcurrency(items, limit, mapper) {
-  const ret = new Array(items.length);
-  let i = 0;
-
-  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
-    while (i < items.length) {
-      const idx = i++;
-      ret[idx] = await mapper(items[idx], idx);
-    }
-  });
-
-  await Promise.all(workers);
-  return ret;
-}
-
 /* -------------------------------------------------------------------------- */
-/* --- Hook pour les photos présignées ---                                    */
+/* --- Hook pour les photos présignées (ULTRA rapide) ---                     */
 /* -------------------------------------------------------------------------- */
 function usePresignedPhotos(participants) {
   const [photoUrls, setPhotoUrls] = useState({});
+  const abortRef = useRef(null);
 
-  // ✅ dépendance stable (évite relance de l'effet si le parent recrée le tableau)
+  // ✅ dépendance stable
   const participantsKey = useMemo(() => {
     return (participants || [])
       .map((p) => `${p?.id || "x"}:${p?.photoUrl || ""}`)
@@ -83,61 +111,71 @@ function usePresignedPhotos(participants) {
   useEffect(() => {
     let canceled = false;
 
-    async function fetchGroup(list) {
+    // abort previous batch fetch
+    if (abortRef.current) abortRef.current.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    async function hydrate(list) {
       if (!list || list.length === 0) return;
 
-      // 1) hydrate direct depuis cache pour affichage immédiat
-      const now = Date.now();
-      const partial = {};
+      // 0) mise en place immédiate (fallback /uploads ou http) pour éviter l’attente
+      const immediate = {};
       for (const p of list) {
         if (!p?.id) continue;
         const key = p.photoUrl;
-
         if (!key) {
-          partial[p.id] = "/default.jpg";
+          immediate[p.id] = "/default.jpg";
           continue;
         }
-        if (typeof key === "string" && key.startsWith("http")) {
-          partial[p.id] = key;
-          continue;
-        }
+        // si déjà en cache => instant
         const cached = presignCache.get(key);
-        if (cached && cached.exp > now) {
-          partial[p.id] = cached.url;
+        if (cached && cached.exp > Date.now()) {
+          immediate[p.id] = cached.url;
+        } else {
+          immediate[p.id] = guessFastUrlFromKey(key);
         }
       }
-      if (!canceled && Object.keys(partial).length) {
-        setPhotoUrls((prev) => ({ ...prev, ...partial }));
+      if (!canceled && Object.keys(immediate).length) {
+        setPhotoUrls((prev) => ({ ...prev, ...immediate }));
       }
 
-      // 2) fetch uniquement ce qui manque
-      const toFetch = list.filter((p) => {
-        if (!p?.id) return false;
-        const key = p.photoUrl;
-        if (!key) return false;
-        if (typeof key === "string" && key.startsWith("http")) return false;
-
+      // 1) batch presign uniquement pour les keys non-http, non vides, non expirées
+      const keysToPresign = [];
+      for (const p of list) {
+        const key = p?.photoUrl;
+        if (!key) continue;
+        if (isHttpUrl(key)) continue;
         const cached = presignCache.get(key);
-        if (cached && cached.exp > Date.now()) return false;
+        if (cached && cached.exp > Date.now()) continue;
+        keysToPresign.push(key);
+      }
 
-        return true;
-      });
+      if (!keysToPresign.length) return;
 
-      if (!toFetch.length) return;
-
-      const results = await mapWithConcurrency(toFetch, 6, async (p) => {
-        const url = await getPresignedUrl(p.photoUrl);
-        return { id: p.id, url };
-      });
+      // ⚠️ IMPORTANT: on ne passe pas signal au fetch ci-dessus (keepalive + next),
+      // mais on stoppe l'apply state via canceled
+      const map = await getPresignedUrlsBatch(keysToPresign);
 
       if (canceled) return;
+
       const next = {};
-      for (const r of results) next[r.id] = r.url || "/default.jpg";
-      setPhotoUrls((prev) => ({ ...prev, ...next }));
+      for (const p of list) {
+        if (!p?.id) continue;
+        const key = p.photoUrl;
+        if (!key) continue;
+        if (isHttpUrl(key)) continue;
+        const url = map[key];
+        if (url) next[p.id] = url;
+      }
+
+      if (Object.keys(next).length) {
+        setPhotoUrls((prev) => ({ ...prev, ...next }));
+      }
     }
 
     if (participants && participants.length > 0) {
-      // ✅ priorité : d’abord ceux affichés tout de suite
+      // uniq par id
       const uniq = [];
       const seen = new Set();
       for (const p of participants) {
@@ -147,17 +185,24 @@ function usePresignedPhotos(participants) {
         uniq.push(p);
       }
 
+      // priorité : 2 premiers
       const priority = uniq.slice(0, 2);
       const rest = uniq.slice(2);
 
-      runIdle(() => fetchGroup(priority).catch(() => {}), 500);
-      runIdle(() => fetchGroup(rest).catch(() => {}), 1200);
+      // priorité ASAP (pas idle)
+      hydrate(priority).catch(() => {});
+
+      // reste en idle
+      runIdle(() => hydrate(rest).catch(() => {}), 800);
     } else {
       setPhotoUrls({});
     }
 
     return () => {
       canceled = true;
+      try {
+        ac.abort();
+      } catch {}
     };
   }, [participantsKey]);
 
@@ -181,7 +226,6 @@ export default function ChatHeader({
   const handleAddClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // 🔹 On envoie TOUTE la liste des participants au parent
     onAddParticipant?.(participants);
   };
 
@@ -211,13 +255,11 @@ export default function ChatHeader({
           <p className="aucun-participant">Aucun participant trouvé</p>
         ) : (
           participants.map((p) => {
+            const key = p.photoUrl;
+
             const url =
               photoUrls[p.id] ||
-              (p.photoUrl?.startsWith("http")
-                ? p.photoUrl
-                : p.photoUrl
-                ? `/uploads/${p.photoUrl}`
-                : "/default.jpg");
+              (key ? guessFastUrlFromKey(key) : "/default.jpg");
 
             return (
               <Link
