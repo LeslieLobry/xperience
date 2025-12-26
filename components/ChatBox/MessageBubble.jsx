@@ -1,78 +1,93 @@
-import React, { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
-import Image from "next/image";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
+import MessageAudio from "../MessageAudio/MessageAudio";
+import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
 
-/* -------------------------------------------------------
-   Helpers
-------------------------------------------------------- */
+/* =========================================================
+   ✅ PERF: cache global + inflight + TTL pour presign
+   ========================================================= */
+const PRESIGN_TTL_MS = 50 * 60 * 1000;
+const PRESIGN_CACHE = new Map();     // key -> { url, exp }
+const PRESIGN_INFLIGHT = new Map();  // key -> Promise
 
-function formatTime(date) {
-  try {
-    const d = new Date(date);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
-  } catch {
-    return "";
-  }
+function getCachedPresign(key) {
+  if (!key) return null;
+  const entry = PRESIGN_CACHE.get(key);
+  if (!entry) return null;
+  if (entry.exp && entry.exp > Date.now()) return entry.url;
+  PRESIGN_CACHE.delete(key);
+  return null;
 }
 
-function pickMsgText(msg) {
-  if (!msg) return "";
-  if (typeof msg.texte === "string") return msg.texte;
-  if (typeof msg.text === "string") return msg.text;
-  if (typeof msg.message === "string") return msg.message;
-  return "";
+function setCachedPresign(key, url) {
+  if (!key) return;
+  PRESIGN_CACHE.set(key, { url, exp: Date.now() + PRESIGN_TTL_MS });
 }
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
-/* -------------------------------------------------------
-   Presigned photo hook (si tu l'utilises)
-------------------------------------------------------- */
 
 function usePresignedPhoto(photoKey) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(() => {
+    if (!photoKey) return "/default.jpg";
+    if (typeof photoKey === "string" && photoKey.startsWith("http")) return photoKey;
+    return getCachedPresign(photoKey) || null;
+  });
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      try {
-        if (!photoKey) {
-          if (!cancelled) setUrl("");
-          return;
-        }
-
-        const res = await fetch("/api/photos/presign-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ keys: [photoKey] }),
-        });
-
-        const data = await res.json();
-        const u = data?.urls?.[photoKey] || "";
-        if (!cancelled) setUrl(u);
-      } catch {
-        if (!cancelled) setUrl("");
-      }
+    if (!photoKey) {
+      if (url !== "/default.jpg") setUrl("/default.jpg");
+      return;
     }
 
-    run();
+    if (typeof photoKey === "string" && photoKey.startsWith("http")) {
+      if (url !== photoKey) setUrl(photoKey);
+      return;
+    }
+
+    const cached = getCachedPresign(photoKey);
+    if (cached) {
+      if (url !== cached) setUrl(cached);
+      return;
+    }
+
+    let p = PRESIGN_INFLIGHT.get(photoKey);
+    if (!p) {
+      p = fetch("/api/photos/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: photoKey }),
+        credentials: "include",
+        keepalive: true,
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          const finalUrl = data?.url || "/default.jpg";
+          setCachedPresign(photoKey, finalUrl);
+          return finalUrl;
+        })
+        .catch(() => "/default.jpg")
+        .finally(() => {
+          PRESIGN_INFLIGHT.delete(photoKey);
+        });
+
+      PRESIGN_INFLIGHT.set(photoKey, p);
+    }
+
+    let cancelled = false;
+    p.then((finalUrl) => {
+      if (!cancelled && url !== finalUrl) setUrl(finalUrl);
+    });
+
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoKey]);
 
   return url;
 }
 
-/* -------------------------------------------------------
-   MessageBubble
-------------------------------------------------------- */
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
 
 function MessageBubble({
   msg,
@@ -81,25 +96,55 @@ function MessageBubble({
   lastReads,
   onReact,
   onDelete,
-  isMine,
-  showDate,
-  dateLabel,
+  emojiPack = "app",
+  prenomsCouple = null,
 }) {
+  /* ✅ Emojis "comme sur l'app" */
+  const emojiPacks = {
+    app: ["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"],
+    sexy: ["😍", "😈", "💋", "👀", "💦", "🍑"],
+    glamour: ["🖤", "🥂", "🥀", "🪩", "🎭", "🫣"],
+    erotique: ["🫦", "🍆", "🍒", "🥵", "🛏️", "🧴"],
+    sensuel: ["🫶", "🪶", "🎀", "🤤", "😮‍💨", "👄"],
+  };
+
+  const emojiTooltips = {
+    "❤️": "J’adore",
+    "😂": "Trop drôle",
+    "😍": "J’aime",
+    "😮": "Oh wow",
+    "😢": "Triste",
+    "👍": "Top",
+    "👎": "Bof",
+    "🔥": "Ça chauffe",
+    "😡": "Pas content",
+    "🙏": "Merci / stp",
+    "🎉": "Yes !",
+    "😉": "Clin d’œil",
+  };
+
+  const activePack = emojiPacks[emojiPack] || emojiPacks.app;
+
+  /* ---------------- Picker ---------------- */
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerPos, setPickerPos] = useState(null); // { x, y }
+  const pickerRef = useRef(null);
   const pressableRef = useRef(null);
 
-  // --- Reaction picker state / anchor ---
-  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
-  const [pickerAnchor, setPickerAnchor] = useState(null);
+  // ✅ bouton desktop 😊
+  const triggerRef = useRef(null);
 
-  // --- Long press mechanics ---
+  /* ---------- Long press (ULTRA FIABLE) ---------- */
   const longPressTimerRef = useRef(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
-  const didLongPressRef = useRef(false);
   const pointerIdRef = useRef(null);
 
-  // --- input-mode gating (évite double déclenchement touch/pointer) ---
-  const lastInputModeRef = useRef(null);
-  const lastInputModeTsRef = useRef(0);
+  const didLongPressRef = useRef(false);
+
+  const unblockTouchMoveRef = useRef(null);
+
+  const inputModeRef = useRef(null); // "pointer" | "touch"
+  const inputModeTsRef = useRef(0);
 
   const LONG_PRESS_DELAY = 380;
   const MOVE_TOLERANCE = 28;
@@ -109,18 +154,6 @@ function MessageBubble({
     window.matchMedia &&
     window.matchMedia("(pointer: coarse)").matches;
 
-  const rememberInputMode = useCallback((mode) => {
-    lastInputModeRef.current = mode;
-    lastInputModeTsRef.current = Date.now();
-  }, []);
-
-  const shouldIgnoreBecauseOtherMode = useCallback((mode) => {
-    const other = lastInputModeRef.current;
-    const dt = Date.now() - (lastInputModeTsRef.current || 0);
-    // si l'autre mode a été détecté très récemment, on ignore celui-ci
-    return other && other !== mode && dt < 650;
-  }, []);
-
   const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -128,8 +161,6 @@ function MessageBubble({
     }
     pointerIdRef.current = null;
   }, []);
-
-  const unblockTouchMoveRef = useRef(null);
 
   const blockScrollWhilePressing = useCallback(() => {
     if (unblockTouchMoveRef.current) return;
@@ -149,36 +180,51 @@ function MessageBubble({
   }, []);
 
   const unblockScroll = useCallback(() => {
-    if (unblockTouchMoveRef.current) {
-      unblockTouchMoveRef.current();
-    }
-  }, []);
+    if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
+  }, [blockScrollWhilePressing]);
 
   const openPickerFromEl = useCallback((el) => {
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const anchor = {
-      x: r.left,
-      y: r.top,
-      width: r.width,
-      height: r.height,
-      right: r.right,
-      bottom: r.bottom,
-    };
-    setPickerAnchor(anchor);
-    setReactionPickerOpen(true);
+    const rect = el?.getBoundingClientRect?.();
+    if (!rect) {
+      setPickerPos(null);
+      setIsPickerOpen(true);
+      return;
+    }
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let x = rect.left + rect.width / 2;
+
+    const yAbove = rect.top - 62;
+    let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
+
+    x = clamp(x, 8, vw - 8);
+    y = clamp(y, 8, vh - 8);
+
+    setPickerPos({ x, y });
+    setIsPickerOpen(true);
   }, []);
+
+  const rememberInputMode = (mode) => {
+    inputModeRef.current = mode;
+    inputModeTsRef.current = Date.now();
+  };
+
+  const shouldIgnoreBecauseOtherMode = (mode) => {
+    const last = inputModeRef.current;
+    const dt = Date.now() - (inputModeTsRef.current || 0);
+    return last && last !== mode && dt < 800;
+  };
 
   const armLongPress = useCallback(
     (el, x, y) => {
-      cancelLongPress();
-      unblockScroll();
       didLongPressRef.current = false;
 
-      pressStartRef.current = { x, y };
-
-      // bloque le scroll pendant le "press"
+      cancelLongPress();
       blockScrollWhilePressing();
+
+      pressStartRef.current = { x, y };
 
       longPressTimerRef.current = setTimeout(() => {
         didLongPressRef.current = true;
@@ -186,7 +232,7 @@ function MessageBubble({
         longPressTimerRef.current = null;
       }, LONG_PRESS_DELAY);
     },
-    [cancelLongPress, unblockScroll, blockScrollWhilePressing, openPickerFromEl]
+    [cancelLongPress, blockScrollWhilePressing, openPickerFromEl]
   );
 
   const checkMoveCancel = useCallback(
@@ -210,17 +256,12 @@ function MessageBubble({
     unblockScroll();
   }, [cancelLongPress, unblockScroll]);
 
-  // --- Pointer handlers (✅ corrigé : accepte tout sauf souris + anti ghost click + leave cancel) ---
-  const isMousePointer = (e) => e?.pointerType === "mouse";
-
   const handlePointerDown = (e) => {
-    // ✅ long press sur mobile/stylet/unknown, pas sur souris
-    if (isMousePointer(e)) return;
+    if (e.pointerType && e.pointerType !== "touch") return;
 
     if (shouldIgnoreBecauseOtherMode("pointer")) return;
     rememberInputMode("pointer");
 
-    // iOS/Android : évite callout / selection
     if (isCoarsePointer()) e.preventDefault?.();
 
     pointerIdRef.current = e.pointerId;
@@ -232,36 +273,26 @@ function MessageBubble({
   };
 
   const handlePointerMove = (e) => {
-    if (isMousePointer(e)) return;
-    if (!longPressTimerRef.current) return;
+    if (e.pointerType && e.pointerType !== "touch") return;
     checkMoveCancel(e.clientX, e.clientY);
   };
 
-  const finishPointer = (e) => {
-    if (isMousePointer(e)) return;
-
-    // ✅ si le long press a déclenché, on tue les “click fantômes”
-    if (didLongPressRef.current) {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-    }
-
+  const handlePointerUp = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
     disarmLongPress();
     try {
       e.currentTarget?.releasePointerCapture?.(e.pointerId);
     } catch {}
   };
 
-  const handlePointerUp = finishPointer;
-  const handlePointerCancel = finishPointer;
-
-  // ✅ très important: si le doigt sort de la bulle → on annule
-  const handlePointerLeave = (e) => {
-    if (isMousePointer(e)) return;
+  const handlePointerCancel = (e) => {
+    if (e.pointerType && e.pointerType !== "touch") return;
     disarmLongPress();
+    try {
+      e.currentTarget?.releasePointerCapture?.(e.pointerId);
+    } catch {}
   };
 
-  // --- Touch fallback handlers ---
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length !== 1) return;
 
@@ -278,12 +309,7 @@ function MessageBubble({
     checkMoveCancel(t.clientX, t.clientY);
   };
 
-  const handleTouchEnd = (e) => {
-    // ✅ si le long press a déclenché, on tue les “click fantômes”
-    if (didLongPressRef.current) {
-      e?.preventDefault?.();
-      e?.stopPropagation?.();
-    }
+  const handleTouchEnd = () => {
     disarmLongPress();
   };
 
@@ -292,158 +318,306 @@ function MessageBubble({
   };
 
   const handleContextMenu = (e) => {
-    // évite le menu contextuel (clic droit / long tap)
-    if (isCoarsePointer()) e.preventDefault?.();
+    if (isCoarsePointer()) e.preventDefault();
   };
 
-  // --- message rendering (texte / image / audio etc.) ---
-  const texte = pickMsgText(msg);
-  const timeLabel = formatTime(msg?.date || msg?.createdAt);
+  useLayoutEffect(() => {
+    if (!isPickerOpen) return;
 
-  const reactions = msg?.reactions || [];
-  const hasReactions = Array.isArray(reactions) && reactions.length > 0;
+    let raf1 = 0;
+    let raf2 = 0;
 
-  // Exemples: si tu as une image en S3 via key
-  const photoKey = msg?.photoKey || msg?.imageKey || msg?.imagePath || "";
-  const presignedPhotoUrl = usePresignedPhoto(photoKey);
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = pickerRef.current;
 
-  // Example: group logic
-  const showAvatar = !isMine && (!previousMsg || previousMsg?.auteurId !== msg?.auteurId);
+        if (el) {
+          el.scrollLeft = 0;
+          el.scrollTo?.({ left: 0, behavior: "auto" });
+        }
 
-  // Close picker when clicking outside (optionnel)
-  useEffect(() => {
-    if (!reactionPickerOpen) return;
+        if (pickerPos && el) {
+          const pr = el.getBoundingClientRect();
+          const margin = 8;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
 
-    const onDown = (ev) => {
-      // si clic/tap ailleurs → ferme
-      // (tu peux affiner si tu as un composant picker spécifique)
-      setReactionPickerOpen(false);
-    };
+          let x = clamp(
+            pickerPos.x,
+            margin + pr.width / 2,
+            vw - margin - pr.width / 2
+          );
+          let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
 
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("touchstart", onDown, { passive: true });
+          if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
+        }
+      });
+    });
 
     return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("touchstart", onDown);
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
     };
-  }, [reactionPickerOpen]);
+  }, [isPickerOpen, pickerPos]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (!isPickerOpen) return;
+
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target) &&
+        pressableRef.current &&
+        !pressableRef.current.contains(e.target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target)
+      ) {
+        setIsPickerOpen(false);
+      }
+    }
+
+    function handleEsc(e) {
+      if (e.key === "Escape") setIsPickerOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside, { passive: true });
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+      cancelLongPress();
+      unblockScroll();
+    };
+  }, [isPickerOpen, cancelLongPress, unblockScroll]);
+
+  /* --------------------------- Infos message --------------------------- */
+  const isOwn = msg.auteurId === utilisateur.id;
+  const auteurIsCouple = msg.auteur?.type === "couple";
+
+  const showAuthorInfo =
+    auteurIsCouple ||
+    !previousMsg ||
+    previousMsg.auteurId !== msg.auteurId ||
+    previousMsg.prenomEnvoyeur !== msg.prenomEnvoyeur;
+
+  const heure = msg.createdAt
+    ? new Date(msg.createdAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
+  const statutTexte = useMemo(() => {
+    if (!isOwn || !lastReads || !msg.createdAt) return "";
+    const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
+    if (!autresLecteurs.length) return "✔ Envoyé";
+
+    const msgTime = new Date(msg.createdAt).getTime();
+    let lus = 0;
+
+    for (const r of autresLecteurs) {
+      if (!r?.lastReadAt) continue;
+      if (new Date(r.lastReadAt).getTime() > msgTime) lus++;
+    }
+
+    if (lus === autresLecteurs.length && lus > 0) return "✔✔ Vu";
+    if (lus > 0) return "✔✔ Reçu";
+    return "✔ Envoyé";
+  }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
+
+  // ✅ Important : on garde tes presign, mais optimisés (TTL + no double setState)
+  const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
+  const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
+  const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
+
+  const groupedReactions = useMemo(() => {
+    const rx = msg.reactions || [];
+    if (!rx.length) return [];
+    return Object.entries(
+      rx.reduce((acc, r) => {
+        if (!acc[r.emoji]) acc[r.emoji] = new Set();
+        acc[r.emoji].add(r.utilisateurId);
+        return acc;
+      }, {})
+    );
+  }, [msg.reactions]);
+
+  if (msg.type === "EPHEMERE") {
+    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
+  }
+
+  if (msg.type === "SYSTEME") {
+    return (
+      <div className="message-systeme">
+        <span>📝 {msg.texte || msg.contenu}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={`message-row ${isMine ? "mine" : "theirs"}`}>
-      {showDate && (
-        <div className="message-date-sep">
-          <span>{dateLabel}</span>
+    <div className={`message-bubble ${isOwn ? "own" : "other"}`}>
+      {showAuthorInfo && (
+        <div className="author-info">
+          <img
+            src={auteurPhotoUrl || "/default.jpg"}
+            alt={msg.auteur?.pseudo || "Utilisateur"}
+            className="author-avatar"
+            loading="lazy"
+            decoding="async"
+          />
+          <div>
+            {msg.prenomEnvoyeur ? (
+              <span className="author-name">{msg.prenomEnvoyeur}</span>
+            ) : (
+              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+            )}
+            {auteurIsCouple && prenomsCouple && (
+              <span
+                className="author-couple-names"
+                style={{
+                  marginLeft: 4,
+                  color: "#b5a06c",
+                  fontSize: "0.95em",
+                  fontStyle: "italic",
+                }}
+              >
+                ({prenomsCouple})
+              </span>
+            )}
+          </div>
         </div>
       )}
 
-      <div className={`message-bubble ${isMine ? "mine" : "theirs"}`}>
-        {!isMine && showAvatar && (
-          <div className="message-avatar">
-            <Image
-              src={msg?.auteur?.avatarUrl || "/default.jpg"}
-              alt="avatar"
-              width={34}
-              height={34}
-              unoptimized
-            />
-          </div>
+      <div
+        ref={pressableRef}
+        className="message-content-pressable"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+        onContextMenu={handleContextMenu}
+        onClickCapture={(e) => {
+          if (didLongPressRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            didLongPressRef.current = false;
+          }
+        }}
+      >
+        {msg.type === "IMAGE" && msg.imageUrl ? (
+          <img
+            src={imageMsgUrl || "/default.jpg"}
+            alt="image envoyée"
+            className="message-image"
+            draggable={false}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : msg.type === "AUDIO" && msg.audioUrl ? (
+          <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
+        ) : (
+          <p className="message-text">{msg.contenu}</p>
         )}
+      </div>
 
-        <div className="message-bubble-inner">
-          {/* Picker (si tu as ton composant, garde le tien) */}
-          {reactionPickerOpen && pickerAnchor && (
-            <div className="reaction-picker-overlay">
-              {/* ICI: ton picker existant */}
-              {/* Exemple minimal: */}
-              <div className="reaction-picker">
-                {["❤️", "😂", "😍", "😮", "😢", "👍", "👎", "🔥", "😡", "🙏", "🎉", "😉"].map((emo) => (
-                  <button
-                    key={emo}
-                    className="reaction-btn"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setReactionPickerOpen(false);
-                      onReact?.(msg, emo);
-                    }}
-                  >
-                    {emo}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      {isOwn && (
+        <button
+          className="delete-message-button"
+          onClick={() => onDelete?.(msg.id)}
+          title="Supprimer ce message"
+          type="button"
+        >
+          🗑️
+        </button>
+      )}
 
-          <div
-            ref={pressableRef}
-            className="message-content-pressable"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
-            onPointerLeave={handlePointerLeave}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchCancel}
-            onContextMenu={handleContextMenu}
-            onClickCapture={(e) => {
-              // ✅ stoppe le click “fantôme” qui suit souvent un long press
-              if (didLongPressRef.current) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
-            }}
-          >
-            {/* Contenu message */}
-            {presignedPhotoUrl ? (
-              <div className="message-photo">
-                <Image
-                  src={presignedPhotoUrl}
-                  alt="photo"
-                  width={260}
-                  height={260}
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <div className="message-text">{texte}</div>
-            )}
+      {groupedReactions.length > 0 && (
+        <div className="message-reactions">
+          {groupedReactions.map(([emoji, utilisateursSet]) => {
+            const nb = utilisateursSet.size;
+            const userHasReacted = msg.reactions?.some(
+              (r) => r.emoji === emoji && r.utilisateurId === utilisateur.id
+            );
 
-            <div className="message-meta">
-              <span className="message-time">{timeLabel}</span>
-              {/* Ici tu peux remettre ton statut (envoyé/reçu/vu) si tu l’as */}
-            </div>
-          </div>
+            return (
+              <span
+                key={emoji}
+                className={`reaction-item ${userHasReacted ? "user-reaction" : ""}`}
+                title={
+                  (emojiTooltips[emoji] || "") +
+                  " — " +
+                  (nb > 1 ? `${nb} personnes` : "1 personne")
+                }
+                onClick={() => onReact?.(msg.id, emoji)}
+              >
+                <span>{emoji}</span>
+                <span>{nb}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
-          {hasReactions && (
-            <div className="message-reactions">
-              {reactions.map((r, i) => (
-                <span key={`${r?.emoji || r}-${i}`} className="reaction-pill">
-                  {r?.emoji || r}
-                </span>
-              ))}
-            </div>
-          )}
+      <button
+        ref={triggerRef}
+        className="message-react-btn"
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isPickerOpen) setIsPickerOpen(false);
+          else openPickerFromEl(triggerRef.current);
+        }}
+        aria-label="Réagir"
+        title="Réagir"
+      >
+        😊
+      </button>
 
-          {/* Exemple de bouton delete (si tu l’avais déjà, garde-le comme avant) */}
-          {!!onDelete && isMine && (
+      {isPickerOpen && (
+        <div
+          ref={pickerRef}
+          className="reaction-picker reaction-picker-fixed"
+          style={
+            pickerPos
+              ? {
+                  left: pickerPos.x,
+                  top: pickerPos.y,
+                  transform: "translateX(-50%)",
+                }
+              : undefined
+          }
+        >
+          {activePack.map((emo) => (
             <button
-              className="message-delete"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onDelete?.(msg);
+              key={emo}
+              type="button"
+              className="reaction-option"
+              title={emojiTooltips[emo] || ""}
+              onClick={() => {
+                onReact?.(msg.id, emo);
+                setIsPickerOpen(false);
               }}
             >
-              Supprimer
+              {emo}
             </button>
-          )}
+          ))}
         </div>
+      )}
+
+      <div className="message-meta">
+        <span className="message-time">{heure}</span>
+        {isOwn && <span className="message-status">{statutTexte}</span>}
       </div>
     </div>
   );
 }
 
-export default MessageBubble;
+export default React.memo(MessageBubble);
