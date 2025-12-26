@@ -4,32 +4,47 @@ import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
 
 /* =========================================================
-   ✅ PERF: cache global + inflight pour presign (1 requête/key)
+   ✅ PERF: cache global + inflight + TTL pour presign
    ========================================================= */
-const PRESIGN_CACHE = new Map();     // key -> url
+const PRESIGN_TTL_MS = 50 * 60 * 1000;
+const PRESIGN_CACHE = new Map();     // key -> { url, exp }
 const PRESIGN_INFLIGHT = new Map();  // key -> Promise
+
+function getCachedPresign(key) {
+  if (!key) return null;
+  const entry = PRESIGN_CACHE.get(key);
+  if (!entry) return null;
+  if (entry.exp && entry.exp > Date.now()) return entry.url;
+  PRESIGN_CACHE.delete(key);
+  return null;
+}
+
+function setCachedPresign(key, url) {
+  if (!key) return;
+  PRESIGN_CACHE.set(key, { url, exp: Date.now() + PRESIGN_TTL_MS });
+}
 
 function usePresignedPhoto(photoKey) {
   const [url, setUrl] = useState(() => {
     if (!photoKey) return "/default.jpg";
     if (typeof photoKey === "string" && photoKey.startsWith("http")) return photoKey;
-    return PRESIGN_CACHE.get(photoKey) || null;
+    return getCachedPresign(photoKey) || null;
   });
 
   useEffect(() => {
     if (!photoKey) {
-      setUrl("/default.jpg");
+      if (url !== "/default.jpg") setUrl("/default.jpg");
       return;
     }
 
     if (typeof photoKey === "string" && photoKey.startsWith("http")) {
-      setUrl(photoKey);
+      if (url !== photoKey) setUrl(photoKey);
       return;
     }
 
-    const cached = PRESIGN_CACHE.get(photoKey);
+    const cached = getCachedPresign(photoKey);
     if (cached) {
-      setUrl(cached);
+      if (url !== cached) setUrl(cached);
       return;
     }
 
@@ -39,11 +54,13 @@ function usePresignedPhoto(photoKey) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: photoKey }),
+        credentials: "include",
+        keepalive: true,
       })
         .then((res) => res.json())
         .then((data) => {
           const finalUrl = data?.url || "/default.jpg";
-          PRESIGN_CACHE.set(photoKey, finalUrl);
+          setCachedPresign(photoKey, finalUrl);
           return finalUrl;
         })
         .catch(() => "/default.jpg")
@@ -54,7 +71,15 @@ function usePresignedPhoto(photoKey) {
       PRESIGN_INFLIGHT.set(photoKey, p);
     }
 
-    p.then((finalUrl) => setUrl(finalUrl));
+    let cancelled = false;
+    p.then((finalUrl) => {
+      if (!cancelled && url !== finalUrl) setUrl(finalUrl);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoKey]);
 
   return url;
@@ -114,18 +139,15 @@ function MessageBubble({
   const pressStartRef = useRef({ x: 0, y: 0 });
   const pointerIdRef = useRef(null);
 
-  // ✅ pour empêcher le "tap" final de fermer le picker
   const didLongPressRef = useRef(false);
 
-  // ✅ blocage scroll pendant armement
   const unblockTouchMoveRef = useRef(null);
 
-  // ✅ évite double déclenchement pointer+touch
   const inputModeRef = useRef(null); // "pointer" | "touch"
   const inputModeTsRef = useRef(0);
 
-  const LONG_PRESS_DELAY = 380; // ⬅️ un poil plus rapide
-  const MOVE_TOLERANCE = 28;    // ⬅️ plus permissif (micro-mouvements doigt)
+  const LONG_PRESS_DELAY = 380;
+  const MOVE_TOLERANCE = 28;
 
   const isCoarsePointer = () =>
     typeof window !== "undefined" &&
@@ -144,7 +166,6 @@ function MessageBubble({
     if (unblockTouchMoveRef.current) return;
 
     const handler = (ev) => {
-      // on bloque le scroll uniquement tant que le long-press est "armé"
       if (longPressTimerRef.current) {
         ev.preventDefault();
       }
@@ -160,7 +181,7 @@ function MessageBubble({
 
   const unblockScroll = useCallback(() => {
     if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
-  }, []);
+  }, [blockScrollWhilePressing]);
 
   const openPickerFromEl = useCallback((el) => {
     const rect = el?.getBoundingClientRect?.();
@@ -173,10 +194,8 @@ function MessageBubble({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // centre horizontal
     let x = rect.left + rect.width / 2;
 
-    // au-dessus sinon en-dessous
     const yAbove = rect.top - 62;
     let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
 
@@ -193,60 +212,59 @@ function MessageBubble({
   };
 
   const shouldIgnoreBecauseOtherMode = (mode) => {
-    // si on vient de déclencher touch, on ignore pointer pendant 800ms (et inversement)
     const last = inputModeRef.current;
     const dt = Date.now() - (inputModeTsRef.current || 0);
     return last && last !== mode && dt < 800;
   };
 
-  const armLongPress = useCallback((el, x, y) => {
-    didLongPressRef.current = false;
+  const armLongPress = useCallback(
+    (el, x, y) => {
+      didLongPressRef.current = false;
 
-    cancelLongPress();
-    blockScrollWhilePressing();
-
-    pressStartRef.current = { x, y };
-
-    longPressTimerRef.current = setTimeout(() => {
-      didLongPressRef.current = true;
-      openPickerFromEl(el);
-      longPressTimerRef.current = null;
-    }, LONG_PRESS_DELAY);
-  }, [cancelLongPress, blockScrollWhilePressing, openPickerFromEl]);
-
-  const checkMoveCancel = useCallback((x, y) => {
-    if (!longPressTimerRef.current) return;
-
-    const dx = x - pressStartRef.current.x;
-    const dy = y - pressStartRef.current.y;
-    const dist2 = dx * dx + dy * dy;
-
-    // ✅ annule seulement si on bouge "vraiment"
-    if (dist2 > MOVE_TOLERANCE * MOVE_TOLERANCE) {
       cancelLongPress();
-      unblockScroll();
-    }
-  }, [cancelLongPress, unblockScroll]);
+      blockScrollWhilePressing();
+
+      pressStartRef.current = { x, y };
+
+      longPressTimerRef.current = setTimeout(() => {
+        didLongPressRef.current = true;
+        openPickerFromEl(el);
+        longPressTimerRef.current = null;
+      }, LONG_PRESS_DELAY);
+    },
+    [cancelLongPress, blockScrollWhilePressing, openPickerFromEl]
+  );
+
+  const checkMoveCancel = useCallback(
+    (x, y) => {
+      if (!longPressTimerRef.current) return;
+
+      const dx = x - pressStartRef.current.x;
+      const dy = y - pressStartRef.current.y;
+      const dist2 = dx * dx + dy * dy;
+
+      if (dist2 > MOVE_TOLERANCE * MOVE_TOLERANCE) {
+        cancelLongPress();
+        unblockScroll();
+      }
+    },
+    [cancelLongPress, unblockScroll]
+  );
 
   const disarmLongPress = useCallback(() => {
     cancelLongPress();
     unblockScroll();
   }, [cancelLongPress, unblockScroll]);
 
-  /* ---------------- POINTER (quand dispo) ---------------- */
   const handlePointerDown = (e) => {
-    // long-press uniquement sur touch
     if (e.pointerType && e.pointerType !== "touch") return;
 
     if (shouldIgnoreBecauseOtherMode("pointer")) return;
     rememberInputMode("pointer");
 
-    // évite le menu contextuel (iOS/Android)
     if (isCoarsePointer()) e.preventDefault?.();
 
     pointerIdRef.current = e.pointerId;
-
-    // capture = on garde move/up même si ça glisse un peu
     try {
       e.currentTarget?.setPointerCapture?.(e.pointerId);
     } catch {}
@@ -275,7 +293,6 @@ function MessageBubble({
     } catch {}
   };
 
-  /* ---------------- TOUCH FALLBACK (Safari/Android capricieux) ---------------- */
   const handleTouchStart = (e) => {
     if (!e.touches || e.touches.length !== 1) return;
 
@@ -301,11 +318,9 @@ function MessageBubble({
   };
 
   const handleContextMenu = (e) => {
-    // empêche menu copier/partager sur long press mobile
     if (isCoarsePointer()) e.preventDefault();
   };
 
-  /* ✅ Reposition + reset scroll du picker (évite “emoji coupés”) */
   useLayoutEffect(() => {
     if (!isPickerOpen) return;
 
@@ -345,7 +360,6 @@ function MessageBubble({
     };
   }, [isPickerOpen, pickerPos]);
 
-  // fermeture click dehors + ESC
   useEffect(() => {
     function handleClickOutside(e) {
       if (!isPickerOpen) return;
@@ -396,7 +410,6 @@ function MessageBubble({
       })
     : "";
 
-  // ✅ PERF: calc statut via useMemo
   const statutTexte = useMemo(() => {
     if (!isOwn || !lastReads || !msg.createdAt) return "";
     const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
@@ -415,14 +428,16 @@ function MessageBubble({
     return "✔ Envoyé";
   }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
 
+  // ✅ Important : on garde tes presign, mais optimisés (TTL + no double setState)
   const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
   const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
   const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
 
-  // ✅ PERF: groupedReactions en memo
   const groupedReactions = useMemo(() => {
+    const rx = msg.reactions || [];
+    if (!rx.length) return [];
     return Object.entries(
-      (msg.reactions || []).reduce((acc, r) => {
+      rx.reduce((acc, r) => {
         if (!acc[r.emoji]) acc[r.emoji] = new Set();
         acc[r.emoji].add(r.utilisateurId);
         return acc;
@@ -450,6 +465,8 @@ function MessageBubble({
             src={auteurPhotoUrl || "/default.jpg"}
             alt={msg.auteur?.pseudo || "Utilisateur"}
             className="author-avatar"
+            loading="lazy"
+            decoding="async"
           />
           <div>
             {msg.prenomEnvoyeur ? (
@@ -474,7 +491,6 @@ function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Mobile: appui long ultra fiable (pointer + touch fallback) */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -488,7 +504,6 @@ function MessageBubble({
         onTouchCancel={handleTouchCancel}
         onContextMenu={handleContextMenu}
         onClickCapture={(e) => {
-          // ✅ évite que le tap final ferme le picker via "click outside"
           if (didLongPressRef.current) {
             e.preventDefault();
             e.stopPropagation();
@@ -502,6 +517,8 @@ function MessageBubble({
             alt="image envoyée"
             className="message-image"
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
         ) : msg.type === "AUDIO" && msg.audioUrl ? (
           <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
@@ -548,7 +565,6 @@ function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Desktop: bouton 😊 */}
       <button
         ref={triggerRef}
         className="message-react-btn"
@@ -565,7 +581,6 @@ function MessageBubble({
         😊
       </button>
 
-      {/* ✅ Picker (fixed, LTR, jamais coupé) */}
       {isPickerOpen && (
         <div
           ref={pickerRef}

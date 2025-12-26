@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useLayoutEffect, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { Realtime } from "ably";
 import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
@@ -10,7 +17,17 @@ import AddParticipantList from "../AddParticipantList/AddParticipantList";
 import "./ChatBox.css";
 
 const ChatHeader = dynamic(() => import("./ChatHeader"), { ssr: false });
-import MessagesList from "../MessagesList";
+
+// ✅ PERF: MessagesList en dynamic pour éviter le gros freeze au clic
+const MessagesList = dynamic(() => import("../MessagesList"), {
+  ssr: false,
+  loading: () => (
+    <div className="chat-messages" style={{ padding: 16, color: "#b89760" }}>
+      Chargement des messages...
+    </div>
+  ),
+});
+
 const NotificationAppelEntrant = dynamic(
   () => import("../NotificationAppelEntrant/NotificationAppelEntrant"),
   { ssr: false }
@@ -30,7 +47,6 @@ let ablyClient = null;
 function getAblyClient() {
   if (ablyClient) return ablyClient;
 
-  // ✅ Si tu as une route token (recommandé)
   try {
     ablyClient = new Realtime({
       authUrl: "/api/ably/token",
@@ -41,7 +57,6 @@ function getAblyClient() {
     return ablyClient;
   } catch (_) {}
 
-  // fallback clé publique
   if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
     console.error("❌ NEXT_PUBLIC_ABLY_API_KEY manquant pour Ably");
     return null;
@@ -150,7 +165,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const {
     messages,
     lastReads,
-    setMessages,
+    // setMessages,  // ⚠️ ton hook semble ne plus l’exposer parfois : on n’en dépend pas ici
     participantsAutres,
     envoyerMessage,
     handleReaction,
@@ -164,6 +179,12 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     conversationId,
     utilisateur
   );
+
+  // ✅ memo (évite recréer concat à chaque render)
+  const participantsWithMe = useMemo(() => {
+    const others = Array.isArray(participantsAutres) ? participantsAutres : [];
+    return others.concat(utilisateur);
+  }, [participantsAutres, utilisateur]);
 
   /* ======================================================================= */
   /*                        SYNC REFS AVEC LES STATES                        */
@@ -195,7 +216,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       atBottomRef.current = computeIsNearBottom();
     };
 
-    // init
     atBottomRef.current = computeIsNearBottom();
 
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -293,19 +313,35 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     };
   }, [utilisateur?.id]);
 
-  /* --------------------- Prénoms couple ---------------------- */
+  /* --------------------- Prénoms couple (idle + abort) ------------------- */
   useEffect(() => {
     if (utilisateur.type !== "couple" || !conversationId) {
       setPrenomsCouple(null);
       return;
     }
-    fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.prenoms) setPrenomsCouple(data.prenoms);
-        else setPrenomsCouple(null);
+
+    let cancelIdle = null;
+    const controller = new AbortController();
+
+    cancelIdle = runIdle(() => {
+      fetch(`/api/prenoms-couple?conversationId=${conversationId}`, {
+        signal: controller.signal,
+        credentials: "include",
       })
-      .catch(() => setPrenomsCouple(null));
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.prenoms) setPrenomsCouple(data.prenoms);
+          else setPrenomsCouple(null);
+        })
+        .catch(() => setPrenomsCouple(null));
+    }, 800);
+
+    return () => {
+      try {
+        controller.abort();
+      } catch (_) {}
+      if (typeof cancelIdle === "function") cancelIdle();
+    };
   }, [conversationId, utilisateur.type]);
 
   // Quand on reçoit / modifie les prénoms, on remplit les inputs
@@ -327,55 +363,18 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
-  // ✅ Scroll "ouverture conversation" : version stable (pas de setInterval agressif)
-  useEffect(() => {
-    if (!conversationId) return;
-
-    let tries = 0;
-    let raf = 0;
-
-    const tick = () => {
-      tries++;
-      scrollToBottom(false);
-      if (tries < 6) raf = requestAnimationFrame(tick);
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [conversationId, scrollToBottom]);
-
-  // ➜ 1ère fois où les messages sont chargés → scroll bas
-  useEffect(() => {
-    if (!messages?.length) return;
-    if (hasScrolledInitialRef.current) return;
-
-    const t = setTimeout(() => {
-      scrollToBottom(false);
-      hasScrolledInitialRef.current = true;
-    }, 40);
-
-    return () => clearTimeout(t);
-  }, [messages?.length, conversationId, scrollToBottom]);
-
-  // Scroll initial layout
+  // ✅ Ouverture conversation : scroll 1 seule fois quand messages dispo
   useLayoutEffect(() => {
-    if (!messages?.length || !loadingInitial) return;
-
-    const lastMsg = messages[messages.length - 1];
-    if (
-      lastMsg?.conversationId &&
-      Number(lastMsg.conversationId) !== Number(conversationId)
-    ) {
-      return;
+    if (!conversationId) return;
+    if (loadingInitial && messages?.length) {
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+        hasScrolledInitialRef.current = true;
+        lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
+        setLoadingInitial(false);
+      });
     }
-
-    requestAnimationFrame(() => {
-      scrollToBottom(false);
-    });
-
-    lastMsgIdRef.current = lastMsg?.id || null;
-    setLoadingInitial(false);
-  }, [messages, loadingInitial, conversationId, scrollToBottom]);
+  }, [conversationId, loadingInitial, messages?.length, scrollToBottom, messages]);
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
@@ -395,13 +394,11 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     lastMsgIdRef.current = lastMsg.id;
     if (!isNew) return;
 
-    // si c'est toi qui viens d'envoyer → scroll
     if (lastMsg.auteurId === utilisateur?.id) {
       scrollToBottom(true);
       return;
     }
 
-    // nouveau message entrant → scroll seulement si déjà près du bas
     if (atBottomRef.current) {
       scrollToBottom(true);
     }
@@ -527,9 +524,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       window.localVideoTrack = localVideoTrack;
     }
 
-    localTracks.forEach((track) =>
-      newRoom.localParticipant.publishTrack(track)
-    );
+    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
 
     setInCall(true);
     inCallRef.current = true;
@@ -551,9 +546,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         }
       }
 
-      currentRoom.localParticipant?.tracks?.forEach((pub) =>
-        pub.track?.stop()
-      );
+      currentRoom.localParticipant?.tracks?.forEach((pub) => pub.track?.stop());
 
       currentRoom.disconnect().then(() => {
         roomRef.current = null;
@@ -688,7 +681,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     view.setUint32(40, samples.length * 2, true);
 
     floatTo16BitPCM(view, 44, samples);
-
     return new Blob([view], { type: "audio/wav" });
   }
 
@@ -812,19 +804,22 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     }
   };
 
-  // On surcharge l'utilisateur avec les prénoms de couple pour l'UI
-  const userWithPrenoms = prenomsCouple
-    ? {
-        ...utilisateur,
-        prenom1: prenomsCouple.prenom1 || utilisateur.prenom1,
-        prenom2: prenomsCouple.prenom2 || utilisateur.prenom2,
-      }
-    : utilisateur;
+  // ✅ memo (évite recréer objet à chaque render)
+  const userWithPrenoms = useMemo(() => {
+    return prenomsCouple
+      ? {
+          ...utilisateur,
+          prenom1: prenomsCouple.prenom1 || utilisateur.prenom1,
+          prenom2: prenomsCouple.prenom2 || utilisateur.prenom2,
+        }
+      : utilisateur;
+  }, [prenomsCouple, utilisateur]);
 
   // ✅ onMessageSent sorti du JSX (perf)
   const handleMessageSent = useCallback(
     async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
-      const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+      const tmpId =
+        "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 
       let optimisticMessage;
       if (isImage && contenu instanceof FormData) {
@@ -891,7 +886,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           const message = await envoyerMessage(contenu, type, membreParlant);
           if (!message?.id) throw new Error("Message non créé");
         }
-        // ✅ on laisse Ably/useMessages merger le vrai message
       } catch (err) {
         console.error("Erreur envoi message :", err);
         mutate(
@@ -1009,7 +1003,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
           <h3>Ajouter un membre</h3>
           <AddParticipantList
             conversationId={conversationId}
-            participants={participantsAutres.concat(utilisateur)}
+            participants={participantsWithMe}
             onClose={() => {
               setShowAddParticipant(false);
               setAddUserError("");
