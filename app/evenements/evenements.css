@@ -34,7 +34,6 @@
   color: var(--text);
 
   gap: 22px;
-  padding: clamp(18px, 3vw, 28px) 16px 34px;
 }
 
 /* Fond: image + voile + vignette douce + grain léger */
