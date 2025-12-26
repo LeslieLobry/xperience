@@ -4,13 +4,13 @@ import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 
 // ----------- CRÉATION (POST) -----------
+// (INCHANGÉ)
 export async function POST(req) {
   try {
     const currentUser = await getUserFromToken();
     if (!currentUser)
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 1) Normalisation des IDs (nombres + dédoublonnage)
     const body = await req.json();
     let ids = Array.isArray(body?.participantIds) ? body.participantIds : [];
     ids = [...new Set(ids.map((x) => Number(x)).filter(Number.isFinite))];
@@ -32,7 +32,6 @@ export async function POST(req) {
         { status: 403 }
       );
 
-    // 2) EXISTING: match EXACT du set de participants
     const existingConv = await prisma.conversation.findFirst({
       where: {
         AND: [
@@ -47,7 +46,6 @@ export async function POST(req) {
     });
 
     if (existingConv) {
-      // Restaure si ce user avait "supprimé" la conv
       const myParticipant = existingConv.participants.find(
         (p) => p.utilisateurId === currentUser.id
       );
@@ -60,7 +58,6 @@ export async function POST(req) {
       return NextResponse.json({ conversation: existingConv, existed: true });
     }
 
-    // 3) CRÉATION
     const conversation = await prisma.conversation.create({
       data: {
         participants: {
@@ -85,6 +82,7 @@ export async function POST(req) {
 }
 
 // ----------- LISTE / UNREADS (GET) -----------
+// ✅ OPTIMISÉ: 1 requête unread au lieu de N counts
 export async function GET() {
   try {
     const currentUser = await getUserFromToken();
@@ -93,7 +91,6 @@ export async function GET() {
 
     const userId = currentUser.id;
 
-    // On récupère toutes les conversations non supprimées pour ce user
     const convs = await prisma.conversation.findMany({
       where: {
         participants: { some: { utilisateurId: userId, supprimé: false } },
@@ -109,36 +106,36 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
     });
 
-    // Pour bloquer l'affichage si un bloqué est présent
     const exclus = await getIdsUtilisateursExclus(userId);
     const visibleConvs = convs.filter((conv) =>
       conv.participants.every((p) => !exclus.includes(p.utilisateurId))
     );
 
-    // ✅ unreadCount basé sur participant.lastReadAt (cohérent avec /messages/mark-as-read)
-    // (N requêtes message.count : safe et simple, on optimisera si besoin)
-    const unreadPairs = await Promise.all(
-      visibleConvs.map(async (conv) => {
-        const myParticipant = conv.participants.find((p) => p.utilisateurId === userId);
+    const convIds = visibleConvs.map((c) => c.id);
+    let unreadCounts = {};
 
-        // Si jamais null => jamais lu => on compte tout
-        const lastReadAt = myParticipant?.lastReadAt ?? new Date(0);
+    if (convIds.length) {
+      // ⚡ 1 seule requête: compte des messages > lastReadAt pour CE user
+      // (on se base sur Participant.lastReadAt comme ton code)
+      const rows = await prisma.$queryRaw`
+        SELECT
+          m."conversationId" AS "conversationId",
+          COUNT(*)::int      AS "count"
+        FROM "Message" m
+        JOIN "Participant" p
+          ON p."conversationId" = m."conversationId"
+         AND p."utilisateurId"  = ${userId}
+        WHERE m."conversationId" = ANY(${convIds})
+          AND m."auteurId" <> ${userId}
+          AND m."createdAt" > COALESCE(p."lastReadAt", to_timestamp(0))
+        GROUP BY m."conversationId"
+      `;
 
-        const count = await prisma.message.count({
-          where: {
-            conversationId: conv.id,
-            auteurId: { not: userId },
-            createdAt: { gt: lastReadAt },
-          },
-        });
+      unreadCounts = Object.fromEntries(
+        rows.map((r) => [Number(r.conversationId), Number(r.count)])
+      );
+    }
 
-        return [conv.id, count];
-      })
-    );
-
-    const unreadCounts = Object.fromEntries(unreadPairs);
-
-    // Formatage retour (inchangé)
     const conversations = visibleConvs.map((conv) => ({
       ...conv,
       unreadCount: unreadCounts[conv.id] || 0,
