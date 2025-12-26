@@ -171,11 +171,13 @@ else setInitialParticipants([]);
 
       <div className="chat-section">
         {conversationId ? (
-          <ChatBox
-            conversationId={conversationId}
-            utilisateur={displayedUser}
-            onBack={handleBack}
-          />
+         <ChatBox
+  conversationId={conversationId}
+  utilisateur={displayedUser}
+  initialParticipants={initialParticipants}
+  onBack={handleBack}
+/>
+
         ) : (
           <div className="no-conversation">
             <p>Sélectionne une conversation</p>
