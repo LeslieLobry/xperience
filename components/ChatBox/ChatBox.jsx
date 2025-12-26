@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useLayoutEffect, useCallback } from "react";
 import { Realtime } from "ably";
 import dynamic from "next/dynamic";
 import ChatInput from "../ChatInput/ChatInput";
@@ -23,12 +23,25 @@ const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), {
 });
 
 /* --------------------------------------------------------------------------- */
-/* 🔹 Ably : singleton + helper pour éviter new Realtime partout               */
+/* 🔹 Ably : singleton + authUrl (fallback clé publique)                       */
 /* --------------------------------------------------------------------------- */
 let ablyClient = null;
 
 function getAblyClient() {
   if (ablyClient) return ablyClient;
+
+  // ✅ Si tu as une route token (recommandé)
+  try {
+    ablyClient = new Realtime({
+      authUrl: "/api/ably/token",
+      authMethod: "GET",
+      echoMessages: false,
+      closeOnUnload: false,
+    });
+    return ablyClient;
+  } catch (_) {}
+
+  // fallback clé publique
   if (!process.env.NEXT_PUBLIC_ABLY_API_KEY) {
     console.error("❌ NEXT_PUBLIC_ABLY_API_KEY manquant pour Ably");
     return null;
@@ -47,6 +60,16 @@ function publishNotification(targetId, event, data) {
 /* 🔹 LiveKit (chargé à la demande)                                            */
 /* --------------------------------------------------------------------------- */
 let Room, createLocalTracks;
+
+function runIdle(fn, timeout = 1200) {
+  if (typeof window === "undefined") return;
+  if ("requestIdleCallback" in window) {
+    const id = window.requestIdleCallback(fn, { timeout });
+    return () => window.cancelIdleCallback(id);
+  }
+  const t = setTimeout(fn, 250);
+  return () => clearTimeout(t);
+}
 
 export default function ChatBox({ conversationId, utilisateur, onBack }) {
   // --------------------- STATES ----------------------
@@ -82,7 +105,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
 
-  // ⚠️ C'est CE conteneur qui scrolle (le <div className="chat-messages"> dans MessagesList)
+  // ⚠️ Conteneur scrollable réel
   const messagesContainerRef = useRef(null);
 
   const mediaStreamRef = useRef(null);
@@ -99,17 +122,18 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   const skipNextAutoScrollRef = useRef(false);
   const hasScrolledInitialRef = useRef(false);
 
-  // Helpers scroll
-  const SCROLL_TOLERANCE_PX = 120;
-  const isNearBottom = () => {
+  // ✅ Perf: état "at bottom" maintenu par listener scroll
+  const atBottomRef = useRef(true);
+  const SCROLL_TOLERANCE_PX = 140;
+
+  const computeIsNearBottom = useCallback(() => {
     const el = messagesContainerRef.current;
     if (!el) return true;
     const diff = el.scrollHeight - el.scrollTop - el.clientHeight;
     return diff < SCROLL_TOLERANCE_PX;
-  };
+  }, []);
 
-  // 👉 Fonction qui scrolle VRAIMENT le conteneur de messages
-  const scrollToBottom = (smooth = true) => {
+  const scrollToBottom = useCallback((smooth = true) => {
     const container = messagesContainerRef.current;
     if (!container) return;
 
@@ -121,7 +145,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     } else {
       container.scrollTop = container.scrollHeight;
     }
-  };
+  }, []);
 
   const {
     messages,
@@ -144,7 +168,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   /* ======================================================================= */
   /*                        SYNC REFS AVEC LES STATES                        */
   /* ======================================================================= */
-
   useEffect(() => {
     appelEntrantRef.current = appelEntrant;
   }, [appelEntrant]);
@@ -162,8 +185,39 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
   }, [room]);
 
   /* ======================================================================= */
+  /* ✅ LISTENER scroll : met à jour atBottomRef (passive)                    */
+  /* ======================================================================= */
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      atBottomRef.current = computeIsNearBottom();
+    };
+
+    // init
+    atBottomRef.current = computeIsNearBottom();
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [computeIsNearBottom]);
+
+  /* ======================================================================= */
   /*                              USE EFFECTS                                */
   /* ======================================================================= */
+
+  // ✅ Préload LiveKit en idle (moins de freeze au 1er appel)
+  useEffect(() => {
+    return runIdle(async () => {
+      try {
+        if (!Room || !createLocalTracks) {
+          const livekit = await import("livekit-client");
+          Room = livekit.Room;
+          createLocalTracks = livekit.createLocalTracks;
+        }
+      } catch (_) {}
+    }, 1800);
+  }, []);
 
   /* --------------------- Notifications d'appel Ably ---------------------- */
   useEffect(() => {
@@ -253,7 +307,8 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       })
       .catch(() => setPrenomsCouple(null));
   }, [conversationId, utilisateur.type]);
-    // Quand on reçoit / modifie les prénoms, on remplit les inputs
+
+  // Quand on reçoit / modifie les prénoms, on remplit les inputs
   useEffect(() => {
     if (prenomsCouple) {
       setPrenom1(prenomsCouple.prenom1 || "");
@@ -264,7 +319,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     }
   }, [prenomsCouple]);
 
-
   // 🔁 Quand la conversation change, on reset l'état de scroll
   useEffect(() => {
     setLoadingInitial(true);
@@ -273,41 +327,41 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
-  // 🔨 SCROLL AGRESSIF À L’OUVERTURE DE LA CONVERSATION (quelques essais)
+  // ✅ Scroll "ouverture conversation" : version stable (pas de setInterval agressif)
   useEffect(() => {
     if (!conversationId) return;
 
-    let count = 0;
-    const maxTries = 8;
+    let tries = 0;
+    let raf = 0;
 
-    const interval = setInterval(() => {
+    const tick = () => {
+      tries++;
       scrollToBottom(false);
-      count++;
-      if (count >= maxTries) clearInterval(interval);
-    }, 80);
+      if (tries < 6) raf = requestAnimationFrame(tick);
+    };
 
-    return () => clearInterval(interval);
-  }, [conversationId]);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [conversationId, scrollToBottom]);
 
-  // ➜ À la 1ère fois où les messages sont chargés → on force un scroll tout en bas
+  // ➜ 1ère fois où les messages sont chargés → scroll bas
   useEffect(() => {
     if (!messages?.length) return;
     if (hasScrolledInitialRef.current) return;
 
-    const timer = setTimeout(() => {
+    const t = setTimeout(() => {
       scrollToBottom(false);
       hasScrolledInitialRef.current = true;
-    }, 50);
+    }, 40);
 
-    return () => clearTimeout(timer);
-  }, [messages?.length, conversationId]);
+    return () => clearTimeout(t);
+  }, [messages?.length, conversationId, scrollToBottom]);
 
-  // --------------------- Scroll initial quand les messages sont là ----------------------
+  // Scroll initial layout
   useLayoutEffect(() => {
     if (!messages?.length || !loadingInitial) return;
 
     const lastMsg = messages[messages.length - 1];
-
     if (
       lastMsg?.conversationId &&
       Number(lastMsg.conversationId) !== Number(conversationId)
@@ -321,7 +375,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
     lastMsgIdRef.current = lastMsg?.id || null;
     setLoadingInitial(false);
-  }, [messages, loadingInitial, conversationId]);
+  }, [messages, loadingInitial, conversationId, scrollToBottom]);
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
@@ -347,11 +401,11 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       return;
     }
 
-    // nouveau message entrant → scroll seulement si on est déjà près du bas
-    if (isNearBottom()) {
+    // nouveau message entrant → scroll seulement si déjà près du bas
+    if (atBottomRef.current) {
       scrollToBottom(true);
     }
-  }, [messages, utilisateur?.id]);
+  }, [messages, utilisateur?.id, scrollToBottom]);
 
   /* --------------------- Cleanup global à l’unmount ---------------------- */
   useEffect(() => {
@@ -453,10 +507,10 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
 
     newRoom.on("trackSubscribed", (track, publication, participant) => {
       const id = participant.identity + "-" + track.kind;
-      setRemoteTracks((prev) => [
-        ...prev.filter((t) => t.id !== id),
-        { id, nom: participant.identity, track },
-      ]);
+      setRemoteTracks((prev) => {
+        const filtered = prev.filter((t) => t.id !== id);
+        return [...filtered, { id, nom: participant.identity, track }];
+      });
     });
 
     newRoom.on("trackUnsubscribed", (track, publication, participant) => {
@@ -691,7 +745,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         setShowAddParticipant(false);
         setAddUserInput("");
         setAddUserError("");
-        window.location.reload();
+        window.location.reload(); // ✅ gardé (tu l’avais)
       } else {
         setAddUserError(data.error || "Erreur lors de l'ajout.");
       }
@@ -708,6 +762,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
     skipNextAutoScrollRef.current = true;
     onBack?.();
   };
+
   const handleSavePrenomsCouple = async () => {
     setErrorPrenoms("");
 
@@ -747,7 +802,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         return;
       }
 
-      // On se cale sur ce que renvoie l'API (id, prenom1, prenom2, etc.)
       setPrenomsCouple(data.prenoms);
       setSavingPrenoms(false);
       setShowEditPrenoms(false);
@@ -757,6 +811,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
       setSavingPrenoms(false);
     }
   };
+
   // On surcharge l'utilisateur avec les prénoms de couple pour l'UI
   const userWithPrenoms = prenomsCouple
     ? {
@@ -765,6 +820,93 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         prenom2: prenomsCouple.prenom2 || utilisateur.prenom2,
       }
     : utilisateur;
+
+  // ✅ onMessageSent sorti du JSX (perf)
+  const handleMessageSent = useCallback(
+    async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
+      const tmpId = "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
+
+      let optimisticMessage;
+      if (isImage && contenu instanceof FormData) {
+        optimisticMessage = {
+          id: tmpId,
+          auteurId: utilisateur.id,
+          auteur: utilisateur,
+          pseudo: utilisateur.pseudo,
+          type: contenu.get("type") || "IMAGE",
+          contenu: "[Image]",
+          createdAt: new Date().toISOString(),
+          statut: "pending",
+          ephemere:
+            !!contenu.get("type") &&
+            contenu.get("type").toUpperCase() === "EPHEMERE",
+        };
+      } else if (type === "AUDIO") {
+        optimisticMessage = {
+          id: tmpId,
+          auteurId: utilisateur.id,
+          auteur: utilisateur,
+          pseudo: utilisateur.pseudo,
+          type,
+          contenu: "[Audio]",
+          createdAt: new Date().toISOString(),
+          statut: "pending",
+          ephemere: false,
+        };
+      } else {
+        optimisticMessage = {
+          id: tmpId,
+          auteurId: utilisateur.id,
+          auteur: utilisateur,
+          pseudo: utilisateur.pseudo,
+          type: type || "TEXTE",
+          contenu: typeof contenu === "string" ? contenu : contenu?.contenu,
+          createdAt: new Date().toISOString(),
+          statut: "pending",
+          ephemere: type === "EPHEMERE",
+        };
+      }
+
+      mutate(
+        (old) => ({
+          ...old,
+          messages: [...(old?.messages || []), optimisticMessage],
+        }),
+        false
+      );
+
+      scrollToBottom(true);
+
+      try {
+        if (isImage && contenu instanceof FormData) {
+          const res = await fetch("/api/messages", {
+            method: "POST",
+            body: contenu,
+          });
+          const result = await res.json();
+          if (!res.ok || !result?.message?.id) {
+            throw new Error("Erreur enregistrement image");
+          }
+        } else {
+          const message = await envoyerMessage(contenu, type, membreParlant);
+          if (!message?.id) throw new Error("Message non créé");
+        }
+        // ✅ on laisse Ably/useMessages merger le vrai message
+      } catch (err) {
+        console.error("Erreur envoi message :", err);
+        mutate(
+          (old) => ({
+            ...old,
+            messages: (old?.messages || []).map((m) =>
+              m.id === tmpId ? { ...m, statut: "failed" } : m
+            ),
+          }),
+          false
+        );
+      }
+    },
+    [envoyerMessage, mutate, scrollToBottom, utilisateur]
+  );
 
   /* ======================================================================= */
   /*                                 RENDER                                  */
@@ -781,6 +923,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         onAddParticipant={() => setShowAddParticipant(true)}
         onBack={handleBackClick}
       />
+
       {utilisateur?.type === "couple" && (
         <div className="couple-prenoms-bar">
           <span>
@@ -886,7 +1029,6 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         />
       )}
 
-      {/* 🔹 ICI : le conteneur scrollable réel (ref branché ici) */}
       <MessagesList
         ref={messagesContainerRef}
         messages={messages}
@@ -907,104 +1049,7 @@ export default function ChatBox({ conversationId, utilisateur, onBack }) {
         setTexte={setTexte}
         showEmojiPicker={showEmojiPicker}
         setShowEmojiPicker={setShowEmojiPicker}
-onMessageSent={async (
-  contenu,
-  type = "TEXTE",
-  membreParlant,
-  isImage = false
-) => {
-  const tmpId =
-    "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
-
-  let optimisticMessage;
-  if (isImage && contenu instanceof FormData) {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type: contenu.get("type") || "IMAGE",
-      contenu: "[Image]",
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere:
-        !!contenu.get("type") &&
-        contenu.get("type").toUpperCase() === "EPHEMERE",
-    };
-  } else if (type === "AUDIO") {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type,
-      contenu: "[Audio]",
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere: false,
-    };
-  } else {
-    optimisticMessage = {
-      id: tmpId,
-      auteurId: utilisateur.id,
-      auteur: utilisateur,
-      pseudo: utilisateur.pseudo,
-      type: type || "TEXTE",
-      contenu: typeof contenu === "string" ? contenu : contenu.contenu,
-      createdAt: new Date().toISOString(),
-      statut: "pending",
-      ephemere: type === "EPHEMERE",
-    };
-  }
-
-  // 🔥 Optimistic : on ajoute juste le message temporaire
-  mutate(
-    (old) => ({
-      ...old,
-      messages: [...(old?.messages || []), optimisticMessage],
-    }),
-    false
-  );
-
-  scrollToBottom(true);
-
-  try {
-    // Envoi réel
-    if (isImage && contenu instanceof FormData) {
-      const res = await fetch("/api/messages", {
-        method: "POST",
-        body: contenu,
-      });
-      const result = await res.json();
-      if (!res.ok || !result?.message?.id) {
-        throw new Error("Erreur enregistrement image");
-      }
-    } else {
-      const message = await envoyerMessage(contenu, type, membreParlant);
-      if (!message?.id) {
-        throw new Error("Message non créé");
-      }
-    }
-
-    // ✅ Succès : on ne touche pas à la liste.
-    // Ably enverra le vrai message, et useMessages fera le "merge".
-  } catch (err) {
-    console.error("Erreur envoi message :", err);
-
-    // ❌ Erreur : on marque juste le temporaire en "failed"
-    mutate(
-      (old) => ({
-        ...old,
-        messages: (old?.messages || []).map((m) =>
-          m.id === tmpId ? { ...m, statut: "failed" } : m
-        ),
-      }),
-      false
-    );
-  }
-}}
-
-
+        onMessageSent={handleMessageSent}
         onTyping={envoyerTyping}
         startRecording={startRecording}
         stopRecording={stopRecording}
@@ -1032,9 +1077,8 @@ onMessageSent={async (
           clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
-          if (sonnerieRef.current) {
-            sonnerieRef.current.currentTime = 0;
-          }
+          if (sonnerieRef.current) sonnerieRef.current.currentTime = 0;
+
           if (appelEntrant?.from?.id) {
             publishNotification(appelEntrant.from.id, "call:accepted", {
               from: utilisateur,
@@ -1042,6 +1086,7 @@ onMessageSent={async (
               type,
             });
           }
+
           startCall(type === "video", false);
           setInCall(true);
           inCallRef.current = true;
@@ -1051,9 +1096,8 @@ onMessageSent={async (
           clearTimeout(appelTimeoutRef.current);
           setAppelEntrant(null);
           sonnerieRef.current?.pause();
-          if (sonnerieRef.current) {
-            sonnerieRef.current.currentTime = 0;
-          }
+          if (sonnerieRef.current) sonnerieRef.current.currentTime = 0;
+
           if (appelEntrant?.from?.id) {
             publishNotification(appelEntrant.from.id, "call:refused", {
               from: utilisateur,
@@ -1067,15 +1111,14 @@ onMessageSent={async (
               });
             });
           }
+
           stopTimer();
         }}
       />
 
       <audio ref={sonnerieRef} src="/sonnerie.mp3" preload="auto" />
 
-      {appelRefuse && (
-        <div className="call-refused-notif">Appel refusé 📵</div>
-      )}
+      {appelRefuse && <div className="call-refused-notif">Appel refusé 📵</div>}
       {appelOccupe && (
         <div className="call-busy-notif">
           Utilisateur occupé sur un autre appel 🚫
