@@ -212,6 +212,81 @@ useEffect(() => {
     mutate,
     isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
+// ✅ Optimistic UI: afficher la réaction immédiatement (sans refresh)
+const toggleReactionLocal = useCallback((reactions = [], emoji, userId) => {
+  const rx = Array.isArray(reactions) ? [...reactions] : [];
+  const idx = rx.findIndex(
+    (r) => r?.emoji === emoji && (r?.utilisateurId === userId || r?.userId === userId)
+  );
+
+  if (idx >= 0) rx.splice(idx, 1);
+  else rx.push({ emoji, utilisateurId: userId });
+
+  return rx;
+}, []);
+
+const handleReactionOptimistic = useCallback(
+  async (messageId, emoji) => {
+    // 1) update instant côté UI
+    mutate(
+      (old) => {
+        const list = old?.messages || old?.data || old || [];
+        // si ton hook renvoie {messages:[]}
+        if (old?.messages) {
+          return {
+            ...old,
+            messages: old.messages.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id),
+                  }
+                : m
+            ),
+          };
+        }
+
+        // fallback si la structure est différente
+        if (Array.isArray(list)) {
+          return list.map((m) =>
+            m.id === messageId
+              ? { ...m, reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id) }
+              : m
+          );
+        }
+
+        return old;
+      },
+      false
+    );
+
+    // 2) backend (ton hook fait déjà le fetch)
+    try {
+      await handleReaction(messageId, emoji);
+    } catch (e) {
+      console.error("Erreur reaction:", e);
+      // optionnel: rollback (si tu veux) -> on re-toggle
+      mutate(
+        (old) => {
+          if (!old?.messages) return old;
+          return {
+            ...old,
+            messages: old.messages.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id),
+                  }
+                : m
+            ),
+          };
+        },
+        false
+      );
+    }
+  },
+  [handleReaction, mutate, toggleReactionLocal, utilisateur?.id]
+);
 
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(
     conversationId,
@@ -1085,7 +1160,7 @@ useLayoutEffect(() => {
         ref={messagesContainerRef}
         messages={messages}
         utilisateur={userWithPrenoms}
-        onReact={handleReaction}
+        onReact={handleReactionOptimistic}
         lastReads={lastReads}
         typingPseudo={isTyping ? typingPseudo : null}
         hasMore={hasMore}

@@ -285,29 +285,75 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   };
 
   /* ---------------------------------------------------------------------- */
-  /* 6) Réaction                                                              */
-  /* ---------------------------------------------------------------------- */
-  const handleReaction = async (messageId, emoji) => {
-    const res = await fetch(`/api/messages/${messageId}/react`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji }),
-      credentials: "include",
-    });
+/* 6) Réaction                                                              */
+/* ---------------------------------------------------------------------- */
+const handleReaction = async (messageId, emoji) => {
+  // ✅ Optimistic : toggle local immédiat (sans attendre Ably)
+  mutate(
+    (current) => {
+      if (!current?.messages) return current;
 
-    const dataRes = await res.json();
-    if (dataRes.success) {
-      const client = getAbly();
-      if (client) {
-        const channel = client.channels.get(`conversation-${conversationId}`);
-        channel.publish("reaction", {
-          messageId,
-          reactions: dataRes.reactions,
-        });
-      }
-      // ✅ pas de mutate ici (tu es déjà sync via Ably)
+      return {
+        ...current,
+        messages: current.messages.map((m) => {
+          if (m.id !== messageId) return m;
+
+          const rx = Array.isArray(m.reactions) ? [...m.reactions] : [];
+          const idx = rx.findIndex(
+            (r) => r?.emoji === emoji && r?.utilisateurId === utilisateur.id
+          );
+
+          if (idx >= 0) rx.splice(idx, 1);
+          else rx.push({ emoji, utilisateurId: utilisateur.id });
+
+          return { ...m, reactions: rx };
+        }),
+      };
+    },
+    false
+  );
+
+  // ✅ API
+  const res = await fetch(`/api/messages/${messageId}/react`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emoji }),
+    credentials: "include",
+  });
+
+  const dataRes = await res.json();
+
+  if (dataRes.success) {
+    // ✅ On remplace par la vérité serveur (liste finale)
+    mutate(
+      (current) => {
+        if (!current?.messages) return current;
+        return {
+          ...current,
+          messages: current.messages.map((m) =>
+            m.id === messageId ? { ...m, reactions: dataRes.reactions } : m
+          ),
+        };
+      },
+      false
+    );
+
+    // ✅ On broadcast aux autres via Ably
+    const client = getAbly();
+    if (client) {
+      const channel = client.channels.get(`conversation-${conversationId}`);
+      channel.publish("reaction", {
+        messageId,
+        reactions: dataRes.reactions,
+      });
     }
-  };
+
+    return;
+  }
+
+  // ❌ si échec: rollback (on revalidate pour être safe)
+  mutate();
+};
 
   /* ---------------------------------------------------------------------- */
   /* 7) Timers éphémères                                                      */
