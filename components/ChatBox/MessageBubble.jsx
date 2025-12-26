@@ -131,16 +131,14 @@ function MessageBubble({
   const pickerRef = useRef(null);
   const pressableRef = useRef(null);
 
-  // ✅ bouton desktop 😊
+  // ✅ bouton "comme sur l'app" : petite icône emoji toujours dispo
   const triggerRef = useRef(null);
 
-  /* ---------- Long press (ULTRA FIABLE) ---------- */
+  /* ---------- Long press (on le garde en bonus) ---------- */
   const longPressTimerRef = useRef(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
   const pointerIdRef = useRef(null);
-
   const didLongPressRef = useRef(false);
-
   const unblockTouchMoveRef = useRef(null);
 
   const inputModeRef = useRef(null); // "pointer" | "touch"
@@ -205,6 +203,33 @@ function MessageBubble({
     setPickerPos({ x, y });
     setIsPickerOpen(true);
   }, []);
+
+  // ✅ ouverture "fiable" depuis un event (clic/tap)
+  const openPickerFromEvent = useCallback((e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    if (!e) {
+      openPickerFromEl(triggerRef.current || pressableRef.current);
+      return;
+    }
+
+    // On place le picker proche du doigt/clic
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const clientX = e.clientX ?? (e.touches?.[0]?.clientX);
+    const clientY = e.clientY ?? (e.touches?.[0]?.clientY);
+
+    if (typeof clientX === "number" && typeof clientY === "number") {
+      const x = clamp(clientX, 8, vw - 8);
+      const y = clamp(clientY - 70, 8, vh - 8); // un peu au-dessus
+      setPickerPos({ x, y });
+      setIsPickerOpen(true);
+    } else {
+      openPickerFromEl(triggerRef.current || pressableRef.current);
+    }
+  }, [openPickerFromEl]);
 
   const rememberInputMode = (mode) => {
     inputModeRef.current = mode;
@@ -428,7 +453,6 @@ function MessageBubble({
     return "✔ Envoyé";
   }, [isOwn, lastReads, msg.createdAt, utilisateur.id]);
 
-  // ✅ Important : on garde tes presign, mais optimisés (TTL + no double setState)
   const auteurPhotoUrl = usePresignedPhoto(msg.auteur?.photoUrl);
   const imageMsgUrl = usePresignedPhoto(msg.type === "IMAGE" ? msg.imageUrl : null);
   const audioMsgUrl = usePresignedPhoto(msg.type === "AUDIO" ? msg.audioUrl : null);
@@ -491,6 +515,7 @@ function MessageBubble({
         </div>
       )}
 
+      {/* ✅ Le message (on garde ton long-press, mais ce n'est PLUS la méthode principale) */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -504,6 +529,7 @@ function MessageBubble({
         onTouchCancel={handleTouchCancel}
         onContextMenu={handleContextMenu}
         onClickCapture={(e) => {
+          // si long-press a ouvert → on stoppe le click fantôme
           if (didLongPressRef.current) {
             e.preventDefault();
             e.stopPropagation();
@@ -526,6 +552,35 @@ function MessageBubble({
           <p className="message-text">{msg.contenu}</p>
         )}
       </div>
+
+      {/* ✅ Bouton "comme sur l'app" pour déclencher les réactions (FIABLE) */}
+      <button
+        ref={triggerRef}
+        className="message-react-btn"
+        type="button"
+        onMouseDown={(e) => {
+          // desktop: on évite de perdre le focus / déclencher des sélections
+          e.preventDefault();
+        }}
+        onClick={(e) => {
+          if (isPickerOpen) {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsPickerOpen(false);
+            return;
+          }
+          openPickerFromEvent(e);
+        }}
+        onTouchStart={(e) => {
+          // mobile: ouverture immédiate au tap (plus fiable que long press)
+          if (isPickerOpen) return;
+          openPickerFromEvent(e);
+        }}
+        aria-label="Réagir"
+        title="Réagir"
+      >
+        😊
+      </button>
 
       {isOwn && (
         <button
@@ -564,22 +619,6 @@ function MessageBubble({
           })}
         </div>
       )}
-
-      <button
-        ref={triggerRef}
-        className="message-react-btn"
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (isPickerOpen) setIsPickerOpen(false);
-          else openPickerFromEl(triggerRef.current);
-        }}
-        aria-label="Réagir"
-        title="Réagir"
-      >
-        😊
-      </button>
 
       {isPickerOpen && (
         <div
