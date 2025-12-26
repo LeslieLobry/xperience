@@ -34,17 +34,22 @@ export function useMessages(conversationId, utilisateur, setTexte) {
   /* ---------------------------------------------------------------------- */
   /* 1) SWR                                                                  */
   /* ---------------------------------------------------------------------- */
-  const { data, error, isLoading, mutate } = useSWR(
-    conversationId
-      ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
-      : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      dedupingInterval: 5000,
-    }
-  );
+const { data, error, isLoading, mutate } = useSWR(
+  conversationId
+    ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
+    : null,
+  fetcher,
+  {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    dedupingInterval: 5000,
+
+    // ✅ MEGA RAPIDE :
+    keepPreviousData: true,   // garde l'ancien affichage pendant le fetch
+    fallbackData: { messages: [], participants: [], hasMore: false, lastReads: [] }, 
+  }
+);
+
 
   const messages = data?.messages || [];
   const participantsAutres = (data?.participants || []).filter(

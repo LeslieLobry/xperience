@@ -22,11 +22,12 @@ import ChatHeader from "./ChatHeader";
 // ✅ PERF: MessagesList en dynamic pour éviter le gros freeze au clic
 const MessagesList = dynamic(() => import("../MessagesList"), {
   ssr: false,
-  loading: () => (
-    <div className="chat-messages" style={{ padding: 16, color: "#b89760" }}>
-      Chargement des messages...
-    </div>
-  ),
+loading: () => (
+  <div className="chat-messages" style={{ padding: 6, opacity: 0.6 }}>
+    {/* rien ou mini loader */}
+  </div>
+),
+
 });
 
 const NotificationAppelEntrant = dynamic(
@@ -39,7 +40,6 @@ const VideoCallView = dynamic(() => import("../VideoCallView/VideoCallView"), {
 const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), {
   ssr: false,
 });
-
 /* --------------------------------------------------------------------------- */
 /* 🔹 Ably : singleton + authUrl (fallback clé publique)                       */
 /* --------------------------------------------------------------------------- */
@@ -187,7 +187,7 @@ useEffect(() => {
 
   // 1er scroll dès qu'on peut
   reScroll();
-
+  
   const ro = new ResizeObserver(() => {
     reScroll();
   });
@@ -202,6 +202,10 @@ useEffect(() => {
 }, [conversationId, loadingInitial, scrollToBottom]);
   // ✅ Garde les derniers participants non vides pour éviter "0 participant" pendant le fetch
  
+// ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
+  useEffect(() => {
+    import("../MessagesList").catch(() => {});
+  }, []);
 
   const {
     messages,
@@ -501,7 +505,6 @@ const handleReactionOptimistic = useCallback(
 useLayoutEffect(() => {
   if (!conversationId) return;
   if (!loadingInitial) return;
-  if (isLoading) return;
   if (!messages?.length) return;
 
   let tries = 0;
@@ -526,7 +529,8 @@ useLayoutEffect(() => {
   };
 
   attempt();
-}, [conversationId, loadingInitial, isLoading, messages?.length, scrollToBottom, messages]);
+}, [conversationId, loadingInitial, messages?.length, scrollToBottom]);
+
 
 
   /* --------------------- Auto-scroll intelligent ---------------------- */
