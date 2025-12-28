@@ -1811,3 +1811,9 @@
    ✅ PATCH iPhone clavier (à coller TOUT EN BAS)
    ========================================================= */
 
+/* ✅ iOS seulement – comportement type Messenger */
+@supports (-webkit-touch-callout: none) {
+  .chat-input {
+    padding-bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px));
+  }
+}

@@ -158,7 +158,6 @@ export default function ChatBox({
 
   /* =========================================================
      ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
-     (tu l'avais 2 fois -> on garde UNE seule version propre)
      ========================================================= */
  useEffect(() => {
   if (typeof window === "undefined") return;
@@ -187,6 +186,67 @@ export default function ChatBox({
     vv?.removeEventListener("resize", setVars);
     vv?.removeEventListener("scroll", setVars);
     window.removeEventListener("resize", setVars);
+  };
+}, []);
+/* =========================================================
+   ✅ iOS Messenger-like : éviter que tout se lève au focus input
+   (iPhone uniquement – ne touche pas Android)
+   ========================================================= */
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isIOS) return;
+
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+
+  const setKb = () => {
+    if (!vv) return;
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    root.style.setProperty("--kb", `${kb}px`);
+  };
+
+  const onFocusIn = (e) => {
+    const t = e.target;
+    if (!t) return;
+
+    const isText =
+      t.tagName === "TEXTAREA" ||
+      (t.tagName === "INPUT" &&
+        ["text", "search", "email", "tel", "url", "password"].includes(
+          (t.getAttribute("type") || "text").toLowerCase()
+        ));
+
+    if (!isText) return;
+
+    setKb();
+
+    // comportement Messenger : on garde l’input visible
+    setTimeout(() => {
+      setKb();
+      const el =
+        typeof messagesListRef.current?.getEl === "function"
+          ? messagesListRef.current.getEl()
+          : null;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 60);
+  };
+
+  const onFocusOut = () => {
+    root.style.setProperty("--kb", "0px");
+  };
+
+  vv?.addEventListener("resize", setKb);
+  vv?.addEventListener("scroll", setKb);
+  document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("focusout", onFocusOut);
+
+  return () => {
+    vv?.removeEventListener("resize", setKb);
+    vv?.removeEventListener("scroll", setKb);
+    document.removeEventListener("focusin", onFocusIn);
+    document.removeEventListener("focusout", onFocusOut);
   };
 }, []);
 
