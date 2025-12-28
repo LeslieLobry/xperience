@@ -146,6 +146,8 @@ export default function GaleriePriveePhotos({
 
   // ✅ Upload : ajoute direct dans la liste + pousse une URL affichable tout de suite
   const handleNewPhoto = async (payload) => {
+    console.log("UPLOAD PAYLOAD:", payload);
+
     // PhotoUploader renvoie parfois un objet photo, parfois { ...photo, photoUrl }
     const raw = payload || {};
 
