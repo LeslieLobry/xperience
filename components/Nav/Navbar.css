@@ -124,7 +124,13 @@
     box-shadow: none;
     background-image: none ;
   }
-
+  .navbar-pseudo{
+    font-size: 12px;
+  }
+.navbar-logo img {
+  width: 60px;
+  height: 60px;
+}
   .nav-links {
     display: flex;
     align-items: flex-start;
