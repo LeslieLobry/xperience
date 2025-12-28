@@ -26,15 +26,6 @@ export default function ChatInput({
   onMessageSent,
   onTyping,
 }) {
-  // ✅ Anti double envoi ultra court (sans bloquer l’UI)
-  const sendLockRef = useRef(false);
-  const lockSend = () => {
-    sendLockRef.current = true;
-    setTimeout(() => {
-      sendLockRef.current = false;
-    }, 250);
-  };
-
   // AUDIO
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -72,14 +63,12 @@ export default function ChatInput({
           if (d && isFinite(d) && d > 0) resolve(Math.round(d));
           else resolve(null);
         };
-        audio.onerror = function () {
-          resolve(null);
-        };
+        audio.onerror = function () { resolve(null); };
       });
     } catch (err) {}
     let duree = Math.max(chrono || 0, html5 || 0);
     if (!duree || isNaN(duree) || duree < 1) duree = 1;
-    return duree;
+    return formatDuration(duree);
   }
 
   // COUPLE
@@ -92,27 +81,15 @@ export default function ChatInput({
   // EMOJI
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emoticonsMap = {
-    ":)": "😊",
-    ":-)": "😊",
-    ":(": "😢",
-    ":-(": "😢",
-    ";)": "😉",
-    ":D": "😄",
-    ":-D": "😄",
-    "<3": "❤️",
-    ":p": "😛",
-    ":-p": "😛",
-    ":'(": "😭",
-    ":o": "😮",
-    ":-o": "😮",
+    ":)": "😊", ":-)": "😊", ":(": "😢", ":-(": "😢", ";)": "😉",
+    ":D": "😄", ":-D": "😄", "<3": "❤️", ":p": "😛", ":-p": "😛",
+    ":'(": "😭", ":o": "😮", ":-o": "😮"
   };
   function replaceEmoticonsWithEmojis(text) {
     return Object.keys(emoticonsMap).reduce(
-      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]),
-      text
+      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]), text
     );
   }
-
   // --- IMAGE COMPRESSION ---
   const compressImage = (file, maxSize = 900) =>
     new Promise((resolve) => {
@@ -122,18 +99,14 @@ export default function ChatInput({
         const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
         const width = Math.round(img.width * ratio);
         const height = Math.round(img.height * ratio);
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob(
           (blob) => {
-            resolve(
-              new File([blob], file.name.replace(/\.\w+$/, ".jpg"), {
-                type: "image/jpeg",
-              })
-            );
+            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: "image/jpeg" }));
             URL.revokeObjectURL(url);
           },
           "image/jpeg",
@@ -151,92 +124,108 @@ export default function ChatInput({
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
 
-  // ✅ ref input file (sablier cliquable)
-  const fileInputRef = useRef(null);
-
-  // ✅ comportement clair des boutons
-  const openPickerNormal = () => {
-    if (isSending) return;
-    if (!imageFile) {
-      setEphemere(false);
-      fileInputRef.current?.click();
-    } else {
-      setEphemere(false);
+  // --- AUDIO RECORDING ---
+  const startAudioRecording = async () => {
+    try {
+      const supportedType = getSupportedAudioType();
+      setAudioType(supportedType);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new window.MediaRecorder(
+        stream,
+        supportedType ? { mimeType: supportedType } : undefined
+      );
+      audioChunks.current = [];
+      audioStartRef.current = Date.now();
+      audioStopRef.current = null;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunks.current.push(e.data);
+        }
+      };
+      recorder.onstop = () => {
+        audioStopRef.current = Date.now();
+        if (audioChunks.current.length) {
+          const blob = new Blob(audioChunks.current, { type: supportedType || "audio/webm" });
+          setAudioBlob(blob);
+          setAudioUrl(URL.createObjectURL(blob));
+        } else {
+          setAudioBlob(null);
+          setAudioUrl(null);
+        }
+        audioChunks.current = [];
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      recorder.start();
+    } catch (err) {
+      alert("Impossible d'accéder au micro.");
     }
   };
 
-  const openPickerEphemere = () => {
-    if (isSending) return;
-    if (!imageFile) {
-      setEphemere(true);
-      fileInputRef.current?.click();
-    } else {
-      setEphemere(true);
+  const stopAudioRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.requestData?.();
+      setTimeout(() => {
+        mediaRecorder.stop();
+        setIsRecording(false);
+      }, 100);
     }
   };
 
-  const startCamera = async () => {
+  const removeAudioPreview = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    audioStartRef.current = null;
+    audioStopRef.current = null;
+  };
+
+  // --- CAMERA ---
+  const handleOpenCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setCameraStream(stream);
       setShowCamera(true);
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      }, 50);
     } catch (err) {
-      console.error("Erreur caméra :", err);
       alert("Impossible d'accéder à la caméra.");
+      setShowCamera(false);
     }
   };
-
   const stopCamera = () => {
-    try {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach((t) => t.stop());
-      }
-    } catch (_) {}
-    setCameraStream(null);
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
     setShowCamera(false);
   };
-
-  const handleTakePhoto = async () => {
-    try {
-      const video = videoRef.current;
-      if (!video) return;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-      if (!blob) return;
-
-      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
-
-      let compressed = file;
-      try {
-        compressed = await compressImage(file, 900);
-      } catch (err) {
-        compressed = file;
-      }
-
-      const url = URL.createObjectURL(compressed);
-      setImagePreview(url);
-      setImageFile(compressed);
-
-      stopCamera();
-    } catch (err) {
-      console.error("Erreur capture photo :", err);
-      alert("Erreur lors de la capture.");
+  useEffect(() => {
+    if (showCamera && videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
     }
+    return () => stopCamera();
+  }, [showCamera, cameraStream]);
+  const handleTakePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 360;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImagePreview(URL.createObjectURL(blob));
+        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+        stopCamera();
+      }
+    }, "image/jpeg", 0.9);
   };
-
-  const handlePickImage = async (e) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
     if (!file) return;
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
 
     let compressed = file;
     try {
@@ -257,177 +246,79 @@ export default function ChatInput({
   };
 
   // --- PRENOMS COUPLE ---
-  // ✅ N'affiche le formulaire que si aucun prénom n'existe nulle part.
-  // 1) si l'utilisateur a déjà prenom1/prenom2 => OK direct
-  // 2) sinon on tente /api/prenoms-couple
   useEffect(() => {
     if (utilisateur.type !== "couple") return;
-
-    const userP1 = (utilisateur?.prenom1 || "").trim();
-    const userP2 = (utilisateur?.prenom2 || "").trim();
-    const hasUserPrenoms = Boolean(userP1) && Boolean(userP2);
-
-    if (hasUserPrenoms) {
-      setPr1(userP1);
-      setPr2(userP2);
-      setPrenomsOK(true);
-      // garde un membre parlant cohérent
-      setMembreParlant((prev) => prev || "couple");
-      setLoadingPrenoms(false);
-      return;
-    }
-
     setLoadingPrenoms(true);
-
     fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const p1 = (data?.prenoms?.prenom1 || "").trim();
-        const p2 = (data?.prenoms?.prenom2 || "").trim();
-
-        if (p1 && p2) {
-          setPr1(p1);
-          setPr2(p2);
+      .then(res => res.json())
+      .then(data => {
+        if (data.prenoms) {
+          setPr1(data.prenoms.prenom1 || "");
+          setPr2(data.prenoms.prenom2 || "");
           setPrenomsOK(true);
-
-          // si l'utilisateur avait encore "couple", on laisse.
-          // sinon, on s'assure que la valeur est bien dans les options.
-          setMembreParlant((prev) => {
-            if (!prev) return "couple";
-            if (prev === p1 || prev === p2 || prev === "couple") return prev;
-            return "couple";
-          });
         } else {
           setPrenomsOK(false);
         }
       })
-      .catch(() => {
-        setPrenomsOK(false);
-      })
       .finally(() => setLoadingPrenoms(false));
-  }, [conversationId, utilisateur.type, utilisateur?.prenom1, utilisateur?.prenom2]);
-
+  }, [conversationId, utilisateur.type]);
   const handlePrenomsSubmit = async (e) => {
     e.preventDefault();
-
-    const p1 = (pr1 || "").trim();
-    const p2 = (pr2 || "").trim();
-    if (!p1 || !p2) return;
-
+    if (!pr1.trim() || !pr2.trim()) return;
     setLoadingPrenoms(true);
-
-    try {
-      const res = await fetch("/api/prenoms-couple", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId,
-          prenom1: p1,
-          prenom2: p2,
-        }),
-      });
-
-      const dataRes = await res.json().catch(() => null);
-
-      if (res.ok && dataRes?.success) {
-        // ✅ met à jour immédiatement (pas de flash)
-        setPr1(p1);
-        setPr2(p2);
-        setPrenomsOK(true);
-        setMembreParlant((prev) => (prev ? prev : "couple"));
-      }
-    } finally {
-      setLoadingPrenoms(false);
+    const res = await fetch("/api/prenoms-couple", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId,
+        prenom1: pr1,
+        prenom2: pr2,
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setPrenomsOK(true);
     }
+    setLoadingPrenoms(false);
   };
-
-  // ✅ AUTO-GROW (Messenger-like)
-  const MAX_TA_HEIGHT = 140; // ~5-6 lignes
 
   function autoResize() {
     const ta = textareaRef.current;
-    if (!ta) return;
-
-    // reset height to recompute scrollHeight
-    ta.style.height = "auto";
-
-    const next = Math.min(ta.scrollHeight, MAX_TA_HEIGHT);
-    ta.style.height = next + "px";
-
-    // ✅ après le max => textarea scrollable
-    if (ta.scrollHeight > MAX_TA_HEIGHT) {
-      ta.style.overflowY = "auto";
-    } else {
-      ta.style.overflowY = "hidden";
+    if (ta) {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
     }
   }
+  useEffect(() => { autoResize(); }, [texte]);
 
-  useEffect(() => {
-    autoResize();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [texte]);
-
-  // --- SUBMIT LOGIC (✅ reset UI immédiat, plus de “Envoi…” qui traîne) ---
+  // --- SUBMIT LOGIC ---
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (sendLockRef.current) return;
-    lockSend();
-
-    // on active 1 instant (mais on coupe vite)
+    if (isSending) return;
     setIsSending(true);
 
     try {
       // IMAGE
       if (imageFile) {
         const optimisticKey = generateOptimisticKey();
-        const texteToSend = texte || "";
-        const isEph = ephemere;
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        formData.append("conversationId", conversationId);
+        formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
+        formData.append("optimisticKey", optimisticKey);
+        if (texte) formData.append("contenu", texte);
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
+        }
 
-        // ✅ RESET UI IMMÉDIAT
+        await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
         if (imagePreview) URL.revokeObjectURL(imagePreview);
         setImageFile(null);
         setImagePreview(null);
         setTexte("");
         setEphemere(false);
-
-        // ✅ Envoi via parent (optimistic)
-        if (utilisateur.type === "couple") {
-          const p = onMessageSent(
-            {
-              file: imageFile,
-              contenu: texteToSend,
-              type: "IMAGE",
-              conversationId,
-              ephemere: isEph,
-              membreParlant,
-              prenom1: pr1,
-              prenom2: pr2,
-              optimisticKey,
-            },
-            "IMAGE",
-            membreParlant,
-            true,
-            optimisticKey
-          );
-          if (p?.catch) p.catch((err) => console.error("[ChatInput] Erreur envoi IMAGE:", err));
-        } else {
-          const p = onMessageSent(
-            {
-              file: imageFile,
-              contenu: texteToSend,
-              type: "IMAGE",
-              conversationId,
-              ephemere: isEph,
-              optimisticKey,
-            },
-            "IMAGE",
-            undefined,
-            true,
-            optimisticKey
-          );
-          if (p?.catch) p.catch((err) => console.error("[ChatInput] Erreur envoi IMAGE:", err));
-        }
-
         setIsSending(false);
         return;
       }
@@ -435,102 +326,79 @@ export default function ChatInput({
       // AUDIO
       if (audioBlob) {
         const optimisticKey = generateOptimisticKey();
-
-        // ✅ RESET UI IMMÉDIAT
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-        setAudioBlob(null);
-        setAudioUrl(null);
-
-        // ✅ duration
-        const duree = await getAccurateDuration(audioBlob);
-
+        let duree = await getAccurateDuration(audioBlob);
         const formData = new FormData();
-        formData.append("audio", audioBlob, `audio-${Date.now()}.webm`);
-        formData.append("conversationId", String(conversationId));
-        formData.append("type", "AUDIO");
-        formData.append("duree", String(duree));
+        let extension = "webm";
+        if (audioType === "audio/mp4") extension = "m4a";
+        if (audioType === "audio/mpeg") extension = "mp3";
+        formData.append("audio", audioBlob, `audio.${extension}`);
+        formData.append("audioType", audioType); // pour info backend/lecture
+        formData.append("conversationId", conversationId);
+        formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
+        formData.append("duree", duree);
         formData.append("optimisticKey", optimisticKey);
 
-        if (utilisateur.type === "couple") {
+        if (utilisateur.type === "couple" && prenomsOK) {
           formData.append("membreParlant", membreParlant);
           formData.append("prenom1", pr1);
           formData.append("prenom2", pr2);
         }
 
-        const p = onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
-        if (p?.catch) p.catch((err) => console.error("[ChatInput] Erreur envoi AUDIO:", err));
-
+        await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioBlob(null);
+        setAudioUrl(null);
+        audioStartRef.current = null;
+        audioStopRef.current = null;
+        setTexte("");
+        setEphemere(false);
         setIsSending(false);
         return;
       }
 
       // TEXTE
-      const texteToSend = (texte || "").trim();
-      if (!texteToSend) {
+      if (!texte.trim()) {
         setIsSending(false);
         return;
       }
-
       const optimisticKey = generateOptimisticKey();
-      const isEph = ephemere;
-
-      // ✅ RESET UI IMMÉDIAT
+      if (utilisateur.type === "couple" && prenomsOK) {
+        await onMessageSent({
+          contenu: texte,
+          type: ephemere ? "EPHEMERE" : "TEXTE",
+          conversationId,
+          optimisticKey,
+          prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
+          prenom1: pr1,
+          prenom2: pr2,
+        }, "TEXTE", membreParlant, false, optimisticKey);
+      } else {
+        await onMessageSent({
+          contenu: texte,
+          type: ephemere ? "EPHEMERE" : "TEXTE",
+          conversationId,
+          optimisticKey,
+        }, "TEXTE", undefined, false, optimisticKey);
+      }
       setTexte("");
       setEphemere(false);
-
-      if (utilisateur.type === "couple") {
-        const p = onMessageSent(
-          {
-            contenu: texteToSend,
-            type: isEph ? "EPHEMERE" : "TEXTE",
-            conversationId,
-            optimisticKey,
-            membreParlant,
-            prenom1: pr1,
-            prenom2: pr2,
-          },
-          "TEXTE",
-          membreParlant,
-          false,
-          optimisticKey
-        );
-        if (p?.catch) p.catch((err) => console.error("[ChatInput] Erreur envoi TEXTE:", err));
-      } else {
-        const p = onMessageSent(
-          {
-            contenu: texteToSend,
-            type: isEph ? "EPHEMERE" : "TEXTE",
-            conversationId,
-            optimisticKey,
-          },
-          "TEXTE",
-          undefined,
-          false,
-          optimisticKey
-        );
-        if (p?.catch) p.catch((err) => console.error("[ChatInput] Erreur envoi TEXTE:", err));
-      }
-      return;
     } catch (err) {
       console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
-      setIsSending(false);
     }
+    setIsSending(false);
   };
 
   // --- Notification éphémère ---
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
   useEffect(() => {
     if (showEphemereNotif) {
-      const timer = setTimeout(() => {
-        setShowEphemereNotif(false);
-      }, 5000);
+      const timer = setTimeout(() => { setShowEphemereNotif(false); }, 5000);
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
-
   const handleSubmitWithNotif = async (e) => {
     e.preventDefault();
-    if (sendLockRef.current) return;
+    if (isSending) return;
     if (ephemere) setShowEphemereNotif(true);
     await handleSubmit(e);
   };
@@ -538,18 +406,14 @@ export default function ChatInput({
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
-        <form
-          className="chat-input"
-          onSubmit={handlePrenomsSubmit}
-          style={{ flexDirection: "column", gap: 8 }}
-        >
+        <form className="chat-input" onSubmit={handlePrenomsSubmit} style={{ flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <input
               type="text"
               className="input-prenom"
               placeholder="Prénom membre 1"
               value={pr1}
-              onChange={(e) => setPr1(e.target.value)}
+              onChange={e => setPr1(e.target.value)}
               style={{ width: 120 }}
               disabled={loadingPrenoms}
               autoFocus
@@ -559,7 +423,7 @@ export default function ChatInput({
               className="input-prenom"
               placeholder="Prénom membre 2"
               value={pr2}
-              onChange={(e) => setPr2(e.target.value)}
+              onChange={e => setPr2(e.target.value)}
               style={{ width: 120 }}
               disabled={loadingPrenoms}
             />
@@ -572,52 +436,40 @@ export default function ChatInput({
 
       {/* CAMERA MODAL */}
       {showCamera && (
-        <div
-          className="camera-modal"
-          style={{
-            position: "fixed",
-            zIndex: 1002,
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "column",
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
-              width: 340,
-              height: 250,
-              borderRadius: 14,
-              background: "#222",
-            }}
-          />
+        <div className="camera-modal" style={{
+          position: "fixed",
+          zIndex: 1002,
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.85)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+        }}>
+          <video ref={videoRef} autoPlay playsInline style={{
+            width: 340,
+            height: 250,
+            borderRadius: 14,
+            background: "#222",
+          }} />
           <div style={{ marginTop: 18 }}>
             <button onClick={handleTakePhoto} style={{ fontSize: 22, marginRight: 24 }}>
               📸 Prendre la photo
             </button>
-            <button
-              onClick={stopCamera}
-              style={{ fontSize: 18, color: "#fff", background: "#e53" }}
-            >
+            <button onClick={stopCamera} style={{ fontSize: 18, color: "#fff", background: "#e53" }}>
               Annuler
             </button>
           </div>
         </div>
       )}
-
       {utilisateur.type === "couple" && prenomsOK && (
         <select
           className="select-membre"
           value={membreParlant}
-          onChange={(e) => setMembreParlant(e.target.value)}
+          onChange={e => setMembreParlant(e.target.value)}
         >
           <option value={pr1}>{pr1}</option>
           <option value={pr2}>{pr2}</option>
@@ -626,45 +478,38 @@ export default function ChatInput({
       )}
 
       {showEphemereNotif && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 10,
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: "#e53",
-            color: "#fff",
-            padding: "10px 20px",
-            borderRadius: 25,
-            fontWeight: "bold",
-            zIndex: 1100,
-            boxShadow: "0 0 10px rgba(234, 215, 108, 0.7)",
-          }}
-        >
+        <div style={{
+          position: "fixed",
+          bottom: 10,
+          left: "50%",
+          transform: "translateX(-50%)",
+          backgroundColor: "#e53",
+          color: "#fff",
+          padding: "10px 20px",
+          borderRadius: 25,
+          fontWeight: "bold",
+          zIndex: 1100,
+          boxShadow: "0 0 10px rgba(234, 215, 108, 0.7)",
+        }}>
           Photo éphémère envoyée!
         </div>
       )}
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-        <textarea
-          className="input-text"
-          ref={textareaRef}
-          value={texte}
-          placeholder="Écris un message…"
-          onChange={(e) => {
-            const value = e.target.value;
-            const withEmojis = replaceEmoticonsWithEmojis(value);
-            setTexte(withEmojis);
-            if (onTyping) onTyping();
-            autoResize();
-          }}
+        <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e) => {
+          const value = e.target.value;
+          const withEmojis = replaceEmoticonsWithEmojis(value);
+          setTexte(withEmojis);
+          if (onTyping) onTyping();
+          autoResize();
+        }}
           onInput={autoResize}
           rows={1}
           style={{
             resize: "none",
+            overflow: "hidden",
           }}
         />
-
         <div className="input-wrapper" style={{ alignItems: "center" }}>
           {/* Aperçu image */}
           {imagePreview && (
@@ -712,113 +557,131 @@ export default function ChatInput({
                   color: "#d00",
                 }}
                 onClick={removePreview}
+                title="Supprimer"
               >
-                ✕
+                ×
               </button>
             </div>
           )}
 
-          {/* Input file caché */}
+          {/* Aperçu audio */}
+          {audioBlob && !isRecording && (
+            <div
+              className="audio-file-ready"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginLeft: 8,
+                background: "transparent",
+                borderRadius: 8,
+                fontSize: 8,
+              }}
+            >
+              <span>Message audio prêt à envoyer</span>
+              <button
+                type="button"
+                onClick={removeAudioPreview}
+                title="Supprimer l'audio"
+                style={{
+                  color: "#d00",
+                  fontSize: 12,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer"
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Upload classique */}
           <input
             type="file"
             accept="image/*"
-            ref={fileInputRef}
-            onChange={handlePickImage}
+            id="file-upload"
             style={{ display: "none" }}
+            onChange={handleImageUpload}
+            disabled={!!imageFile || isSending}
           />
-
-          {/* Boutons */}
-          <button type="button" onClick={openPickerNormal} disabled={isSending}>
-            📷
+          <label
+            htmlFor="file-upload"
+            className="chat-input-photo-btn"
+            title="Envoyer une photo"
+            style={{ pointerEvents: (!!imageFile || isSending) ? "none" : "auto", opacity: (!!imageFile || isSending) ? 0.5 : 1 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-image-up-icon lucide-image-up"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg>
+          </label>
+          <button
+            type="button"
+            className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
+            onClick={() => setEphemere((v) => !v)}
+            title="Message éphémère (Snap)"
+          >
+            <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
           </button>
-          <button type="button" onClick={openPickerEphemere} disabled={isSending}>
-            ⏳
+          {/* MICRO */}
+          <button
+            type="button"
+            className="chat-input-mic-btn"
+            onClick={isRecording ? stopAudioRecording : startAudioRecording}
+            title={
+              isRecording
+                ? "Arrêter l'enregistrement"
+                : "Envoyer un message audio"
+            }
+            disabled={isSending}
+          >
+            {isRecording ? <CircleStop /> : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-mic" viewBox="0 0 16 16">
+              <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
+              <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
+            </svg>}
           </button>
-          <button type="button" onClick={startCamera} disabled={isSending}>
-            📸
-          </button>
-
-          {/* Emoji */}
-          <button type="button" onClick={() => setShowEmojiPicker((v) => !v)} disabled={isSending}>
-            😀
-          </button>
-
-          {/* Audio */}
-          {!isRecording ? (
-            <button
-              type="button"
-              className="chat-input-mic-btn"
-              disabled={isSending}
-              onClick={async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                  const chosenType = getSupportedAudioType();
-                  setAudioType(chosenType);
-
-                  const recorder = new MediaRecorder(stream, { mimeType: chosenType });
-                  audioChunks.current = [];
-
-                  recorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) audioChunks.current.push(event.data);
-                  };
-
-                  recorder.onstop = async () => {
-                    const blob = new Blob(audioChunks.current, { type: chosenType });
-                    const url = URL.createObjectURL(blob);
-                    setAudioBlob(blob);
-                    setAudioUrl(url);
-
-                    // stop tracks
-                    try {
-                      stream.getTracks().forEach((t) => t.stop());
-                    } catch (_) {}
-
-                    audioStopRef.current = Date.now();
-                  };
-
-                  audioStartRef.current = Date.now();
-                  recorder.start();
-                  setMediaRecorder(recorder);
-                  setIsRecording(true);
-                } catch (err) {
-                  console.error("Erreur micro :", err);
-                  alert("Impossible d'accéder au micro.");
-                }
-              }}
-            >
-              🎤
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  mediaRecorder?.stop();
-                } catch (_) {}
-                setIsRecording(false);
-              }}
-              className="chat-input-mic-btn"
-            >
-              <CircleStop size={20} />
-            </button>
-          )}
-
-          {/* Envoyer */}
-          <button type="submit" disabled={isSending}>
-            ➤
+          {/* EMOJI */}
+          <button
+            type="button"
+            className="chat-input-emoji-btn"
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            title="Insérer un emoji"
+            disabled={isSending}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-emoji-smile" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5"/>
+            </svg>
           </button>
         </div>
-      </form>
 
-      {/* Picker emoji */}
+        <button
+          type="submit"
+          className="message-btn"
+          disabled={
+            isSending ||
+            !(
+              (audioBlob && !isRecording) ||
+              imageFile ||
+              (texte && texte.trim())
+            )
+          }
+        >
+          {isSending
+            ? "Envoi…"
+            : imageFile
+              ? "Envoyer l'image"
+              : audioBlob
+                ? "Envoyer l'audio"
+                : "Envoyer"}
+        </button>
+      </form>
       {showEmojiPicker && (
-        <div style={{ position: "absolute", bottom: 60, right: 10, zIndex: 999 }}>
+        <div className="emoji-picker-container">
           <Picker
             data={data}
             onEmojiSelect={(emoji) => {
               setTexte((prev) => prev + emoji.native);
               setShowEmojiPicker(false);
             }}
+            theme="light"
           />
         </div>
       )}
