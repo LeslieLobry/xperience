@@ -249,6 +249,35 @@ useEffect(() => {
     document.removeEventListener("focusout", onFocusOut);
   };
 }, []);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isIOS) return;
+
+  const body = document.body;
+  const scrollY = window.scrollY || 0;
+
+  // lock page scroll
+  body.dataset.scrollY = String(scrollY);
+  body.style.position = "fixed";
+  body.style.top = `-${scrollY}px`;
+  body.style.left = "0";
+  body.style.right = "0";
+  body.style.width = "100%";
+  body.style.overflow = "hidden";
+
+  return () => {
+    const y = Number(body.dataset.scrollY || "0") || 0;
+    body.style.position = "";
+    body.style.top = "";
+    body.style.left = "";
+    body.style.right = "";
+    body.style.width = "";
+    body.style.overflow = "";
+    delete body.dataset.scrollY;
+    window.scrollTo(0, y);
+  };
+}, []);
 
   const computeIsNearBottom = useCallback(() => {
     const el = getScrollEl();
