@@ -72,11 +72,11 @@ function usePresignedGalleryUrls(photoList) {
     return () => {
       unmounted = true;
     };
-    // ⚠️ on dépend de photoList ET presignedUrls pour compléter au fur et à mesure
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoList]);
 
-  return presignedUrls;
+  // ✅ IMPORTANT : on renvoie aussi le setter pour pouvoir injecter une url instantanée
+  return [presignedUrls, setPresignedUrls];
 }
 
 export default function GaleriePriveePhotos({
@@ -97,9 +97,7 @@ export default function GaleriePriveePhotos({
     const visiteur = visiteurId || utilisateurId;
     setLoading(true);
 
-    fetch(
-      `/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`
-    )
+    fetch(`/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.access === "pending") {
@@ -125,7 +123,8 @@ export default function GaleriePriveePhotos({
       .finally(() => setLoading(false));
   }, [utilisateurId, visiteurId]);
 
-  const presignedUrls = usePresignedGalleryUrls(photoList);
+  // ✅ Maintenant on récupère aussi le setter
+  const [presignedUrls, setPresignedUrls] = usePresignedGalleryUrls(photoList);
 
   const handleDemandeAcces = async () => {
     const visiteur = visiteurId || utilisateurId;
@@ -145,14 +144,53 @@ export default function GaleriePriveePhotos({
     setLoading(false);
   };
 
-  // ✅ Upload : ajoute direct dans la liste
-  // + ajoute une "clé stable" si jamais id manque (cas rare)
-  const handleNewPhoto = (photo) => {
-    const safePhoto = photo?.id
-      ? photo
-      : { ...photo, id: `tmp-${Date.now()}-${Math.random()}` };
+  // ✅ Upload : ajoute direct dans la liste + pousse une URL affichable tout de suite
+  const handleNewPhoto = async (payload) => {
+    // PhotoUploader renvoie parfois un objet photo, parfois { ...photo, photoUrl }
+    const raw = payload || {};
 
+    // id + url "clé" base
+    const safeId = raw?.id ? raw.id : `tmp-${Date.now()}-${Math.random()}`;
+
+    // clé S3 ou URL stockée en BDD
+    const storedKeyOrUrl = raw?.url || raw?.imageUrl || raw?.key || raw?.s3Key || "";
+
+    // URL affichable immédiate si présente (souvent photoUrl quand tu upload)
+    const immediateUrl =
+      raw?.photoUrl ||
+      raw?.publicUrl ||
+      (typeof storedKeyOrUrl === "string" && storedKeyOrUrl.startsWith("http") ? storedKeyOrUrl : null);
+
+    const safePhoto = raw?.id
+      ? { ...raw, id: safeId, url: storedKeyOrUrl || raw?.url }
+      : { ...raw, id: safeId, url: storedKeyOrUrl || raw?.url };
+
+    // 1) Ajout dans la liste (UI immédiate)
     setPhotoList((prev) => [safePhoto, ...prev]);
+
+    // 2) Injecte direct une URL affichable => plus besoin de refresh
+    if (immediateUrl) {
+      setPresignedUrls((prev) => ({ ...prev, [safeId]: immediateUrl }));
+      return;
+    }
+
+    // 3) Sinon on presign immédiatement si c'est une clé S3
+    if (storedKeyOrUrl && typeof storedKeyOrUrl === "string" && !storedKeyOrUrl.startsWith("http")) {
+      try {
+        const res = await fetch("/api/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: storedKeyOrUrl }),
+        });
+        const data = await res.json();
+        const url = data?.url;
+        if (url) {
+          setPresignedUrls((prev) => ({ ...prev, [safeId]: url }));
+        }
+      } catch (e) {
+        // on laisse /default.jpg si échec
+      }
+    }
   };
 
   const handleDelete = async (id) => {
@@ -164,10 +202,8 @@ export default function GaleriePriveePhotos({
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
     if (e.key === "Escape") setCurrentIndex(null);
-    if (e.key === "ArrowLeft")
-      setCurrentIndex((i) => (i > 0 ? i - 1 : i));
-    if (e.key === "ArrowRight")
-      setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
+    if (e.key === "ArrowLeft") setCurrentIndex((i) => (i > 0 ? i - 1 : i));
+    if (e.key === "ArrowRight") setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
   };
 
   useEffect(() => {
@@ -204,10 +240,7 @@ export default function GaleriePriveePhotos({
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id || index}>
             {editable && (
-              <button
-                className="delete-button"
-                onClick={() => handleDelete(photo.id)}
-              >
+              <button className="delete-button" onClick={() => handleDelete(photo.id)}>
                 <Trash2 size={16} />
               </button>
             )}
@@ -241,31 +274,19 @@ export default function GaleriePriveePhotos({
 
       {currentIndex !== null && photoList[currentIndex] && (
         <div className="lightbox" onClick={() => setCurrentIndex(null)}>
-          <div
-            className="lightbox-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="lightbox-close"
-              onClick={() => setCurrentIndex(null)}
-            >
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button className="lightbox-close" onClick={() => setCurrentIndex(null)}>
               <X size={24} />
             </button>
 
             {currentIndex > 0 && (
-              <button
-                className="lightbox-prev"
-                onClick={() => setCurrentIndex((i) => i - 1)}
-              >
+              <button className="lightbox-prev" onClick={() => setCurrentIndex((i) => i - 1)}>
                 <ChevronLeft size={32} />
               </button>
             )}
 
             {currentIndex < photoList.length - 1 && (
-              <button
-                className="lightbox-next"
-                onClick={() => setCurrentIndex((i) => i + 1)}
-              >
+              <button className="lightbox-next" onClick={() => setCurrentIndex((i) => i + 1)}>
                 <ChevronRight size={32} />
               </button>
             )}

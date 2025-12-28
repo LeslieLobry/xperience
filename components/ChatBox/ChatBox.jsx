@@ -18,16 +18,14 @@ import "./ChatBox.css";
 
 import ChatHeader from "./ChatHeader";
 
-
 // ✅ PERF: MessagesList en dynamic pour éviter le gros freeze au clic
 const MessagesList = dynamic(() => import("../MessagesList"), {
   ssr: false,
-loading: () => (
-  <div className="chat-messages" style={{ padding: 6, opacity: 0.6 }}>
-    {/* rien ou mini loader */}
-  </div>
-),
-
+  loading: () => (
+    <div className="chat-messages" style={{ padding: 6, opacity: 0.6 }}>
+      {/* rien ou mini loader */}
+    </div>
+  ),
 });
 
 const NotificationAppelEntrant = dynamic(
@@ -40,6 +38,7 @@ const VideoCallView = dynamic(() => import("../VideoCallView/VideoCallView"), {
 const EmojiPicker = dynamic(() => import("./EmojiPickerWrapper"), {
   ssr: false,
 });
+
 /* --------------------------------------------------------------------------- */
 /* 🔹 Ably : singleton + authUrl (fallback clé publique)                       */
 /* --------------------------------------------------------------------------- */
@@ -87,8 +86,12 @@ function runIdle(fn, timeout = 1200) {
   return () => clearTimeout(t);
 }
 
-export default function ChatBox({ conversationId, utilisateur, onBack, initialParticipants = [] }) {
-
+export default function ChatBox({
+  conversationId,
+  utilisateur,
+  onBack,
+  initialParticipants = [],
+}) {
   // --------------------- STATES ----------------------
   const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -143,6 +146,27 @@ export default function ChatBox({ conversationId, utilisateur, onBack, initialPa
   const atBottomRef = useRef(true);
   const SCROLL_TOLERANCE_PX = 140;
 
+  /* =========================================================
+     ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
+     ========================================================= */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const setVh = () => {
+      const h = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--app-vh", `${h}px`);
+    };
+
+    setVh();
+    window.visualViewport?.addEventListener("resize", setVh);
+    window.addEventListener("resize", setVh);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", setVh);
+      window.removeEventListener("resize", setVh);
+    };
+  }, []);
+
   const computeIsNearBottom = useCallback(() => {
     const el = messagesContainerRef.current;
     if (!el) return true;
@@ -163,47 +187,45 @@ export default function ChatBox({ conversationId, utilisateur, onBack, initialPa
       container.scrollTop = container.scrollHeight;
     }
   }, []);
-// ✅ Re-scroll si la hauteur change (images/presign/etc.)
-// ➜ on le garde actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
-useEffect(() => {
-  if (!conversationId) return;
-  if (typeof ResizeObserver === "undefined") return;
 
-  const el = messagesContainerRef.current;
-  if (!el) return;
+  // ✅ Re-scroll si la hauteur change (images/presign/etc.)
+  // ➜ on le garde actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
+  useEffect(() => {
+    if (!conversationId) return;
+    if (typeof ResizeObserver === "undefined") return;
 
-  let raf1 = null;
-  let raf2 = null;
+    const el = messagesContainerRef.current;
+    if (!el) return;
 
-  const reScroll = () => {
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        // ✅ si on est en ouverture OU si l’utilisateur est déjà en bas, on recolle
-        if (loadingInitial || atBottomRef.current) {
-          scrollToBottom(false);
-        }
+    let raf1 = null;
+    let raf2 = null;
+
+    const reScroll = () => {
+      raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          if (loadingInitial || atBottomRef.current) {
+            scrollToBottom(false);
+          }
+        });
       });
-    });
-  };
+    };
 
-  // 1er scroll dès qu'on peut
-  reScroll();
-  
-  const ro = new ResizeObserver(() => {
     reScroll();
-  });
 
-  ro.observe(el);
+    const ro = new ResizeObserver(() => {
+      reScroll();
+    });
 
-  return () => {
-    ro.disconnect();
-    if (raf1) cancelAnimationFrame(raf1);
-    if (raf2) cancelAnimationFrame(raf2);
-  };
-}, [conversationId, loadingInitial, scrollToBottom]);
-  // ✅ Garde les derniers participants non vides pour éviter "0 participant" pendant le fetch
- 
-// ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
+      if (raf1) cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [conversationId, loadingInitial, scrollToBottom]);
+
+  // ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
   useEffect(() => {
     import("../MessagesList").catch(() => {});
   }, []);
@@ -211,7 +233,6 @@ useEffect(() => {
   const {
     messages,
     lastReads,
-    // setMessages,  // ⚠️ ton hook semble ne plus l’exposer parfois : on n’en dépend pas ici
     participantsAutres,
     envoyerMessage,
     handleReaction,
@@ -220,115 +241,126 @@ useEffect(() => {
     mutate,
     isLoading,
   } = useMessages(conversationId, utilisateur, setTexte);
+
   const lastNonEmptyParticipantsRef = useRef(initialParticipants);
-useEffect(() => {
-  if (Array.isArray(initialParticipants) && initialParticipants.length > 0) {
-    lastNonEmptyParticipantsRef.current = initialParticipants;
-  }
-}, [initialParticipants]);
+  useEffect(() => {
+    if (Array.isArray(initialParticipants) && initialParticipants.length > 0) {
+      lastNonEmptyParticipantsRef.current = initialParticipants;
+    }
+  }, [initialParticipants]);
 
+  useEffect(() => {
+    if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
+      lastNonEmptyParticipantsRef.current = participantsAutres;
+    }
+  }, [participantsAutres]);
 
-useEffect(() => {
-  if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
-    lastNonEmptyParticipantsRef.current = participantsAutres;
-  }
-}, [participantsAutres]);
+  const displayParticipantsAutres = useMemo(() => {
+    if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
+      return participantsAutres;
+    }
+    return lastNonEmptyParticipantsRef.current || [];
+  }, [participantsAutres]);
 
-const displayParticipantsAutres = useMemo(() => {
-  if (Array.isArray(participantsAutres) && participantsAutres.length > 0) {
-    return participantsAutres;
-  }
-  return lastNonEmptyParticipantsRef.current || [];
-}, [participantsAutres]);
-// ✅ Optimistic UI: afficher la réaction immédiatement (sans refresh)
-const toggleReactionLocal = useCallback((reactions = [], emoji, userId) => {
-  const rx = Array.isArray(reactions) ? [...reactions] : [];
-  const idx = rx.findIndex(
-    (r) => r?.emoji === emoji && (r?.utilisateurId === userId || r?.userId === userId)
-  );
-
-  if (idx >= 0) rx.splice(idx, 1);
-  else rx.push({ emoji, utilisateurId: userId });
-
-  return rx;
-}, []);
-
-const handleReactionOptimistic = useCallback(
-  async (messageId, emoji) => {
-    // 1) update instant côté UI
-    mutate(
-      (old) => {
-        const list = old?.messages || old?.data || old || [];
-        // si ton hook renvoie {messages:[]}
-        if (old?.messages) {
-          return {
-            ...old,
-            messages: old.messages.map((m) =>
-              m.id === messageId
-                ? {
-                    ...m,
-                    reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id),
-                  }
-                : m
-            ),
-          };
-        }
-
-        // fallback si la structure est différente
-        if (Array.isArray(list)) {
-          return list.map((m) =>
-            m.id === messageId
-              ? { ...m, reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id) }
-              : m
-          );
-        }
-
-        return old;
-      },
-      false
+  // ✅ Optimistic UI: afficher la réaction immédiatement (sans refresh)
+  const toggleReactionLocal = useCallback((reactions = [], emoji, userId) => {
+    const rx = Array.isArray(reactions) ? [...reactions] : [];
+    const idx = rx.findIndex(
+      (r) =>
+        r?.emoji === emoji &&
+        (r?.utilisateurId === userId || r?.userId === userId)
     );
 
-    // 2) backend (ton hook fait déjà le fetch)
-    try {
-      await handleReaction(messageId, emoji);
-    } catch (e) {
-      console.error("Erreur reaction:", e);
-      // optionnel: rollback (si tu veux) -> on re-toggle
+    if (idx >= 0) rx.splice(idx, 1);
+    else rx.push({ emoji, utilisateurId: userId });
+
+    return rx;
+  }, []);
+
+  const handleReactionOptimistic = useCallback(
+    async (messageId, emoji) => {
       mutate(
         (old) => {
-          if (!old?.messages) return old;
-          return {
-            ...old,
-            messages: old.messages.map((m) =>
+          const list = old?.messages || old?.data || old || [];
+          if (old?.messages) {
+            return {
+              ...old,
+              messages: old.messages.map((m) =>
+                m.id === messageId
+                  ? {
+                      ...m,
+                      reactions: toggleReactionLocal(
+                        m.reactions,
+                        emoji,
+                        utilisateur?.id
+                      ),
+                    }
+                  : m
+              ),
+            };
+          }
+
+          if (Array.isArray(list)) {
+            return list.map((m) =>
               m.id === messageId
                 ? {
                     ...m,
-                    reactions: toggleReactionLocal(m.reactions, emoji, utilisateur?.id),
+                    reactions: toggleReactionLocal(
+                      m.reactions,
+                      emoji,
+                      utilisateur?.id
+                    ),
                   }
                 : m
-            ),
-          };
+            );
+          }
+
+          return old;
         },
         false
       );
-    }
-  },
-  [handleReaction, mutate, toggleReactionLocal, utilisateur?.id]
-);
+
+      try {
+        await handleReaction(messageId, emoji);
+      } catch (e) {
+        console.error("Erreur reaction:", e);
+        mutate(
+          (old) => {
+            if (!old?.messages) return old;
+            return {
+              ...old,
+              messages: old.messages.map((m) =>
+                m.id === messageId
+                  ? {
+                      ...m,
+                      reactions: toggleReactionLocal(
+                        m.reactions,
+                        emoji,
+                        utilisateur?.id
+                      ),
+                    }
+                  : m
+              ),
+            };
+          },
+          false
+        );
+      }
+    },
+    [handleReaction, mutate, toggleReactionLocal, utilisateur?.id]
+  );
 
   const { isTyping, typingPseudo, envoyerTyping } = useTyping(
     conversationId,
     utilisateur
   );
 
-  // ✅ memo (évite recréer concat à chaque render)
   const participantsWithMe = useMemo(() => {
     const others = Array.isArray(displayParticipantsAutres)
       ? displayParticipantsAutres
       : [];
     return others.concat(utilisateur);
   }, [displayParticipantsAutres, utilisateur]);
-
 
   /* ======================================================================= */
   /*                        SYNC REFS AVEC LES STATES                        */
@@ -488,7 +520,6 @@ const handleReactionOptimistic = useCallback(
     };
   }, [conversationId, utilisateur.type]);
 
-  // Quand on reçoit / modifie les prénoms, on remplit les inputs
   useEffect(() => {
     if (prenomsCouple) {
       setPrenom1(prenomsCouple.prenom1 || "");
@@ -499,7 +530,6 @@ const handleReactionOptimistic = useCallback(
     }
   }, [prenomsCouple]);
 
-  // 🔁 Quand la conversation change, on reset l'état de scroll
   useEffect(() => {
     setLoadingInitial(true);
     lastMsgIdRef.current = null;
@@ -507,40 +537,35 @@ const handleReactionOptimistic = useCallback(
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
+  useLayoutEffect(() => {
+    if (!conversationId) return;
+    if (!loadingInitial) return;
+    if (!messages?.length) return;
 
- // ✅ Ouverture conversation : scroll 1 seule fois quand messages OK (et pas ceux de l’ancienne conv)
-useLayoutEffect(() => {
-  if (!conversationId) return;
-  if (!loadingInitial) return;
-  if (!messages?.length) return;
+    let tries = 0;
+    const maxTries = 6;
 
-  let tries = 0;
-  const maxTries = 6;
+    const attempt = () => {
+      tries += 1;
 
-  const attempt = () => {
-    tries += 1;
-
-    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!messagesContainerRef.current) {
-          if (tries < maxTries) setTimeout(attempt, 50);
-          return;
-        }
+        requestAnimationFrame(() => {
+          if (!messagesContainerRef.current) {
+            if (tries < maxTries) setTimeout(attempt, 50);
+            return;
+          }
 
-        scrollToBottom(false);
-        hasScrolledInitialRef.current = true;
-        lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
-        setLoadingInitial(false);
+          scrollToBottom(false);
+          hasScrolledInitialRef.current = true;
+          lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
+          setLoadingInitial(false);
+        });
       });
-    });
-  };
+    };
 
-  attempt();
-}, [conversationId, loadingInitial, messages?.length, scrollToBottom]);
+    attempt();
+  }, [conversationId, loadingInitial, messages?.length, scrollToBottom]);
 
-
-
-  /* --------------------- Auto-scroll intelligent ---------------------- */
   useEffect(() => {
     if (!messages?.length) return;
 
@@ -568,8 +593,6 @@ useLayoutEffect(() => {
     }
   }, [messages?.length, utilisateur?.id, scrollToBottom]);
 
-
-  /* --------------------- Cleanup global à l’unmount ---------------------- */
   useEffect(() => {
     return () => {
       stopTimer();
@@ -689,7 +712,9 @@ useLayoutEffect(() => {
       window.localVideoTrack = localVideoTrack;
     }
 
-    localTracks.forEach((track) => newRoom.localParticipant.publishTrack(track));
+    localTracks.forEach((track) =>
+      newRoom.localParticipant.publishTrack(track)
+    );
 
     setInCall(true);
     inCallRef.current = true;
@@ -902,7 +927,7 @@ useLayoutEffect(() => {
         setShowAddParticipant(false);
         setAddUserInput("");
         setAddUserError("");
-        window.location.reload(); // ✅ gardé (tu l’avais)
+        window.location.reload();
       } else {
         setAddUserError(data.error || "Erreur lors de l'ajout.");
       }
@@ -912,7 +937,6 @@ useLayoutEffect(() => {
     }
   };
 
-  /* --------------------- BACK HANDLER ---------------------- */
   const handleBackClick = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -969,7 +993,6 @@ useLayoutEffect(() => {
     }
   };
 
-  // ✅ memo (évite recréer objet à chaque render)
   const userWithPrenoms = useMemo(() => {
     return prenomsCouple
       ? {
@@ -980,7 +1003,6 @@ useLayoutEffect(() => {
       : utilisateur;
   }, [prenomsCouple, utilisateur]);
 
-  // ✅ onMessageSent sorti du JSX (perf)
   const handleMessageSent = useCallback(
     async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
       const tmpId =
@@ -1067,22 +1089,20 @@ useLayoutEffect(() => {
     [envoyerMessage, mutate, scrollToBottom, utilisateur]
   );
 
-  /* ======================================================================= */
-  /*                                 RENDER                                  */
-  /* ======================================================================= */
-
   return (
     <div className="chatbox-container">
+      {/* ✅ wrapper sticky fiable (au lieu de dépendre d’une classe interne) */}
+      <div className="chat-header-wrapper">
         <ChatHeader
-        participants={displayParticipantsAutres}
-        inCall={inCall}
-        onCallAudio={() => startCall(false)}
-        onCallVideo={() => startCall(true)}
-        onClose={hangupCall}
-        onAddParticipant={() => setShowAddParticipant(true)}
-        onBack={handleBackClick}
-      />
-
+          participants={displayParticipantsAutres}
+          inCall={inCall}
+          onCallAudio={() => startCall(false)}
+          onCallVideo={() => startCall(true)}
+          onClose={hangupCall}
+          onAddParticipant={() => setShowAddParticipant(true)}
+          onBack={handleBackClick}
+        />
+      </div>
 
       {utilisateur?.type === "couple" && (
         <div className="couple-prenoms-bar">

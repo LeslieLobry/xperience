@@ -1,10 +1,21 @@
+/* =========================================================
+   ✅ FIX GLOBAL LAYOUT (ANTI SLIDE / HEADER FIXE / INPUT FIXE)
+   À garder en haut du fichier
+   ========================================================= */
+
 /* === Layout principal === */
 .chatbox-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+
+  /* ✅ iOS + mobile: hauteur stable */
+  height: 100dvh;
+  height: 100vh; /* fallback */
+
   position: relative;
-  overflow: visible;
+
+  /* ✅ IMPORTANT: on empêche la page de scroller (sinon header disparaît) */
+  overflow: hidden;
 }
 
 /* === Header === */
@@ -18,8 +29,14 @@
   position: relative;
   background: transparent;
   border: 1px #e0c084 solid;
+
+  /* ✅ Header toujours visible */
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
+/* Badge timer */
 .call-timer-badge {
   position: absolute;
   left: 0;
@@ -29,7 +46,7 @@
   font-weight: 500;
   color: #7d5d2a;
   font-size: 1.1em;
-  z-index: 20;
+  z-index: 120;
   letter-spacing: 1px;
 }
 
@@ -128,12 +145,19 @@
 /* === Messages container === */
 .chat-messages {
   flex: 1 1 auto;
-  min-height: 0;                        /* indispensable pour que le scroll marche */
-  max-height: calc(100vh - 160px);      /* header + input (ajuste si besoin) */
+  min-height: 0; /* indispensable pour que le scroll marche */
+
+  /* ❌ on enlève la logique “calc(100vh - ... )” qui crée des glitches iOS */
+  max-height: none;
+
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   padding: 1rem;
+
+  /* ✅ scroll mobile smooth */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* === Messages & Bubbles === */
@@ -438,6 +462,19 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
+
+  /* ✅ input toujours visible en bas */
+  position: sticky;
+  bottom: 0;
+  z-index: 120;
+
+  /* ✅ safe-area iPhone */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+
+  /* pour éviter que ça “saute” */
+  background: rgba(5,5,9,0.85);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(224,192,132,0.25);
 }
 
 .input-wrapper { flex: 1; }
@@ -452,6 +489,9 @@
   font-family: inherit;
   line-height: 1.4;
   width: 100%;
+
+  /* ✅ iOS: empêche le zoom clavier */
+  font-size: 16px;
 }
 
 .input-text:focus {
@@ -681,6 +721,7 @@
 @media (max-width: 768px) {
   .chatbox-container {
     position: relative;
+    height: 100dvh;
     height: 100vh;
     box-sizing: border-box;
   }
@@ -688,10 +729,13 @@
   .chat-header-mobile {
     left: 0;
     right: 0;
-    z-index: 50;
+    z-index: 100;
     background: #050509;
     border-left: none;
     border-right: none;
+
+    position: sticky;
+    top: 0;
   }
 }
 
@@ -779,6 +823,9 @@
   border: 1px solid #444;
   background: #1a1a1a;
   color: #fff;
+
+  /* ✅ iOS: empêche zoom */
+  font-size: 16px;
 }
 
 .edit-prenoms-modal__error {
@@ -803,9 +850,10 @@
   font-size: 0.9rem;
   color: #e0c084;
 }
+
 /* =========================================================
-   ✅ OVERRIDE FINAL : bouton réaction "comme Messenger"
-   (à coller TOUT EN BAS du fichier)
+   ✅ OVERRIDES FINALS (TONS FIX REACTIONS + PICKER + MARGES)
+   (on garde, mais ça n'affecte pas le layout global)
    ========================================================= */
 
 /* 1) On ANNULLE tes anciens "display:none !important" */
@@ -821,7 +869,7 @@
   top: auto !important;
   transform: none !important;
 
-  bottom: 10px !important;     /* ajuste si tu veux plus haut/bas */
+  bottom: 10px !important;
   width: 30px !important;
   height: 30px !important;
   border-radius: 999px !important;
@@ -849,8 +897,7 @@
   right: auto !important;
 }
 
-/* 4) Desktop: option "au survol seulement" (si tu veux)
-   -> si tu préfères toujours visible, supprime ce bloc */
+/* 4) Desktop: option "au survol seulement" */
 @media (hover: hover) and (pointer: fine){
   .message-react-btn{
     opacity: 0 !important;
@@ -870,17 +917,13 @@
   }
 }
 
-/* 6) Picker en FIXED (ta classe existe déjà côté React) */
+/* 6) Picker en FIXED */
 .reaction-picker-fixed{
   position: fixed !important;
   z-index: 9999 !important;
 }
-/* =========================================================
-   ✅ FIX: voir TOUS les emojis dans le picker (mobile + desktop)
-   À COLLER TOUT EN BAS
-   ========================================================= */
 
-/* le picker doit pouvoir défiler et ne jamais être coupé */
+/* Voir tous les emojis */
 .reaction-picker-fixed{
   max-width: calc(100vw - 12px) !important;
   padding: 8px 10px !important;
@@ -893,15 +936,13 @@
 }
 .reaction-picker-fixed::-webkit-scrollbar{ display:none; }
 
-/* boutons un peu plus compacts pour en afficher + */
 .reaction-picker-fixed .reaction-option{
   flex: 0 0 auto !important;
-  font-size: 20px !important;     /* ↓ un poil plus petit = plus d’emojis visibles */
+  font-size: 20px !important;
   padding: 3px 6px !important;
   line-height: 1 !important;
 }
 
-/* petit “fade” à droite/gauche pour montrer qu’on peut scroller */
 .reaction-picker-fixed{
   -webkit-mask-image: linear-gradient(
     90deg,
@@ -919,23 +960,17 @@
   );
 }
 
-/* sur très petits écrans, on compacte encore */
 @media (max-width: 360px){
   .reaction-picker-fixed .reaction-option{
     font-size: 18px !important;
     padding: 2px 5px !important;
   }
 }
-/* =========================
-   FIX: bouton réaction ne doit jamais chevaucher le texte
-   (override final)
-   ========================= */
 
-/* réserve + d’espace pour le bouton à l’extérieur */
+/* bouton réaction ne doit jamais chevaucher le texte */
 .message-bubble.own { margin-right: 44px !important; }
 .message-bubble.other { margin-left: 44px !important; }
 
-/* bouton “comme Messenger”, mais plus loin (hors de la bulle) */
 .message-bubble.own .message-react-btn{
   right: -34px !important;
   left: auto !important;
@@ -948,7 +983,6 @@
   bottom: 10px !important;
 }
 
-/* optionnel: si tu veux qu’il soit un poil plus petit sur mobile */
 @media (max-width: 600px){
   .message-react-btn{
     width: 28px !important;
@@ -956,4 +990,812 @@
   }
   .message-bubble.own .message-react-btn{ right: -32px !important; }
   .message-bubble.other .message-react-btn{ left: -32px !important; }
+}
+/* =========================================================
+   ✅ FIX GLOBAL LAYOUT (ANTI SLIDE / HEADER FIXE / INPUT FIXE)
+   ========================================================= */
+
+/* ✅ iOS clavier: on utilisera --app-vh si tu ajoutes le petit useEffect côté ChatBox.jsx */
+.chatbox-container {
+  display: flex;
+  flex-direction: column;
+
+  /* ✅ hauteur stable */
+  height: var(--app-vh, 100dvh);
+  height: var(--app-vh, 100vh);
+
+  position: relative;
+
+  /* ✅ empêche le body/page de scroller */
+  overflow: hidden;
+}
+
+/* =========================================================
+   ✅ HEADER : on force le sticky même si la classe du header
+   n’est pas exactement .chat-header
+   -> si ton ChatHeader rend .chat-header-mobile ou autre,
+   on le rend sticky aussi.
+   ========================================================= */
+
+.chat-header,
+.chat-header-mobile,
+.chat-header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 300;
+}
+
+/* === Header === */
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0.5rem 1rem;
+  min-height: 54px;
+  position: relative;
+  background: transparent;
+  border: 1px #e0c084 solid;
+
+  /* ✅ Header toujours visible */
+  /* sticky déjà au-dessus */
+}
+
+/* Badge timer */
+.call-timer-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 25px;
+  text-align: center;
+  font-weight: 500;
+  color: #7d5d2a;
+  font-size: 1.1em;
+  z-index: 320;
+  letter-spacing: 1px;
+}
+
+.typing-notif {
+  color: #888;
+  font-style: italic;
+  margin: 0 0 4px 8px;
+}
+
+.chat-participants {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.participant-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgb(224 192 132 / 10%);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.participant-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: #444;
+}
+
+.participant-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #e0c084;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* === Appel entrant & Popups === */
+.appel-entrant-box button {
+  margin: 6px;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.appel-popup-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.appel-popup-actions button:first-child {
+  background-color: #4caf50;
+  color: white;
+}
+
+.appel-popup-actions button:last-child {
+  background-color: #f44336;
+  color: white;
+}
+
+/* === Header actions génériques === */
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.chat-actions button {
+  background: none;
+  border: none;
+  color: #e0c084;
+  cursor: pointer;
+  font-size: 1.3rem;
+  padding: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.chat-actions button:hover {
+  opacity: 0.8;
+}
+
+/* =========================================================
+   ✅ MESSAGES : la seule zone scrollable
+   IMPORTANT: si un parent de .chat-messages a overflow,
+   sticky peut bug -> on garde sticky en haut et scroll ici.
+   ========================================================= */
+
+.chat-messages {
+  flex: 1 1 auto;
+  min-height: 0; /* indispensable pour que le scroll marche */
+  max-height: none;
+
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  /* ✅ anti “slide” horizontal involontaire */
+  overflow-x: hidden;
+}
+
+/* === Messages & Bubbles === */
+.message-bubble {
+  position: relative;
+  max-width: 75%;
+  margin: 8px 0;
+  padding: 13px 18px 10px 14px;
+  border-radius: 16px;
+  overflow-wrap: break-word;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  transition: background 0.2s;
+  z-index: 1;
+}
+
+.message-bubble.own {
+  background: linear-gradient(
+    100deg,
+    rgb(198 132 10 / 28%) 92%,
+    rgb(221 169 87 / 17%) 100%
+  );
+  color: white;
+  align-self: flex-end;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 16px;
+  width: 50%;
+  margin-right: 30px; /* espace bouton emoji */
+}
+
+.message-bubble.other {
+  background: rgb(30 20 7 / 72%);
+  color: #f7f6f4;
+  align-self: flex-start;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 16px;
+  width: 50%;
+  margin-left: 30px; /* espace bouton emoji */
+}
+
+.message-class {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.message-text {
+  white-space: pre-line;
+}
+
+/* === Auteur (avatar + nom) === */
+.author-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px;
+  gap: 6px;
+  border-bottom: 1px solid #e0c084;
+}
+
+.author-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff5;
+  object-fit: cover;
+  box-shadow: 0 0 2px #ddd8;
+  margin-bottom: 6px;
+}
+
+.author-name {
+  font-size: 0.97em;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.03em;
+}
+
+/* === Nom inline pour les couples === */
+.author-inline-name {
+  font-size: 0.87em;
+  color: black;
+  margin-top: 3px;
+  text-align: left;
+  opacity: 0.9;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* === Contenu du message === */
+.message-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 8px;
+  box-shadow: 0 1px 5px #0001;
+}
+
+.message-content-pressable {
+  touch-action: pan-y;
+}
+
+@media (pointer: coarse) {
+  .message-content-pressable {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .message-image {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+}
+
+/* === Infos meta (heure, statut) === */
+.message-meta {
+  display: flex;
+  gap: 12px;
+}
+
+.message-time {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* =========================================================
+   ✅ Réactions / Emojis
+   ========================================================= */
+
+.message-react-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 12, 0.55);
+  color: #f7f6f4;
+
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 6;
+
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.message-bubble.own .message-react-btn { right: -18px; }
+.message-bubble.other .message-react-btn { left: -18px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .message-react-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .message-bubble:hover .message-react-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (hover: none) {
+  .message-react-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.message-react-btn:hover {
+  transform: translateY(-50%) scale(1.06);
+  background: rgba(10, 10, 12, 0.7);
+}
+
+.reaction-picker-fixed {
+  position: fixed !important;
+  z-index: 9999;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  background: rgba(5, 5, 9, 0.95);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+  display: flex;
+  gap: 6px;
+
+  max-width: min(92vw, 360px);
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  direction: ltr;
+  unicode-bidi: isolate;
+
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  white-space: nowrap;
+}
+.reaction-picker-fixed::-webkit-scrollbar { display: none; }
+
+.reaction-option {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+.reaction-option:hover { transform: scale(1.25); }
+
+.message-reactions {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: rgb(0 0 0 / 25%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  font-size: 0.8rem;
+}
+
+.reaction-item {
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b96c21;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.reaction-item.user-reaction {
+  background: #f8e7cc;
+  color: #4d3314;
+}
+
+.reaction-item:hover {
+  transform: translateY(-1px);
+  background: #e9dbbd;
+}
+
+.reaction-item:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+/* === Bouton supprimer === */
+.delete-message-button {
+  background: transparent;
+  border: none;
+  color: #b4b4b4;
+  cursor: pointer;
+  margin-left: 10px;
+  font-size: 1em;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  opacity: 0.4;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.delete-message-button:hover {
+  color: #e66;
+  opacity: 1;
+}
+
+.message-bubble.own .delete-message-button { color: white; }
+
+/* =========================================================
+   ✅ INPUT : sticky + safe area + anti zoom iPhone
+   ========================================================= */
+
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+
+  position: sticky;
+  bottom: 0;
+  z-index: 350;
+
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+
+  background: rgba(5,5,9,0.85);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(224,192,132,0.25);
+}
+
+.input-wrapper { flex: 1; }
+
+.input-text {
+  flex: 6 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: rgb(255 255 255 / 5%);
+  color: #e0c084;
+  font-family: inherit;
+  line-height: 1.4;
+  width: 100%;
+
+  font-size: 16px; /* ✅ iOS: empêche le zoom */
+}
+
+.input-text:focus {
+  outline: none;
+  box-shadow: 0 0 3px #e0c084;
+}
+
+.message-btn,
+.audio-btn,
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.message-btn { color: white; }
+.audio-btn.recording { color: red; }
+
+.typing-indicator {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin: 4px 14px;
+  font-style: italic;
+}
+
+/* === Audio message === */
+.audio-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.playpause-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #e0c084;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, opacity 0.2s, transform 0.2s;
+  opacity: 1;
+}
+
+.playpause-button:hover {
+  color: #fff;
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+.audio-progress {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #eee;
+  margin: 0 8px;
+  cursor: pointer;
+  position: relative;
+  min-width: 60px;
+  overflow: hidden;
+}
+
+.audio-progress-bar {
+  height: 100%;
+  background: #e0c084;
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+.duration {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  min-width: 55px;
+  text-align: right;
+  color: #fff3ce;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .audio-bubble { font-size: 16px; }
+  .playpause-button { font-size: 20px; }
+  .duration { font-size: 9px; }
+
+  .message-bubble.own,
+  .message-bubble.other { width: 60%; }
+
+  .input-wrapper { display: flex; gap: 16px; }
+  .message-btn { padding: 0.7rem 2rem !important; }
+
+  .message-bubble {
+    max-width: 94vw;
+    padding: 10px 10px 6px;
+  }
+
+  .author-info { gap: 4px; }
+  .author-avatar { width: 22px; height: 22px; }
+}
+
+/* === Webcam / Visio === */
+.mini-webcam {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 160px;
+  height: 120px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: #000;
+  z-index: 1000;
+  object-fit: cover;
+}
+
+.mini-webcam.remote { right: 200px; }
+
+.video-call-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #111;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  height: auto;
+}
+
+.video-call-container video {
+  width: 100%;
+  border-radius: 8px;
+  margin: 5px;
+  background: #000;
+}
+
+/* Modal ajout */
+.add-participant-modal {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 3000;
+  background: #2c3e50;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #0002;
+  min-width: 290px;
+}
+
+.add-participant-modal h3 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.message-systeme {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  font-size: 0.99em;
+  opacity: 0.92;
+  margin: 10px 0;
+  letter-spacing: 0.01em;
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+
+@media screen and (max-width: 768px) {
+  .chat-input { flex-direction: column; }
+
+  .participant-name {
+    display: inline-block;
+    max-width: 80px;
+    font-size: 0.8rem;
+  }
+}
+
+.chat-input-ephemere-btn,
+.chat-input-mic-btn,
+.chat-input-emoji-btn {
+  background-color: transparent;
+  border: none;
+}
+
+@media (max-width: 768px) {
+  .chatbox-container {
+    position: relative;
+    height: var(--app-vh, 100dvh);
+    height: var(--app-vh, 100vh);
+    box-sizing: border-box;
+  }
+
+  .chat-header-mobile {
+    left: 0;
+    right: 0;
+    z-index: 300;
+    background: #050509;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+.chat-back-btn {
+  background: none;
+  border: none;
+  color: #e0c084;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  padding: 0;
+}
+
+.chat-back-btn:hover {
+  opacity: 0.8;
+  transform: translateX(-1px);
+}
+
+/* Couple : barre prénoms + modale */
+.couple-prenoms-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  font-size: 0.9rem;
+  border: 1px solid #e0c084;
+  border-top: none;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.couple-prenoms-bar strong { color: #e0c084; }
+.couple-prenoms-bar span { color: #e0c084; }
+
+.btn-edit-prenoms {
+  border: 1px solid #e0c084;
+  background: transparent;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #e0c084;
+  border-radius: 20px;
+}
+
+.btn-edit-prenoms:hover {
+  background: rgba(224, 192, 132, 0.15);
+}
+
+.edit-prenoms-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.edit-prenoms-modal__content {
+  background: #2c3e50;
+  border: 1px solid #e0c084;
+  padding: 16px 20px;
+  max-width: 320px;
+  width: 100%;
+  border-radius: 20px;
+}
+
+.edit-prenoms-modal__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #e0c084;
+}
+
+.edit-prenoms-modal__label input {
+  padding: 6px 8px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 16px; /* anti zoom iOS */
+}
+
+.edit-prenoms-modal__error {
+  margin-top: 8px;
+  color: #ff7676;
+  font-size: 0.85rem;
+}
+
+.edit-prenoms-modal__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  border-radius: 20px;
+}
+
+.edit-prenoms-modal__buttons button {
+  padding: 6px 10px;
+  border: 1px solid #e0c084;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #e0c084;
 }
