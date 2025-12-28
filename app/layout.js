@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "../context/AuthContext";
 import { Allura, Raleway } from "next/font/google";
 import ConditionalNavbar from "../components/ConditionalNavbar/ConditionalNavbar";
-import Footer from "../components/Footer/Footer";
+import ConditionalFooter from "../components/ConditionalFooter/ConditionalFooter";
 import ClientWrapper from "../components/ClientWrapper/ClientWrapper";
 import BandeauCookies from "../components/BandeauCookies/BandeauCookies";
 import { Analytics } from "@vercel/analytics/next";
@@ -51,7 +51,7 @@ export default function RootLayout({ children }) {
             <InstallAppBanner />
 
             {children}
-            <Footer />
+            <ConditionalFooter />
             <BandeauCookies />
 
             {/* 🔔 Notifications toast (dans un composant client dédié) */}
