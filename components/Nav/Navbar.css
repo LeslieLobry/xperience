@@ -4,9 +4,9 @@
   align-items: center;
   padding: 1rem 2rem;
   border-bottom: 1px solid var(--primary-color);
-  
+  position: sticky;
   top: 0;
-  z-index: 10000;
+    z-index: 10000;
   color: white;
   background-color: transparent;
 }
