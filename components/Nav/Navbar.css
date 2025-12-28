@@ -127,9 +127,13 @@
   .navbar-pseudo{
     font-size: 12px;
   }
-.navbar-logo img {
+.navbar-left img {
   width: 60px;
   height: 60px;
+}
+.navbar-left{
+  display: flex;
+  align-items: center;
 }
   .nav-links {
     display: flex;
