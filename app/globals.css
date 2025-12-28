@@ -31,17 +31,27 @@ img {
 html,
 body {
   width: 100%;
+  height: 100%;
+  min-height: 100%;
   overflow-x: hidden;
+
   background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
   background-repeat: no-repeat;
   background-size: cover;
+  background-position: center;
+  background-attachment: scroll; /* ✅ évite des bugs iOS */
 }
+
 
 body {
   color: var(--foreground);
- font-family: Inter, sans-serif;
+  font-family: Inter, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  margin: 0;
+  overscroll-behavior: none;   /* ✅ évite les rebonds chelous */
+  background-color: #0a0a0c;    /* ✅ évite le blanc derrière */
 }
 
 * {

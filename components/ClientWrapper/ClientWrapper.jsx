@@ -70,5 +70,33 @@ export default function ClientWrapper({ children }) {
     };
   }, []);
 
+  // ✅ FIX iPhone Safari clavier: variable CSS --app-vh basée sur visualViewport
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const vv = window.visualViewport;
+
+    const setVh = () => {
+      const h = vv?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--app-vh", `${h}px`);
+    };
+
+    setVh();
+
+    vv?.addEventListener("resize", setVh);
+    vv?.addEventListener("scroll", setVh); // ✅ important iOS
+    window.addEventListener("resize", setVh);
+    window.addEventListener("focusin", setVh);
+    window.addEventListener("focusout", setVh);
+
+    return () => {
+      vv?.removeEventListener("resize", setVh);
+      vv?.removeEventListener("scroll", setVh);
+      window.removeEventListener("resize", setVh);
+      window.removeEventListener("focusin", setVh);
+      window.removeEventListener("focusout", setVh);
+    };
+  }, []);
+
   return <>{children}</>;
 }
