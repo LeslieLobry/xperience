@@ -14,7 +14,6 @@ export default function ClientWrapper({ children }) {
         if (!dataUser?.utilisateur?.statutAuto) return;
 
         if (useBeacon) {
-          console.log("📡 sendBeacon statut :", statut);
           navigator.sendBeacon(
             "/api/utilisateur/statut",
             new Blob([JSON.stringify({ statut })], { type: "application/json" })
@@ -36,23 +35,18 @@ export default function ClientWrapper({ children }) {
       clearTimeout(timer);
 
       if (document.visibilityState === "hidden") {
-        console.log("👁️ Page cachée → HORS_LIGNE dans 15s");
         timer = setTimeout(() => updateStatut("hors_ligne"), 15000);
       } else {
-        console.log("👁️ Page visible → EN_LIGNE immédiat");
         updateStatut("en_ligne");
       }
     };
 
     const handlePageHide = () => {
-      console.log("🚪 pagehide → sendBeacon");
       updateStatut("hors_ligne", true);
     };
 
-    // ➤ Dès le montage
     updateStatut("en_ligne");
 
-    // ➤ Listeners
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pagehide", handlePageHide);
 
@@ -70,31 +64,38 @@ export default function ClientWrapper({ children }) {
     };
   }, []);
 
-  // ✅ FIX iPhone Safari clavier: variable CSS --app-vh basée sur visualViewport
+  // ✅ FIX iPhone Safari clavier: calcule la "vraie" hauteur visible
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const root = document.documentElement;
     const vv = window.visualViewport;
 
-    const setVh = () => {
-      const h = vv?.height || window.innerHeight;
-      document.documentElement.style.setProperty("--app-vh", `${h}px`);
+    const apply = () => {
+      const vh = vv?.height || window.innerHeight;
+      root.style.setProperty("--app-vh", `${vh}px`);
+
+      // keyboard height (approx) = innerHeight - visualViewport.height (quand clavier ouvert)
+      const kb = vv ? Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0)) : 0;
+      root.style.setProperty("--kb", `${kb}px`);
     };
 
-    setVh();
+    apply();
 
-    vv?.addEventListener("resize", setVh);
-    vv?.addEventListener("scroll", setVh); // ✅ important iOS
-    window.addEventListener("resize", setVh);
-    window.addEventListener("focusin", setVh);
-    window.addEventListener("focusout", setVh);
+    if (vv) {
+      vv.addEventListener("resize", apply);
+      vv.addEventListener("scroll", apply);
+    }
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", apply);
 
     return () => {
-      vv?.removeEventListener("resize", setVh);
-      vv?.removeEventListener("scroll", setVh);
-      window.removeEventListener("resize", setVh);
-      window.removeEventListener("focusin", setVh);
-      window.removeEventListener("focusout", setVh);
+      if (vv) {
+        vv.removeEventListener("resize", apply);
+        vv.removeEventListener("scroll", apply);
+      }
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", apply);
     };
   }, []);
 

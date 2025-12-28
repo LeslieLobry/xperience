@@ -22,9 +22,7 @@ import ChatHeader from "./ChatHeader";
 const MessagesList = dynamic(() => import("../MessagesList"), {
   ssr: false,
   loading: () => (
-    <div className="chat-messages" style={{ padding: 6, opacity: 0.6 }}>
-      {/* rien ou mini loader */}
-    </div>
+    <div className="chat-messages" style={{ padding: 6, opacity: 0.6 }} />
   ),
 });
 
@@ -125,8 +123,6 @@ export default function ChatBox({
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
 
-  // ✅ IMPORTANT: on référence MessagesList (handle), pas un div direct
-  // -> MessagesList doit être forwardRef + expose { scrollToBottom(), getEl() }
   const messagesListRef = useRef(null);
 
   const mediaStreamRef = useRef(null);
@@ -157,176 +153,77 @@ export default function ChatBox({
   }, []);
 
   /* =========================================================
-     ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
+     ✅ FIX iOS clavier (SIMPLE + SAFE)
+     - Met à jour --app-vh et --kb
+     - AUCUN body lock (sinon blanc/décalage Safari)
      ========================================================= */
- useEffect(() => {
-  if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const vv = window.visualViewport;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (!isIOS) return;
 
-  const setVars = () => {
-    const viewportH = vv?.height || window.innerHeight;
-    document.documentElement.style.setProperty("--app-vh", `${viewportH}px`);
+    const vv = window.visualViewport;
+    const root = document.documentElement;
 
-    // ✅ hauteur clavier (diff entre layout et zone visible)
-    if (vv) {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      document.documentElement.style.setProperty("--kb", `${kb}px`);
-    } else {
-      document.documentElement.style.setProperty("--kb", `0px`);
-    }
-  };
+    const setVars = () => {
+      const viewportH = vv?.height || window.innerHeight;
+      root.style.setProperty("--app-vh", `${viewportH}px`);
 
-  setVars();
-  vv?.addEventListener("resize", setVars);
-  vv?.addEventListener("scroll", setVars);
-  window.addEventListener("resize", setVars);
-
-  return () => {
-    vv?.removeEventListener("resize", setVars);
-    vv?.removeEventListener("scroll", setVars);
-    window.removeEventListener("resize", setVars);
-  };
-}, []);
-/* =========================================================
-   ✅ iOS Messenger-like : éviter que tout se lève au focus input
-   (iPhone uniquement – ne touche pas Android)
-   ========================================================= */
-useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (!isIOS) return;
-
-  const root = document.documentElement;
-  const vv = window.visualViewport;
-
-  const setKb = () => {
-    if (!vv) return;
-    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    root.style.setProperty("--kb", `${kb}px`);
-  };
-
-  const onFocusIn = (e) => {
-    const t = e.target;
-    if (!t) return;
-
-    const isText =
-      t.tagName === "TEXTAREA" ||
-      (t.tagName === "INPUT" &&
-        ["text", "search", "email", "tel", "url", "password"].includes(
-          (t.getAttribute("type") || "text").toLowerCase()
-        ));
-
-    if (!isText) return;
-
-    setKb();
-
-    // comportement Messenger : on garde l’input visible
-    setTimeout(() => {
-      setKb();
-      const el =
-        typeof messagesListRef.current?.getEl === "function"
-          ? messagesListRef.current.getEl()
-          : null;
-      if (el) el.scrollTop = el.scrollHeight;
-    }, 60);
-  };
-
-  const onFocusOut = () => {
-    root.style.setProperty("--kb", "0px");
-  };
-
-  vv?.addEventListener("resize", setKb);
-  vv?.addEventListener("scroll", setKb);
-  document.addEventListener("focusin", onFocusIn);
-  document.addEventListener("focusout", onFocusOut);
-
-  return () => {
-    vv?.removeEventListener("resize", setKb);
-    vv?.removeEventListener("scroll", setKb);
-    document.removeEventListener("focusin", onFocusIn);
-    document.removeEventListener("focusout", onFocusOut);
-  };
-}, []);
-
-useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (!isIOS) return;
-
-  const body = document.body;
-  let locked = false;
-  let saved = null;
-
-  const lockBody = () => {
-    if (locked) return;
-    locked = true;
-
-    const scrollY = window.scrollY || 0;
-    saved = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-      scrollY,
+      if (vv) {
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        root.style.setProperty("--kb", `${kb}px`);
+      } else {
+        root.style.setProperty("--kb", `0px`);
+      }
     };
 
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-  };
+    setVars();
+    vv?.addEventListener("resize", setVars);
+    vv?.addEventListener("scroll", setVars);
+    window.addEventListener("resize", setVars);
 
-  const unlockBody = () => {
-    if (!locked) return;
-    locked = false;
+    // Quand on focus un champ texte : on recalc + scroll bottom (type Messenger)
+    const onFocusIn = (e) => {
+      const t = e.target;
+      if (!t) return;
 
-    const y = saved?.scrollY || 0;
-    body.style.position = saved?.position || "";
-    body.style.top = saved?.top || "";
-    body.style.left = saved?.left || "";
-    body.style.right = saved?.right || "";
-    body.style.width = saved?.width || "";
-    body.style.overflow = saved?.overflow || "";
-    saved = null;
+      const isText =
+        t.tagName === "TEXTAREA" ||
+        (t.tagName === "INPUT" &&
+          ["text", "search", "email", "tel", "url", "password"].includes(
+            (t.getAttribute("type") || "text").toLowerCase()
+          ));
 
-    window.scrollTo(0, y);
-  };
+      if (!isText) return;
 
-  const onFocusIn = (e) => {
-    const t = e.target;
-    if (!t) return;
+      setTimeout(() => {
+        setVars();
+        const el =
+          typeof messagesListRef.current?.getEl === "function"
+            ? messagesListRef.current.getEl()
+            : null;
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 60);
+    };
 
-    const isText =
-      t.tagName === "TEXTAREA" ||
-      (t.tagName === "INPUT" &&
-        ["text", "search", "email", "tel", "url", "password"].includes(
-          (t.getAttribute("type") || "text").toLowerCase()
-        ));
+    const onFocusOut = () => {
+      // quand le clavier se ferme
+      root.style.setProperty("--kb", "0px");
+      setTimeout(setVars, 50);
+    };
 
-    if (!isText) return;
-    lockBody();
-  };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
 
-  const onFocusOut = () => {
-    unlockBody();
-  };
-
-  document.addEventListener("focusin", onFocusIn);
-  document.addEventListener("focusout", onFocusOut);
-
-  return () => {
-    document.removeEventListener("focusin", onFocusIn);
-    document.removeEventListener("focusout", onFocusOut);
-    unlockBody(); // sécurité
-  };
-}, []);
+    return () => {
+      vv?.removeEventListener("resize", setVars);
+      vv?.removeEventListener("scroll", setVars);
+      window.removeEventListener("resize", setVars);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
 
   const computeIsNearBottom = useCallback(() => {
     const el = getScrollEl();
@@ -341,7 +238,6 @@ useEffect(() => {
       const el = getScrollEl();
       if (!el) return;
 
-      // ✅ si MessagesList expose une méthode, on l'utilise (plus fiable iOS)
       if (handle && typeof handle.scrollToBottom === "function") {
         handle.scrollToBottom(smooth ? "smooth" : "auto");
         return;
@@ -360,7 +256,6 @@ useEffect(() => {
   );
 
   // ✅ Re-scroll si la hauteur change (images/presign/etc.)
-  // ➜ actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
   useEffect(() => {
     if (!conversationId) return;
     if (typeof ResizeObserver === "undefined") return;
@@ -1022,7 +917,6 @@ useEffect(() => {
         throw new Error(result?.error || "Erreur upload audio");
       }
 
-      // ✅ adapte si ton endpoint ne renvoie pas { message: ... }
       const savedMessage = result?.message || result;
 
       if (!savedMessage?.id) {
@@ -1030,7 +924,6 @@ useEffect(() => {
         throw new Error("Réponse audio invalide (message manquant)");
       }
 
-      // ✅ injecte le message final (anti-doublon si Ably renvoie aussi)
       mutate(
         (old) => {
           const list = old?.messages || [];
@@ -1121,35 +1014,6 @@ useEffect(() => {
     }
   };
 
-  const handleAddParticipant = async () => {
-    setAddUserError("");
-    if (!addUserInput.trim()) return setAddUserError("Champ vide !");
-    setAddUserLoading(true);
-    try {
-      const res = await fetch(
-        `/api/conversations/${conversationId}/add-participant`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
-        }
-      );
-      const data = await res.json();
-      setAddUserLoading(false);
-      if (data.success) {
-        setShowAddParticipant(false);
-        setAddUserInput("");
-        setAddUserError("");
-        window.location.reload();
-      } else {
-        setAddUserError(data.error || "Erreur lors de l'ajout.");
-      }
-    } catch (err) {
-      setAddUserLoading(false);
-      setAddUserError("Erreur réseau.");
-    }
-  };
-
   const handleBackClick = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -1216,7 +1080,6 @@ useEffect(() => {
       : utilisateur;
   }, [prenomsCouple, utilisateur]);
 
-  // ✅ remplace le message tmp par le message final (serveur)
   const replaceTmpMessage = useCallback(
     (tmpId, realMsg) => {
       mutate(
@@ -1297,14 +1160,10 @@ useEffect(() => {
           if (!res.ok || !result?.message?.id) {
             throw new Error("Erreur enregistrement image");
           }
-
-          // ✅ remplace tmp par message final (imageUrl dispo)
           replaceTmpMessage(tmpId, result.message);
         } else {
           const message = await envoyerMessage(contenu, type, membreParlant);
           if (!message?.id) throw new Error("Message non créé");
-
-          // ✅ remplace tmp par message final (texte/éphémère)
           replaceTmpMessage(tmpId, message);
         }
       } catch (err) {
@@ -1325,7 +1184,6 @@ useEffect(() => {
 
   return (
     <div className="chatbox-container">
-      {/* ✅ wrapper sticky fiable */}
       <div className="chat-header-wrapper">
         <ChatHeader
           participants={displayParticipantsAutres}
