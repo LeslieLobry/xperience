@@ -25,7 +25,7 @@ function computeStatut(u) {
   return u?.statut || "hors_ligne";
 }
 
-export default function ProfilsDisplay({ profils, afficherPlus = false }) {
+export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize }) {
   const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
@@ -39,6 +39,16 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   // Nouveau : stockage des presigned URLs par userId
   const [photoUrls, setPhotoUrls] = useState({});
 
+  // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
+  useEffect(() => {
+    // window existe seulement côté client ✅
+    const params = new URLSearchParams(window.location.search);
+    const online = params.get("online");
+    if (online === "1" || online === "true") {
+      setFiltrerEnLigne(true);
+    }
+  }, []);
+
   // 🔁 garde le state sync si la prop `profils` change (évite liste figée)
   useEffect(() => {
     setProfilsAffiches(profils);
@@ -48,9 +58,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    const filtered = filtrerEnLigne
-      ? base.filter((p) => isOnline?.(p?.id))
-      : base;
+    const filtered = filtrerEnLigne ? base.filter((p) => isOnline?.(p?.id)) : base;
 
     return melangerProfils(filtered);
   }, [filtrerEnLigne, profilsAffiches, isOnline]);
@@ -151,6 +159,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     }
   };
 
+  // ✅ URL "Afficher plus" qui garde le filtre online
+  const hrefAfficherPlus = filtrerEnLigne
+    ? { pathname: "/profils", query: { online: "1" } }
+    : "/profils";
+
   return (
     <div className="profil-list1">
       <h1 className="profil-list1-title">Profils</h1>
@@ -206,10 +219,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           ) : (
             profilsFiltres.map((user) => {
               // ✅ statut final : Presence d’abord, fallback lastSeen/statut ensuite
-             const online = isOnline?.(user?.id);
-const statutEff = online ? "en_ligne" : "hors_ligne";
-
-console.log("Presence online?", user.id, isOnline?.(user?.id));
+              const online = isOnline?.(user?.id);
+              const statutEff = online ? "en_ligne" : "hors_ligne";
 
               return (
                 <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
@@ -264,7 +275,7 @@ console.log("Presence online?", user.id, isOnline?.(user?.id));
       )}
 
       {afficherPlus && !filtrerProches && (
-        <Link href="/profils" className="afficher-plus">
+        <Link href={hrefAfficherPlus} className="afficher-plus">
           Afficher plus
         </Link>
       )}
