@@ -6,10 +6,16 @@
   border-bottom: 1px solid var(--primary-color);
   position: sticky;
   top: 0;
-    z-index: 10000;
+
+  z-index: 10000;
+  isolation: isolate;
+
   color: white;
-  background-color: transparent;
+  background-color: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
+
 .burger {
   position: relative; /* important pour positionner le badge */
 }
@@ -302,4 +308,9 @@
   margin-left: 8px;
   vertical-align: middle;
   box-shadow: 0 1px 2px #0002;
+}
+
+
+.nav-combined-popup{
+  z-index: 10001;
 }

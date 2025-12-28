@@ -587,7 +587,13 @@ export default function ChatBox({
     };
 
     attempt();
-  }, [conversationId, loadingInitial, messages?.length, scrollToBottom, getScrollEl]);
+  }, [
+    conversationId,
+    loadingInitial,
+    messages?.length,
+    scrollToBottom,
+    getScrollEl,
+  ]);
 
   // ✅ auto-scroll new messages (uniquement si on est en bas)
   useEffect(() => {
@@ -854,7 +860,40 @@ export default function ChatBox({
     formData.append("type", "AUDIO");
 
     try {
-      await fetch("/api/messages/audio", { method: "POST", body: formData });
+      const res = await fetch("/api/messages/audio", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        console.error("Erreur API upload audio :", result);
+        throw new Error(result?.error || "Erreur upload audio");
+      }
+
+      // ✅ adapte si ton endpoint ne renvoie pas { message: ... }
+      const savedMessage = result?.message || result;
+
+      if (!savedMessage?.id) {
+        console.error("Réponse audio inattendue :", result);
+        throw new Error("Réponse audio invalide (message manquant)");
+      }
+
+      // ✅ injecte le message final (anti-doublon si Ably renvoie aussi)
+      mutate(
+        (old) => {
+          const list = old?.messages || [];
+          if (list.some((m) => m.id === savedMessage.id)) return old;
+          return {
+            ...old,
+            messages: [...list, { ...savedMessage, statut: "sent" }],
+          };
+        },
+        false
+      );
+
+      scrollToBottom(true);
     } catch (e) {
       console.error("Erreur upload audio :", e);
     }
@@ -1027,25 +1066,40 @@ export default function ChatBox({
       : utilisateur;
   }, [prenomsCouple, utilisateur]);
 
+  // ✅ remplace le message tmp par le message final (serveur)
+  const replaceTmpMessage = useCallback(
+    (tmpId, realMsg) => {
+      mutate(
+        (old) => ({
+          ...old,
+          messages: (old?.messages || []).map((m) =>
+            m.id === tmpId ? { ...realMsg, statut: "sent" } : m
+          ),
+        }),
+        false
+      );
+    },
+    [mutate]
+  );
+
   const handleMessageSent = useCallback(
     async (contenu, type = "TEXTE", membreParlant, isImage = false) => {
       const tmpId =
         "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
 
       let optimisticMessage;
+
       if (isImage && contenu instanceof FormData) {
         optimisticMessage = {
           id: tmpId,
           auteurId: utilisateur.id,
           auteur: utilisateur,
           pseudo: utilisateur.pseudo,
-          type: contenu.get("type") || "IMAGE",
+          type: "IMAGE",
           contenu: "[Image]",
           createdAt: new Date().toISOString(),
           statut: "pending",
-          ephemere:
-            !!contenu.get("type") &&
-            contenu.get("type").toUpperCase() === "EPHEMERE",
+          ephemere: false,
         };
       } else if (type === "AUDIO") {
         optimisticMessage = {
@@ -1093,9 +1147,15 @@ export default function ChatBox({
           if (!res.ok || !result?.message?.id) {
             throw new Error("Erreur enregistrement image");
           }
+
+          // ✅ remplace tmp par message final (imageUrl dispo)
+          replaceTmpMessage(tmpId, result.message);
         } else {
           const message = await envoyerMessage(contenu, type, membreParlant);
           if (!message?.id) throw new Error("Message non créé");
+
+          // ✅ remplace tmp par message final (texte/éphémère)
+          replaceTmpMessage(tmpId, message);
         }
       } catch (err) {
         console.error("Erreur envoi message :", err);
@@ -1110,7 +1170,7 @@ export default function ChatBox({
         );
       }
     },
-    [envoyerMessage, mutate, scrollToBottom, utilisateur]
+    [envoyerMessage, mutate, scrollToBottom, utilisateur, replaceTmpMessage]
   );
 
   return (

@@ -1816,6 +1816,3 @@
 }
 
 /* optionnel: le wrapper doit laisser grandir vers le haut */
-.chat-input{
-  align-items: flex-end; /* au lieu de center */
-}
