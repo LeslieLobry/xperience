@@ -47,7 +47,11 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ClientWrapper>
             <OnlinePresenceRoot>
-              <ConditionalNavbar />
+              {/* ✅ IMPORTANT: évite l’erreur de prerender avec useSearchParams */}
+              <Suspense fallback={null}>
+                <ConditionalNavbar />
+              </Suspense>
+
               <HeartbeatClient intervalMs={60_000} />
 
               {/* 📲 Bannière "Télécharger l’app" → composant client */}
