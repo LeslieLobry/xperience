@@ -114,10 +114,3 @@ input:-webkit-autofill:active {
    (comportement type Messenger)
    iOS uniquement → n'impacte pas Android
    ========================================================= */
-@supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    height: 100%;
-    overflow: hidden; /* 🔥 empêche Safari de scroller le body au focus */
-  }
-}
