@@ -1,53 +1,89 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PhotoUploader from "../PhotoUploader/PhotoUploader";
 import { Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 // HOOK pour charger les presigned URLs des photos S3
 function usePresignedGalleryUrls(photoList) {
   const [presignedUrls, setPresignedUrls] = useState({});
+  const inflightRef = useRef(new Set()); // évite de presign 2x la même photo
 
   useEffect(() => {
     if (!Array.isArray(photoList)) return;
     let unmounted = false;
 
     const load = async () => {
-      const map = {};
+      const next = {};
+
       await Promise.all(
         photoList.map(async (photo) => {
-          if (!photo?.url) {
-            map[photo.id] = "/default.jpg";
-          } else if (photo.url.startsWith("http")) {
-            map[photo.id] = photo.url;
-          } else {
-            try {
-              const res = await fetch("/api/photos/presign", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key: photo.url }),
-              });
-              const data = await res.json();
-              map[photo.id] = data.url || "/default.jpg";
-            } catch {
-              map[photo.id] = "/default.jpg";
-            }
+          const id = photo?.id;
+          const keyOrUrl = photo?.url;
+
+          if (!id) return;
+
+          // ✅ Si déjà en cache, on garde
+          if (presignedUrls[id]) {
+            next[id] = presignedUrls[id];
+            return;
+          }
+
+          // ✅ Pas de clé => fallback
+          if (!keyOrUrl) {
+            next[id] = "/default.jpg";
+            return;
+          }
+
+          // ✅ URL http directe
+          if (keyOrUrl.startsWith("http")) {
+            next[id] = keyOrUrl;
+            return;
+          }
+
+          // ✅ Déjà en cours de presign => on laisse (évite spam)
+          if (inflightRef.current.has(id)) {
+            return;
+          }
+
+          inflightRef.current.add(id);
+          try {
+            const res = await fetch("/api/photos/presign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ key: keyOrUrl }),
+            });
+            const data = await res.json();
+            next[id] = data.url || "/default.jpg";
+          } catch {
+            next[id] = "/default.jpg";
+          } finally {
+            inflightRef.current.delete(id);
           }
         })
       );
-      if (!unmounted) setPresignedUrls(map);
+
+      if (!unmounted && Object.keys(next).length > 0) {
+        setPresignedUrls((prev) => ({ ...prev, ...next }));
+      }
     };
 
     load();
     return () => {
       unmounted = true;
     };
+    // ⚠️ on dépend de photoList ET presignedUrls pour compléter au fur et à mesure
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoList]);
 
   return presignedUrls;
 }
 
-export default function GaleriePriveePhotos({ utilisateurId, editable = false, visiteurId }) {
+export default function GaleriePriveePhotos({
+  utilisateurId,
+  editable = false,
+  visiteurId,
+}) {
   const MAX_PHOTOS = 6;
   const [photoList, setPhotoList] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(null);
@@ -61,7 +97,9 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     const visiteur = visiteurId || utilisateurId;
     setLoading(true);
 
-    fetch(`/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`)
+    fetch(
+      `/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data.access === "pending") {
@@ -107,8 +145,15 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     setLoading(false);
   };
 
-  // ✅ j’ai juste corrigé le typo (sinon ça casse)
-  const handleNewPhoto = (photo) => setPhotoList((prev) => [photo, ...prev]);
+  // ✅ Upload : ajoute direct dans la liste
+  // + ajoute une "clé stable" si jamais id manque (cas rare)
+  const handleNewPhoto = (photo) => {
+    const safePhoto = photo?.id
+      ? photo
+      : { ...photo, id: `tmp-${Date.now()}-${Math.random()}` };
+
+    setPhotoList((prev) => [safePhoto, ...prev]);
+  };
 
   const handleDelete = async (id) => {
     if (!editable) return;
@@ -119,8 +164,10 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
     if (e.key === "Escape") setCurrentIndex(null);
-    if (e.key === "ArrowLeft") setCurrentIndex((i) => (i > 0 ? i - 1 : i));
-    if (e.key === "ArrowRight") setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
+    if (e.key === "ArrowLeft")
+      setCurrentIndex((i) => (i > 0 ? i - 1 : i));
+    if (e.key === "ArrowRight")
+      setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
   };
 
   useEffect(() => {
@@ -157,10 +204,14 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
         {photoList.map((photo, index) => (
           <div className="gallery-slot filled" key={photo.id || index}>
             {editable && (
-              <button className="delete-button" onClick={() => handleDelete(photo.id)}>
+              <button
+                className="delete-button"
+                onClick={() => handleDelete(photo.id)}
+              >
                 <Trash2 size={16} />
               </button>
             )}
+
             <img
               src={presignedUrls[photo.id] || "/default.jpg"}
               alt={`Photo ${index + 1}`}
@@ -179,7 +230,7 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
                   isGallery
                   galerieId={galerieId}
                   onUpload={handleNewPhoto}
-                  hidePlus // ✅ NOUVEAU : plus de "+"
+                  hidePlus
                 />
               ) : (
                 <span>Préparation de la galerie…</span>
@@ -190,19 +241,31 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
 
       {currentIndex !== null && photoList[currentIndex] && (
         <div className="lightbox" onClick={() => setCurrentIndex(null)}>
-          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <button className="lightbox-close" onClick={() => setCurrentIndex(null)}>
+          <div
+            className="lightbox-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="lightbox-close"
+              onClick={() => setCurrentIndex(null)}
+            >
               <X size={24} />
             </button>
 
             {currentIndex > 0 && (
-              <button className="lightbox-prev" onClick={() => setCurrentIndex((i) => i - 1)}>
+              <button
+                className="lightbox-prev"
+                onClick={() => setCurrentIndex((i) => i - 1)}
+              >
                 <ChevronLeft size={32} />
               </button>
             )}
 
             {currentIndex < photoList.length - 1 && (
-              <button className="lightbox-next" onClick={() => setCurrentIndex((i) => i + 1)}>
+              <button
+                className="lightbox-next"
+                onClick={() => setCurrentIndex((i) => i + 1)}
+              >
                 <ChevronRight size={32} />
               </button>
             )}
