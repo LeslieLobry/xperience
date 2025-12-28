@@ -472,7 +472,6 @@
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
 
   /* pour éviter que ça “saute” */
-  background: rgba(5,5,9,0.85);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(224,192,132,0.25);
 }
@@ -730,7 +729,6 @@
     left: 0;
     right: 0;
     z-index: 100;
-    background: #050509;
     border-left: none;
     border-right: none;
 
@@ -769,7 +767,6 @@
   font-size: 0.9rem;
   border: 1px solid #e0c084;
   border-top: none;
-  background: rgba(0, 0, 0, 0.4);
 }
 
 .couple-prenoms-bar strong { color: #e0c084; }
