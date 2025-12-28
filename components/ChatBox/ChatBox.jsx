@@ -160,23 +160,35 @@ export default function ChatBox({
      ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
      (tu l'avais 2 fois -> on garde UNE seule version propre)
      ========================================================= */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+ useEffect(() => {
+  if (typeof window === "undefined") return;
 
-    const setVh = () => {
-      const h = window.visualViewport?.height || window.innerHeight;
-      document.documentElement.style.setProperty("--app-vh", `${h}px`);
-    };
+  const vv = window.visualViewport;
 
-    setVh();
-    window.visualViewport?.addEventListener("resize", setVh);
-    window.addEventListener("resize", setVh);
+  const setVars = () => {
+    const viewportH = vv?.height || window.innerHeight;
+    document.documentElement.style.setProperty("--app-vh", `${viewportH}px`);
 
-    return () => {
-      window.visualViewport?.removeEventListener("resize", setVh);
-      window.removeEventListener("resize", setVh);
-    };
-  }, []);
+    // ✅ hauteur clavier (diff entre layout et zone visible)
+    if (vv) {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty("--kb", `${kb}px`);
+    } else {
+      document.documentElement.style.setProperty("--kb", `0px`);
+    }
+  };
+
+  setVars();
+  vv?.addEventListener("resize", setVars);
+  vv?.addEventListener("scroll", setVars);
+  window.addEventListener("resize", setVars);
+
+  return () => {
+    vv?.removeEventListener("resize", setVars);
+    vv?.removeEventListener("scroll", setVars);
+    window.removeEventListener("resize", setVars);
+  };
+}, []);
 
   const computeIsNearBottom = useCallback(() => {
     const el = getScrollEl();
