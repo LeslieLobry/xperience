@@ -11,8 +11,11 @@ import Script from "next/script";
 import "react-toastify/dist/ReactToastify.css";
 import HeartbeatClient from "../components/HeartbeatClient/HeartbeatClient";
 import InstallAppBanner from "../components/InstallAppBanner/InstallAppBanner";
-import ToastProvider from "../components/ToastProvider"; 
-import OnlinePresenceRoot from "../components/OnlinePresenceRoot/OnlinePresenceRoot"; // ✅ AJOUT
+import ToastProvider from "../components/ToastProvider";
+import OnlinePresenceRoot from "../components/OnlinePresenceRoot/OnlinePresenceRoot";
+
+// ✅ AJOUT
+import { Suspense } from "react";
 
 const allura = Allura({ subsets: ["latin"], weight: "400" });
 const raleway = Raleway({
@@ -43,19 +46,24 @@ export default function RootLayout({ children }) {
       <body className="font-raleway">
         <AuthProvider>
           <ClientWrapper>
-           <OnlinePresenceRoot>
-            <ConditionalNavbar />
-            <HeartbeatClient intervalMs={60_000} />
+            <OnlinePresenceRoot>
+              <ConditionalNavbar />
+              <HeartbeatClient intervalMs={60_000} />
 
-            {/* 📲 Bannière "Télécharger l’app" → composant client */}
-            <InstallAppBanner />
+              {/* 📲 Bannière "Télécharger l’app" → composant client */}
+              <InstallAppBanner />
 
-            {children}
-            <ConditionalFooter />
-            <BandeauCookies />
+              {children}
 
-            {/* 🔔 Notifications toast (dans un composant client dédié) */}
-            <ToastProvider />
+              {/* ✅ IMPORTANT: évite l’erreur de prerender avec useSearchParams */}
+              <Suspense fallback={null}>
+                <ConditionalFooter />
+              </Suspense>
+
+              <BandeauCookies />
+
+              {/* 🔔 Notifications toast (dans un composant client dédié) */}
+              <ToastProvider />
             </OnlinePresenceRoot>
           </ClientWrapper>
         </AuthProvider>
