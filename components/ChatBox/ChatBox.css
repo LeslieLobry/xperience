@@ -1835,3 +1835,37 @@
   /* ✅ le point clé */
   padding-bottom: calc(8px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
 }
+/* ================================
+   ✅ PATCH iPhone clavier (ChatBox)
+   ================================ */
+
+.chatbox-container{
+  height: var(--app-vh, 100dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* header ok */
+.chat-header-wrapper{
+  flex: 0 0 auto;
+}
+
+/* ✅ wrapper qui prend l’espace */
+.chat-messages-wrap{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden; /* important : pas de scroll global */
+}
+
+/* ✅ barre input qui remonte avec le clavier */
+.chat-input-bar{
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 80;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom) + var(--kb, 0px));
+  background: transparent; /* ou mets ta couleur si besoin */
+}

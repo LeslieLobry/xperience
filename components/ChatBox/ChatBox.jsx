@@ -157,38 +157,37 @@ export default function ChatBox({
   }, []);
 
   /* =========================================================
-     ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
-     (tu l'avais 2 fois -> on garde UNE seule version propre)
+     ✅ FIX iOS clavier / vh
      ========================================================= */
- useEffect(() => {
-  if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const vv = window.visualViewport;
+    const vv = window.visualViewport;
 
-  const setVars = () => {
-    const viewportH = vv?.height || window.innerHeight;
-    document.documentElement.style.setProperty("--app-vh", `${viewportH}px`);
+    const setVars = () => {
+      const viewportH = vv?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--app-vh", `${viewportH}px`);
 
-    // ✅ hauteur clavier (diff entre layout et zone visible)
-    if (vv) {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      document.documentElement.style.setProperty("--kb", `${kb}px`);
-    } else {
-      document.documentElement.style.setProperty("--kb", `0px`);
-    }
-  };
+      // ✅ hauteur clavier (diff entre layout et zone visible)
+      if (vv) {
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty("--kb", `${kb}px`);
+      } else {
+        document.documentElement.style.setProperty("--kb", `0px`);
+      }
+    };
 
-  setVars();
-  vv?.addEventListener("resize", setVars);
-  vv?.addEventListener("scroll", setVars);
-  window.addEventListener("resize", setVars);
+    setVars();
+    vv?.addEventListener("resize", setVars);
+    vv?.addEventListener("scroll", setVars);
+    window.addEventListener("resize", setVars);
 
-  return () => {
-    vv?.removeEventListener("resize", setVars);
-    vv?.removeEventListener("scroll", setVars);
-    window.removeEventListener("resize", setVars);
-  };
-}, []);
+    return () => {
+      vv?.removeEventListener("resize", setVars);
+      vv?.removeEventListener("scroll", setVars);
+      window.removeEventListener("resize", setVars);
+    };
+  }, []);
 
   const computeIsNearBottom = useCallback(() => {
     const el = getScrollEl();
@@ -222,7 +221,6 @@ export default function ChatBox({
   );
 
   // ✅ Re-scroll si la hauteur change (images/presign/etc.)
-  // ➜ actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
   useEffect(() => {
     if (!conversationId) return;
     if (typeof ResizeObserver === "undefined") return;
@@ -884,7 +882,6 @@ export default function ChatBox({
         throw new Error(result?.error || "Erreur upload audio");
       }
 
-      // ✅ adapte si ton endpoint ne renvoie pas { message: ... }
       const savedMessage = result?.message || result;
 
       if (!savedMessage?.id) {
@@ -892,7 +889,6 @@ export default function ChatBox({
         throw new Error("Réponse audio invalide (message manquant)");
       }
 
-      // ✅ injecte le message final (anti-doublon si Ably renvoie aussi)
       mutate(
         (old) => {
           const list = old?.messages || [];
@@ -980,35 +976,6 @@ export default function ChatBox({
       }
     } catch (err) {
       console.error("Erreur suppression message :", err);
-    }
-  };
-
-  const handleAddParticipant = async () => {
-    setAddUserError("");
-    if (!addUserInput.trim()) return setAddUserError("Champ vide !");
-    setAddUserLoading(true);
-    try {
-      const res = await fetch(
-        `/api/conversations/${conversationId}/add-participant`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userIdOrPseudo: addUserInput.trim() }),
-        }
-      );
-      const data = await res.json();
-      setAddUserLoading(false);
-      if (data.success) {
-        setShowAddParticipant(false);
-        setAddUserInput("");
-        setAddUserError("");
-        window.location.reload();
-      } else {
-        setAddUserError(data.error || "Erreur lors de l'ajout.");
-      }
-    } catch (err) {
-      setAddUserLoading(false);
-      setAddUserError("Erreur réseau.");
     }
   };
 
@@ -1160,13 +1127,11 @@ export default function ChatBox({
             throw new Error("Erreur enregistrement image");
           }
 
-          // ✅ remplace tmp par message final (imageUrl dispo)
           replaceTmpMessage(tmpId, result.message);
         } else {
           const message = await envoyerMessage(contenu, type, membreParlant);
           if (!message?.id) throw new Error("Message non créé");
 
-          // ✅ remplace tmp par message final (texte/éphémère)
           replaceTmpMessage(tmpId, message);
         }
       } catch (err) {
@@ -1305,33 +1270,39 @@ export default function ChatBox({
         />
       )}
 
-      <MessagesList
-        ref={messagesListRef}
-        conversationId={conversationId}
-        messages={messages}
-        utilisateur={userWithPrenoms}
-        onReact={handleReactionOptimistic}
-        lastReads={lastReads}
-        typingPseudo={isTyping ? typingPseudo : null}
-        hasMore={hasMore}
-        onLoadMore={loadMoreMessages}
-        onDelete={handleDelete}
-        prenomsCouple={prenomsCouple}
-      />
+      {/* ✅ NEW: wrapper flex safe pour iPhone (évite les vides et le scroll global) */}
+      <div className="chat-messages-wrap">
+        <MessagesList
+          ref={messagesListRef}
+          conversationId={conversationId}
+          messages={messages}
+          utilisateur={userWithPrenoms}
+          onReact={handleReactionOptimistic}
+          lastReads={lastReads}
+          typingPseudo={isTyping ? typingPseudo : null}
+          hasMore={hasMore}
+          onLoadMore={loadMoreMessages}
+          onDelete={handleDelete}
+          prenomsCouple={prenomsCouple}
+        />
+      </div>
 
-      <ChatInput
-        utilisateur={utilisateur}
-        conversationId={conversationId}
-        texte={texte}
-        setTexte={setTexte}
-        showEmojiPicker={showEmojiPicker}
-        setShowEmojiPicker={setShowEmojiPicker}
-        onMessageSent={handleMessageSent}
-        onTyping={envoyerTyping}
-        startRecording={startRecording}
-        stopRecording={stopRecording}
-        recording={recording}
-      />
+      {/* ✅ NEW: wrapper sticky bottom qui va remonter avec --kb */}
+      <div className="chat-input-bar">
+        <ChatInput
+          utilisateur={utilisateur}
+          conversationId={conversationId}
+          texte={texte}
+          setTexte={setTexte}
+          showEmojiPicker={showEmojiPicker}
+          setShowEmojiPicker={setShowEmojiPicker}
+          onMessageSent={handleMessageSent}
+          onTyping={envoyerTyping}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          recording={recording}
+        />
+      </div>
 
       {showEmojiPicker && (
         <div className="emoji-picker-container">
