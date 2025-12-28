@@ -1804,3 +1804,18 @@
   scroll-padding-bottom: calc(120px + env(safe-area-inset-bottom));
   padding-bottom: calc(18px + env(safe-area-inset-bottom));
 }
+/* ✅ AUTOGROW TEXTAREA (override final) */
+.input-text{
+  min-height: 40px;
+  height: auto;
+  max-height: 140px;     /* match ton MAX_TA_HEIGHT */
+
+  overflow-y: hidden;    /* clé: sinon elle scroll au lieu de grandir */
+  resize: none;
+  box-sizing: border-box;
+}
+
+/* optionnel: le wrapper doit laisser grandir vers le haut */
+.chat-input{
+  align-items: flex-end; /* au lieu de center */
+}
