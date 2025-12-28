@@ -125,8 +125,9 @@ export default function ChatBox({
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
 
-  // ⚠️ Conteneur scrollable réel
-  const messagesContainerRef = useRef(null);
+  // ✅ IMPORTANT: on référence MessagesList (handle), pas un div direct
+  // -> MessagesList doit être forwardRef + expose { scrollToBottom(), getEl() }
+  const messagesListRef = useRef(null);
 
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
@@ -146,8 +147,18 @@ export default function ChatBox({
   const atBottomRef = useRef(true);
   const SCROLL_TOLERANCE_PX = 140;
 
+  // ✅ helper: récupérer le vrai élément scrollable
+  const getScrollEl = useCallback(() => {
+    const handle = messagesListRef.current;
+    if (!handle) return null;
+    if (typeof handle.getEl === "function") return handle.getEl();
+    if (handle.el) return handle.el;
+    return null;
+  }, []);
+
   /* =========================================================
      ✅ FIX iOS clavier / vh : stabilise l’écran quand le clavier s’ouvre
+     (tu l'avais 2 fois -> on garde UNE seule version propre)
      ========================================================= */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -168,33 +179,43 @@ export default function ChatBox({
   }, []);
 
   const computeIsNearBottom = useCallback(() => {
-    const el = messagesContainerRef.current;
+    const el = getScrollEl();
     if (!el) return true;
     const diff = el.scrollHeight - el.scrollTop - el.clientHeight;
     return diff < SCROLL_TOLERANCE_PX;
-  }, []);
+  }, [getScrollEl]);
 
-  const scrollToBottom = useCallback((smooth = true) => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
+  const scrollToBottom = useCallback(
+    (smooth = true) => {
+      const handle = messagesListRef.current;
+      const el = getScrollEl();
+      if (!el) return;
 
-    if (smooth && container.scrollTo) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: "smooth",
-      });
-    } else {
-      container.scrollTop = container.scrollHeight;
-    }
-  }, []);
+      // ✅ si MessagesList expose une méthode, on l'utilise (plus fiable iOS)
+      if (handle && typeof handle.scrollToBottom === "function") {
+        handle.scrollToBottom(smooth ? "smooth" : "auto");
+        return;
+      }
+
+      if (smooth && el.scrollTo) {
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    },
+    [getScrollEl]
+  );
 
   // ✅ Re-scroll si la hauteur change (images/presign/etc.)
-  // ➜ on le garde actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
+  // ➜ actif tant que l’utilisateur est en bas (ou pendant l’ouverture)
   useEffect(() => {
     if (!conversationId) return;
     if (typeof ResizeObserver === "undefined") return;
 
-    const el = messagesContainerRef.current;
+    const el = getScrollEl();
     if (!el) return;
 
     let raf1 = null;
@@ -223,7 +244,7 @@ export default function ChatBox({
       if (raf1) cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
-  }, [conversationId, loadingInitial, scrollToBottom]);
+  }, [conversationId, loadingInitial, scrollToBottom, getScrollEl]);
 
   // ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
   useEffect(() => {
@@ -385,7 +406,7 @@ export default function ChatBox({
   /* ✅ LISTENER scroll : met à jour atBottomRef (passive)                    */
   /* ======================================================================= */
   useEffect(() => {
-    const el = messagesContainerRef.current;
+    const el = getScrollEl();
     if (!el) return;
 
     const onScroll = () => {
@@ -396,7 +417,7 @@ export default function ChatBox({
 
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [computeIsNearBottom]);
+  }, [computeIsNearBottom, getScrollEl]);
 
   /* ======================================================================= */
   /*                              USE EFFECTS                                */
@@ -537,21 +558,23 @@ export default function ChatBox({
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
+  // ✅ scroll initial: iPhone friendly
   useLayoutEffect(() => {
     if (!conversationId) return;
     if (!loadingInitial) return;
     if (!messages?.length) return;
 
     let tries = 0;
-    const maxTries = 6;
+    const maxTries = 8;
 
     const attempt = () => {
       tries += 1;
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (!messagesContainerRef.current) {
-            if (tries < maxTries) setTimeout(attempt, 50);
+          const el = getScrollEl();
+          if (!el) {
+            if (tries < maxTries) setTimeout(attempt, 60);
             return;
           }
 
@@ -564,8 +587,9 @@ export default function ChatBox({
     };
 
     attempt();
-  }, [conversationId, loadingInitial, messages?.length, scrollToBottom]);
+  }, [conversationId, loadingInitial, messages?.length, scrollToBottom, getScrollEl]);
 
+  // ✅ auto-scroll new messages (uniquement si on est en bas)
   useEffect(() => {
     if (!messages?.length) return;
 
@@ -1091,7 +1115,7 @@ export default function ChatBox({
 
   return (
     <div className="chatbox-container">
-      {/* ✅ wrapper sticky fiable (au lieu de dépendre d’une classe interne) */}
+      {/* ✅ wrapper sticky fiable */}
       <div className="chat-header-wrapper">
         <ChatHeader
           participants={displayParticipantsAutres}
@@ -1210,7 +1234,8 @@ export default function ChatBox({
       )}
 
       <MessagesList
-        ref={messagesContainerRef}
+        ref={messagesListRef}
+        conversationId={conversationId}
         messages={messages}
         utilisateur={userWithPrenoms}
         onReact={handleReactionOptimistic}

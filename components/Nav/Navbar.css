@@ -125,7 +125,7 @@
     background-image: none ;
   }
   .navbar-pseudo{
-    font-size: 12px;
+    font-size: 18px;
   }
 .navbar-left img {
   width: 60px;
@@ -134,6 +134,7 @@
 .navbar-left{
   display: flex;
   align-items: center;
+  gap: 20px;
 }
   .nav-links {
     display: flex;

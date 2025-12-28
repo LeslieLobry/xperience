@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, forwardRef, useMemo, useState } from "react";
+import { useEffect, useRef, useCallback, forwardRef, useMemo, useState, useLayoutEffect, useImperativeHandle } from "react";
 import MessageBubble from "./ChatBox/MessageBubble";
 import { format, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -68,6 +68,15 @@ async function mapWithConcurrency(items, limit, mapper) {
   return ret;
 }
 
+/* =========================================================
+   ✅ HELPERS SCROLL
+   ========================================================= */
+function isNearBottom(el, px = 140) {
+  if (!el) return true;
+  const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
+  return dist < px;
+}
+
 const MessagesList = forwardRef(function MessagesList(
   {
     messages,
@@ -79,10 +88,12 @@ const MessagesList = forwardRef(function MessagesList(
     onLoadMore,
     onDelete,
     prenomsCouple = null,
+
+    // ✅ nouveau: le parent peut dire "j'ouvre une conversation"
+    conversationId,
   },
-  ref // ← ref venant du parent (ChatBox)
+  ref
 ) {
-  // Ref interne pour manipuler le conteneur
   const containerRef = useRef(null);
   const endRef = useRef(null);
 
@@ -91,22 +102,59 @@ const MessagesList = forwardRef(function MessagesList(
   const rafRef = useRef(null);
 
   // ✅ map presigned urls par key (state local)
-  const [resolved, setResolved] = useState(() => new Map()); // key -> url
+  const [resolved, setResolved] = useState(() => new Map());
+
+  // ✅ scroll control
+  const shouldStickToBottomRef = useRef(true); // si user est en bas, on colle
+  const firstRenderForConvRef = useRef(true);
+  const lastConvIdRef = useRef(conversationId);
+
+  // ✅ preserve position when prepending
+  const pendingPrependAdjustRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
+  const prevScrollTopRef = useRef(0);
+
+  // expose des méthodes au parent
+  useImperativeHandle(ref, () => ({
+    scrollToBottom: (behavior = "auto") => {
+      const el = containerRef.current;
+      if (!el) return;
+      // plus fiable que endRef.scrollIntoView sur iOS
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    },
+    getEl: () => containerRef.current,
+  }));
+
+  // track si user est “en bas”
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      shouldStickToBottomRef.current = isNearBottom(el, 180);
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // reset "first render" quand conversation change
+  useEffect(() => {
+    if (lastConvIdRef.current !== conversationId) {
+      lastConvIdRef.current = conversationId;
+      firstRenderForConvRef.current = true;
+      shouldStickToBottomRef.current = true;
+    }
+  }, [conversationId]);
 
   // Merge du ref parent et du ref interne
   const setMergedRef = useCallback(
     (node) => {
       containerRef.current = node;
-      if (typeof ref === "function") {
-        ref(node);
-      } else if (ref && "current" in ref) {
-        ref.current = node;
-      }
     },
-    [ref]
+    []
   );
 
-  // → Fonction utilitaire pour avoir les prénoms au bon format string
   const getPrenomsCoupleString = (msg) => {
     if (msg.prenom1 && msg.prenom2) return `${msg.prenom1} & ${msg.prenom2}`;
     if (
@@ -136,11 +184,8 @@ const MessagesList = forwardRef(function MessagesList(
 
   /* =========================================================
      ✅ PERF: Préfetch presign pour les médias visibles
-     - on prépare avatar + image + audio
-     - on stocke dans resolved (et cache global)
      ========================================================= */
   const keysSignature = useMemo(() => {
-    // signature stable pour relancer seulement si nécessaire
     const parts = [];
     for (const m of messages || []) {
       if (!m) continue;
@@ -171,9 +216,7 @@ const MessagesList = forwardRef(function MessagesList(
           if (seen.has(k)) continue;
           seen.add(k);
 
-          // si déjà résolu local ou en cache global, inutile de refetch
           if (resolved.get(k) || getCached(k)) continue;
-
           uniqueKeys.push(k);
         }
       }
@@ -203,50 +246,36 @@ const MessagesList = forwardRef(function MessagesList(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keysSignature]);
 
-  /* =========================================================
-     ✅ On injecte les urls presignées dans les messages
-     => MessageBubble ne refetch plus (http direct)
-     ========================================================= */
   const enhancedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
-
     return messages.map((m) => {
       if (!m) return m;
-
       const next = { ...m };
 
-      // avatar auteur
       if (next.auteur && next.auteur.photoUrl) {
         const k = next.auteur.photoUrl;
         const url =
           (typeof k === "string" && k.startsWith("http") ? k : null) ||
           resolved.get(k) ||
           getCached(k);
-
-        if (url) {
-          next.auteur = { ...next.auteur, photoUrl: url };
-        }
+        if (url) next.auteur = { ...next.auteur, photoUrl: url };
       }
 
-      // image
       if (next.type === "IMAGE" && next.imageUrl) {
         const k = next.imageUrl;
         const url =
           (typeof k === "string" && k.startsWith("http") ? k : null) ||
           resolved.get(k) ||
           getCached(k);
-
         if (url) next.imageUrl = url;
       }
 
-      // audio
       if (next.type === "AUDIO" && next.audioUrl) {
         const k = next.audioUrl;
         const url =
           (typeof k === "string" && k.startsWith("http") ? k : null) ||
           resolved.get(k) ||
           getCached(k);
-
         if (url) next.audioUrl = url;
       }
 
@@ -254,7 +283,9 @@ const MessagesList = forwardRef(function MessagesList(
     });
   }, [messages, resolved]);
 
-  // Lazy loading des anciens messages au scroll haut
+  /* =========================================================
+     ✅ Lazy loading: on capture la hauteur AVANT de prepend
+     ========================================================= */
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -263,11 +294,16 @@ const MessagesList = forwardRef(function MessagesList(
       if (container.scrollTop < 50 && hasMore) {
         if (loadingMoreRef.current) return;
 
-        // ✅ throttle pour éviter spam
         if (rafRef.current) return;
         rafRef.current = requestAnimationFrame(async () => {
           rafRef.current = null;
           if (loadingMoreRef.current) return;
+
+          // ✅ capture AVANT
+          prevScrollHeightRef.current = container.scrollHeight;
+          prevScrollTopRef.current = container.scrollTop;
+          pendingPrependAdjustRef.current = true;
+
           loadingMoreRef.current = true;
           try {
             await onLoadMore();
@@ -285,6 +321,48 @@ const MessagesList = forwardRef(function MessagesList(
       rafRef.current = null;
     };
   }, [hasMore, onLoadMore]);
+
+  /* =========================================================
+     ✅ Après render: si on a prepend, on restaure la position
+     ========================================================= */
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    if (pendingPrependAdjustRef.current) {
+      const prevH = prevScrollHeightRef.current || 0;
+      const prevTop = prevScrollTopRef.current || 0;
+      const newH = el.scrollHeight || 0;
+      const delta = newH - prevH;
+
+      // ✅ on garde exactement la même “ligne” sous le doigt
+      el.scrollTop = prevTop + (delta > 0 ? delta : 0);
+
+      pendingPrependAdjustRef.current = false;
+      return;
+    }
+  }, [enhancedMessages.length]);
+
+  /* =========================================================
+     ✅ Auto-scroll bottom:
+     - 1er render d’une conversation => direct en bas
+     - new message => en bas seulement si user était déjà en bas
+     ========================================================= */
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    if (firstRenderForConvRef.current) {
+      firstRenderForConvRef.current = false;
+      // ✅ force en bas (iOS: useLayoutEffect + scrollTo)
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+
+    if (shouldStickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [enhancedMessages.length, conversationId]);
 
   let lastDate = null;
 
@@ -330,6 +408,7 @@ const MessagesList = forwardRef(function MessagesList(
                 {label}
               </div>
             )}
+
             <MessageBubble
               msg={msg}
               utilisateur={utilisateur}
@@ -343,7 +422,6 @@ const MessagesList = forwardRef(function MessagesList(
         );
       })}
 
-      {/* Ancre finale (au cas où tu en as besoin plus tard) */}
       <div ref={endRef} style={{ height: 1 }} />
       <div style={{ height: 20 }} />
     </div>

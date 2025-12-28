@@ -1799,3 +1799,8 @@
   font-size: 0.9rem;
   color: #e0c084;
 }
+/* ✅ Le dernier message ne doit jamais passer sous l'input (iPhone compris) */
+.chat-messages{
+  scroll-padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
