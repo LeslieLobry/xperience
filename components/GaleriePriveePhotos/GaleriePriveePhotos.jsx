@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import PhotoUploader from "./PhotoUploader/PhotoUploader";
+import PhotoUploader from "../PhotoUploader/PhotoUploader";
 import { Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 // HOOK pour charger les presigned URLs des photos S3
