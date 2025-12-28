@@ -1819,6 +1819,7 @@
   }
 }
 /* ✅ PATCH FINAL iPhone : sticky -> fixed (comportement Messenger) */
+/* ✅ PATCH FINAL iPhone : input fixé + remonté juste au-dessus du clavier */
 @supports (-webkit-touch-callout: none) {
   .chat-input{
     position: fixed !important;
@@ -1827,12 +1828,19 @@
     bottom: 0 !important;
     width: 100% !important;
     z-index: 9999 !important;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
+
+    /* ✅ on ne "gonfle" pas la barre avec kb */
+    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+
+    /* ✅ on la remonte vraiment au-dessus du clavier */
+    transform: translateY(calc(-1 * var(--kb, 0px))) !important;
+    will-change: transform;
   }
 
-  /* ✅ évite que le dernier message passe sous l'input */
+  /* ✅ dernier message jamais sous l’input + clavier */
   .chat-messages{
     scroll-padding-bottom: calc(180px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
     padding-bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
   }
 }
+

@@ -171,7 +171,7 @@ export default function ChatBox({
       root.style.setProperty("--app-vh", `${viewportH}px`);
 
       if (vv) {
-        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        const kb = Math.max(0, window.innerHeight - (vv?.height || window.innerHeight));
         root.style.setProperty("--kb", `${kb}px`);
       } else {
         root.style.setProperty("--kb", `0px`);
