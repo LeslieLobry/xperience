@@ -44,7 +44,7 @@ export async function POST(req, { params }) {
       data: {
         utilisateurId,
         message: "Nouvelle demande d'accès à votre galerie privée",
-        lien: `/profil/${visiteurId}`,
+        lien: `/parametres/galerie`,
       },
     });
 

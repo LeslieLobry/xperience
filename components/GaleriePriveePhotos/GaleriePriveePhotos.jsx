@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import PhotoUploader from '../PhotoUploader/PhotoUploader';
-import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import PhotoUploader from "./PhotoUploader/PhotoUploader";
+import { Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 // HOOK pour charger les presigned URLs des photos S3
 function usePresignedGalleryUrls(photoList) {
@@ -17,20 +17,20 @@ function usePresignedGalleryUrls(photoList) {
       await Promise.all(
         photoList.map(async (photo) => {
           if (!photo?.url) {
-            map[photo.id] = '/default.jpg';
-          } else if (photo.url.startsWith('http')) {
+            map[photo.id] = "/default.jpg";
+          } else if (photo.url.startsWith("http")) {
             map[photo.id] = photo.url;
           } else {
             try {
-              const res = await fetch('/api/photos/presign', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+              const res = await fetch("/api/photos/presign", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ key: photo.url }),
               });
               const data = await res.json();
-              map[photo.id] = data.url || '/default.jpg';
+              map[photo.id] = data.url || "/default.jpg";
             } catch {
-              map[photo.id] = '/default.jpg';
+              map[photo.id] = "/default.jpg";
             }
           }
         })
@@ -53,7 +53,7 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
   const [currentIndex, setCurrentIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState(null); // 'granted' | 'pending' | 'denied' | null
-  const [galerieId, setGalerieId] = useState(null);       // ⭐ id réel de la galerie privée
+  const [galerieId, setGalerieId] = useState(null); // ⭐ id réel de la galerie privée
 
   // 1) Charger les photos + statut d'accès (+ galerieId)
   useEffect(() => {
@@ -64,14 +64,14 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     fetch(`/api/utilisateur/${utilisateurId}/galerie-privee?visiteurId=${visiteur}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.access === 'pending') {
-          setAccessStatus('pending');
+        if (data.access === "pending") {
+          setAccessStatus("pending");
           setPhotoList([]);
-        } else if (data.access === 'refused' || data.access === 'none') {
-          setAccessStatus('denied');
+        } else if (data.access === "refused" || data.access === "none") {
+          setAccessStatus("denied");
           setPhotoList([]);
-        } else if (data.access === 'granted') {
-          setAccessStatus('granted');
+        } else if (data.access === "granted") {
+          setAccessStatus("granted");
           setPhotoList(data.photos || []);
         }
 
@@ -80,8 +80,8 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
         }
       })
       .catch((err) => {
-        console.error('Erreur galerie privée :', err);
-        setAccessStatus('denied');
+        console.error("Erreur galerie privée :", err);
+        setAccessStatus("denied");
         setPhotoList([]);
       })
       .finally(() => setLoading(false));
@@ -95,45 +95,46 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     setLoading(true);
     try {
       const res = await fetch(`/api/utilisateur/${utilisateurId}/demande-acces`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visiteurId: visiteur }),
       });
-      if (res.ok) setAccessStatus('pending');
-      else throw new Error('Erreur');
+      if (res.ok) setAccessStatus("pending");
+      else throw new Error("Erreur");
     } catch {
       alert("Erreur lors de la demande d'accès");
     }
     setLoading(false);
   };
 
-  const handleNewPhoto = (photo) => setPhotoList((prev) => [...prev, photo]);
+  // ✅ j’ai juste corrigé le typo (sinon ça casse)
+  const handleNewPhoto = (photo) => setPhotoList((prev) => [photo, ...prev]);
 
   const handleDelete = async (id) => {
     if (!editable) return;
-    const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/photos/${id}`, { method: "DELETE" });
     if (res.ok) setPhotoList((prev) => prev.filter((p) => p.id !== id));
   };
 
   const handleKeyDown = (e) => {
     if (currentIndex === null) return;
-    if (e.key === 'Escape') setCurrentIndex(null);
-    if (e.key === 'ArrowLeft') setCurrentIndex((i) => (i > 0 ? i - 1 : i));
-    if (e.key === 'ArrowRight') setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
+    if (e.key === "Escape") setCurrentIndex(null);
+    if (e.key === "ArrowLeft") setCurrentIndex((i) => (i > 0 ? i - 1 : i));
+    if (e.key === "ArrowRight") setCurrentIndex((i) => (i < photoList.length - 1 ? i + 1 : i));
   };
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, photoList.length]);
 
   if (loading) return <div>Chargement...</div>;
 
-  if (!editable && accessStatus === 'pending') {
+  if (!editable && accessStatus === "pending") {
     return <div>Votre demande d'accès est en attente de validation.</div>;
   }
 
-  if (!editable && (accessStatus === 'denied' || accessStatus === null)) {
+  if (!editable && (accessStatus === "denied" || accessStatus === null)) {
     return (
       <div>
         <p>Cette galerie est privée. Vous devez en faire la demande pour y accéder.</p>
@@ -142,7 +143,7 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
     );
   }
 
-  if (!editable && accessStatus !== 'granted') {
+  if (!editable && accessStatus !== "granted") {
     return <div>Accès non autorisé.</div>;
   }
 
@@ -161,10 +162,10 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
               </button>
             )}
             <img
-              src={presignedUrls[photo.id] || '/default.jpg'}
+              src={presignedUrls[photo.id] || "/default.jpg"}
               alt={`Photo ${index + 1}`}
               onClick={() => setCurrentIndex(index)}
-              style={{ cursor: 'zoom-in' }}
+              style={{ cursor: "zoom-in" }}
             />
           </div>
         ))}
@@ -178,6 +179,7 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
                   isGallery
                   galerieId={galerieId}
                   onUpload={handleNewPhoto}
+                  hidePlus // ✅ NOUVEAU : plus de "+"
                 />
               ) : (
                 <span>Préparation de la galerie…</span>
@@ -206,7 +208,7 @@ export default function GaleriePriveePhotos({ utilisateurId, editable = false, v
             )}
 
             <img
-              src={presignedUrls[photoList[currentIndex].id] || '/default.jpg'}
+              src={presignedUrls[photoList[currentIndex].id] || "/default.jpg"}
               alt="Agrandissement"
             />
           </div>

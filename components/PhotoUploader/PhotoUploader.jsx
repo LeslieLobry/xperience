@@ -1,15 +1,14 @@
-'use client';
+"use client";
 
-import { useRef, useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import { useRef, useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import "../PhotoUploader/PhotoUploader.css";
-import { Camera, Plus } from 'lucide-react';
+import { Camera, Plus } from "lucide-react";
 
 // Détecte si c'est une vidéo ou une image
 function isVideoFile(fileOrUrl) {
   if (!fileOrUrl) return false;
-  if (typeof fileOrUrl === "string")
-    return /\.(mp4|webm|ogg|mov)$/i.test(fileOrUrl);
+  if (typeof fileOrUrl === "string") return /\.(mp4|webm|ogg|mov)$/i.test(fileOrUrl);
   if (fileOrUrl.type) return fileOrUrl.type.startsWith("video/");
   return false;
 }
@@ -57,10 +56,17 @@ export default function PhotoUploader({
   isGallery = false,
   galerieId,
   isPublic = false,
-  isOwnProfile = false
+  isOwnProfile = false,
+
+  // ✅ NOUVEAU : permet de masquer le "+"
+  hidePlus = false,
 }) {
   const fileInputRef = useRef(null);
   const { preview, previewType, setPreview, setPreviewType } = usePresignedPreview(currentUrl);
+
+  const openPicker = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
 
   // Quand l'utilisateur choisit un fichier
   const handleFileChange = async (e) => {
@@ -84,11 +90,11 @@ export default function PhotoUploader({
     }
 
     const formData = new FormData();
-    formData.append('photo', file);
+    formData.append("photo", file);
 
     // ✅ Galerie publique : inchangé
     if (isGallery && isPublic) {
-      formData.append('isPublic', 'true');
+      formData.append("isPublic", "true");
     }
 
     // ✅ Galerie privée : check simplifié, ne casse pas les IDs string
@@ -98,14 +104,14 @@ export default function PhotoUploader({
         console.error("PhotoUploader → galerieId manquant pour galerie privée :", galerieId);
         return;
       }
-      formData.append('galerieId', String(galerieId));
+      formData.append("galerieId", String(galerieId));
     }
 
     try {
-      const res = await fetch('/api/upload-photo', {
-        method: 'POST',
+      const res = await fetch("/api/upload-photo", {
+        method: "POST",
         body: formData,
-        credentials: 'include',
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -143,11 +149,14 @@ export default function PhotoUploader({
     } catch (err) {
       console.error("Erreur réseau :", err);
       toast.error("Erreur réseau pendant l'upload.");
+    } finally {
+      // reset input sinon re-upload même fichier ne déclenche pas change
+      e.target.value = "";
     }
   };
 
   return (
-    <div className={`photo-upload-contenant ${isGallery ? 'gallery-mode' : ''}`}>
+    <div className={`photo-upload-contenant ${isGallery ? "gallery-mode" : ""}`}>
       {!isGallery && preview && (
         <div className="photo-preview-wrapper">
           {previewType === "video" ? (
@@ -164,17 +173,17 @@ export default function PhotoUploader({
               className="photo-preview"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = '/default.jpg';
+                e.target.src = "/default.jpg";
               }}
             />
           )}
+
           {isOwnProfile && (
             <label
               htmlFor="photo-upload"
               className="camera-label"
               title="Changer la photo"
-              style={{ cursor: "pointer" }}
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <Camera className="camera-icon" />
             </label>
@@ -184,14 +193,17 @@ export default function PhotoUploader({
 
       {isGallery && (
         <div
-          className="gallery-placeholder"
-          onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          style={{ cursor: "pointer" }}
+          className="gallery-placeholder gallery-placeholder-full"
+          onClick={openPicker}
           tabIndex={0}
+          role="button"
           title="Ajouter une photo"
-          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") fileInputRef.current.click(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") openPicker();
+          }}
         >
-          <Plus size={32} color="#ccc" />
+          {/* ✅ plus de + si hidePlus */}
+          {!hidePlus && <Plus size={32} color="#ccc" />}
         </div>
       )}
 
@@ -200,7 +212,7 @@ export default function PhotoUploader({
         type="file"
         ref={fileInputRef}
         accept="image/*,video/*"
-        style={{ visibility: 'hidden', width: 0, height: 0 }}
+        style={{ visibility: "hidden", width: 0, height: 0 }}
         onChange={handleFileChange}
       />
     </div>

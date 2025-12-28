@@ -281,6 +281,7 @@ export default function GaleriePhotos({ photos = [], editable = false }) {
                 isPublic={true}
                 isOwnProfile={true}
                 onUpload={handleNewPhoto}
+                hidePlus={true} /* ✅ NOUVEAU : pas de +, mais zone cliquable */
               />
             </div>
           ))}
