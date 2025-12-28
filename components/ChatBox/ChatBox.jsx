@@ -249,33 +249,82 @@ useEffect(() => {
     document.removeEventListener("focusout", onFocusOut);
   };
 }, []);
+
 useEffect(() => {
   if (typeof window === "undefined") return;
+
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   if (!isIOS) return;
 
   const body = document.body;
-  const scrollY = window.scrollY || 0;
+  let locked = false;
+  let saved = null;
 
-  // lock page scroll
-  body.dataset.scrollY = String(scrollY);
-  body.style.position = "fixed";
-  body.style.top = `-${scrollY}px`;
-  body.style.left = "0";
-  body.style.right = "0";
-  body.style.width = "100%";
-  body.style.overflow = "hidden";
+  const lockBody = () => {
+    if (locked) return;
+    locked = true;
+
+    const scrollY = window.scrollY || 0;
+    saved = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      scrollY,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+  };
+
+  const unlockBody = () => {
+    if (!locked) return;
+    locked = false;
+
+    const y = saved?.scrollY || 0;
+    body.style.position = saved?.position || "";
+    body.style.top = saved?.top || "";
+    body.style.left = saved?.left || "";
+    body.style.right = saved?.right || "";
+    body.style.width = saved?.width || "";
+    body.style.overflow = saved?.overflow || "";
+    saved = null;
+
+    window.scrollTo(0, y);
+  };
+
+  const onFocusIn = (e) => {
+    const t = e.target;
+    if (!t) return;
+
+    const isText =
+      t.tagName === "TEXTAREA" ||
+      (t.tagName === "INPUT" &&
+        ["text", "search", "email", "tel", "url", "password"].includes(
+          (t.getAttribute("type") || "text").toLowerCase()
+        ));
+
+    if (!isText) return;
+    lockBody();
+  };
+
+  const onFocusOut = () => {
+    unlockBody();
+  };
+
+  document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("focusout", onFocusOut);
 
   return () => {
-    const y = Number(body.dataset.scrollY || "0") || 0;
-    body.style.position = "";
-    body.style.top = "";
-    body.style.left = "";
-    body.style.right = "";
-    body.style.width = "";
-    body.style.overflow = "";
-    delete body.dataset.scrollY;
-    window.scrollTo(0, y);
+    document.removeEventListener("focusin", onFocusIn);
+    document.removeEventListener("focusout", onFocusOut);
+    unlockBody(); // sécurité
   };
 }, []);
 
