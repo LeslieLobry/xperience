@@ -21,3 +21,7 @@
 .chat-input-mic-btn{
   color: #e0c084;
 }
+.input-text{
+  max-height: 140px;   /* doit matcher MAX_TA_HEIGHT */
+  -webkit-overflow-scrolling: touch;
+}
