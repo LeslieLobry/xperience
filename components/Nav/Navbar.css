@@ -6,8 +6,7 @@
   border-bottom: 1px solid rgba(224, 192, 132, 0.45);
   position: sticky;
   top: 0;
-
-  z-index: 10000;
+  z-index: 99;
   isolation: isolate;
   overflow: visible;
 
@@ -255,7 +254,7 @@
 }
 
 .nav-combined-popup a {
-  color: #0070f3;
+ 
   text-decoration: none;
   font-weight: 500;
 }
@@ -267,7 +266,7 @@
 }
 
 .btn-mark-read {
-  background: #0070f3;
+  
   color: white;
   border: none;
   padding: 6px 12px;
