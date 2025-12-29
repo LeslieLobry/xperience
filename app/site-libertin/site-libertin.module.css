@@ -1,0 +1,197 @@
+/* app/site-libertin/site-libertin.module.css */
+.page {
+  width: 100%;
+  min-height: 100vh;
+  color: #f5ece0;
+  background: #0a0a0c;
+}
+
+.hero {
+  position: relative;
+  padding: 64px 16px 40px;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(10, 10, 12, 0.78), rgba(10, 10, 12, 0.88)),
+    radial-gradient(1200px 600px at 30% 10%, rgba(224, 192, 132, 0.12), transparent 60%);
+  z-index: 0;
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.kicker {
+  margin: 0 0 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.h1 {
+  margin: 0 0 14px;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.lead {
+  margin: 0 0 22px;
+  max-width: 860px;
+  font-size: 16px;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.ctaRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 18px 0 16px;
+}
+
+.ctaPrimary,
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid rgba(224, 192, 132, 0.55);
+}
+
+.ctaPrimary {
+  background: rgba(224, 192, 132, 0.18);
+}
+
+.ctaSecondary {
+  background: transparent;
+  opacity: 0.95;
+}
+
+.badges {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badges li {
+  border: 1px solid rgba(245, 236, 224, 0.14);
+  background: rgba(245, 236, 224, 0.04);
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  opacity: 0.95;
+}
+
+.section,
+.sectionAlt {
+  padding: 44px 16px;
+}
+
+.sectionAlt {
+  background: rgba(245, 236, 224, 0.03);
+}
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+.h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.p {
+  margin: 0 0 14px;
+  line-height: 1.65;
+  opacity: 0.95;
+}
+
+.list {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.card {
+  border: 1px solid rgba(245, 236, 224, 0.12);
+  background: rgba(245, 236, 224, 0.04);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.steps {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  line-height: 1.75;
+}
+
+.faq {
+  margin-top: 14px;
+}
+
+.faqItem {
+  border: 1px solid rgba(245, 236, 224, 0.12);
+  background: rgba(245, 236, 224, 0.04);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.faqQ {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.faqQ::-webkit-details-marker {
+  display: none;
+}
+
+.faqA {
+  padding-top: 8px;
+}
+
+.bottomCta {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 840px) {
+  .h1 {
+    font-size: 44px;
+  }
+  .grid2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
