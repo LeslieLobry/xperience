@@ -1,4 +1,4 @@
-// /app/api/utilisateur/[id]/galerie-privee/acces/route.js
+// /app/api/utilisateur/[id]/galerie-privee/attente/route.js
 
 import { prisma } from "../../../../../../lib/prisma";
 import { NextResponse } from "next/server";
@@ -18,15 +18,14 @@ export async function GET(_, { params }) {
       return NextResponse.json({ error: "ID utilisateur manquant" }, { status: 400 });
     }
 
-    // ✅ sécurité: seul le propriétaire peut voir ses listes
     if (Number(connectedUser.id) !== Number(utilisateurId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const acces = await prisma.demandeAcces.findMany({
+    const attente = await prisma.demandeAcces.findMany({
       where: {
         proprietaireId: utilisateurId,
-        statut: "ACCEPTEE",
+        statut: "EN_ATTENTE",
       },
       orderBy: { id: "desc" },
       include: {
@@ -36,9 +35,9 @@ export async function GET(_, { params }) {
       },
     });
 
-    return NextResponse.json(acces);
+    return NextResponse.json(attente);
   } catch (e) {
-    console.error("💥 Erreur acces:", e);
+    console.error("💥 Erreur attente:", e);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

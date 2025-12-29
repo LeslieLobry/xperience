@@ -4,21 +4,26 @@ import { useEffect, useState } from "react";
 export default function GalerieSection({ utilisateurId }) {
   const [accesList, setAccesList] = useState([]);
   const [refusesList, setRefusesList] = useState([]);
+  const [attenteList, setAttenteList] = useState([]);
+
   const [photoUrls, setPhotoUrls] = useState({}); // { userId: url }
 
   useEffect(() => {
     async function load() {
       try {
-        const [accesRes, refusesRes] = await Promise.all([
+        const [accesRes, refusesRes, attenteRes] = await Promise.all([
           fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/acces`, { cache: "no-store" }),
           fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/refusees`, { cache: "no-store" }),
+          fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/attente`, { cache: "no-store" }),
         ]);
 
         const acces = await accesRes.json();
         const refuses = await refusesRes.json();
+        const attente = await attenteRes.json();
 
         setAccesList(Array.isArray(acces) ? acces : []);
         setRefusesList(Array.isArray(refuses) ? refuses : []);
+        setAttenteList(Array.isArray(attente) ? attente : []);
       } catch (e) {
         console.error("Erreur chargement galerie section", e);
       }
@@ -27,12 +32,12 @@ export default function GalerieSection({ utilisateurId }) {
     if (utilisateurId) load();
   }, [utilisateurId]);
 
-  // Résout les URLs des avatars pour les 2 listes
+  // Résout les URLs des avatars pour les 3 listes
   useEffect(() => {
     let cancelled = false;
 
     async function resolvePhotos() {
-      const all = [...accesList, ...refusesList];
+      const all = [...accesList, ...refusesList, ...attenteList];
       const next = {};
 
       await Promise.all(
@@ -75,18 +80,30 @@ export default function GalerieSection({ utilisateurId }) {
       }
     }
 
-    if (accesList.length || refusesList.length) resolvePhotos();
+    if (accesList.length || refusesList.length || attenteList.length) resolvePhotos();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accesList, refusesList]);
+  }, [accesList, refusesList, attenteList]);
+
+  const avatarSrc = (u) => photoUrls[u?.id] || "/images/default-avatar.png";
+
+  const refreshAcces = async () => {
+    try {
+      const res = await fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/acces`, {
+        cache: "no-store",
+      });
+      const updated = await res.json();
+      setAccesList(Array.isArray(updated) ? updated : []);
+    } catch (e) {
+      console.error("Erreur refresh acces", e);
+    }
+  };
 
   const retirerAcces = async (demandeId) => {
     try {
-      await fetch(`/api/demandes-acces/${demandeId}/supprimer`, {
-        method: "DELETE",
-      });
+      await fetch(`/api/demandes-acces/${demandeId}/supprimer`, { method: "DELETE" });
       setAccesList((prev) => prev.filter((d) => d.id !== demandeId));
     } catch (e) {
       console.error("Erreur retirer accès", e);
@@ -95,37 +112,54 @@ export default function GalerieSection({ utilisateurId }) {
 
   const accorderAcces = async (demandeId) => {
     try {
-      await fetch(`/api/demandes-acces/${demandeId}/accepter`, {
-        method: "PATCH",
-      });
-      setRefusesList((prev) => prev.filter((d) => d.id !== demandeId));
+      await fetch(`/api/demandes-acces/${demandeId}/accepter`, { method: "PATCH" });
 
-      const res = await fetch(
-        `/api/utilisateur/${utilisateurId}/galerie-privee/acces`,
-        { cache: "no-store" }
-      );
-      const updated = await res.json();
-      setAccesList(Array.isArray(updated) ? updated : []);
+      // peut venir de "refusées" OU de "attente"
+      setRefusesList((prev) => prev.filter((d) => d.id !== demandeId));
+      setAttenteList((prev) => prev.filter((d) => d.id !== demandeId));
+
+      await refreshAcces();
     } catch (e) {
       console.error("Erreur accorder accès", e);
     }
   };
 
-  const avatarSrc = (u) =>
-    photoUrls[u?.id] || "/images/default-avatar.png";
+  const refuserAcces = async (demandeId) => {
+    try {
+      await fetch(`/api/demandes-acces/${demandeId}/refuser`, { method: "PATCH" });
+
+      // on enlève de "attente"
+      setAttenteList((prev) => prev.filter((d) => d.id !== demandeId));
+
+      // et on recharge la liste refusées (simple et fiable)
+      const res = await fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/refusees`, {
+        cache: "no-store",
+      });
+      const updated = await res.json();
+      setRefusesList(Array.isArray(updated) ? updated : []);
+    } catch (e) {
+      console.error("Erreur refuser accès", e);
+    }
+  };
 
   return (
     <div>
-      <h2>Utilisateurs ayant accès à votre galerie privée</h2>
+      {/* -------------------- EN ATTENTE -------------------- */}
+      <h2>Demandes d&apos;accès en attente</h2>
 
-      {accesList.length === 0 ? (
-        <p>Aucun accès accordé pour le moment.</p>
+      {attenteList.length === 0 ? (
+        <p>Aucune demande en attente.</p>
       ) : (
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {accesList.map((d) => (
+          {attenteList.map((d) => (
             <li
               key={d.id}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 0",
+              }}
             >
               <img
                 src={avatarSrc(d.demandeur)}
@@ -138,12 +172,49 @@ export default function GalerieSection({ utilisateurId }) {
                 }}
               />
               <span style={{ flex: 1 }}>{d.demandeur?.pseudo}</span>
-              <button onClick={() => retirerAcces(d.id)}>Retirer l'accès</button>
+
+              <button onClick={() => accorderAcces(d.id)}>Accepter</button>
+              <button onClick={() => refuserAcces(d.id)}>Refuser</button>
             </li>
           ))}
         </ul>
       )}
 
+      {/* -------------------- ACCÈS ACCORDÉS -------------------- */}
+      <h2 style={{ marginTop: "2rem" }}>Utilisateurs ayant accès à votre galerie privée</h2>
+
+      {accesList.length === 0 ? (
+        <p>Aucun accès accordé pour le moment.</p>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {accesList.map((d) => (
+            <li
+              key={d.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 0",
+              }}
+            >
+              <img
+                src={avatarSrc(d.demandeur)}
+                width={40}
+                height={40}
+                style={{ borderRadius: "50%", objectFit: "cover" }}
+                alt={`Avatar de ${d.demandeur?.pseudo || "utilisateur"}`}
+                onError={(e) => {
+                  e.currentTarget.src = "/images/default-avatar.png";
+                }}
+              />
+              <span style={{ flex: 1 }}>{d.demandeur?.pseudo}</span>
+              <button onClick={() => retirerAcces(d.id)}>Retirer l&apos;accès</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* -------------------- REFUSÉES -------------------- */}
       <h2 style={{ marginTop: "2rem" }}>Demandes refusées</h2>
 
       {refusesList.length === 0 ? (
@@ -153,7 +224,12 @@ export default function GalerieSection({ utilisateurId }) {
           {refusesList.map((d) => (
             <li
               key={d.id}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 0",
+              }}
             >
               <img
                 src={avatarSrc(d.demandeur)}
@@ -166,7 +242,7 @@ export default function GalerieSection({ utilisateurId }) {
                 }}
               />
               <span style={{ flex: 1 }}>{d.demandeur?.pseudo}</span>
-              <button onClick={() => accorderAcces(d.id)}>Accorder l'accès</button>
+              <button onClick={() => accorderAcces(d.id)}>Accorder l&apos;accès</button>
             </li>
           ))}
         </ul>
