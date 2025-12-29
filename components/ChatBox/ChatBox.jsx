@@ -47,7 +47,7 @@ function getAblyClient() {
 
   try {
     ablyClient = new Realtime({
-      authUrl: "/api/ably/token",
+      authUrl: "/api/ably-token",
       authMethod: "GET",
       echoMessages: false,
       closeOnUnload: false,

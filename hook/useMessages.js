@@ -12,7 +12,7 @@ function getAbly() {
   // ✅ si tu as /api/ably/token : plus stable en prod
   try {
     ablyClient = new Realtime({
-      authUrl: "/api/ably/token",
+      authUrl: "/api/ably-token",
       authMethod: "GET",
       echoMessages: false,
       closeOnUnload: false,
