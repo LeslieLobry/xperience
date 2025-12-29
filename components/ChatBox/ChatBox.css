@@ -1837,10 +1837,12 @@
     will-change: transform;
   }
 
-  /* ✅ dernier message jamais sous l’input + clavier */
-  .chat-messages{
-    scroll-padding-bottom: calc(180px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
-    padding-bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
-  }
+/* ✅ Dernier message jamais caché derrière la barre */
+.chat-messages{
+  /* espace fixe "sécurisé" (barre + safe area) */
+  padding-bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+  scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+}
+
 }
 
