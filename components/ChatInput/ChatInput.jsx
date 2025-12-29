@@ -285,13 +285,20 @@ export default function ChatInput({
     setLoadingPrenoms(false);
   };
 
-  function autoResize() {
-    const ta = textareaRef.current;
-    if (ta) {
-      ta.style.height = "auto";
-      ta.style.height = ta.scrollHeight + "px";
-    }
-  }
+function autoResize() {
+  const ta = textareaRef.current;
+  if (!ta) return;
+
+  const MAX = 140; // ajuste si tu veux (doit matcher le CSS)
+  ta.style.height = "auto";
+
+  const next = Math.min(ta.scrollHeight, MAX);
+  ta.style.height = next + "px";
+
+  // si on dépasse le max → on autorise le scroll dans le textarea
+  ta.style.overflowY = ta.scrollHeight > MAX ? "auto" : "hidden";
+}
+
   useEffect(() => { autoResize(); }, [texte]);
 
   // --- SUBMIT LOGIC ---
