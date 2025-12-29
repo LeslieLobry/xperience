@@ -1,68 +1,78 @@
-// app/api/push/register/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+const JWT_SECRET = process.env.JWT_SECRET;
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS });
-}
-
-function isExpoToken(t) {
-  return (
-    typeof t === "string" &&
-    (t.startsWith("ExponentPushToken[") || t.startsWith("ExpoPushToken[")) &&
-    t.includes("]")
-  );
+function getUserIdFromBearer(req) {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  const token = auth.slice(7);
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload?.id ? Number(payload.id) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req) {
   try {
-    const body = await req.json().catch(() => null);
-    const userId = body?.userId;
-    const tokenRaw = body?.token;
-
-    const token = typeof tokenRaw === "string" ? tokenRaw.trim() : null;
-
-    if (!userId || !token) {
+    const userId = getUserIdFromBearer(req);
+    if (!userId) {
       return NextResponse.json(
-        { ok: false, error: "userId et token requis" },
-        { status: 400, headers: CORS }
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
-    // Log utile (sans exposer tout le token)
-    console.log("[push/register] userId=", userId, "token=", token.slice(0, 18) + "...");
+    const body = await req.json();
+    const expoPushToken = body?.expoPushToken || body?.token; // ✅ accepte les 2
+    const pushEnabled = body?.pushEnabled;
 
-    // (Optionnel) validation format Expo token
-    if (!isExpoToken(token)) {
-      console.log("[push/register] token format inattendu");
-      // On ne bloque pas forcément, mais tu peux bloquer si tu veux :
-      // return NextResponse.json({ ok:false, error:"Token invalide"},{status:400, headers:CORS});
+    if (!expoPushToken || typeof expoPushToken !== "string") {
+      return NextResponse.json(
+        { success: false, error: "Missing expoPushToken" },
+        { status: 400 }
+      );
     }
 
-    // Support id Int OU String selon ton Prisma
-    const where =
-      /^\d+$/.test(String(userId)) ? { id: Number(userId) } : { id: String(userId) };
-
     await prisma.utilisateur.update({
-      where,
-      data: { expoPushToken: token },
+      where: { id: userId },
+      data: {
+        expoPushToken,
+        ...(typeof pushEnabled === "boolean" ? { pushEnabled } : {}),
+      },
     });
 
-    return NextResponse.json({ ok: true }, { headers: CORS });
+    return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("[push/register] ERROR", e);
-    return NextResponse.json(
-      { ok: false, error: e?.message || "Erreur serveur" },
-      { status: 500, headers: CORS }
-    );
+    console.error("❌ /api/push/register error:", e);
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    const userId = getUserIdFromBearer(req);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    await prisma.utilisateur.update({
+      where: { id: userId },
+      data: {
+        expoPushToken: null,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("❌ /api/push/register DELETE error:", e);
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }
