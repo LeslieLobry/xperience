@@ -23,22 +23,21 @@
 }
 .input-text{
   width: 100%;
-  min-height: 40px;        /* hauteur de base */
-  height: auto;            /* laisse le JS mettre scrollHeight */
-  max-height: 140px;       /* doit matcher MAX_TA_HEIGHT */
+  min-height: 40px;
+  height: auto;
+  max-height: 140px;
 
-  overflow-y: hidden;      /* sinon ça scroll au lieu de grandir */
   resize: none;
   box-sizing: border-box;
 
   background-color: transparent;
   color: #e0c084;
 
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+
+  overflow-y: hidden; /* grandit, pas de scroll */
   -webkit-overflow-scrolling: touch;
-}
-.input-text{
-  white-space: pre-wrap;     /* garde les retours à la ligne */
-  overflow-wrap: anywhere;   /* coupe les mots longs */
-  word-break: break-word;    /* secours */
-  line-height: 1.35;         /* lisible */
 }

@@ -290,19 +290,23 @@ function autoResize() {
   const ta = textareaRef.current;
   if (!ta) return;
 
-  // reset
+  // ✅ on évite le “saut” : on ne remet height:auto que si nécessaire
+  const prev = ta.style.height;
+
   ta.style.height = "auto";
+  const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
+  const nextPx = next + "px";
 
-  const scrollH = ta.scrollHeight;
-
-  if (scrollH <= MAX_HEIGHT) {
-    ta.style.height = scrollH + "px";
-    ta.style.overflowY = "hidden";
+  if (prev !== nextPx) {
+    ta.style.height = nextPx;
   } else {
-    ta.style.height = MAX_HEIGHT + "px";
-    ta.style.overflowY = "auto";
+    ta.style.height = prev; // stable
   }
+
+  // ✅ toi tu veux "grandit" => pas de scroll interne
+  ta.style.overflowY = "hidden";
 }
+
 
   useEffect(() => { autoResize(); }, [texte]);
 
@@ -547,17 +551,20 @@ const handleSubmit = async (e) => {
       )}
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-        <textarea className="input-text" ref={textareaRef} value={texte} placeholder="Écris un message…" onChange={(e) => {
-  setTexte(e.target.value);
-  requestAnimationFrame(autoResize);
-}}
+<textarea
+  className="input-text"
+  ref={textareaRef}
+  value={texte}
+  placeholder="Écris un message…"
+  rows={1}
+  onChange={(e) => {
+    setTexte(e.target.value);
+    requestAnimationFrame(autoResize);
+  }}
+  onInput={() => requestAnimationFrame(autoResize)}
+  style={{ resize: "none" }}
+/>
 
-          onInput={() => requestAnimationFrame(autoResize)}
-          rows={1}
-          style={{
-            resize: "none"
-          }}
-        />
         <div className="input-wrapper" style={{ alignItems: "center" }}>
           {/* Aperçu image */}
           {imagePreview && (
