@@ -552,11 +552,10 @@ const handleSubmit = async (e) => {
   requestAnimationFrame(autoResize);
 }}
 
-          onInput={autoResize}
+          onInput={() => requestAnimationFrame(autoResize)}
           rows={1}
           style={{
-            resize: "none",
-            overflow: "hidden",
+            resize: "none"
           }}
         />
         <div className="input-wrapper" style={{ alignItems: "center" }}>
