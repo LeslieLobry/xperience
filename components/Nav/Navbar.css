@@ -2,7 +2,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1rem;
+  padding: 5px 1rem;
   border-bottom: 1px solid rgba(224, 192, 132, 0.45);
   position: sticky;
   top: 0;
