@@ -295,101 +295,137 @@ export default function ChatInput({
   useEffect(() => { autoResize(); }, [texte]);
 
   // --- SUBMIT LOGIC ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isSending) return;
-    setIsSending(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (isSending) return;
 
-    try {
-      // IMAGE
-      if (imageFile) {
-        const optimisticKey = generateOptimisticKey();
-        const formData = new FormData();
-        formData.append("image", imageFile);
-        formData.append("conversationId", conversationId);
-        formData.append("type", ephemere ? "EPHEMERE" : "IMAGE");
-        formData.append("optimisticKey", optimisticKey);
-        if (texte) formData.append("contenu", texte);
-        if (utilisateur.type === "couple" && prenomsOK) {
-          formData.append("membreParlant", membreParlant);
-          formData.append("prenom1", pr1);
-          formData.append("prenom2", pr2);
-        }
+  // ✅ on capture le texte maintenant
+  const texteToSend = texte;
+  const ephemereToSend = ephemere;
 
-        await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
-        if (imagePreview) URL.revokeObjectURL(imagePreview);
-        setImageFile(null);
-        setImagePreview(null);
-        setTexte("");
-        setEphemere(false);
-        setIsSending(false);
-        return;
-      }
+  // ✅ on vide l'input immédiatement (sans attendre la requête)
+  if (texteToSend && texteToSend.length) {
+    setTexte("");
+    requestAnimationFrame(() => autoResize());
+  }
 
-      // AUDIO
-      if (audioBlob) {
-        const optimisticKey = generateOptimisticKey();
-        let duree = await getAccurateDuration(audioBlob);
-        const formData = new FormData();
-        let extension = "webm";
-        if (audioType === "audio/mp4") extension = "m4a";
-        if (audioType === "audio/mpeg") extension = "mp3";
-        formData.append("audio", audioBlob, `audio.${extension}`);
-        formData.append("audioType", audioType); // pour info backend/lecture
-        formData.append("conversationId", conversationId);
-        formData.append("type", ephemere ? "EPHEMERE" : "AUDIO");
-        formData.append("duree", duree);
-        formData.append("optimisticKey", optimisticKey);
+  setIsSending(true);
 
-        if (utilisateur.type === "couple" && prenomsOK) {
-          formData.append("membreParlant", membreParlant);
-          formData.append("prenom1", pr1);
-          formData.append("prenom2", pr2);
-        }
-
-        await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-        setAudioBlob(null);
-        setAudioUrl(null);
-        audioStartRef.current = null;
-        audioStopRef.current = null;
-        setTexte("");
-        setEphemere(false);
-        setIsSending(false);
-        return;
-      }
-
-      // TEXTE
-      if (!texte.trim()) {
-        setIsSending(false);
-        return;
-      }
+  try {
+    // IMAGE
+    if (imageFile) {
       const optimisticKey = generateOptimisticKey();
+      const formData = new FormData();
+      formData.append("image", imageFile);
+      formData.append("conversationId", conversationId);
+      formData.append("type", ephemereToSend ? "EPHEMERE" : "IMAGE");
+      formData.append("optimisticKey", optimisticKey);
+      if (texteToSend) formData.append("contenu", texteToSend);
+
       if (utilisateur.type === "couple" && prenomsOK) {
-        await onMessageSent({
-          contenu: texte,
-          type: ephemere ? "EPHEMERE" : "TEXTE",
+        formData.append("membreParlant", membreParlant);
+        formData.append("prenom1", pr1);
+        formData.append("prenom2", pr2);
+      }
+
+      await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
+
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImageFile(null);
+      setImagePreview(null);
+      setEphemere(false);
+      setIsSending(false);
+      return;
+    }
+
+    // AUDIO
+    if (audioBlob) {
+      const optimisticKey = generateOptimisticKey();
+      let duree = await getAccurateDuration(audioBlob);
+
+      const formData = new FormData();
+      let extension = "webm";
+      if (audioType === "audio/mp4") extension = "m4a";
+      if (audioType === "audio/mpeg") extension = "mp3";
+
+      formData.append("audio", audioBlob, `audio.${extension}`);
+      formData.append("audioType", audioType);
+      formData.append("conversationId", conversationId);
+      formData.append("type", ephemereToSend ? "EPHEMERE" : "AUDIO");
+      formData.append("duree", duree);
+      formData.append("optimisticKey", optimisticKey);
+
+      if (utilisateur.type === "couple" && prenomsOK) {
+        formData.append("membreParlant", membreParlant);
+        formData.append("prenom1", pr1);
+        formData.append("prenom2", pr2);
+      }
+
+      await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
+
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      setAudioBlob(null);
+      setAudioUrl(null);
+      audioStartRef.current = null;
+      audioStopRef.current = null;
+      setEphemere(false);
+      setIsSending(false);
+      return;
+    }
+
+    // TEXTE
+    if (!texteToSend || !texteToSend.trim()) {
+      setIsSending(false);
+      return;
+    }
+
+    const optimisticKey = generateOptimisticKey();
+
+    if (utilisateur.type === "couple" && prenomsOK) {
+      await onMessageSent(
+        {
+          contenu: texteToSend,
+          type: ephemereToSend ? "EPHEMERE" : "TEXTE",
           conversationId,
           optimisticKey,
           prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
           prenom1: pr1,
           prenom2: pr2,
-        }, "TEXTE", membreParlant, false, optimisticKey);
-      } else {
-        await onMessageSent({
-          contenu: texte,
-          type: ephemere ? "EPHEMERE" : "TEXTE",
+        },
+        "TEXTE",
+        membreParlant,
+        false,
+        optimisticKey
+      );
+    } else {
+      await onMessageSent(
+        {
+          contenu: texteToSend,
+          type: ephemereToSend ? "EPHEMERE" : "TEXTE",
           conversationId,
           optimisticKey,
-        }, "TEXTE", undefined, false, optimisticKey);
-      }
-      setTexte("");
-      setEphemere(false);
-    } catch (err) {
-      console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
+        },
+        "TEXTE",
+        undefined,
+        false,
+        optimisticKey
+      );
     }
-    setIsSending(false);
-  };
+
+    setEphemere(false);
+  } catch (err) {
+    console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
+
+    // ✅ optionnel : on remet le texte si l'envoi a échoué
+    if (texteToSend && texteToSend.trim()) {
+      setTexte(texteToSend);
+      requestAnimationFrame(() => autoResize());
+    }
+  }
+
+  setIsSending(false);
+};
+
 
   // --- Notification éphémère ---
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
