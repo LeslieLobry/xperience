@@ -274,8 +274,8 @@ export default function Navbar() {
           <Image
             src={logo}
             alt="logo xpérience"
-            width={120}
-            height={120}
+            width={80}
+            height={80}
             className="navbar-logo"
             priority
           />

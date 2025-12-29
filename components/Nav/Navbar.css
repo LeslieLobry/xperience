@@ -2,7 +2,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 1rem 1rem;
   border-bottom: 1px solid rgba(224, 192, 132, 0.45);
   position: sticky;
   top: 0;
@@ -66,7 +66,7 @@
 }
 .navbar-pseudo {
   color: #a2b9c1;
-  font-size: 24px;
+  font-size: 18px;
   font-style: italic;
 }
 
