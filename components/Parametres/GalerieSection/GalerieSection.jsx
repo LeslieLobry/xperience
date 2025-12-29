@@ -14,7 +14,7 @@ export default function GalerieSection({ utilisateurId }) {
         const [accesRes, refusesRes, attenteRes] = await Promise.all([
           fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/acces`, { cache: "no-store" }),
           fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/refusees`, { cache: "no-store" }),
-          fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/attente`, { cache: "no-store" }),
+          fetch(`/api/utilisateur/${utilisateurId}/galerie-privee/demandes`, { cache: "no-store" }),
         ]);
 
         const acces = await accesRes.json();
