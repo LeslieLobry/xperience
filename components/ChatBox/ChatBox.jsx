@@ -1292,14 +1292,15 @@ export default function ChatBox({
         </div>
       )}
 
-      {inCall && (
-        <VideoCallView
-          inCall={inCall}
-          remoteTracks={remoteTracks}
-          startCall={startCall}
-          hangupCall={hangupCall}
-        />
-      )}
+ {inCall && (
+  <VideoCallView
+    inCall={inCall}
+    room={room}
+    remoteTracks={remoteTracks}
+    hangupCall={hangupCall}
+    callDuration={callDuration}
+  />
+)}
 
       <MessagesList
         ref={messagesListRef}
