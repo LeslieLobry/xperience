@@ -196,7 +196,7 @@ function getAbly() {
 
   try {
     ablySingleton = new Realtime({
-      authUrl: "/api/ably/token",
+      authUrl: "/api/ably-token",
       authMethod: "GET",
       echoMessages: false,
       closeOnUnload: false,
