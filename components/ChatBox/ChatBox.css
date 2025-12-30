@@ -457,24 +457,32 @@
 .message-bubble.own .delete-message-button { color: white; }
 
 /* === Zone saisie message === */
+/* === Zone saisie message (FIX clavier iOS/Android) === */
 .chat-input {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px;
 
-  /* ✅ input toujours visible en bas */
-  position: sticky;
+  /* ✅ FIXE à l'écran (ne bouge plus au focus) */
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 120;
+  z-index: 9999;
 
   /* ✅ safe-area iPhone */
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
 
-  /* pour éviter que ça “saute” */
+  /* ✅ remonte exactement de la hauteur du clavier (variable déjà gérée dans ChatBox.jsx) */
+  transform: translateY(calc(-1 * var(--kb, 0px)));
+  will-change: transform;
+
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(224,192,132,0.25);
+  background: #2c3e50;
 }
+
 
 .input-wrapper { flex: 1; }
 
@@ -1458,7 +1466,7 @@
    ✅ INPUT : sticky + safe area + anti zoom iPhone
    ========================================================= */
 
-.chat-input {
+/* .chat-input {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1469,7 +1477,7 @@
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(224,192,132,0.25);
-}
+} */
 
 .input-wrapper { flex: 1; }
 
@@ -1844,11 +1852,6 @@
   scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom)) !important;
 }
 
-}
-/* --- Base : garde ton rendu Android / web inchangé --- */
-.chat-input {
-  position: sticky; /* ou fixed chez toi */
-  z-index: 50;
 }
 
 /* ✅ iOS uniquement : empêcher de voir les messages à travers */
