@@ -1983,3 +1983,9 @@
   transform: translateY(calc(-1 * var(--kb, 0px))) !important;
   will-change: transform;
 }
+/* ✅ Le dernier message ne doit jamais être caché sous la barre d'input */
+.chat-messages{
+  /* 92px ≈ hauteur barre (à ajuster si besoin) */
+  padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
+  scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
+}
