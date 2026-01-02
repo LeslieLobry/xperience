@@ -1,43 +1,55 @@
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    }
-  }
-};
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { prisma } from "../../../lib/prisma";
+import { getUserFromToken } from "../../../lib/auth";
+import { s3 } from "../../../lib/s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { prisma } from '../../../lib/prisma';
-import { getUserFromToken } from '../../../lib/auth';
-import { s3 } from '../../../lib/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+export const runtime = "nodejs"; // important pour Buffer + AWS SDK
+
+function sanitizeFilename(name = "upload.jpg") {
+  // évite caractères chelous / chemins / espaces
+  return name
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    .replace(/[^\w.\-()]/g, "_");
+}
 
 export async function POST(req) {
   const cookieStore = cookies();
   const user = await getUserFromToken(cookieStore);
 
   if (!user || !user.id) {
-    return NextResponse.json({ success: false, message: 'Non autorisé' }, { status: 401 });
+    return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
   }
 
   const formData = await req.formData();
-  const file = formData.get('photo');
+  const file = formData.get("photo");
 
-  if (!file || typeof file === 'string') {
-    return NextResponse.json({ success: false, message: 'Fichier invalide' }, { status: 400 });
+  if (!file || typeof file === "string") {
+    return NextResponse.json({ success: false, message: "Fichier invalide" }, { status: 400 });
   }
 
-  const galerieId = formData.get('galerieId');
-  const isPublic = formData.get('isPublic') === 'true';
+  const galerieId = formData.get("galerieId");
+  const isPublic = formData.get("isPublic") === "true";
 
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
+  // ✅ fallback ContentType si vide
+  const contentType =
+    (file.type && String(file.type)) ||
+    "application/octet-stream";
+
   // 🔎 MODÉRATION via Sightengine
   try {
     const moderationForm = new FormData();
-    moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
+
+    // ✅ Blob avec un type cohérent (Sightengine aime bien un type image/*)
+    const blobType = contentType === "application/octet-stream" ? "image/jpeg" : contentType;
+
+    moderationForm.append("media", new Blob([buffer], { type: blobType }), file.name || "upload.jpg");
     moderationForm.append("models", "face-attributes");
     moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
     moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
@@ -51,7 +63,7 @@ export async function POST(req) {
     console.log("🧠 Sightengine response:", JSON.stringify(moderationData, null, 2));
 
     if (moderationData?.faces?.length) {
-      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8); // 🔒 seuil ajusté
+      const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.8);
       if (hasMinor) {
         return NextResponse.json(
           { success: false, message: "Photo refusée : une personne semble avoir moins de 18 ans." },
@@ -59,41 +71,46 @@ export async function POST(req) {
         );
       }
     }
-
   } catch (error) {
     console.error("Erreur modération image :", error);
     return NextResponse.json({ success: false, message: "Erreur analyse image." }, { status: 500 });
   }
 
   // ✅ UPLOAD S3
-  const filename = `photo_${user.id}_${Date.now()}_${file.name}`;
   const bucket = process.env.AWS_S3_BUCKET;
 
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: filename,
-    Body: buffer,
-    ContentType: file.type,
-  }));
+  const safeOriginalName = sanitizeFilename(file.name || "upload.jpg");
+  const filename = `photo_${user.id}_${Date.now()}_${safeOriginalName}`;
 
-  // Ici on stocke UNIQUEMENT la clé S3 (filename)
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: filename,
+      Body: buffer,
+      ContentType: contentType, // ✅ OK si image/jpeg après conversion
+    })
+  );
+
   const s3Key = filename;
 
   // 💾 Galerie privée
   if (galerieId && !isNaN(parseInt(galerieId))) {
     const galerie = await prisma.galeriePrivee.findUnique({
-      where: { id: parseInt(galerieId) }
+      where: { id: parseInt(galerieId) },
     });
+
     if (!galerie) {
       return NextResponse.json({ success: false, message: "Galerie privée introuvable." }, { status: 404 });
     }
+
     const photo = await prisma.photo.create({
       data: {
-        url: s3Key,               // 🟢 SEULEMENT la clé S3
+        url: s3Key,
         utilisateurId: user.id,
         galeriePriveeId: galerie.id,
-      }
+      },
     });
+
     return NextResponse.json({ success: true, photoUrl: s3Key, photo });
   }
 
@@ -101,18 +118,19 @@ export async function POST(req) {
   if (isPublic) {
     const photo = await prisma.photo.create({
       data: {
-        url: s3Key,               // 🟢 SEULEMENT la clé S3
+        url: s3Key,
         utilisateurId: user.id,
         galeriePriveeId: null,
-      }
+      },
     });
+
     return NextResponse.json({ success: true, photoUrl: s3Key, photo });
   }
 
   // 💾 Photo de profil
   await prisma.utilisateur.update({
     where: { id: user.id },
-    data: { photoUrl: s3Key }     // 🟢 SEULEMENT la clé S3
+    data: { photoUrl: s3Key },
   });
 
   return NextResponse.json({ success: true, photoUrl: s3Key });
