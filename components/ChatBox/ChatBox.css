@@ -704,7 +704,9 @@
     font-size: 0.8rem;
   }
 }
-
+.chat-messages{
+  height: 70%;
+}
 .chat-input-ephemere-btn,
 .chat-input-mic-btn,
 .chat-input-emoji-btn {
@@ -720,9 +722,7 @@
     height: 100vh;
     box-sizing: border-box;
   }
-.chat-messages{
-  height: 70%;
-}
+
   .chat-header-mobile {
     left: 0;
     right: 0;
