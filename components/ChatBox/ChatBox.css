@@ -1668,7 +1668,9 @@
     border-right: none;
   }
 }
-
+.chat-input{
+  position: fixed;
+}
 .chat-back-btn {
   background: none;
   border: none;
