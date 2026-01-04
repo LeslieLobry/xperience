@@ -1948,48 +1948,44 @@
   font-weight: 600;
   letter-spacing: 0.5px;
 }
+/* =========================================================
+   ✅ PATCH FINAL : ChatInput FIXE en bas (tous devices)
+   À coller TOUT EN BAS du ChatBox.css
+   ========================================================= */
 
+/* 1) Le container doit réserver la place de la barre du bas */
+.chatbox-container{
+  /* hauteur approximative de la barre + safe area */
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
 
-/* 1) On force la barre d'input à rester en ligne (même sur mobile) */
+/* 2) Messages : jamais cachés derrière l'input */
+.chat-messages{
+  scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom) + var(--kb, 0px));
+  padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--kb, 0px));
+}
+
+/* 3) Input : FIXED en bas, toujours visible */
 .chat-input{
-  flex-direction: row !important;
-  align-items: center !important;
-}
-
-/* 2) Le wrapper doit être en flex pour aligner select + textarea */
-.chat-input .input-wrapper{
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100% !important;
-  min-width: 0 !important;
+  z-index: 9999 !important;
+
+  /* look & safe area */
+  background-color: #2c3e50 !important;
+  border-top: 1px solid rgba(224, 192, 132, 0.25) !important;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+
+  /* iPhone : remonte au-dessus du clavier si tu utilises --kb */
+  transform: translateY(calc(-1 * var(--kb, 0px))) !important;
+  will-change: transform;
 }
-
-/* 3) Select : visible + largeur stable */
-.chat-input .select-membre{
-  flex: 0 0 140px !important;   /* largeur fixe (ajuste 120/160 si tu veux) */
-  width: auto !important;
-  border: 1px solid rgba(224,192,132,0.45) !important;
-  border-radius: 10px !important;
-  background: rgba(0,0,0,0.15) !important;
-  padding: 8px 10px !important;
-}
-
-/* 4) Textarea : il prend le reste sans écraser le select */
-.chat-input .input-text{
-  flex: 1 1 auto !important;
-  width: auto !important;       /* IMPORTANT : on annule ton width:100% */
-  min-width: 0 !important;      /* IMPORTANT : sinon ça déborde en flex */
-}
-
-/* 5) Mobile : on empêche ton ancien override qui mettait en colonne */
-@media (max-width: 768px){
-  .chat-input{
-    flex-direction: row !important;  /* annule le column */
-  }
-
-  /* sur tout petit écran, on réduit un peu le select */
-  .chat-input .select-membre{
-    flex-basis: 120px !important;
-  }
+/* ✅ Le dernier message ne doit jamais être caché sous la barre d'input */
+.chat-messages{
+  /* 92px ≈ hauteur barre (à ajuster si besoin) */
+  padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
+  scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
 }
