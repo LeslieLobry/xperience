@@ -1153,6 +1153,8 @@
 
   /* ✅ anti “slide” horizontal involontaire */
   overflow-x: hidden;
+  height: 100%;
+  padding-bottom: 10px;
 }
 
 /* === Messages & Bubbles === */
