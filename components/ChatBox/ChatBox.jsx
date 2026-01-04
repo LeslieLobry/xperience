@@ -329,7 +329,7 @@ useEffect(() => {
 
   (async () => {
     try {
-      await fetch("/api/messages/mark-as-read", {
+      await fetch("/api/messages/mark-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
