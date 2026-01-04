@@ -143,22 +143,7 @@
 }
 
 /* === Messages container === */
-.chat-messages {
-  flex: 1 1 auto;
-  min-height: 0; /* indispensable pour que le scroll marche */
 
-  /* ❌ on enlève la logique “calc(100vh - ... )” qui crée des glitches iOS */
-  max-height: none;
-
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-
-  /* ✅ scroll mobile smooth */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
 
 /* === Messages & Bubbles === */
 .message-bubble {
@@ -1159,17 +1144,7 @@
    ========================================================= */
 
 .chat-messages {
-  flex: 1 1 auto;
-  min-height: 0; /* indispensable pour que le scroll marche */
-  max-height: none;
 
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 
   /* ✅ anti “slide” horizontal involontaire */
   overflow-x: hidden;
@@ -1799,10 +1774,10 @@
   color: #e0c084;
 }
 /* ✅ Le dernier message ne doit jamais passer sous l'input (iPhone compris) */
-.chat-messages{
+/* .chat-messages{
   scroll-padding-bottom: calc(140px + env(safe-area-inset-bottom) + var(--kb, 0px));
   padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--kb, 0px));
-}
+} */
 
 /* ✅ AUTOGROW TEXTAREA (override final) */
 .input-text{
@@ -1846,11 +1821,7 @@
   }
 
 /* ✅ Dernier message jamais caché derrière la barre */
-.chat-messages{
-  /* espace fixe "sécurisé" (barre + safe area) */
-  padding-bottom: calc(220px + env(safe-area-inset-bottom)) !important;
-  scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom)) !important;
-}
+
 
 }
 
@@ -1955,10 +1926,7 @@
 
 
 /* 2) Messages : jamais cachés derrière l'input */
-.chat-messages{
-  scroll-padding-bottom: calc(220px + env(safe-area-inset-bottom) + var(--kb, 0px));
-  padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--kb, 0px));
-}
+
 
 /* 3) Input : FIXED en bas, toujours visible */
 .chat-input{
@@ -1977,10 +1945,4 @@
   /* iPhone : remonte au-dessus du clavier si tu utilises --kb */
   transform: translateY(calc(-1 * var(--kb, 0px))) !important;
   will-change: transform;
-}
-/* ✅ Le dernier message ne doit jamais être caché sous la barre d'input */
-.chat-messages{
-  /* 92px ≈ hauteur barre (à ajuster si besoin) */
-  padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
-  scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
 }
