@@ -693,7 +693,10 @@
 
 /* === Responsive === */
 @media screen and (max-width: 768px) {
-  .chat-input { flex-direction: column; }
+  .chat-input { 
+    flex-direction: column;
+    position: fixed;
+}
 
   .participant-name {
     display: inline-block;
