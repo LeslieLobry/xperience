@@ -6,7 +6,8 @@ import { NextResponse } from "next/server";
 export async function POST(req, { params }) {
   try {
     const conversationId = parseInt(params.id, 10);
-    const { userId } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const userId = body?.userId ? Number(body.userId) : null;
 
     if (!conversationId || !userId) {
       return NextResponse.json(
@@ -39,6 +40,23 @@ export async function POST(req, { params }) {
         conversationId,
         auteurId: { not: userId },
         lu: false,
+      },
+      data: { lu: true },
+    });
+
+    // ✅ FIX NOTIFS : ton modèle Notification n'a pas conversationId/type
+    // On "consomme" donc les notifs de messages via le champ `lien` (ou `message`) qui contient l'id conversation.
+    const convStr = String(conversationId);
+
+    await prisma.notification.updateMany({
+      where: {
+        utilisateurId: userId,
+        lu: false,
+        OR: [
+          // Adapte ces patterns si besoin selon TON format de lien
+          { lien: { contains: convStr } },
+          { message: { contains: convStr } },
+        ],
       },
       data: { lu: true },
     });
