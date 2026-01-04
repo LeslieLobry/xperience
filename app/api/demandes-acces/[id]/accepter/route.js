@@ -88,7 +88,7 @@ export async function PATCH(req, { params }) {
     });
 
     const ownerPseudo = demande.proprietaire?.pseudo || "Un utilisateur";
-    const lien = `/utilisateur/${demande.proprietaireId}`; // adapte si ton route profil est différent
+    const lien = `/profil/${demande.proprietaireId}`; 
 
     // ✅ 1) Notification en DB (pour le demandeur)
     await prisma.notification.create({
