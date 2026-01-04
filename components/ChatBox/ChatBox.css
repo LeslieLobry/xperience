@@ -1144,7 +1144,7 @@
    ========================================================= */
 
 .chat-messages {
-padding-bottom: 120px;
+padding-bottom: 150px;
 
   /* ✅ anti “slide” horizontal involontaire */
   overflow-x: hidden;
