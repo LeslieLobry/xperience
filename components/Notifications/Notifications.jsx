@@ -49,7 +49,10 @@ export default function Notifications() {
     }
   };
 
-  const markAsRead = async () => {
+  // ⚠️ Ton PATCH actuel marque TOUT lu et vide tout.
+  // On le garde pour "Tout marquer lu" (ou clic notif si tu veux),
+  // mais ce n’est pas ce qui doit se passer quand tu lis dans une conversation.
+  const markAllAsRead = async () => {
     try {
       await fetch("/api/notifications", { method: "PATCH", credentials: "include" });
       setNotifications([]);
@@ -66,6 +69,19 @@ export default function Notifications() {
     }, 400);
   };
 
+  // ✅ retire localement les notifs liées à une conversation (basé sur lien)
+  const clearConversationNotifsLocally = (conversationId) => {
+    const convStr = String(conversationId);
+    setNotifications((prev) =>
+      prev.filter((n) => {
+        const lien = n?.lien || "";
+        const msg = n?.message || "";
+        // on retire si lien (ou message) contient l'id conv
+        return !(lien.includes(convStr) || msg.includes(convStr));
+      })
+    );
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -73,14 +89,12 @@ export default function Notifications() {
 
     (async () => {
       try {
-        // on récupère userId (car ton channel est notification-${userId})
         const meRes = await fetch("/api/me", { credentials: "include" });
         const meData = meRes.ok ? await meRes.json() : null;
 
         const userId = meData?.success ? meData?.user?.id : null;
         if (!userId || cancelled) return;
 
-        // ✅ Ably avec token route (plus sécurisé)
         clientRef.current = new Ably.Realtime({
           authUrl: "/api/ably-token",
           authMethod: "GET",
@@ -88,7 +102,20 @@ export default function Notifications() {
 
         channelRef.current = clientRef.current.channels.get(`notification-${userId}`);
 
+        // ✅ event classique: "notification" => on refetch
         channelRef.current.subscribe("notification", () => {
+          scheduleRefreshSoon();
+        });
+
+        // ✅ NOUVEL event: quand une conversation a été lue
+        channelRef.current.subscribe("notif:clear-conversation", (msg) => {
+          const convId = msg?.data?.conversationId;
+          if (!convId) return;
+
+          // 1) on enlève instantanément dans l’UI
+          clearConversationNotifsLocally(convId);
+
+          // 2) et on refetch bientôt pour être 100% sync
           scheduleRefreshSoon();
         });
       } catch (e) {
@@ -98,7 +125,7 @@ export default function Notifications() {
 
     const interval = setInterval(() => {
       fetchNotifications();
-    }, 180000); // backup 3 minutes
+    }, 180000);
 
     return () => {
       cancelled = true;
@@ -131,7 +158,9 @@ export default function Notifications() {
             <Link
               href={notif.lien || "#"}
               onClick={async () => {
-                await markAsRead();
+                // garde ton comportement actuel si tu veux :
+                // cliquer une notif => tout marquer lu
+                await markAllAsRead();
               }}
             >
               {notif.message}

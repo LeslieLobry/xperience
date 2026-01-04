@@ -290,73 +290,46 @@ export default function ChatBox({
       if (raf2) cancelAnimationFrame(raf2);
     };
   }, [conversationId, loadingInitial, scrollToBottom, getScrollEl]);
-// ✅ À l’ouverture de la conversation : marque comme lu + supprime les notifs liées
-useEffect(() => {
-  if (!conversationId || !utilisateur?.id) return;
-
-  let cancelled = false;
-
-  (async () => {
-    try {
-      await fetch("/api/messages/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ conversationId }),
-      });
-
-      // ✅ OPTIONNEL: si ta liste de notifs est temps réel via Ably,
-      // on notifie le front "notif clear" (sinon, ignore)
-      if (!cancelled) {
-        publishNotification(utilisateur.id, "notif:clear-conversation", {
-          conversationId,
-        });
-      }
-    } catch (e) {
-      console.error("mark-as-read error", e);
-    }
-  })();
-
-  return () => {
-    cancelled = true;
-  };
-}, [conversationId, utilisateur?.id]);
-// ✅ À l’ouverture de la conversation : marque comme lu + supprime les notifs liées
-useEffect(() => {
-  if (!conversationId || !utilisateur?.id) return;
-
-  let cancelled = false;
-
-  (async () => {
-    try {
-      await fetch("/api/messages/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ conversationId }),
-      });
-
-      // ✅ OPTIONNEL: si ta liste de notifs est temps réel via Ably,
-      // on notifie le front "notif clear" (sinon, ignore)
-      if (!cancelled) {
-        publishNotification(utilisateur.id, "notif:clear-conversation", {
-          conversationId,
-        });
-      }
-    } catch (e) {
-      console.error("mark-as-read error", e);
-    }
-  })();
-
-  return () => {
-    cancelled = true;
-  };
-}, [conversationId, utilisateur?.id]);
 
   // ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
   useEffect(() => {
     import("../MessagesList").catch(() => {});
   }, []);
+// ✅ À l’ouverture de la conversation : mark-as-read côté conversation
+useEffect(() => {
+  if (!conversationId || !utilisateur?.id) return;
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/mark-as-read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: utilisateur.id }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        console.error("mark-as-read failed", res.status, err);
+      }
+
+      // ✅ Si tu as un système temps réel de notifs, on peut déclencher un clear UI
+      if (!cancelled) {
+        publishNotification(utilisateur.id, "notif:clear-conversation", {
+          conversationId,
+        });
+      }
+    } catch (e) {
+      console.error("mark-as-read error", e);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [conversationId, utilisateur?.id]);
 
   const {
     messages,
