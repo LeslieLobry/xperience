@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { getUserFromToken } from "../../../lib/auth";
 
-export async function GET() {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(req) {
   try {
-    const user = await getUserFromToken();
-    if (!user) {
+    const user = await getUserFromToken(req);
+    if (!user?.id) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const notifications = await prisma.notification.findMany({
-      where: { utilisateurId: user.id, lu: false },
+      where: { utilisateurId: Number(user.id), lu: false },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -18,13 +21,13 @@ export async function GET() {
         message: true,
         lien: true,
         createdAt: true,
-        // ✅ NOUVEAU : infos de la personne qui like/visite
         auteur: {
           select: {
             id: true,
-            prenom: true,
             pseudo: true,
             photoUrl: true,
+            // si tu veux vraiment pas exposer prenom :
+            // prenom: false (pas possible en select)
           },
         },
       },
@@ -37,15 +40,15 @@ export async function GET() {
   }
 }
 
-export async function PATCH() {
+export async function PATCH(req) {
   try {
-    const user = await getUserFromToken();
-    if (!user) {
+    const user = await getUserFromToken(req);
+    if (!user?.id) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     await prisma.notification.updateMany({
-      where: { utilisateurId: user.id, lu: false },
+      where: { utilisateurId: Number(user.id), lu: false },
       data: { lu: true },
     });
 
