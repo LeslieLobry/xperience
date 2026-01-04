@@ -1798,11 +1798,11 @@ padding-bottom: 150px;
    ========================================================= */
 
 /* ✅ iOS seulement – comportement type Messenger */
-@supports (-webkit-touch-callout: none) {
+/* @supports (-webkit-touch-callout: none) {
   .chat-input {
     padding-bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px));
   }
-}
+} */
 /* ✅ PATCH FINAL iPhone : sticky -> fixed (comportement Messenger) */
 /* ✅ PATCH FINAL iPhone : input fixé + remonté juste au-dessus du clavier */
 @supports (-webkit-touch-callout: none) {
@@ -1815,10 +1815,10 @@ padding-bottom: 150px;
     z-index: 9999 !important;
 
     /* ✅ on ne "gonfle" pas la barre avec kb */
-    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    /* padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important; */
 
     /* ✅ on la remonte vraiment au-dessus du clavier */
-    transform: translateY(calc(-1 * var(--kb, 0px))) !important;
+    /* transform: translateY(calc(-1 * var(--kb, 0px))) !important; */
     will-change: transform;
   }
 
