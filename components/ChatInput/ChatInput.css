@@ -41,3 +41,11 @@
   overflow-y: hidden; /* grandit, pas de scroll */
   -webkit-overflow-scrolling: touch;
 }
+@media (max-width: 768px) {
+  .select-membre{
+    width: 100%;
+    display: flex;
+    position: absolute;
+    bottom: 150px;
+  }
+}
