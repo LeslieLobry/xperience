@@ -465,7 +465,7 @@
   padding: 8px;
 
   /* ✅ FIXE à l'écran (ne bouge plus au focus) */
-  position: fixed;
+  /* position: fixed; */
   left: 0;
   right: 0;
   bottom: 0;
@@ -1953,11 +1953,6 @@
    À coller TOUT EN BAS du ChatBox.css
    ========================================================= */
 
-/* 1) Le container doit réserver la place de la barre du bas */
-.chatbox-container{
-  /* hauteur approximative de la barre + safe area */
-  padding-bottom: calc(92px + env(safe-area-inset-bottom));
-}
 
 /* 2) Messages : jamais cachés derrière l'input */
 .chat-messages{
