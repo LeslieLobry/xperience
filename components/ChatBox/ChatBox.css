@@ -720,7 +720,9 @@
     height: 100vh;
     box-sizing: border-box;
   }
-
+.chat-messages{
+  height: 70%;
+}
   .chat-header-mobile {
     left: 0;
     right: 0;
