@@ -1989,3 +1989,30 @@
   padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
   scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom) + var(--kb, 0px)) !important;
 }
+
+/* ✅ MOBILE: le select ne doit plus être écrasé par le textarea */
+@media (max-width: 768px) {
+  /* Le wrapper qui contient select + input doit pouvoir aller à la ligne */
+  .input-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* Le select prend toute la largeur (sinon il se fait pousser) */
+  .select-membre {
+    width: 100% !important;
+    min-width: 0;
+    border: 1px solid rgba(224,192,132,0.45); /* sinon invisible */
+    border-radius: 10px;
+    padding: 10px 12px;
+    background-color: rgba(0,0,0,0.15); /* léger fond pour le voir */
+  }
+
+  /* Le textarea reste en dessous */
+  .input-text {
+    width: 100% !important;
+    flex: 1 1 100%;
+  }
+}
