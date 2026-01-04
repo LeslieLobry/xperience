@@ -1962,7 +1962,7 @@
 
 /* 3) Input : FIXED en bas, toujours visible */
 .chat-input{
-  position: fixed !important;
+ 
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
