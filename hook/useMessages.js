@@ -28,28 +28,33 @@ function getAbly() {
 }
 
 const MESSAGES_LIMIT = 30;
-const fetcher = (url) => fetch(url, { credentials: "include" }).then((res) => res.json());
+const fetcher = (url) =>
+  fetch(url, { credentials: "include" }).then((res) => res.json());
 
 export function useMessages(conversationId, utilisateur, setTexte) {
   /* ---------------------------------------------------------------------- */
   /* 1) SWR                                                                  */
   /* ---------------------------------------------------------------------- */
-const { data, error, isLoading, mutate } = useSWR(
-  conversationId
-    ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
-    : null,
-  fetcher,
-  {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    dedupingInterval: 5000,
+  const { data, error, isLoading, mutate } = useSWR(
+    conversationId
+      ? `/api/messages?conversationId=${conversationId}&limit=${MESSAGES_LIMIT}`
+      : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 5000,
 
-    // ✅ MEGA RAPIDE :
-    keepPreviousData: true,   // garde l'ancien affichage pendant le fetch
-    fallbackData: { messages: [], participants: [], hasMore: false, lastReads: [] }, 
-  }
-);
-
+      // ✅ MEGA RAPIDE :
+      keepPreviousData: true,
+      fallbackData: {
+        messages: [],
+        participants: [],
+        hasMore: false,
+        lastReads: [],
+      },
+    }
+  );
 
   const messages = data?.messages || [];
   const participantsAutres = (data?.participants || []).filter(
@@ -128,10 +133,26 @@ const { data, error, isLoading, mutate } = useSWR(
           if (!current) return current;
           const currentMessages = current.messages || [];
 
-          // 1) déjà présent
+          // 0) déjà présent
           if (currentMessages.some((m) => m.id === newMsg.id)) return current;
 
-          // 2) remplacement du message optimiste pending
+          // ✅ 1) remplacement via optimisticKey (le plus fiable)
+          if (newMsg.optimisticKey) {
+            const idx = currentMessages.findIndex(
+              (m) =>
+                m?.optimisticKey &&
+                m.optimisticKey === newMsg.optimisticKey &&
+                m.statut === "pending"
+            );
+
+            if (idx !== -1) {
+              const updated = [...currentMessages];
+              updated[idx] = { ...newMsg, statut: "sent" };
+              return { ...current, messages: updated };
+            }
+          }
+
+          // 2) fallback ancien matching (si optimisticKey absent)
           const pendingIndex = currentMessages.findIndex((m) => {
             if (m.statut !== "pending") return false;
             if (m.auteurId !== newMsg.auteurId) return false;
@@ -158,7 +179,6 @@ const { data, error, isLoading, mutate } = useSWR(
     const onReaction = (msg) => {
       const { messageId, reactions } = msg.data || {};
       if (!messageId) {
-        // garde ton comportement : si donnée invalide => refetch
         mutate();
         return;
       }
@@ -177,8 +197,7 @@ const { data, error, isLoading, mutate } = useSWR(
     };
 
     const onRead = () => {
-      // 🔥 Avant: mutate() direct => refetch souvent
-      // ✅ Maintenant: throttle léger
+      // ✅ throttle léger
       if (readRefetchTimerRef.current) return;
       readRefetchTimerRef.current = setTimeout(() => {
         mutate();
@@ -220,7 +239,6 @@ const { data, error, isLoading, mutate } = useSWR(
           (current) => {
             if (!current) return current;
 
-            // ✅ évite doublons (si Ably arrive en même temps)
             const existingIds = new Set((current.messages || []).map((m) => m.id));
             const cleanedMore = more.messages.filter((m) => !existingIds.has(m.id));
 
@@ -251,7 +269,11 @@ const { data, error, isLoading, mutate } = useSWR(
     let res;
     let result;
 
-    if (dataToSend instanceof FormData) {
+    const isForm = dataToSend instanceof FormData;
+
+    if (isForm) {
+      // ✅ IMPORTANT: on ne touche PAS à setTexte ici pour FormData
+      // (ChatInput gère, et on évite les races)
       res = await fetch("/api/messages", {
         method: "POST",
         body: dataToSend,
@@ -282,83 +304,81 @@ const { data, error, isLoading, mutate } = useSWR(
     result = await res.json();
 
     if (result.success) {
-      setTexte && setTexte("");
-      // ✅ garde ton choix : pas de mutate ici (Ably gère)
+      // ✅ on vide le texte uniquement pour JSON (texte pur)
+      if (!isForm && setTexte) setTexte("");
+
+      // ✅ pas de mutate ici (Ably gère)
       return result.message;
     }
     return null;
   };
 
   /* ---------------------------------------------------------------------- */
-/* 6) Réaction                                                              */
-/* ---------------------------------------------------------------------- */
-const handleReaction = async (messageId, emoji) => {
-  // ✅ Optimistic : toggle local immédiat (sans attendre Ably)
-  mutate(
-    (current) => {
-      if (!current?.messages) return current;
-
-      return {
-        ...current,
-        messages: current.messages.map((m) => {
-          if (m.id !== messageId) return m;
-
-          const rx = Array.isArray(m.reactions) ? [...m.reactions] : [];
-          const idx = rx.findIndex(
-            (r) => r?.emoji === emoji && r?.utilisateurId === utilisateur.id
-          );
-
-          if (idx >= 0) rx.splice(idx, 1);
-          else rx.push({ emoji, utilisateurId: utilisateur.id });
-
-          return { ...m, reactions: rx };
-        }),
-      };
-    },
-    false
-  );
-
-  // ✅ API
-  const res = await fetch(`/api/messages/${messageId}/react`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ emoji }),
-    credentials: "include",
-  });
-
-  const dataRes = await res.json();
-
-  if (dataRes.success) {
-    // ✅ On remplace par la vérité serveur (liste finale)
+  /* 6) Réaction                                                              */
+  /* ---------------------------------------------------------------------- */
+  const handleReaction = async (messageId, emoji) => {
+    // ✅ Optimistic : toggle local immédiat
     mutate(
       (current) => {
         if (!current?.messages) return current;
+
         return {
           ...current,
-          messages: current.messages.map((m) =>
-            m.id === messageId ? { ...m, reactions: dataRes.reactions } : m
-          ),
+          messages: current.messages.map((m) => {
+            if (m.id !== messageId) return m;
+
+            const rx = Array.isArray(m.reactions) ? [...m.reactions] : [];
+            const idx = rx.findIndex(
+              (r) => r?.emoji === emoji && r?.utilisateurId === utilisateur.id
+            );
+
+            if (idx >= 0) rx.splice(idx, 1);
+            else rx.push({ emoji, utilisateurId: utilisateur.id });
+
+            return { ...m, reactions: rx };
+          }),
         };
       },
       false
     );
 
-    // ✅ On broadcast aux autres via Ably
-    const client = getAbly();
-    if (client) {
-      const channel = client.channels.get(`conversation-${conversationId}`);
-      channel.publish("reaction", {
-        messageId,
-        reactions: dataRes.reactions,
-      });
+    const res = await fetch(`/api/messages/${messageId}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+      credentials: "include",
+    });
+
+    const dataRes = await res.json();
+
+    if (dataRes.success) {
+      mutate(
+        (current) => {
+          if (!current?.messages) return current;
+          return {
+            ...current,
+            messages: current.messages.map((m) =>
+              m.id === messageId ? { ...m, reactions: dataRes.reactions } : m
+            ),
+          };
+        },
+        false
+      );
+
+      const client = getAbly();
+      if (client) {
+        const channel = client.channels.get(`conversation-${conversationId}`);
+        channel.publish("reaction", {
+          messageId,
+          reactions: dataRes.reactions,
+        });
+      }
+
+      return;
     }
 
-    return;
-  }
-
-  // ❌ si échec: rollback (on revalidate pour être safe)
-  mutate();
-};
+    mutate();
+  };
 
   /* ---------------------------------------------------------------------- */
   /* 7) Timers éphémères                                                      */

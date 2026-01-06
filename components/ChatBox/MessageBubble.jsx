@@ -1,4 +1,11 @@
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
 import "./MessageBubble.css";
@@ -7,8 +14,8 @@ import "./MessageBubble.css";
    ✅ PERF: cache global + inflight + TTL pour presign
    ========================================================= */
 const PRESIGN_TTL_MS = 50 * 60 * 1000;
-const PRESIGN_CACHE = new Map();     // key -> { url, exp }
-const PRESIGN_INFLIGHT = new Map();  // key -> Promise
+const PRESIGN_CACHE = new Map(); // key -> { url, exp }
+const PRESIGN_INFLIGHT = new Map(); // key -> Promise
 
 function getCachedPresign(key) {
   if (!key) return null;
@@ -205,31 +212,34 @@ function MessageBubble({
   }, []);
 
   // ✅ ouverture "fiable" depuis un event (clic/tap)
-  const openPickerFromEvent = useCallback((e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
+  const openPickerFromEvent = useCallback(
+    (e) => {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
 
-    if (!e) {
-      openPickerFromEl(triggerRef.current || pressableRef.current);
-      return;
-    }
+      if (!e) {
+        openPickerFromEl(triggerRef.current || pressableRef.current);
+        return;
+      }
 
-    // On place le picker proche du doigt/clic
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+      // On place le picker proche du doigt/clic
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-    const clientX = e.clientX ?? (e.touches?.[0]?.clientX);
-    const clientY = e.clientY ?? (e.touches?.[0]?.clientY);
+      const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+      const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
-    if (typeof clientX === "number" && typeof clientY === "number") {
-      const x = clamp(clientX, 8, vw - 8);
-      const y = clamp(clientY - 70, 8, vh - 8); // un peu au-dessus
-      setPickerPos({ x, y });
-      setIsPickerOpen(true);
-    } else {
-      openPickerFromEl(triggerRef.current || pressableRef.current);
-    }
-  }, [openPickerFromEl]);
+      if (typeof clientX === "number" && typeof clientY === "number") {
+        const x = clamp(clientX, 8, vw - 8);
+        const y = clamp(clientY - 70, 8, vh - 8); // un peu au-dessus
+        setPickerPos({ x, y });
+        setIsPickerOpen(true);
+      } else {
+        openPickerFromEl(triggerRef.current || pressableRef.current);
+      }
+    },
+    [openPickerFromEl]
+  );
 
   const rememberInputMode = (mode) => {
     inputModeRef.current = mode;
@@ -469,6 +479,12 @@ function MessageBubble({
     );
   }, [msg.reactions]);
 
+  // ✅ NEW: légende (photo/audio) si contenu non vide
+  const caption = useMemo(() => {
+    const c = (msg?.contenu || "").trim();
+    return c.length ? c : "";
+  }, [msg?.contenu]);
+
   if (msg.type === "EPHEMERE") {
     return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
   }
@@ -538,16 +554,24 @@ function MessageBubble({
         }}
       >
         {msg.type === "IMAGE" && msg.imageUrl ? (
-          <img
-            src={imageMsgUrl || "/default.jpg"}
-            alt="image envoyée"
-            className="message-image"
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-          />
+          <>
+            <img
+              src={imageMsgUrl || "/default.jpg"}
+              alt="image envoyée"
+              className="message-image"
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+            />
+            {/* ✅ NEW: légende sous la photo */}
+            {caption ? <p className="message-text message-caption">{caption}</p> : null}
+          </>
         ) : msg.type === "AUDIO" && msg.audioUrl ? (
-          <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
+          <>
+            <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
+            {/* ✅ NEW: légende sous l’audio */}
+            {caption ? <p className="message-text message-caption">{caption}</p> : null}
+          </>
         ) : (
           <p className="message-text">{msg.contenu}</p>
         )}
