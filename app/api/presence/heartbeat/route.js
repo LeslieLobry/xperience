@@ -1,84 +1,66 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
-import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
+"use client";
 
-export const runtime = "nodejs";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
+export default function HeartbeatClient({
+  intervalMs = 60_000, // ping toutes les 60s
+  immediate = true, // ping au montage
+} = {}) {
+  const pathname = usePathname();
+  const timerRef = useRef(null);
 
-/* ---------- CORS (si Expo / RN appelle ton domaine) ---------- */
-const ALLOWED_ORIGINS = [
-  "http://localhost:8081",
-  "http://localhost:19006",
-  "https://x-periences.fr",
-  "https://www.x-periences.fr",
-];
+  const send = () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
-function corsHeaders(req) {
-  const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  const h = new Headers();
-  if (allowed) {
-    h.set("Access-Control-Allow-Origin", allowed);
-    h.set("Vary", "Origin");
-  }
-  h.set("Access-Control-Allow-Credentials", "true");
-  h.set("Access-Control-Allow-Methods", "POST,OPTIONS");
-  h.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  return h;
-}
+    fetch("/api/me/heartbeat", {
+      method: "POST",
+      credentials: "include", // ✅ IMPORTANT
+      cache: "no-store",
+    }).catch(() => {});
+  };
 
-async function getUserFromRequest(req) {
-  if (!JWT_SECRET) return null;
+  useEffect(() => {
+    let disposed = false;
 
-  // Mobile: Authorization: Bearer xxx
-  const auth = req.headers.get("authorization") || "";
-  const match = auth.match(/^Bearer\s+(.+)$/i);
-  const tokenHeader = match?.[1];
+    const start = () => {
+      if (immediate) send();
+      timerRef.current = window.setInterval(send, intervalMs);
+    };
 
-  // Web: cookie token
-  const tokenCookie = cookies().get("token")?.value;
+    const stop = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
 
-  const token = tokenHeader || tokenCookie;
-  if (!token) return null;
+    const onFocus = () => send();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") send();
+    };
+    const onOnline = () => send();
 
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
+    start();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
 
-export async function OPTIONS(req) {
-  return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
-}
+    return () => {
+      if (disposed) return;
+      disposed = true;
+      stop();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [intervalMs, immediate]);
 
-export async function POST(req) {
-  try {
-    const user = await getUserFromRequest(req);
-    if (!user?.id) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401, headers: corsHeaders(req) }
-      );
-    }
+  useEffect(() => {
+    send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
-    await prisma.utilisateur.update({
-      where: { id: Number(user.id) },
-      data: {
-        lastSeenAt: new Date(),
-        // OPTIONNEL : si tu veux que "statut" suive automatiquement
-        // ...(true ? { statut: "en_ligne" } : {}),
-      },
-    });
-
-    return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders(req) });
-  } catch (e) {
-    console.error("heartbeat error", e);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500, headers: corsHeaders(req) }
-    );
-  }
+  return null;
 }

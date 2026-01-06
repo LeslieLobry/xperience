@@ -13,7 +13,7 @@ import Image from "next/image";
 import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
-import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ AJOUT
+import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ Presence
 
 const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
   ssr: false,
@@ -133,13 +133,39 @@ function calculateProfileCompletion(user) {
   return Math.round((completed / fields.length) * 100);
 }
 
+// ✅ Fallback (si Presence indispo) : lastSeenAt/statutAuto
+function computeStatut(u) {
+  const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
+  if (u?.statutAuto && u?.lastSeenAt) {
+    const seen = new Date(u.lastSeenAt).getTime();
+    if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) return "en_ligne";
+    return "hors_ligne";
+  }
+  return u?.statut || "hors_ligne";
+}
+
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  // ✅ Online Presence (fiable)
+  // ✅ Online Presence (fiable) + fallback
   const { isOnline } = useOnlineStatus();
-  const online = !isOwnProfile && isOnline?.(user?.id);
+
+  const presenceOnline =
+    !isOwnProfile && typeof isOnline === "function"
+      ? isOnline(String(user?.id))
+      : undefined;
+
+  const statutEff =
+    isOwnProfile
+      ? null
+      : presenceOnline === true
+      ? "en_ligne"
+      : presenceOnline === false
+      ? "hors_ligne"
+      : computeStatut(user);
+
+  const online = !isOwnProfile && statutEff === "en_ligne";
 
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
   const [presignedPhotoUrl, setPresignedPhotoUrl] = useState("/default.jpg");
@@ -403,7 +429,7 @@ export default function Profil({ user, connectedUser }) {
           </div>
 
           <div>
-            {/* ✅ ICI : statut fiable */}
+            {/* ✅ Statut */}
             {isOwnProfile ? (
               <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
             ) : (

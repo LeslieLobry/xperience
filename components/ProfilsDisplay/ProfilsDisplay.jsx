@@ -12,7 +12,7 @@ function melangerProfils(array) {
     .map(({ val }) => val);
 }
 
-// (fallback) ton ancien calcul basé lastSeenAt/statutAuto — on le garde, mais on ne s’en sert plus pour "En ligne"
+// (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence ne sait pas
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
   if (u?.statutAuto && u?.lastSeenAt) {
@@ -26,7 +26,7 @@ function computeStatut(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize }) {
-  const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel
+  const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel (Presence)
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -36,12 +36,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
   const [filtrerProches, setFiltrerProches] = useState(false);
   const [distance, setDistance] = useState(20);
 
-  // Nouveau : stockage des presigned URLs par userId
+  // presigned URLs par userId
   const [photoUrls, setPhotoUrls] = useState({});
 
   // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
   useEffect(() => {
-    // window existe seulement côté client ✅
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
     if (online === "1" || online === "true") {
@@ -49,16 +48,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
     }
   }, []);
 
-  // 🔁 garde le state sync si la prop `profils` change (évite liste figée)
+  // 🔁 sync si la prop `profils` change
   useEffect(() => {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Profils filtrés : "En ligne" = Presence (isOnline), pas lastSeenAt
+  // ✅ Profils filtrés : "En ligne" = Presence (isOnline)
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    const filtered = filtrerEnLigne ? base.filter((p) => isOnline?.(p?.id)) : base;
+    const filtered = filtrerEnLigne
+      ? base.filter((p) => isOnline?.(String(p?.id)) === true)
+      : base;
 
     return melangerProfils(filtered);
   }, [filtrerEnLigne, profilsAffiches, isOnline]);
@@ -69,21 +70,27 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
 
     const loadAllUrls = async () => {
       const newUrls = {};
+
       await Promise.all(
         profilsFiltres.map(async (user) => {
+          if (!user?.id) return;
+
           if (!user?.photoUrl) {
             newUrls[user.id] = "/default.jpg";
             return;
           }
+
           // Pour éviter de spam si déjà présente
           if (photoUrls[user.id]) {
             newUrls[user.id] = photoUrls[user.id];
             return;
           }
+
           if (user.photoUrl.startsWith("http")) {
             newUrls[user.id] = user.photoUrl;
             return;
           }
+
           try {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
@@ -91,6 +98,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
               credentials: "include",
               body: JSON.stringify({ key: user.photoUrl }),
             });
+
             const data = await res.json();
             newUrls[user.id] = data.url || "/default.jpg";
           } catch {
@@ -113,16 +121,20 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
 
   const handleToggleProches = async (active, customDistance) => {
     setFiltrerProches(active);
+
     if (active) {
       setLoading(true);
+
       if (!navigator.geolocation) {
         console.error("Géolocalisation non supportée");
         setLoading(false);
         return;
       }
+
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
+
           try {
             const res = await fetch("/api/profils-proches", {
               method: "POST",
@@ -133,6 +145,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
                 distance: customDistance || distance,
               }),
             });
+
             const data = await res.json();
             setProfilsAffiches(data);
           } catch (err) {
@@ -218,15 +231,24 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
-              // ✅ statut final : Presence d’abord, fallback lastSeen/statut ensuite
-              const online = isOnline?.(user?.id);
-              const statutEff = online ? "en_ligne" : "hors_ligne";
+              // ✅ Presence d’abord (true/false), fallback computeStatut si Presence indispo
+              const online =
+                typeof isOnline === "function" ? isOnline(String(user?.id)) : undefined;
+
+              const statutEff =
+                online === true
+                  ? "en_ligne"
+                  : online === false
+                  ? "hors_ligne"
+                  : computeStatut(user);
 
               return (
                 <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
+                      className={`statut-badge ${
+                        statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
+                      }`}
                       title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
 
@@ -252,7 +274,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+                      {user.pseudo.charAt(0).toUpperCase() +
+                        user.pseudo.slice(1).toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">

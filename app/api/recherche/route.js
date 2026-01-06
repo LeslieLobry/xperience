@@ -32,9 +32,7 @@ function normalizeAndSingularizeArray(arr) {
 async function getCoordsFromVille(ville) {
   if (!ville) return null;
   const res = await fetch(
-    `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(
-      ville
-    )}&limit=1`
+    `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(ville)}&limit=1`
   );
   const data = await res.json();
   if (data.features?.[0]) {
@@ -51,9 +49,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -94,41 +90,32 @@ export async function GET(req) {
   const ageMax = searchParams.get("ageMax") || null;
 
   // ⚠️ alias accepté: localisation OU ville
-  const localisation =
-    searchParams.get("localisation") ||
-    searchParams.get("ville") ||
-    "";
+  const localisation = searchParams.get("localisation") || searchParams.get("ville") || "";
 
   const photo = searchParams.get("photo") === "true";
   const description = searchParams.get("description") === "true";
+
+  // ⚠️ "statut" dans la recherche : NE PAS filtrer en DB sur "en_ligne"
+  // car la vérité vient de Presence côté client.
+  // On le garde seulement pour compatibilité, mais on ne l'applique pas ici.
   const statut = searchParams.get("statut") || "all";
 
   // Rayon/coords (peuvent être absents)
   const rayonRaw = searchParams.get("rayon");
-  const rayon = Number.isFinite(parseFloat(rayonRaw))
-    ? parseFloat(rayonRaw)
-    : 0;
+  const rayon = Number.isFinite(parseFloat(rayonRaw)) ? parseFloat(rayonRaw) : 0;
 
-  const latitude = parseFloat(
-    searchParams.get("latitude") || "NaN"
-  );
-  const longitude = parseFloat(
-    searchParams.get("longitude") || "NaN"
-  );
+  const latitude = parseFloat(searchParams.get("latitude") || "NaN");
+  const longitude = parseFloat(searchParams.get("longitude") || "NaN");
 
   const autourDeMoi = searchParams.get("autourDeMoi") === "true";
 
   // --- Normalisation + singularisation ---
   const typeNorm = normalizeAndSingularizeArray(type);
-  const orientationNorm =
-    normalizeAndSingularizeArray(orientation);
-  const rechercheTypeNorm =
-    normalizeAndSingularizeArray(rechercheType);
-  const experienceNorm =
-    normalizeAndSingularizeArray(experience);
+  const orientationNorm = normalizeAndSingularizeArray(orientation);
+  const rechercheTypeNorm = normalizeAndSingularizeArray(rechercheType);
+  const experienceNorm = normalizeAndSingularizeArray(experience);
   const fumeurNorm = normalizeAndSingularizeArray(fumeur);
-  const silhouetteNorm =
-    normalizeAndSingularizeArray(silhouette);
+  const silhouetteNorm = normalizeAndSingularizeArray(silhouette);
   const originesNorm = normalizeAndSingularizeArray(origines);
   const yeuxNorm = normalizeAndSingularizeArray(yeux);
   const cheveuxNorm = normalizeAndSingularizeArray(cheveux);
@@ -136,7 +123,7 @@ export async function GET(req) {
   // 🔒 Exclusion des utilisateurs bloqués
   let exclus = [];
   try {
-    const cookieStore = await cookies();
+    const cookieStore = cookies();
     const user = await getUserFromToken(cookieStore);
     if (user?.id) {
       exclus = await getIdsUtilisateursExclus(user.id);
@@ -149,12 +136,17 @@ export async function GET(req) {
   // Construction du where pour Prisma
   const where = {
     id: { notIn: exclus },
+
     ...(pseudo.trim() && {
       pseudo: { contains: pseudo.trim(), mode: "insensitive" },
     }),
+
     ...(photo && { photoUrl: { not: null } }),
     ...(description && { description: { not: null } }),
-    ...(statut === "en_ligne" && { statut: "en_ligne" }),
+
+    // ❌ IMPORTANT : ne pas faire ...(statut === "en_ligne" && { statut: "en_ligne" })
+    // La présence "en ligne" se fait côté client via Ably.
+    // Ici on renvoie juste les profils et le client filtre si besoin.
 
     // 🔥 Filtre d'âge flexible (ageMin seul, ageMax seul, ou les deux)
     ...(() => {
@@ -168,38 +160,41 @@ export async function GET(req) {
     ...(typeNorm.length && {
       type: { in: typeNorm, mode: "insensitive" },
     }),
+
     ...(orientationNorm.length && {
       OR: orientationNorm.map((o) => ({
         orientation: { equals: o, mode: "insensitive" },
       })),
     }),
+
     ...(rechercheTypeNorm.length && {
-      rechercheType: {
-        in: rechercheTypeNorm,
-        mode: "insensitive",
-      },
+      rechercheType: { in: rechercheTypeNorm, mode: "insensitive" },
     }),
+
     ...(experienceNorm.length && {
       experience: { in: experienceNorm, mode: "insensitive" },
     }),
+
     ...(fumeurNorm.length && {
       fumeur: { in: fumeurNorm, mode: "insensitive" },
     }),
+
     ...(silhouetteNorm.length && {
-      silhouette: {
-        in: silhouetteNorm,
-        mode: "insensitive",
-      },
+      silhouette: { in: silhouetteNorm, mode: "insensitive" },
     }),
+
     ...(taille.length && {
       taille: { in: taille.map((t) => parseInt(t, 10) || -1) },
     }),
+
     ...(originesNorm.length && {
       origines: { in: originesNorm, mode: "insensitive" },
     }),
+
     ...(yeuxNorm.length && {
       yeux: { in: yeuxNorm, mode: "insensitive" },
     }),
+
     // ---> on garde le contains pour cheveux
     ...(cheveuxNorm.length && {
       OR: cheveuxNorm.map((c) => ({
@@ -221,7 +216,12 @@ export async function GET(req) {
         type: true,
         orientation: true,
         description: true,
+
+        // ✅ garde statut + fallback fields (utile dans UI si Presence indispo)
         statut: true,
+        statutAuto: true, // ✅ AJOUT
+        lastSeenAt: true, // ✅ AJOUT
+
         experience: true,
         rechercheType: true,
         fumeur: true,
@@ -238,53 +238,38 @@ export async function GET(req) {
 
     // --- Filtrage géographique (modes exclusifs) ---
     let logs = "\nRecherche distance : ";
-    const hasCoords = (lat, lon) =>
-      !isNaN(lat) && !isNaN(lon);
+    const hasCoords = (lat, lon) => !isNaN(lat) && !isNaN(lon);
 
     // Tranche explicitement le mode (si les deux arrivent, on priorise NEAR_ME)
-    const mode = autourDeMoi
-      ? "NEAR_ME"
-      : localisation
-      ? "CITY"
-      : "NONE";
+    const mode = autourDeMoi ? "NEAR_ME" : localisation ? "CITY" : "NONE";
 
     if (mode === "NEAR_ME") {
       // Mode AUTOUR DE MOI : on ignore la ville
       const r = rayon || DEFAULT_RAYON;
       logs += `mode=NEAR_ME rayon=${r}km coords=${latitude},${longitude}`;
+
       if (hasCoords(latitude, longitude)) {
         utilisateurs = utilisateurs.filter(
           (u) =>
             u.latitude != null &&
             u.longitude != null &&
-            distanceKm(
-              latitude,
-              longitude,
-              u.latitude,
-              u.longitude
-            ) <= r
+            distanceKm(latitude, longitude, u.latitude, u.longitude) <= r
         );
       } else {
-        logs +=
-          " (coords manquantes → pas de filtre distance)";
+        logs += " (coords manquantes → pas de filtre distance)";
       }
     } else if (mode === "CITY") {
       // Mode VILLE : on ignore autourDeMoi
       const r = rayon || DEFAULT_RAYON;
       logs += `mode=CITY ville='${localisation}' rayon=${r}km`;
 
-      // 1) Si coords déjà fournies par le front (autocomplétion / voix géocodée)
+      // 1) Si coords déjà fournies par le front
       if (hasCoords(latitude, longitude)) {
         utilisateurs = utilisateurs.filter(
           (u) =>
             u.latitude != null &&
             u.longitude != null &&
-            distanceKm(
-              latitude,
-              longitude,
-              u.latitude,
-              u.longitude
-            ) <= r
+            distanceKm(latitude, longitude, u.latitude, u.longitude) <= r
         );
       } else {
         // 2) Sinon, géocode côté serveur à partir de la ville
@@ -294,36 +279,39 @@ export async function GET(req) {
             (u) =>
               u.latitude != null &&
               u.longitude != null &&
-              distanceKm(
-                ref.lat,
-                ref.lon,
-                u.latitude,
-                u.longitude
-              ) <= r
+              distanceKm(ref.lat, ref.lon, u.latitude, u.longitude) <= r
           );
         } else {
-          // 3) Fallback: match texte exact (moins fiable)
-          logs +=
-            " (géocodage KO → fallback match texte exact)";
+          // 3) Fallback: match texte exact
+          logs += " (géocodage KO → fallback match texte exact)";
           utilisateurs = utilisateurs.filter(
-            (u) =>
-              normalizeVille(u.localisation) ===
-              normalizeVille(localisation)
+            (u) => normalizeVille(u.localisation) === normalizeVille(localisation)
           );
         }
       }
     } else {
-      // Pas de ville, pas autour de moi → aucun filtre distance
       logs += "mode=NONE (pas de filtre distance)";
+    }
+
+    // ⚠️ NOTE : si tu veux garder un filtre "en_ligne" ici,
+    // il faut le faire en fonction de lastSeenAt/statutAuto (fallback),
+    // mais le vrai filtre Presence reste côté client.
+    if (statut === "en_ligne") {
+      const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+      const now = Date.now();
+      utilisateurs = utilisateurs.filter((u) => {
+        if (u?.statutAuto && u?.lastSeenAt) {
+          const seen = new Date(u.lastSeenAt).getTime();
+          return Number.isFinite(seen) && now - seen <= ONLINE_WINDOW_MS;
+        }
+        return false;
+      });
     }
 
     console.log(logs);
     return NextResponse.json({ utilisateurs });
   } catch (err) {
     console.error("Erreur API recherche :", err);
-    return NextResponse.json(
-      { utilisateurs: [] },
-      { status: 500 }
-    );
+    return NextResponse.json({ utilisateurs: [] }, { status: 500 });
   }
 }

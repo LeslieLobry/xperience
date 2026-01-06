@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Ably from "ably";
 
 const OnlineStatusContext = createContext(null);
@@ -22,14 +29,18 @@ export function OnlineStatusProvider({ user, children }) {
       authMethod: "GET",
       echoMessages: false,
       closeOnUnload: false,
+      // optionnel (mais OK) : clientId côté client
+      // ⚠️ doit matcher le token (ton token force déjà clientId = String(user.id))
+      clientId: String(user.id),
     });
 
     const channel = ably.channels.get("presence:online");
     enteredRef.current = false;
 
     const memberToUserId = (m) => {
-      const id = Number(m?.clientId);
-      return Number.isFinite(id) ? id : null;
+      const id = m?.clientId;
+      if (!id) return null;
+      return String(id);
     };
 
     const addOne = (id) => {
@@ -58,10 +69,10 @@ export function OnlineStatusProvider({ user, children }) {
         const next = {};
         for (const m of members || []) {
           const id = memberToUserId(m);
-          if (id == null) continue;
-          const key = String(id);
-          next[key] = (next[key] || 0) + 1;
+          if (!id) continue;
+          next[id] = (next[id] || 0) + 1;
         }
+
         setCounts(next);
 
         const ids = (members || []).map((m) => m?.clientId).filter(Boolean);
@@ -75,20 +86,23 @@ export function OnlineStatusProvider({ user, children }) {
 
       console.log("[Presence] entering…");
 
-      channel.presence.enter(
-        { pseudo: user.pseudo || "", t: Date.now() },
-        (err) => {
-          console.log("[Presence] enter callback err?:", err || null);
-          if (err) {
-            enteredRef.current = false;
-            return;
-          }
+      channel.presence.enter({ pseudo: user.pseudo || "", t: Date.now() }, (err) => {
+        console.log("[Presence] enter callback err?:", err || null);
 
-          // sync direct + sync retardée (les membres déjà présents)
-          syncFromGet();
-          setTimeout(syncFromGet, 500);
+        if (err) {
+          enteredRef.current = false;
+          return;
         }
-      );
+
+        // Debug utile : confirme le clientId utilisé
+        try {
+          console.log("[Presence] entered with clientId:", ably?.auth?.clientId || null);
+        } catch {}
+
+        // sync direct + sync retardée (les membres déjà présents)
+        syncFromGet();
+        setTimeout(syncFromGet, 500);
+      });
     };
 
     // ---- connection logs + robust reconnect handling ----
@@ -105,6 +119,13 @@ export function OnlineStatusProvider({ user, children }) {
     };
 
     ably.connection.on(onConnectionState);
+
+    // ✅ IMPORTANT : si on a raté l'event "connected", on tente quand même un enter
+    // (certains navigateurs / timings peuvent rater le stateChange initial)
+    setTimeout(() => {
+      enterPresence();
+      syncFromGet();
+    }, 0);
 
     // ---- présence events ----
     const onEnter = (m) => {
@@ -191,7 +212,11 @@ export function OnlineStatusProvider({ user, children }) {
     return { isOnline, onlineCount, counts };
   }, [counts]);
 
-  return <OnlineStatusContext.Provider value={api}>{children}</OnlineStatusContext.Provider>;
+  return (
+    <OnlineStatusContext.Provider value={api}>
+      {children}
+    </OnlineStatusContext.Provider>
+  );
 }
 
 export function useOnlineStatus() {

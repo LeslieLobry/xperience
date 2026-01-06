@@ -23,9 +23,15 @@ async function getAuthUser(req) {
 
   // 2) Auth web via cookie
   try {
-    const user = await getUserFromCookie();
+    // certains helpers attendent req, d'autres non
+    const user = await getUserFromCookie(req);
     if (user) return user;
-  } catch {}
+  } catch {
+    try {
+      const user = await getUserFromCookie();
+      if (user) return user;
+    } catch {}
+  }
 
   return null;
 }
@@ -60,6 +66,7 @@ export async function GET(req, { params }) {
         // Statuts & vérification
         statut: true,
         statutAuto: true,
+        lastSeenAt: true, // ✅ AJOUT IMPORTANT pour fallback online/offline
         verificationIdentiteStatut: true,
 
         // Description (utilisée par DescriptionCard)
