@@ -63,7 +63,9 @@ export default function ChatInput({
           if (d && isFinite(d) && d > 0) resolve(Math.round(d));
           else resolve(null);
         };
-        audio.onerror = function () { resolve(null); };
+        audio.onerror = function () {
+          resolve(null);
+        };
       });
     } catch (err) {}
     let duree = Math.max(chrono || 0, html5 || 0);
@@ -81,15 +83,27 @@ export default function ChatInput({
   // EMOJI
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emoticonsMap = {
-    ":)": "😊", ":-)": "😊", ":(": "😢", ":-(": "😢", ";)": "😉",
-    ":D": "😄", ":-D": "😄", "<3": "❤️", ":p": "😛", ":-p": "😛",
-    ":'(": "😭", ":o": "😮", ":-o": "😮"
+    ":)": "😊",
+    ":-)": "😊",
+    ":(": "😢",
+    ":-(": "😢",
+    ";)": "😉",
+    ":D": "😄",
+    ":-D": "😄",
+    "<3": "❤️",
+    ":p": "😛",
+    ":-p": "😛",
+    ":'(": "😭",
+    ":o": "😮",
+    ":-o": "😮",
   };
   function replaceEmoticonsWithEmojis(text) {
     return Object.keys(emoticonsMap).reduce(
-      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]), text
+      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]),
+      text
     );
   }
+
   // --- IMAGE COMPRESSION ---
   const compressImage = (file, maxSize = 900) =>
     new Promise((resolve) => {
@@ -99,14 +113,18 @@ export default function ChatInput({
         const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
         const width = Math.round(img.width * ratio);
         const height = Math.round(img.height * ratio);
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob(
           (blob) => {
-            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: "image/jpeg" }));
+            resolve(
+              new File([blob], file.name.replace(/\.\w+$/, ".jpg"), {
+                type: "image/jpeg",
+              })
+            );
             URL.revokeObjectURL(url);
           },
           "image/jpeg",
@@ -124,7 +142,7 @@ export default function ChatInput({
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
 
-  // ✅ NEW: ref sur l'input file (pour ouvrir le picker depuis le sablier)
+  // ✅ ref sur l'input file (pour ouvrir le picker depuis le sablier)
   const fileInputRef = useRef(null);
 
   // --- AUDIO RECORDING ---
@@ -140,15 +158,19 @@ export default function ChatInput({
       audioChunks.current = [];
       audioStartRef.current = Date.now();
       audioStopRef.current = null;
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           audioChunks.current.push(e.data);
         }
       };
+
       recorder.onstop = () => {
         audioStopRef.current = Date.now();
         if (audioChunks.current.length) {
-          const blob = new Blob(audioChunks.current, { type: supportedType || "audio/webm" });
+          const blob = new Blob(audioChunks.current, {
+            type: supportedType || "audio/webm",
+          });
           setAudioBlob(blob);
           setAudioUrl(URL.createObjectURL(blob));
         } else {
@@ -158,6 +180,7 @@ export default function ChatInput({
         audioChunks.current = [];
         stream.getTracks().forEach((track) => track.stop());
       };
+
       setMediaRecorder(recorder);
       setIsRecording(true);
       recorder.start();
@@ -195,6 +218,7 @@ export default function ChatInput({
       setShowCamera(false);
     }
   };
+
   const stopCamera = () => {
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
@@ -202,12 +226,14 @@ export default function ChatInput({
     }
     setShowCamera(false);
   };
+
   useEffect(() => {
     if (showCamera && videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream;
     }
     return () => stopCamera();
   }, [showCamera, cameraStream]);
+
   const handleTakePhoto = () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -216,15 +242,20 @@ export default function ChatInput({
     canvas.height = video.videoHeight || 360;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (blob) {
-        if (imagePreview) URL.revokeObjectURL(imagePreview);
-        setImagePreview(URL.createObjectURL(blob));
-        setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
-        stopCamera();
-      }
-    }, "image/jpeg", 0.9);
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          if (imagePreview) URL.revokeObjectURL(imagePreview);
+          setImagePreview(URL.createObjectURL(blob));
+          setImageFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+          stopCamera();
+        }
+      },
+      "image/jpeg",
+      0.9
+    );
   };
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -253,8 +284,8 @@ export default function ChatInput({
     if (utilisateur.type !== "couple") return;
     setLoadingPrenoms(true);
     fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.prenoms) {
           setPr1(data.prenoms.prenom1 || "");
           setPr2(data.prenoms.prenom2 || "");
@@ -265,6 +296,7 @@ export default function ChatInput({
       })
       .finally(() => setLoadingPrenoms(false));
   }, [conversationId, utilisateur.type]);
+
   const handlePrenomsSubmit = async (e) => {
     e.preventDefault();
     if (!pr1.trim() || !pr2.trim()) return;
@@ -284,173 +316,178 @@ export default function ChatInput({
     }
     setLoadingPrenoms(false);
   };
-const MAX_HEIGHT = 140; // px
 
-function autoResize() {
-  const ta = textareaRef.current;
-  if (!ta) return;
+  const MAX_HEIGHT = 140; // px
 
-  // ✅ on évite le “saut” : on ne remet height:auto que si nécessaire
-  const prev = ta.style.height;
+  function autoResize() {
+    const ta = textareaRef.current;
+    if (!ta) return;
 
-  ta.style.height = "auto";
-  const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
-  const nextPx = next + "px";
+    const prev = ta.style.height;
 
-  if (prev !== nextPx) {
-    ta.style.height = nextPx;
-  } else {
-    ta.style.height = prev; // stable
+    ta.style.height = "auto";
+    const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
+    const nextPx = next + "px";
+
+    if (prev !== nextPx) {
+      ta.style.height = nextPx;
+    } else {
+      ta.style.height = prev; // stable
+    }
+
+    ta.style.overflowY = "hidden";
   }
 
-  // ✅ toi tu veux "grandit" => pas de scroll interne
-  ta.style.overflowY = "hidden";
-}
-
-
-  useEffect(() => { autoResize(); }, [texte]);
+  useEffect(() => {
+    autoResize();
+  }, [texte]);
 
   // --- SUBMIT LOGIC ---
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (isSending) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSending) return;
 
-  // ✅ on capture le texte maintenant
-  const texteToSend = texte;
-  const ephemereToSend = ephemere;
+    // ✅ on capture le texte maintenant
+    const texteToSend = texte;
+    const ephemereToSend = ephemere;
 
-  // ✅ on vide l'input immédiatement (sans attendre la requête)
-  if (texteToSend && texteToSend.length) {
-    setTexte("");
-    requestAnimationFrame(() => autoResize());
-  }
-
-  setIsSending(true);
-
-  try {
-    // IMAGE
-    if (imageFile) {
-      const optimisticKey = generateOptimisticKey();
-      const formData = new FormData();
-      formData.append("image", imageFile);
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemereToSend ? "EPHEMERE" : "IMAGE");
-      formData.append("optimisticKey", optimisticKey);
-      if (texteToSend) formData.append("contenu", texteToSend);
-
-      if (utilisateur.type === "couple" && prenomsOK) {
-        formData.append("membreParlant", membreParlant);
-        formData.append("prenom1", pr1);
-        formData.append("prenom2", pr2);
-      }
-
-      await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
-
-      if (imagePreview) URL.revokeObjectURL(imagePreview);
-      setImageFile(null);
-      setImagePreview(null);
-      setEphemere(false);
-      setIsSending(false);
-      return;
-    }
-
-    // AUDIO
-    if (audioBlob) {
-      const optimisticKey = generateOptimisticKey();
-      let duree = await getAccurateDuration(audioBlob);
-
-      const formData = new FormData();
-      let extension = "webm";
-      if (audioType === "audio/mp4") extension = "m4a";
-      if (audioType === "audio/mpeg") extension = "mp3";
-
-      formData.append("audio", audioBlob, `audio.${extension}`);
-      formData.append("audioType", audioType);
-      formData.append("conversationId", conversationId);
-      formData.append("type", ephemereToSend ? "EPHEMERE" : "AUDIO");
-      formData.append("duree", duree);
-      formData.append("optimisticKey", optimisticKey);
-
-      if (utilisateur.type === "couple" && prenomsOK) {
-        formData.append("membreParlant", membreParlant);
-        formData.append("prenom1", pr1);
-        formData.append("prenom2", pr2);
-      }
-
-      await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
-
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      setAudioBlob(null);
-      setAudioUrl(null);
-      audioStartRef.current = null;
-      audioStopRef.current = null;
-      setEphemere(false);
-      setIsSending(false);
-      return;
-    }
-
-    // TEXTE
-    if (!texteToSend || !texteToSend.trim()) {
-      setIsSending(false);
-      return;
-    }
-
-    const optimisticKey = generateOptimisticKey();
-
-    if (utilisateur.type === "couple" && prenomsOK) {
-      await onMessageSent(
-        {
-          contenu: texteToSend,
-          type: ephemereToSend ? "EPHEMERE" : "TEXTE",
-          conversationId,
-          optimisticKey,
-          prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
-          prenom1: pr1,
-          prenom2: pr2,
-        },
-        "TEXTE",
-        membreParlant,
-        false,
-        optimisticKey
-      );
-    } else {
-      await onMessageSent(
-        {
-          contenu: texteToSend,
-          type: ephemereToSend ? "EPHEMERE" : "TEXTE",
-          conversationId,
-          optimisticKey,
-        },
-        "TEXTE",
-        undefined,
-        false,
-        optimisticKey
-      );
-    }
-
-    setEphemere(false);
-  } catch (err) {
-    console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
-
-    // ✅ optionnel : on remet le texte si l'envoi a échoué
-    if (texteToSend && texteToSend.trim()) {
-      setTexte(texteToSend);
+    // ✅ on vide l'input immédiatement (sans attendre la requête)
+    if (texteToSend && texteToSend.length) {
+      setTexte("");
       requestAnimationFrame(() => autoResize());
     }
-  }
 
-  setIsSending(false);
-};
+    setIsSending(true);
 
+    try {
+      // IMAGE
+      if (imageFile) {
+        const optimisticKey = generateOptimisticKey();
+        const formData = new FormData();
+
+        const realType = ephemereToSend ? "EPHEMERE" : "IMAGE";
+        formData.append("image", imageFile);
+        formData.append("conversationId", conversationId);
+        formData.append("type", realType);
+        formData.append("optimisticKey", optimisticKey);
+        if (texteToSend) formData.append("contenu", texteToSend);
+
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
+        }
+
+        await onMessageSent(formData, realType, membreParlant, true, optimisticKey);
+
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(null);
+        setImagePreview(null);
+        setEphemere(false);
+        setIsSending(false);
+        return;
+      }
+
+      // AUDIO
+      if (audioBlob) {
+        const optimisticKey = generateOptimisticKey();
+        let duree = await getAccurateDuration(audioBlob);
+
+        const formData = new FormData();
+        let extension = "webm";
+        if (audioType === "audio/mp4") extension = "m4a";
+        if (audioType === "audio/mpeg") extension = "mp3";
+
+        const realType = ephemereToSend ? "EPHEMERE" : "AUDIO";
+        formData.append("audio", audioBlob, `audio.${extension}`);
+        formData.append("audioType", audioType);
+        formData.append("conversationId", conversationId);
+        formData.append("type", realType);
+        formData.append("duree", duree);
+        formData.append("optimisticKey", optimisticKey);
+
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
+        }
+
+        await onMessageSent(formData, realType, membreParlant, false, optimisticKey);
+
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioBlob(null);
+        setAudioUrl(null);
+        audioStartRef.current = null;
+        audioStopRef.current = null;
+        setEphemere(false);
+        setIsSending(false);
+        return;
+      }
+
+      // TEXTE
+      if (!texteToSend || !texteToSend.trim()) {
+        setIsSending(false);
+        return;
+      }
+
+      const optimisticKey = generateOptimisticKey();
+
+      if (utilisateur.type === "couple" && prenomsOK) {
+        await onMessageSent(
+          {
+            contenu: texteToSend,
+            type: ephemereToSend ? "EPHEMERE" : "TEXTE",
+            conversationId,
+            optimisticKey,
+            prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
+            prenom1: pr1,
+            prenom2: pr2,
+          },
+          "TEXTE",
+          membreParlant,
+          false,
+          optimisticKey
+        );
+      } else {
+        await onMessageSent(
+          {
+            contenu: texteToSend,
+            type: ephemereToSend ? "EPHEMERE" : "TEXTE",
+            conversationId,
+            optimisticKey,
+          },
+          "TEXTE",
+          undefined,
+          false,
+          optimisticKey
+        );
+      }
+
+      setEphemere(false);
+    } catch (err) {
+      console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
+
+      // ✅ optionnel : on remet le texte si l'envoi a échoué
+      if (texteToSend && texteToSend.trim()) {
+        setTexte(texteToSend);
+        requestAnimationFrame(() => autoResize());
+      }
+    }
+
+    setIsSending(false);
+  };
 
   // --- Notification éphémère ---
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
   useEffect(() => {
     if (showEphemereNotif) {
-      const timer = setTimeout(() => { setShowEphemereNotif(false); }, 5000);
+      const timer = setTimeout(() => {
+        setShowEphemereNotif(false);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
+
   const handleSubmitWithNotif = async (e) => {
     e.preventDefault();
     if (isSending) return;
@@ -461,14 +498,18 @@ const handleSubmit = async (e) => {
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
-        <form className="chat-input" onSubmit={handlePrenomsSubmit} style={{ flexDirection: "column", gap: 8 }}>
+        <form
+          className="chat-input"
+          onSubmit={handlePrenomsSubmit}
+          style={{ flexDirection: "column", gap: 8 }}
+        >
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <input
               type="text"
               className="input-prenom"
               placeholder="Prénom membre 1"
               value={pr1}
-              onChange={e => setPr1(e.target.value)}
+              onChange={(e) => setPr1(e.target.value)}
               style={{ width: 120 }}
               disabled={loadingPrenoms}
               autoFocus
@@ -478,7 +519,7 @@ const handleSubmit = async (e) => {
               className="input-prenom"
               placeholder="Prénom membre 2"
               value={pr2}
-              onChange={e => setPr2(e.target.value)}
+              onChange={(e) => setPr2(e.target.value)}
               style={{ width: 120 }}
               disabled={loadingPrenoms}
             />
@@ -491,40 +532,52 @@ const handleSubmit = async (e) => {
 
       {/* CAMERA MODAL */}
       {showCamera && (
-        <div className="camera-modal" style={{
-          position: "fixed",
-          zIndex: 1002,
-          left: 0,
-          top: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0,0,0,0.85)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-        }}>
-          <video ref={videoRef} autoPlay playsInline style={{
-            width: 340,
-            height: 250,
-            borderRadius: 14,
-            background: "#222",
-          }} />
+        <div
+          className="camera-modal"
+          style={{
+            position: "fixed",
+            zIndex: 1002,
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{
+              width: 340,
+              height: 250,
+              borderRadius: 14,
+              background: "#222",
+            }}
+          />
           <div style={{ marginTop: 18 }}>
             <button onClick={handleTakePhoto} style={{ fontSize: 22, marginRight: 24 }}>
               📸 Prendre la photo
             </button>
-            <button onClick={stopCamera} style={{ fontSize: 18, color: "#fff", background: "#e53" }}>
+            <button
+              onClick={stopCamera}
+              style={{ fontSize: 18, color: "#fff", background: "#e53" }}
+            >
               Annuler
             </button>
           </div>
         </div>
       )}
+
       {utilisateur.type === "couple" && prenomsOK && (
         <select
           className="select-membre"
           value={membreParlant}
-          onChange={e => setMembreParlant(e.target.value)}
+          onChange={(e) => setMembreParlant(e.target.value)}
         >
           <option value={pr1}>{pr1}</option>
           <option value={pr2}>{pr2}</option>
@@ -533,37 +586,39 @@ const handleSubmit = async (e) => {
       )}
 
       {showEphemereNotif && (
-        <div style={{
-          position: "fixed",
-          bottom: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
-          backgroundColor: "#e53",
-          color: "#fff",
-          padding: "10px 20px",
-          borderRadius: 25,
-          fontWeight: "bold",
-          zIndex: 1100,
-          boxShadow: "0 0 10px rgba(234, 215, 108, 0.7)",
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "#e53",
+            color: "#fff",
+            padding: "10px 20px",
+            borderRadius: 25,
+            fontWeight: "bold",
+            zIndex: 1100,
+            boxShadow: "0 0 10px rgba(234, 215, 108, 0.7)",
+          }}
+        >
           Photo éphémère envoyée!
         </div>
       )}
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-<textarea
-  className="input-text"
-  ref={textareaRef}
-  value={texte}
-  placeholder="Écris un message…"
-  rows={1}
-  onChange={(e) => {
-    setTexte(e.target.value);
-    requestAnimationFrame(autoResize);
-  }}
-  onInput={() => requestAnimationFrame(autoResize)}
-  style={{ resize: "none" }}
-/>
+        <textarea
+          className="input-text"
+          ref={textareaRef}
+          value={texte}
+          placeholder="Écris un message…"
+          rows={1}
+          onChange={(e) => {
+            setTexte(e.target.value);
+            requestAnimationFrame(autoResize);
+          }}
+          onInput={() => requestAnimationFrame(autoResize)}
+          style={{ resize: "none" }}
+        />
 
         <div className="input-wrapper" style={{ alignItems: "center" }}>
           {/* Aperçu image */}
@@ -642,7 +697,7 @@ const handleSubmit = async (e) => {
                   fontSize: 12,
                   border: "none",
                   background: "transparent",
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
                 ×
@@ -664,9 +719,28 @@ const handleSubmit = async (e) => {
             htmlFor="file-upload"
             className="chat-input-photo-btn"
             title="Envoyer une photo"
-            style={{ pointerEvents: (!!imageFile || isSending) ? "none" : "auto", opacity: (!!imageFile || isSending) ? 0.5 : 1 }}
+            style={{
+              pointerEvents: !!imageFile || isSending ? "none" : "auto",
+              opacity: !!imageFile || isSending ? 0.5 : 1,
+            }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-image-up-icon lucide-image-up"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="lucide lucide-image-up-icon lucide-image-up"
+            >
+              <path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21" />
+              <path d="m14 19.5 3-3 3 3" />
+              <path d="M17 22v-5.5" />
+              <circle cx="9" cy="9" r="2" />
+            </svg>
           </label>
 
           {/* ✅ SABLIER: cliquable pour choisir une photo éphémère */}
@@ -674,18 +748,30 @@ const handleSubmit = async (e) => {
             type="button"
             className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
             onClick={() => {
-              // Si aucune image sélectionnée → mode éphémère + ouvrir la galerie
               if (!imageFile) {
                 setEphemere(true);
                 fileInputRef.current?.click();
               } else {
-                // Sinon, simple toggle (ex: tu veux repasser en non-éphémère)
                 setEphemere((v) => !v);
               }
             }}
             title="Message éphémère (Snap)"
           >
-            <svg width="24px" height="24px" viewBox="0 0 1024 1024" fill="#e0c084" className="icon" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z" fill="" /><path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8 l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" /></svg>
+            <svg
+              width="24px"
+              height="24px"
+              viewBox="0 0 1024 1024"
+              fill="#e0c084"
+              className="icon"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z"
+                fill=""
+              />
+              <path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8 l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c20 33.6 35.2 74.4 47.2 121.6 2.4 13.6 11.2 43.2 12.8 81.6-37.6-33.6-141.6-57.6-266.4-59.2V464c1.6 0 2.4-0.8 4-1.6v-0.8l6.4-2.4h1.6c45.6-14.4 81.6-36.8 112-66.4 32-32 56.8-71.2 73.6-115.2 4.8-12-0.8-25.6-13.6-30.4-12-4.8-25.6 0.8-30.4 12.8v0.8c-14.4 36.8-35.2 71.2-62.4 98.4-24.8 24-54.4 43.2-92 54.4l-0.8 0.8-2.4 0.8-4 0.8-2.4-0.8-1.6-0.8-2.4-0.8c-36.8-12-68-30.4-92-54.4-28-27.2-48-60.8-62.4-98.4-4.8-12-18.4-18.4-29.6-13.6-12 4.8-17.6 17.6-13.6 30.4 16.8 44 40.8 83.2 73.6 115.2 29.6 29.6 66.4 52 111.2 66.4h0.8l6.4 2.4 1.6 0.8c0.8 0.8 1.6 0.8 3.2 1.6v369.6c-116.8 0-218.4 20-266.4 48 1.6-19.2 5.6-40 12.8-70.4 12-48 28-88 47.2-121.6l0.8-1.6c47.2-81.6 98.4-124.8 167.2-146.4l2.4-1.6h0.8c1.6-0.8 2.4-1.6 4-2.4l0.8-0.8 1.6-0.8v-0.8l1.6-1.6v-0.8c0.8-0.8 1.6-2.4 2.4-4V528c0.8-1.6 1.6-4 1.6-5.6v-8c0-1.6-0.8-4-1.6-5.6v-0.8c-0.8-1.6-1.6-3.2-2.4-4v-0.8l-1.6-1.6-1.6-1.6-2.4 0.8c-1.6-0.8-2.4-1.6-4-2.4h-0.8l-2.4-0.8c-68-20.8-120-64.8-167.2-147.2l-0.8-0.8c-36.8-64.8-61.6-152.8-66.4-271.2h-47.2c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-111.2 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" />
+            </svg>
           </button>
 
           {/* MICRO */}
@@ -693,18 +779,26 @@ const handleSubmit = async (e) => {
             type="button"
             className="chat-input-mic-btn"
             onClick={isRecording ? stopAudioRecording : startAudioRecording}
-            title={
-              isRecording
-                ? "Arrêter l'enregistrement"
-                : "Envoyer un message audio"
-            }
+            title={isRecording ? "Arrêter l'enregistrement" : "Envoyer un message audio"}
             disabled={isSending}
           >
-            {isRecording ? <CircleStop /> : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-mic" viewBox="0 0 16 16">
-              <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
-              <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
-            </svg>}
+            {isRecording ? (
+              <CircleStop />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                fill="#e0c084"
+                className="bi bi-mic"
+                viewBox="0 0 16 16"
+              >
+                <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
+                <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3" />
+              </svg>
+            )}
           </button>
+
           {/* EMOJI */}
           <button
             type="button"
@@ -713,9 +807,16 @@ const handleSubmit = async (e) => {
             title="Insérer un emoji"
             disabled={isSending}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-emoji-smile" viewBox="0 0 16 16">
-              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-              <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              fill="#e0c084"
+              className="bi bi-emoji-smile"
+              viewBox="0 0 16 16"
+            >
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+              <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5" />
             </svg>
           </button>
         </div>
@@ -725,22 +826,19 @@ const handleSubmit = async (e) => {
           className="message-btn"
           disabled={
             isSending ||
-            !(
-              (audioBlob && !isRecording) ||
-              imageFile ||
-              (texte && texte.trim())
-            )
+            !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
           }
         >
           {isSending
             ? "Envoi…"
             : imageFile
-              ? "Envoyer l'image"
-              : audioBlob
-                ? "Envoyer l'audio"
-                : "Envoyer"}
+            ? "Envoyer l'image"
+            : audioBlob
+            ? "Envoyer l'audio"
+            : "Envoyer"}
         </button>
       </form>
+
       {showEmojiPicker && (
         <div className="emoji-picker-container">
           <Picker
