@@ -95,9 +95,7 @@ export async function GET(req) {
   const photo = searchParams.get("photo") === "true";
   const description = searchParams.get("description") === "true";
 
-  // ⚠️ "statut" dans la recherche : NE PAS filtrer en DB sur "en_ligne"
-  // car la vérité vient de Presence côté client.
-  // On le garde seulement pour compatibilité, mais on ne l'applique pas ici.
+  // statut: all | en_ligne | hors_ligne
   const statut = searchParams.get("statut") || "all";
 
   // Rayon/coords (peuvent être absents)
@@ -133,74 +131,96 @@ export async function GET(req) {
     exclus = [];
   }
 
-  // Construction du where pour Prisma
-  const where = {
-    id: { notIn: exclus },
+  // ✅ Construction du where Prisma (corrigé : OR non écrasé)
+  const andParts = [];
 
-    ...(pseudo.trim() && {
-      pseudo: { contains: pseudo.trim(), mode: "insensitive" },
-    }),
+  if (pseudo.trim()) {
+    andParts.push({ pseudo: { contains: pseudo.trim(), mode: "insensitive" } });
+  }
 
-    ...(photo && { photoUrl: { not: null } }),
-    ...(description && { description: { not: null } }),
+  if (photo) andParts.push({ photoUrl: { not: null } });
+  if (description) andParts.push({ description: { not: null } });
 
-    // ❌ IMPORTANT : ne pas faire ...(statut === "en_ligne" && { statut: "en_ligne" })
-    // La présence "en ligne" se fait côté client via Ably.
-    // Ici on renvoie juste les profils et le client filtre si besoin.
+  // âge
+  if (ageMin || ageMax) {
+    const ageFilter = {};
+    if (ageMin) ageFilter.gte = parseInt(ageMin, 10);
+    if (ageMax) ageFilter.lte = parseInt(ageMax, 10);
+    andParts.push({ age: ageFilter });
+  }
 
-    // 🔥 Filtre d'âge flexible (ageMin seul, ageMax seul, ou les deux)
-    ...(() => {
-      if (!ageMin && !ageMax) return {};
-      const ageFilter = {};
-      if (ageMin) ageFilter.gte = parseInt(ageMin, 10);
-      if (ageMax) ageFilter.lte = parseInt(ageMax, 10);
-      return { age: ageFilter };
-    })(),
+  // ✅ type : si tu veux insensitive, il faut OR equals + mode
+  // (car Prisma n'accepte pas mode avec in)
+  if (typeNorm.length) {
+    andParts.push({
+      OR: typeNorm.map((t) => ({ type: { equals: t, mode: "insensitive" } })),
+    });
+  }
 
-    ...(typeNorm.length && {
-      type: { in: typeNorm, mode: "insensitive" },
-    }),
+  if (rechercheTypeNorm.length) {
+    andParts.push({ rechercheType: { in: rechercheTypeNorm } });
+  }
 
-    ...(orientationNorm.length && {
+  if (experienceNorm.length) {
+    andParts.push({ experience: { in: experienceNorm } });
+  }
+
+  if (fumeurNorm.length) {
+    andParts.push({ fumeur: { in: fumeurNorm } });
+  }
+
+  if (silhouetteNorm.length) {
+    andParts.push({ silhouette: { in: silhouetteNorm } });
+  }
+
+  if (taille.length) {
+    andParts.push({ taille: { in: taille.map((t) => parseInt(t, 10) || -1) } });
+  }
+
+  if (originesNorm.length) {
+    andParts.push({ origines: { in: originesNorm } });
+  }
+
+  if (yeuxNorm.length) {
+    andParts.push({ yeux: { in: yeuxNorm } });
+  }
+
+  // ✅ OR orientation (dans AND)
+  if (orientationNorm.length) {
+    andParts.push({
       OR: orientationNorm.map((o) => ({
         orientation: { equals: o, mode: "insensitive" },
       })),
-    }),
+    });
+  }
 
-    ...(rechercheTypeNorm.length && {
-      rechercheType: { in: rechercheTypeNorm, mode: "insensitive" },
-    }),
-
-    ...(experienceNorm.length && {
-      experience: { in: experienceNorm, mode: "insensitive" },
-    }),
-
-    ...(fumeurNorm.length && {
-      fumeur: { in: fumeurNorm, mode: "insensitive" },
-    }),
-
-    ...(silhouetteNorm.length && {
-      silhouette: { in: silhouetteNorm, mode: "insensitive" },
-    }),
-
-    ...(taille.length && {
-      taille: { in: taille.map((t) => parseInt(t, 10) || -1) },
-    }),
-
-    ...(originesNorm.length && {
-      origines: { in: originesNorm, mode: "insensitive" },
-    }),
-
-    ...(yeuxNorm.length && {
-      yeux: { in: yeuxNorm, mode: "insensitive" },
-    }),
-
-    // ---> on garde le contains pour cheveux
-    ...(cheveuxNorm.length && {
+  // ✅ OR cheveux (dans AND) — sinon tu écrases l’OR orientation
+  if (cheveuxNorm.length) {
+    andParts.push({
       OR: cheveuxNorm.map((c) => ({
         cheveux: { contains: c, mode: "insensitive" },
       })),
-    }),
+    });
+  }
+
+  // ✅ Filtre online/offline cohérent avec Prisma (statutAuto boolean + lastSeenAt)
+  if (statut === "en_ligne" || statut === "hors_ligne") {
+    const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+    const since = new Date(Date.now() - ONLINE_WINDOW_MS);
+
+    if (statut === "en_ligne") {
+      andParts.push({ statutAuto: true });
+      andParts.push({ lastSeenAt: { gte: since } });
+    } else {
+      andParts.push({
+        OR: [{ statutAuto: false }, { lastSeenAt: null }, { lastSeenAt: { lt: since } }],
+      });
+    }
+  }
+
+  const where = {
+    id: { notIn: exclus },
+    ...(andParts.length ? { AND: andParts } : {}),
   };
 
   try {
@@ -217,10 +237,9 @@ export async function GET(req) {
         orientation: true,
         description: true,
 
-        // ✅ garde statut + fallback fields (utile dans UI si Presence indispo)
         statut: true,
-        statutAuto: true, // ✅ AJOUT
-        lastSeenAt: true, // ✅ AJOUT
+        statutAuto: true,
+        lastSeenAt: true,
 
         experience: true,
         rechercheType: true,
@@ -240,11 +259,9 @@ export async function GET(req) {
     let logs = "\nRecherche distance : ";
     const hasCoords = (lat, lon) => !isNaN(lat) && !isNaN(lon);
 
-    // Tranche explicitement le mode (si les deux arrivent, on priorise NEAR_ME)
     const mode = autourDeMoi ? "NEAR_ME" : localisation ? "CITY" : "NONE";
 
     if (mode === "NEAR_ME") {
-      // Mode AUTOUR DE MOI : on ignore la ville
       const r = rayon || DEFAULT_RAYON;
       logs += `mode=NEAR_ME rayon=${r}km coords=${latitude},${longitude}`;
 
@@ -259,11 +276,9 @@ export async function GET(req) {
         logs += " (coords manquantes → pas de filtre distance)";
       }
     } else if (mode === "CITY") {
-      // Mode VILLE : on ignore autourDeMoi
       const r = rayon || DEFAULT_RAYON;
       logs += `mode=CITY ville='${localisation}' rayon=${r}km`;
 
-      // 1) Si coords déjà fournies par le front
       if (hasCoords(latitude, longitude)) {
         utilisateurs = utilisateurs.filter(
           (u) =>
@@ -272,7 +287,6 @@ export async function GET(req) {
             distanceKm(latitude, longitude, u.latitude, u.longitude) <= r
         );
       } else {
-        // 2) Sinon, géocode côté serveur à partir de la ville
         const ref = await getCoordsFromVille(localisation);
         if (ref) {
           utilisateurs = utilisateurs.filter(
@@ -282,7 +296,6 @@ export async function GET(req) {
               distanceKm(ref.lat, ref.lon, u.latitude, u.longitude) <= r
           );
         } else {
-          // 3) Fallback: match texte exact
           logs += " (géocodage KO → fallback match texte exact)";
           utilisateurs = utilisateurs.filter(
             (u) => normalizeVille(u.localisation) === normalizeVille(localisation)
@@ -291,21 +304,6 @@ export async function GET(req) {
       }
     } else {
       logs += "mode=NONE (pas de filtre distance)";
-    }
-
-    // ⚠️ NOTE : si tu veux garder un filtre "en_ligne" ici,
-    // il faut le faire en fonction de lastSeenAt/statutAuto (fallback),
-    // mais le vrai filtre Presence reste côté client.
-    if (statut === "en_ligne") {
-      const ONLINE_WINDOW_MS = 2 * 60 * 1000;
-      const now = Date.now();
-      utilisateurs = utilisateurs.filter((u) => {
-        if (u?.statutAuto && u?.lastSeenAt) {
-          const seen = new Date(u.lastSeenAt).getTime();
-          return Number.isFinite(seen) && now - seen <= ONLINE_WINDOW_MS;
-        }
-        return false;
-      });
     }
 
     console.log(logs);

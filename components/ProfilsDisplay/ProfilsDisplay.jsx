@@ -53,12 +53,21 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Profils filtrés : "En ligne" = Presence (isOnline)
+  // ✅ Filtre "En ligne" robuste :
+  // Presence d'abord, et si Presence ne sait pas => fallback computeStatut()
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
     const filtered = filtrerEnLigne
-      ? base.filter((p) => isOnline?.(String(p?.id)) === true)
+      ? base.filter((p) => {
+          const v = typeof isOnline === "function" ? isOnline(String(p?.id)) : undefined;
+
+          if (v === true) return true;   // Presence: online
+          if (v === false) return false; // Presence: offline
+
+          // Presence ne sait pas => fallback DB
+          return computeStatut(p) === "en_ligne";
+        })
       : base;
 
     return melangerProfils(filtered);
@@ -116,8 +125,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
     return () => {
       canceled = true;
     };
+    // ⚠️ dépendance simple : si la liste change réellement
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(profilsFiltres)]);
+  }, [profilsFiltres]);
 
   const handleToggleProches = async (active, customDistance) => {
     setFiltrerProches(active);
@@ -231,7 +241,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
-              // ✅ Presence d’abord (true/false), fallback computeStatut si Presence indispo
               const online =
                 typeof isOnline === "function" ? isOnline(String(user?.id)) : undefined;
 
@@ -274,8 +283,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo.charAt(0).toUpperCase() +
-                        user.pseudo.slice(1).toLowerCase()}
+                      {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">

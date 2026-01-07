@@ -1,4 +1,5 @@
 // app/api/profils/route.js
+
 import { prisma } from "../../../lib/prisma";
 import { okJSON, errorJSON, preflight } from "../../../lib/cors";
 import { cookies } from "next/headers";
@@ -13,9 +14,9 @@ export async function OPTIONS(req) {
 
 export async function GET(req) {
   try {
-    // --- Auth pour exclure l'utilisateur courant + ses exclusions
     const cookieStore = cookies();
     const token = cookieStore.get("token")?.value;
+
     let userId = null;
     if (token) {
       try {
@@ -24,13 +25,11 @@ export async function GET(req) {
       } catch {}
     }
 
-    // --- Params
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "0"); // pagination classique
-    const cursor = searchParams.get("cursor"); // pagination par curseur
+    const page = parseInt(searchParams.get("page") || "0");
+    const cursor = searchParams.get("cursor");
     const limit = Math.min(parseInt(searchParams.get("limit") || "24"), 100);
 
-    // --- Filtre (comme la page SSR)
     let where = {};
     if (userId) {
       const exclus = await getIdsUtilisateursExclus(userId);
@@ -41,12 +40,23 @@ export async function GET(req) {
       };
     }
 
-    // --- Query Prisma
     let utilisateurs = [];
     let nextCursor = null;
 
+    const select = {
+      id: true,
+      pseudo: true,
+      photoUrl: true,
+      age: true,
+      localisation: true,
+      statut: true,
+      statutAuto: true,
+      lastSeenAt: true,
+      type: true,
+      verificationIdentiteStatut: true,
+    };
+
     if (cursor) {
-      // --- Mode scroll infini (cursor)
       const cursorNum = Number(cursor);
       const rows = await prisma.utilisateur.findMany({
         where,
@@ -54,16 +64,7 @@ export async function GET(req) {
         take: limit + 1,
         skip: 1,
         cursor: { id: cursorNum },
-        select: {
-          id: true,
-          pseudo: true,
-          photoUrl: true,
-          age: true,
-          localisation: true,
-          statut: true,
-          type: true,
-          verificationIdentiteStatut: true,
-        },
+        select,
       });
 
       if (rows.length > limit) {
@@ -74,40 +75,20 @@ export async function GET(req) {
         utilisateurs = rows;
       }
     } else if (page > 0) {
-      // --- Mode page=1,2,3... (compat legacy)
       const skip = (page - 1) * limit;
       utilisateurs = await prisma.utilisateur.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
-        select: {
-          id: true,
-          pseudo: true,
-          photoUrl: true,
-          age: true,
-          localisation: true,
-          statut: true,
-          type: true,
-          verificationIdentiteStatut: true,
-        },
+        select,
       });
     } else {
-      // --- Première page sans param
       const rows = await prisma.utilisateur.findMany({
         where,
         orderBy: { id: "desc" },
         take: limit + 1,
-        select: {
-          id: true,
-          pseudo: true,
-          photoUrl: true,
-          age: true,
-          localisation: true,
-          statut: true,
-          type: true,
-          verificationIdentiteStatut: true,
-        },
+        select,
       });
 
       if (rows.length > limit) {

@@ -38,7 +38,8 @@ async function getUserFromRequest(req) {
   const tokenHeader = match?.[1];
 
   // Web: cookie token
-  const tokenCookie = cookies().get("token")?.value;
+  const cookieStore = cookies();
+  const tokenCookie = cookieStore.get("token")?.value;
 
   const token = tokenHeader || tokenCookie;
   if (!token) return null;
@@ -59,7 +60,7 @@ export async function POST(req) {
     const user = await getUserFromRequest(req);
     if (!user?.id) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { ok: false, error: "Non authentifié" },
         { status: 401, headers: corsHeaders(req) }
       );
     }
@@ -68,7 +69,8 @@ export async function POST(req) {
       where: { id: Number(user.id) },
       data: {
         lastSeenAt: new Date(),
-        statutAuto: true, // ✅ IMPORTANT pour computeStatut()
+        statutAuto: true,          // ✅ BOOLEAN (cohérent Prisma)
+        statut: "en_ligne",        // ✅ optionnel mais utile pour l’UI legacy
       },
     });
 
@@ -76,7 +78,7 @@ export async function POST(req) {
   } catch (e) {
     console.error("heartbeat error", e);
     return NextResponse.json(
-      { error: "Erreur serveur" },
+      { ok: false, error: "Erreur serveur" },
       { status: 500, headers: corsHeaders(req) }
     );
   }

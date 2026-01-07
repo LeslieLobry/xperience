@@ -29,8 +29,6 @@ export function OnlineStatusProvider({ user, children }) {
       authMethod: "GET",
       echoMessages: false,
       closeOnUnload: false,
-      // optionnel (mais OK) : clientId côté client
-      // ⚠️ doit matcher le token (ton token force déjà clientId = String(user.id))
       clientId: String(user.id),
     });
 
@@ -94,23 +92,19 @@ export function OnlineStatusProvider({ user, children }) {
           return;
         }
 
-        // Debug utile : confirme le clientId utilisé
         try {
           console.log("[Presence] entered with clientId:", ably?.auth?.clientId || null);
         } catch {}
 
-        // sync direct + sync retardée (les membres déjà présents)
         syncFromGet();
         setTimeout(syncFromGet, 500);
       });
     };
 
-    // ---- connection logs + robust reconnect handling ----
     const onConnectionState = (stateChange) => {
       const state = stateChange?.current || stateChange;
-      console.log("[Presence] Ably state:", stateChange?.current || stateChange);
+      console.log("[Presence] Ably state:", state);
 
-      // Important : à chaque "connected", on autorise un re-enter
       if (state === "connected") {
         enteredRef.current = false;
         enterPresence();
@@ -120,14 +114,11 @@ export function OnlineStatusProvider({ user, children }) {
 
     ably.connection.on(onConnectionState);
 
-    // ✅ IMPORTANT : si on a raté l'event "connected", on tente quand même un enter
-    // (certains navigateurs / timings peuvent rater le stateChange initial)
     setTimeout(() => {
       enterPresence();
       syncFromGet();
     }, 0);
 
-    // ---- présence events ----
     const onEnter = (m) => {
       const id = memberToUserId(m);
       console.log("[Presence] enter event:", m?.clientId, m?.data || null);
@@ -143,12 +134,10 @@ export function OnlineStatusProvider({ user, children }) {
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
 
-    // ---- sync périodique léger ----
     const periodicSync = setInterval(() => {
       syncFromGet();
     }, 15000);
 
-    // ---- cleanup (idempotent) ----
     const cleanup = () => {
       if (cleanedUpRef.current) return;
       cleanedUpRef.current = true;
@@ -164,7 +153,6 @@ export function OnlineStatusProvider({ user, children }) {
       }
 
       try {
-        // leave best-effort (souvent ignoré par le navigateur en unload)
         channel.presence.leave((err) => {
           if (err) console.log("[Presence] leave err:", err);
         });
@@ -177,7 +165,6 @@ export function OnlineStatusProvider({ user, children }) {
       } catch {}
 
       try {
-        // libère le channel proprement
         ably.channels.release("presence:online");
       } catch {}
 
@@ -188,10 +175,8 @@ export function OnlineStatusProvider({ user, children }) {
       }
     };
 
-    // unload : best-effort
     window.addEventListener("beforeunload", cleanup);
 
-    // Optionnel mais utile : quand l’onglet redevient visible, resync
     const onVis = () => {
       if (document.visibilityState === "visible") {
         setTimeout(syncFromGet, 200);
@@ -207,20 +192,25 @@ export function OnlineStatusProvider({ user, children }) {
   }, [user?.id, user?.pseudo]);
 
   const api = useMemo(() => {
-    const isOnline = (userId) => !!counts[String(userId)];
+    // ✅ retourne true si présent, false si on sait qu'il est absent (optionnel), sinon undefined
+    const isOnline = (userId) => {
+      const key = String(userId);
+      return counts[key] ? true : undefined;
+    };
     const onlineCount = (userId) => counts[String(userId)] || 0;
     return { isOnline, onlineCount, counts };
   }, [counts]);
 
-  return (
-    <OnlineStatusContext.Provider value={api}>
-      {children}
-    </OnlineStatusContext.Provider>
-  );
+  return <OnlineStatusContext.Provider value={api}>{children}</OnlineStatusContext.Provider>;
 }
 
 export function useOnlineStatus() {
   const ctx = useContext(OnlineStatusContext);
-  if (!ctx) return { isOnline: () => false, onlineCount: () => 0, counts: {} };
+
+  // ✅ IMPORTANT: si pas de provider, on retourne "unknown" (undefined) au lieu de false
+  if (!ctx) {
+    return { isOnline: () => undefined, onlineCount: () => 0, counts: {} };
+  }
+
   return ctx;
 }

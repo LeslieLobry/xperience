@@ -9,7 +9,6 @@ function generateOptimisticKey() {
   return "tmp-" + Date.now() + "-" + Math.floor(Math.random() * 100000);
 }
 
-// Fonction utilitaire pour choisir le meilleur mime-type audio
 function getSupportedAudioType() {
   if (typeof window === "undefined" || !window.MediaRecorder) return "audio/webm";
   if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
@@ -38,6 +37,10 @@ export default function ChatInput({
   const textareaRef = useRef();
 
   const [isSending, setIsSending] = useState(false);
+
+  // ✅ NEW: garde le fichier/preview pendant qu’on cache l’UI
+  const pendingImageRef = useRef(null); // { file, previewUrl, ephemere }
+  const pendingAudioRef = useRef(null); // { blob, url, ephemere }
 
   function formatDuration(secs) {
     if (!secs || isNaN(secs) || !isFinite(secs) || secs < 0) return "0:01";
@@ -83,27 +86,6 @@ export default function ChatInput({
 
   // EMOJI
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emoticonsMap = {
-    ":)": "😊",
-    ":-)": "😊",
-    ":(": "😢",
-    ":-(": "😢",
-    ";)": "😉",
-    ":D": "😄",
-    ":-D": "😄",
-    "<3": "❤️",
-    ":p": "😛",
-    ":-p": "😛",
-    ":'(": "😭",
-    ":o": "😮",
-    ":-o": "😮",
-  };
-  function replaceEmoticonsWithEmojis(text) {
-    return Object.keys(emoticonsMap).reduce(
-      (acc, emoticon) => acc.split(emoticon).join(emoticonsMap[emoticon]),
-      text
-    );
-  }
 
   // --- IMAGE COMPRESSION ---
   const compressImage = (file, maxSize = 900) =>
@@ -143,7 +125,6 @@ export default function ChatInput({
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
 
-  // ✅ NEW: ref sur l'input file
   const fileInputRef = useRef(null);
 
   // --- AUDIO RECORDING ---
@@ -207,17 +188,6 @@ export default function ChatInput({
   };
 
   // --- CAMERA ---
-  const handleOpenCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setCameraStream(stream);
-      setShowCamera(true);
-    } catch (err) {
-      alert("Impossible d'accéder à la caméra.");
-      setShowCamera(false);
-    }
-  };
-
   const stopCamera = () => {
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
@@ -304,30 +274,23 @@ export default function ChatInput({
     const res = await fetch("/api/prenoms-couple", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversationId,
-        prenom1: pr1,
-        prenom2: pr2,
-      }),
+      body: JSON.stringify({ conversationId, prenom1: pr1, prenom2: pr2 }),
     });
-    const data = await res.json();
-    if (data.success) setPrenomsOK(true);
+    const dataRes = await res.json();
+    if (dataRes.success) setPrenomsOK(true);
     setLoadingPrenoms(false);
   };
 
-  const MAX_HEIGHT = 140; // px
+  const MAX_HEIGHT = 140;
   function autoResize() {
     const ta = textareaRef.current;
     if (!ta) return;
-
     const prev = ta.style.height;
     ta.style.height = "auto";
     const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
     const nextPx = next + "px";
-
     if (prev !== nextPx) ta.style.height = nextPx;
     else ta.style.height = prev;
-
     ta.style.overflowY = "hidden";
   }
 
@@ -335,7 +298,6 @@ export default function ChatInput({
     autoResize();
   }, [texte]);
 
-  // --- SUBMIT LOGIC ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSending) return;
@@ -344,30 +306,43 @@ export default function ChatInput({
     const texteTrim = texteToSend.trim();
     const ephemereToSend = ephemere;
 
-    // ✅ rien à envoyer
     if (!imageFile && !audioBlob && !texteTrim) return;
 
-    // ✅ vide IMMEDIATEMENT l'input (plus de texte “en suspens”)
+    // ✅ vide l’input direct (déjà OK)
     if (texteToSend.length) {
       setTexte("");
-      requestAnimationFrame(() => autoResize());
+      requestAnimationFrame(autoResize);
+    }
+
+    // ✅ CACHE LA MINIATURE DIRECT (UI), mais garde le fichier en ref
+    if (imageFile && imagePreview) {
+      pendingImageRef.current = { file: imageFile, previewUrl: imagePreview, ephemere: ephemereToSend };
+      setImageFile(null);
+      setImagePreview(null);
+      // ⚠️ ne revoke PAS maintenant, on garde l’URL si rollback
+    }
+
+    if (audioBlob && audioUrl) {
+      pendingAudioRef.current = { blob: audioBlob, url: audioUrl, ephemere: ephemereToSend };
+      // on peut cacher "message audio prêt" aussi si tu veux :
+      // setAudioBlob(null); setAudioUrl(null);
+      // mais là tu n’as pas demandé, donc je touche pas par défaut
     }
 
     setIsSending(true);
 
     try {
-      // ✅ IMAGE (photo + texte)
-      if (imageFile) {
+      // ✅ IMAGE (avec texte)
+      if (imageFile || pendingImageRef.current?.file) {
         const optimisticKey = generateOptimisticKey();
         const formData = new FormData();
+        const fileToSend = imageFile || pendingImageRef.current.file;
         const realType = ephemereToSend ? "EPHEMERE" : "IMAGE";
 
-        formData.append("image", imageFile);
+        formData.append("image", fileToSend);
         formData.append("conversationId", conversationId);
         formData.append("type", realType);
         formData.append("optimisticKey", optimisticKey);
-
-        // ✅ texte dans le FormData
         if (texteTrim) formData.append("contenu", texteToSend);
 
         if (utilisateur.type === "couple" && prenomsOK) {
@@ -378,15 +353,18 @@ export default function ChatInput({
 
         await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
 
-        if (imagePreview) URL.revokeObjectURL(imagePreview);
-        setImageFile(null);
-        setImagePreview(null);
+        // ✅ succès : on nettoie “pour de vrai” (revoke url)
+        if (pendingImageRef.current?.previewUrl) {
+          URL.revokeObjectURL(pendingImageRef.current.previewUrl);
+        }
+        pendingImageRef.current = null;
+
         setEphemere(false);
         setIsSending(false);
         return;
       }
 
-      // ✅ AUDIO (+ texte optionnel)
+      // ✅ AUDIO
       if (audioBlob) {
         const optimisticKey = generateOptimisticKey();
         const duree = await getAccurateDuration(audioBlob);
@@ -397,15 +375,12 @@ export default function ChatInput({
         if (audioType === "audio/mpeg") extension = "mp3";
 
         const realType = ephemereToSend ? "EPHEMERE" : "AUDIO";
-
         formData.append("audio", audioBlob, `audio.${extension}`);
         formData.append("audioType", audioType);
         formData.append("conversationId", conversationId);
         formData.append("type", realType);
         formData.append("duree", duree);
         formData.append("optimisticKey", optimisticKey);
-
-        // ✅ texte dans le FormData (légende audio)
         if (texteTrim) formData.append("contenu", texteToSend);
 
         if (utilisateur.type === "couple" && prenomsOK) {
@@ -421,12 +396,13 @@ export default function ChatInput({
         setAudioUrl(null);
         audioStartRef.current = null;
         audioStopRef.current = null;
+
         setEphemere(false);
         setIsSending(false);
         return;
       }
 
-      // ✅ TEXTE
+      // ✅ TEXTE ONLY
       if (!texteTrim) {
         setIsSending(false);
         return;
@@ -469,10 +445,18 @@ export default function ChatInput({
     } catch (err) {
       console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
 
-      // ✅ rollback : on remet le texte si échec
+      // ✅ rollback texte
       if (texteTrim) {
         setTexte(texteToSend);
-        requestAnimationFrame(() => autoResize());
+        requestAnimationFrame(autoResize);
+      }
+
+      // ✅ rollback image preview si on l’a cachée
+      if (pendingImageRef.current) {
+        setImageFile(pendingImageRef.current.file);
+        setImagePreview(pendingImageRef.current.previewUrl);
+        setEphemere(pendingImageRef.current.ephemere);
+        pendingImageRef.current = null;
       }
     }
 
@@ -483,9 +467,7 @@ export default function ChatInput({
   const [showEphemereNotif, setShowEphemereNotif] = useState(false);
   useEffect(() => {
     if (showEphemereNotif) {
-      const timer = setTimeout(() => {
-        setShowEphemereNotif(false);
-      }, 5000);
+      const timer = setTimeout(() => setShowEphemereNotif(false), 5000);
       return () => clearTimeout(timer);
     }
   }, [showEphemereNotif]);
@@ -530,49 +512,6 @@ export default function ChatInput({
             </button>
           </div>
         </form>
-      )}
-
-      {/* CAMERA MODAL */}
-      {showCamera && (
-        <div
-          className="camera-modal"
-          style={{
-            position: "fixed",
-            zIndex: 1002,
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "column",
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
-              width: 340,
-              height: 250,
-              borderRadius: 14,
-              background: "#222",
-            }}
-          />
-          <div style={{ marginTop: 18 }}>
-            <button onClick={handleTakePhoto} style={{ fontSize: 22, marginRight: 24 }}>
-              📸 Prendre la photo
-            </button>
-            <button
-              onClick={stopCamera}
-              style={{ fontSize: 18, color: "#fff", background: "#e53" }}
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
       )}
 
       {utilisateur.type === "couple" && prenomsOK && (
@@ -623,7 +562,7 @@ export default function ChatInput({
         />
 
         <div className="input-wrapper" style={{ alignItems: "center" }}>
-          {/* Aperçu image */}
+          {/* ✅ Aperçu image (maintenant disparaît dès qu’on envoie) */}
           {imagePreview && (
             <div style={{ position: "relative", marginRight: 8 }}>
               <img
@@ -670,6 +609,7 @@ export default function ChatInput({
                 }}
                 onClick={removePreview}
                 title="Supprimer"
+                disabled={isSending}
               >
                 ×
               </button>
@@ -701,13 +641,14 @@ export default function ChatInput({
                   background: "transparent",
                   cursor: "pointer",
                 }}
+                disabled={isSending}
               >
                 ×
               </button>
             </div>
           )}
 
-          {/* Upload classique */}
+          {/* Upload */}
           <input
             ref={fileInputRef}
             type="file"
@@ -726,6 +667,7 @@ export default function ChatInput({
               opacity: !!imageFile || isSending ? 0.5 : 1,
             }}
           >
+            {/* icône */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -745,7 +687,7 @@ export default function ChatInput({
             </svg>
           </label>
 
-          {/* ✅ SABLIER */}
+          {/* SABLIER */}
           <button
             type="button"
             className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
@@ -758,7 +700,9 @@ export default function ChatInput({
               }
             }}
             title="Message éphémère (Snap)"
+            disabled={isSending}
           >
+            {/* icône sablier */}
             <svg
               width="24px"
               height="24px"
@@ -831,13 +775,7 @@ export default function ChatInput({
             !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
           }
         >
-          {isSending
-            ? "Envoi…"
-            : imageFile
-            ? "Envoyer l'image"
-            : audioBlob
-            ? "Envoyer l'audio"
-            : "Envoyer"}
+          {isSending ? "Envoi…" : imageFile ? "Envoyer l'image" : audioBlob ? "Envoyer l'audio" : "Envoyer"}
         </button>
       </form>
 
