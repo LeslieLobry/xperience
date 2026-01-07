@@ -15,15 +15,21 @@ function melangerProfils(array) {
 // (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence ne sait pas
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
-  if (u?.statutAuto && u?.lastSeenAt) {
+
+  // Si statutAuto est activé => on ne fait confiance qu'à lastSeenAt
+  if (u?.statutAuto) {
+    if (!u?.lastSeenAt) return "hors_ligne";
+
     const seen = new Date(u.lastSeenAt).getTime();
-    if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) {
-      return "en_ligne";
-    }
-    return "hors_ligne";
+    if (!Number.isFinite(seen)) return "hors_ligne";
+
+    return Date.now() - seen <= ONLINE_WINDOW_MS ? "en_ligne" : "hors_ligne";
   }
-  return u?.statut || "hors_ligne";
+
+  // Si statutAuto désactivé => on respecte le champ statut manuel
+  return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
+
 
 export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize }) {
   const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel (Presence)

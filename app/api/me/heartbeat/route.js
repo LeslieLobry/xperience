@@ -69,8 +69,8 @@ export async function POST(req) {
       where: { id: Number(user.id) },
       data: {
         lastSeenAt: new Date(),
-        statutAuto: true,          // ✅ BOOLEAN (cohérent Prisma)
-        statut: "en_ligne",        // ✅ optionnel mais utile pour l’UI legacy
+        statutAuto: true, // ✅ on garde juste ça + lastSeenAt
+        // ❌ ne pas écrire "statut" ici
       },
     });
 
