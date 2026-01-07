@@ -58,7 +58,7 @@ export default function ChatInput({
         audio.preload = "metadata";
         audio.src = URL.createObjectURL(blob);
         audio.onloadedmetadata = function () {
-          let d = audio.duration;
+          const d = audio.duration;
           URL.revokeObjectURL(audio.src);
           if (d && isFinite(d) && d > 0) resolve(Math.round(d));
           else resolve(null);
@@ -68,6 +68,7 @@ export default function ChatInput({
         };
       });
     } catch (err) {}
+
     let duree = Math.max(chrono || 0, html5 || 0);
     if (!duree || isNaN(duree) || duree < 1) duree = 1;
     return formatDuration(duree);
@@ -160,9 +161,7 @@ export default function ChatInput({
       audioStopRef.current = null;
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunks.current.push(e.data);
-        }
+        if (e.data.size > 0) audioChunks.current.push(e.data);
       };
 
       recorder.onstop = () => {
@@ -258,7 +257,7 @@ export default function ChatInput({
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
     if (imagePreview) URL.revokeObjectURL(imagePreview);
 
@@ -312,9 +311,7 @@ export default function ChatInput({
       }),
     });
     const data = await res.json();
-    if (data.success) {
-      setPrenomsOK(true);
-    }
+    if (data.success) setPrenomsOK(true);
     setLoadingPrenoms(false);
   };
 
@@ -343,17 +340,26 @@ export default function ChatInput({
     e.preventDefault();
     if (isSending) return;
 
-    const texteToSend = texte; // ✅ capture texte avant tout
+    const texteToSend = texte || "";
+    const texteTrim = texteToSend.trim();
     const ephemereToSend = ephemere;
+
+    // ✅ rien à envoyer
+    if (!imageFile && !audioBlob && !texteTrim) return;
+
+    // ✅ vide IMMEDIATEMENT l'input (plus de texte “en suspens”)
+    if (texteToSend.length) {
+      setTexte("");
+      requestAnimationFrame(() => autoResize());
+    }
 
     setIsSending(true);
 
     try {
-      // ✅ IMAGE (photo + texte en même temps)
+      // ✅ IMAGE (photo + texte)
       if (imageFile) {
         const optimisticKey = generateOptimisticKey();
         const formData = new FormData();
-
         const realType = ephemereToSend ? "EPHEMERE" : "IMAGE";
 
         formData.append("image", imageFile);
@@ -361,10 +367,8 @@ export default function ChatInput({
         formData.append("type", realType);
         formData.append("optimisticKey", optimisticKey);
 
-        // ✅ IMPORTANT : on met bien le texte dans le FormData
-        if (texteToSend && texteToSend.trim()) {
-          formData.append("contenu", texteToSend);
-        }
+        // ✅ texte dans le FormData
+        if (texteTrim) formData.append("contenu", texteToSend);
 
         if (utilisateur.type === "couple" && prenomsOK) {
           formData.append("membreParlant", membreParlant);
@@ -372,12 +376,7 @@ export default function ChatInput({
           formData.append("prenom2", pr2);
         }
 
-        // ✅ IMPORTANT : on n'a PAS vidé setTexte avant → si onMessageSent lit le state, il a encore la valeur
-        await onMessageSent(formData, realType, membreParlant, true, optimisticKey);
-
-        // ✅ maintenant seulement on reset l'UI
-        setTexte("");
-        requestAnimationFrame(() => autoResize());
+        await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
 
         if (imagePreview) URL.revokeObjectURL(imagePreview);
         setImageFile(null);
@@ -387,10 +386,10 @@ export default function ChatInput({
         return;
       }
 
-      // ✅ AUDIO
+      // ✅ AUDIO (+ texte optionnel)
       if (audioBlob) {
         const optimisticKey = generateOptimisticKey();
-        let duree = await getAccurateDuration(audioBlob);
+        const duree = await getAccurateDuration(audioBlob);
 
         const formData = new FormData();
         let extension = "webm";
@@ -406,11 +405,16 @@ export default function ChatInput({
         formData.append("duree", duree);
         formData.append("optimisticKey", optimisticKey);
 
-        await onMessageSent(formData, realType, membreParlant, false, optimisticKey);
+        // ✅ texte dans le FormData (légende audio)
+        if (texteTrim) formData.append("contenu", texteToSend);
 
-        // ✅ reset après envoi
-        setTexte("");
-        requestAnimationFrame(() => autoResize());
+        if (utilisateur.type === "couple" && prenomsOK) {
+          formData.append("membreParlant", membreParlant);
+          formData.append("prenom1", pr1);
+          formData.append("prenom2", pr2);
+        }
+
+        await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
 
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioBlob(null);
@@ -423,16 +427,12 @@ export default function ChatInput({
       }
 
       // ✅ TEXTE
-      if (!texteToSend || !texteToSend.trim()) {
+      if (!texteTrim) {
         setIsSending(false);
         return;
       }
 
       const optimisticKey = generateOptimisticKey();
-
-      // ✅ Là, tu peux vider immédiatement (c’est du texte only)
-      setTexte("");
-      requestAnimationFrame(() => autoResize());
 
       if (utilisateur.type === "couple" && prenomsOK) {
         await onMessageSent(
@@ -469,8 +469,8 @@ export default function ChatInput({
     } catch (err) {
       console.error("[ChatInput] Erreur lors de l'envoi du message :", err);
 
-      // ✅ on remet le texte si l'envoi a échoué
-      if (texteToSend && texteToSend.trim()) {
+      // ✅ rollback : on remet le texte si échec
+      if (texteTrim) {
         setTexte(texteToSend);
         requestAnimationFrame(() => autoResize());
       }
@@ -772,7 +772,7 @@ export default function ChatInput({
                 d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z"
                 fill=""
               />
-              <path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H792c-4 118.4-28.8 206.4-66.4 271.2l-0.8 0.8C678.4 432 626.4 476 559.2 496.8l-3.2 0.8h-0.8c-1.6 0.8-2.4 1.6-4 2.4l-0.8 0.8-1.6 1.6-1.6 1.6v0.8c-0.8 0.8-1.6 2.4-2.4 4l-0.8 0.8-1.6 5.6v8.8l1.6 5.6 0.8 0.8c0.8 1.6 1.6 2.4 2.4 4v0.8 l1.6 1.6V536l1.6 0.8 0.8 0.8c0.8 0.8 2.4 1.6 4 2.4h0.8l3.2 1.6c68 21.6 119.2 64.8 166.4 146.4l0.8 1.6c40.8 70.4 68 166.4 72.8 294.4H184c4.8-128 32-223.2 72.8-294.4l0.8-1.6C297.6 594.4 352 548.8 409.6 520c-57.6-28.8-112-74.4-152.8-145.6l-0.8-1.6c-40.8-71.2-68-166.4-72.8-294.4h47.2c4.8 118.4 29.6 206.4 66.4 271.2l0.8 0.8c47.2 82.4 99.2 126.4 167.2 147.2l2.4 0.8h0.8c1.6 0.8 2.4 1.6 4 2.4l2.4 0.8 1.6 1.6 1.6 1.6v0.8c0.8 0.8 1.6 2.4 2.4 4v0.8c0.8 1.6 1.6 4 1.6 5.6v8c0 1.6-0.8 4-1.6 5.6v0.8c-0.8 1.6-1.6 3.2-2.4 4v0.8l-1.6 1.6-1.6 1.6-0.8 0.8c-0.8 0.8-2.4 1.6-4 2.4h-0.8l-3.2 0.8c-68 21.6-120 64.8-167.2 146.4l-0.8 1.6c-19.2 33.6-35.2 73.6-47.2 121.6-7.2 30.4-11.2 51.2-12.8 70.4 48-28 149.6-48 266.4-48V464c-1.6-0.8-2.4-0.8-3.2-1.6l-1.6-0.8-6.4-2.4h-0.8c-44.8-14.4-81.6-36.8-111.2-66.4-32.8-32-56.8-71.2-73.6-115.2-4-12.8 1.6-25.6 13.6-30.4 11.2-4.8 24.8 1.6 29.6 13.6 14.4 37.6 34.4 71.2 62.4 98.4 24 24 55.2 42.4 92 54.4l2.4 0.8 1.6 0.8 2.4 0.8 4-0.8 2.4-0.8 0.8-0.8c37.6-11.2 67.2-30.4 92-54.4 27.2-27.2 48-61.6 62.4-98.4v-0.8c4.8-12 18.4-17.6 30.4-12.8 12.8 4.8 18.4 18.4 13.6 30.4-16.8 44-41.6 83.2-73.6 115.2-30.4 29.6-66.4 52-112 66.4h-1.6l-6.4 2.4v0.8c-1.6 0.8-2.4 1.6-4 1.6v410.4c124.8 1.6 228.8 25.6 266.4 59.2-1.6-38.4-10.4-68-12.8-81.6-12-47.2-27.2-88-47.2-121.6z" />
+              <path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H184c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-112 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" />
             </svg>
           </button>
 
@@ -787,9 +787,16 @@ export default function ChatInput({
             {isRecording ? (
               <CircleStop />
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-mic" viewBox="0 0 16 16">
-                <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
-                <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                fill="#e0c084"
+                className="bi bi-mic"
+                viewBox="0 0 16 16"
+              >
+                <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
+                <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3" />
               </svg>
             )}
           </button>
@@ -802,9 +809,16 @@ export default function ChatInput({
             title="Insérer un emoji"
             disabled={isSending}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#e0c084" className="bi bi-emoji-smile" viewBox="0 0 16 16">
-              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-              <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              fill="#e0c084"
+              className="bi bi-emoji-smile"
+              viewBox="0 0 16 16"
+            >
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+              <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5" />
             </svg>
           </button>
         </div>
@@ -820,10 +834,10 @@ export default function ChatInput({
           {isSending
             ? "Envoi…"
             : imageFile
-              ? "Envoyer l'image"
-              : audioBlob
-                ? "Envoyer l'audio"
-                : "Envoyer"}
+            ? "Envoyer l'image"
+            : audioBlob
+            ? "Envoyer l'audio"
+            : "Envoyer"}
         </button>
       </form>
 
