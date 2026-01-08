@@ -5,7 +5,7 @@ import { prisma } from "../../lib/prisma";
 import { getIdsUtilisateursExclus } from "../../lib/utilsFiltrage";
 import ProfilsDisplay from "../../components/ProfilsDisplay/ProfilsDisplay";
 import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper";
-import styles from "./profils.module.css"; // <-- CSS local à la page
+import styles from "./profils.module.css";
 
 const secret = process.env.JWT_SECRET;
 
@@ -22,11 +22,12 @@ export default async function PageTousLesProfils() {
     return redirect("/connexion");
   }
 
-  const exclus = await getIdsUtilisateursExclus(decoded.id);
+  const userId = Number(decoded.id);
+  const exclus = await getIdsUtilisateursExclus(userId);
 
   const utilisateurs = await prisma.utilisateur.findMany({
     where: {
-      NOT: { id: { in: [...exclus, decoded.id] } },
+      NOT: { id: { in: [...exclus, userId] } },
     },
     select: {
       id: true,
@@ -34,7 +35,12 @@ export default async function PageTousLesProfils() {
       photoUrl: true,
       age: true,
       localisation: true,
+
+      // ✅ IMPORTANT pour le badge en ligne fiable
       statut: true,
+      statutAuto: true,
+      lastSeenAt: true,
+
       type: true,
       verificationIdentiteStatut: true,
     },
@@ -47,6 +53,7 @@ export default async function PageTousLesProfils() {
         <aside className={styles.sidebar}>
           <RechercheWrapper />
         </aside>
+
         <main className={styles.main}>
           <ProfilsDisplay profils={utilisateurs} context="recherche" />
         </main>
