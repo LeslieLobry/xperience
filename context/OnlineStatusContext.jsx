@@ -1,19 +1,13 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Ably from "ably";
 
 const OnlineStatusContext = createContext(null);
 
 export function OnlineStatusProvider({ user, children }) {
   const [counts, setCounts] = useState({});
+  const [ready, setReady] = useState(false); // ✅ on a une snapshot fiable après un presence.get()
   const enteredRef = useRef(false);
   const cleanedUpRef = useRef(false);
 
@@ -23,6 +17,9 @@ export function OnlineStatusProvider({ user, children }) {
     console.log("[Presence] init for user:", user.id);
 
     cleanedUpRef.current = false;
+    enteredRef.current = false;
+    setCounts({});
+    setReady(false);
 
     const ably = new Ably.Realtime({
       authUrl: "/api/presence/token",
@@ -33,7 +30,6 @@ export function OnlineStatusProvider({ user, children }) {
     });
 
     const channel = ably.channels.get("presence:online");
-    enteredRef.current = false;
 
     const memberToUserId = (m) => {
       const id = m?.clientId;
@@ -72,9 +68,7 @@ export function OnlineStatusProvider({ user, children }) {
         }
 
         setCounts(next);
-
-        const ids = (members || []).map((m) => m?.clientId).filter(Boolean);
-        console.log("[Presence] members:", ids);
+        setReady(true); // ✅ on a une base fiable (online/offline)
       });
     };
 
@@ -86,16 +80,10 @@ export function OnlineStatusProvider({ user, children }) {
 
       channel.presence.enter({ pseudo: user.pseudo || "", t: Date.now() }, (err) => {
         console.log("[Presence] enter callback err?:", err || null);
-
         if (err) {
           enteredRef.current = false;
           return;
         }
-
-        try {
-          console.log("[Presence] entered with clientId:", ably?.auth?.clientId || null);
-        } catch {}
-
         syncFromGet();
         setTimeout(syncFromGet, 500);
       });
@@ -106,7 +94,7 @@ export function OnlineStatusProvider({ user, children }) {
       console.log("[Presence] Ably state:", state);
 
       if (state === "connected") {
-        enteredRef.current = false;
+        enteredRef.current = false; // ✅ autorise re-enter
         enterPresence();
         setTimeout(syncFromGet, 500);
       }
@@ -114,6 +102,7 @@ export function OnlineStatusProvider({ user, children }) {
 
     ably.connection.on(onConnectionState);
 
+    // kick initial
     setTimeout(() => {
       enterPresence();
       syncFromGet();
@@ -134,9 +123,7 @@ export function OnlineStatusProvider({ user, children }) {
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
 
-    const periodicSync = setInterval(() => {
-      syncFromGet();
-    }, 15000);
+    const periodicSync = setInterval(syncFromGet, 15000);
 
     const cleanup = () => {
       if (cleanedUpRef.current) return;
@@ -148,17 +135,11 @@ export function OnlineStatusProvider({ user, children }) {
       try {
         channel.presence.unsubscribe("enter", onEnter);
         channel.presence.unsubscribe("leave", onLeave);
-      } catch (e) {
-        console.log("[Presence] unsubscribe throw:", e);
-      }
+      } catch {}
 
       try {
-        channel.presence.leave((err) => {
-          if (err) console.log("[Presence] leave err:", err);
-        });
-      } catch (e) {
-        console.log("[Presence] leave throw:", e);
-      }
+        channel.presence.leave(() => {});
+      } catch {}
 
       try {
         ably.connection.off(onConnectionState);
@@ -170,9 +151,7 @@ export function OnlineStatusProvider({ user, children }) {
 
       try {
         ably.close();
-      } catch (e) {
-        console.log("[Presence] close throw:", e);
-      }
+      } catch {}
     };
 
     window.addEventListener("beforeunload", cleanup);
@@ -192,25 +171,17 @@ export function OnlineStatusProvider({ user, children }) {
   }, [user?.id, user?.pseudo]);
 
   const api = useMemo(() => {
-    // ✅ retourne true si présent, false si on sait qu'il est absent (optionnel), sinon undefined
-    const isOnline = (userId) => {
-      const key = String(userId);
-      return counts[key] ? true : undefined;
-    };
+    // ✅ IMPORTANT : toujours booléen
+    const isOnline = (userId) => !!counts[String(userId)];
     const onlineCount = (userId) => counts[String(userId)] || 0;
-    return { isOnline, onlineCount, counts };
-  }, [counts]);
+    return { isOnline, onlineCount, counts, ready };
+  }, [counts, ready]);
 
   return <OnlineStatusContext.Provider value={api}>{children}</OnlineStatusContext.Provider>;
 }
 
 export function useOnlineStatus() {
   const ctx = useContext(OnlineStatusContext);
-
-  // ✅ IMPORTANT: si pas de provider, on retourne "unknown" (undefined) au lieu de false
-  if (!ctx) {
-    return { isOnline: () => undefined, onlineCount: () => 0, counts: {} };
-  }
-
+  if (!ctx) return { isOnline: () => false, onlineCount: () => 0, counts: {}, ready: false };
   return ctx;
 }

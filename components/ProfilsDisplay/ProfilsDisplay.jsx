@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import "./ProfilsDisplay.css";
-import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ ajuste le chemin si besoin
+import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
 function melangerProfils(array) {
   return array
@@ -12,7 +12,7 @@ function melangerProfils(array) {
     .map(({ val }) => val);
 }
 
-// (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence ne sait pas
+// (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence pas prête
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
 
@@ -30,9 +30,8 @@ function computeStatut(u) {
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
-
 export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize }) {
-  const { isOnline } = useOnlineStatus(); // ✅ vérité temps réel (Presence)
+  const { isOnline, ready } = useOnlineStatus(); // ✅ ready = snapshot presence OK
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -59,25 +58,26 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Filtre "En ligne" robuste :
-  // Presence d'abord, et si Presence ne sait pas => fallback computeStatut()
+  // ✅ Filtre "En ligne" :
+  // - si Presence prête => on filtre UNIQUEMENT avec Presence (fiable, symétrique)
+  // - sinon => fallback DB (évite "liste vide" au tout début)
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
-          const v = typeof isOnline === "function" ? isOnline(String(p?.id)) : undefined;
+          const id = String(p?.id || "");
 
-          if (v === true) return true;   // Presence: online
-          if (v === false) return false; // Presence: offline
+          if (ready && typeof isOnline === "function") {
+            return isOnline(id) === true;
+          }
 
-          // Presence ne sait pas => fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
     return melangerProfils(filtered);
-  }, [filtrerEnLigne, profilsAffiches, isOnline]);
+  }, [filtrerEnLigne, profilsAffiches, isOnline, ready]);
 
   // Quand la liste à afficher change, on (re)charge les presigned urls
   useEffect(() => {
@@ -131,7 +131,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
     return () => {
       canceled = true;
     };
-    // ⚠️ dépendance simple : si la liste change réellement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profilsFiltres]);
 
@@ -247,14 +246,14 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
-              const online =
-                typeof isOnline === "function" ? isOnline(String(user?.id)) : undefined;
+              const id = String(user?.id || "");
 
+              // ✅ Badge: Presence si prête, sinon fallback DB
               const statutEff =
-                online === true
-                  ? "en_ligne"
-                  : online === false
-                  ? "hors_ligne"
+                ready && typeof isOnline === "function"
+                  ? isOnline(id)
+                    ? "en_ligne"
+                    : "hors_ligne"
                   : computeStatut(user);
 
               return (
