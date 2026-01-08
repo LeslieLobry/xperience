@@ -260,6 +260,10 @@ export default function ChatInput({
           setPr1(data.prenoms.prenom1 || "");
           setPr2(data.prenoms.prenom2 || "");
           setPrenomsOK(true);
+
+          // ✅ important : si membreParlant est "couple" ok,
+          // sinon si jamais il était vide, on remet un défaut
+          setMembreParlant((prev) => prev || "couple");
         } else {
           setPrenomsOK(false);
         }
@@ -308,7 +312,7 @@ export default function ChatInput({
 
     if (!imageFile && !audioBlob && !texteTrim) return;
 
-    // ✅ vide l’input direct (déjà OK)
+    // ✅ vide l’input direct
     if (texteToSend.length) {
       setTexte("");
       requestAnimationFrame(autoResize);
@@ -316,7 +320,11 @@ export default function ChatInput({
 
     // ✅ CACHE LA MINIATURE DIRECT (UI), mais garde le fichier en ref
     if (imageFile && imagePreview) {
-      pendingImageRef.current = { file: imageFile, previewUrl: imagePreview, ephemere: ephemereToSend };
+      pendingImageRef.current = {
+        file: imageFile,
+        previewUrl: imagePreview,
+        ephemere: ephemereToSend,
+      };
       setImageFile(null);
       setImagePreview(null);
       // ⚠️ ne revoke PAS maintenant, on garde l’URL si rollback
@@ -324,9 +332,6 @@ export default function ChatInput({
 
     if (audioBlob && audioUrl) {
       pendingAudioRef.current = { blob: audioBlob, url: audioUrl, ephemere: ephemereToSend };
-      // on peut cacher "message audio prêt" aussi si tu veux :
-      // setAudioBlob(null); setAudioUrl(null);
-      // mais là tu n’as pas demandé, donc je touche pas par défaut
     }
 
     setIsSending(true);
@@ -514,18 +519,6 @@ export default function ChatInput({
         </form>
       )}
 
-      {utilisateur.type === "couple" && prenomsOK && (
-        <select
-          className="select-membre"
-          value={membreParlant}
-          onChange={(e) => setMembreParlant(e.target.value)}
-        >
-          <option value={pr1}>{pr1}</option>
-          <option value={pr2}>{pr2}</option>
-          <option value="couple">Le couple</option>
-        </select>
-      )}
-
       {showEphemereNotif && (
         <div
           style={{
@@ -547,6 +540,21 @@ export default function ChatInput({
       )}
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
+        {/* ✅ SELECT "qui parle" DANS L'INPUT */}
+        {utilisateur.type === "couple" && prenomsOK && (
+          <select
+            className="select-membre select-membre--in-input"
+            value={membreParlant}
+            onChange={(e) => setMembreParlant(e.target.value)}
+            disabled={isSending}
+            title="Qui parle ?"
+          >
+            <option value={pr1}>{pr1}</option>
+            <option value={pr2}>{pr2}</option>
+            <option value="couple">Le couple</option>
+          </select>
+        )}
+
         <textarea
           className="input-text"
           ref={textareaRef}
@@ -562,7 +570,7 @@ export default function ChatInput({
         />
 
         <div className="input-wrapper" style={{ alignItems: "center" }}>
-          {/* ✅ Aperçu image (maintenant disparaît dès qu’on envoie) */}
+          {/* ✅ Aperçu image (disparaît dès qu’on envoie) */}
           {imagePreview && (
             <div style={{ position: "relative", marginRight: 8 }}>
               <img
@@ -667,7 +675,6 @@ export default function ChatInput({
               opacity: !!imageFile || isSending ? 0.5 : 1,
             }}
           >
-            {/* icône */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -702,7 +709,6 @@ export default function ChatInput({
             title="Message éphémère (Snap)"
             disabled={isSending}
           >
-            {/* icône sablier */}
             <svg
               width="24px"
               height="24px"
@@ -775,7 +781,13 @@ export default function ChatInput({
             !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
           }
         >
-          {isSending ? "Envoi…" : imageFile ? "Envoyer l'image" : audioBlob ? "Envoyer l'audio" : "Envoyer"}
+          {isSending
+            ? "Envoi…"
+            : imageFile
+            ? "Envoyer l'image"
+            : audioBlob
+            ? "Envoyer l'audio"
+            : "Envoyer"}
         </button>
       </form>
 
