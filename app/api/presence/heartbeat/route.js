@@ -1,66 +1,92 @@
-"use client";
+// app/api/me/heartbeat/route.js
+import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
-import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+export const runtime = "nodejs";
 
-export default function HeartbeatClient({
-  intervalMs = 60_000, // ping toutes les 60s
-  immediate = true, // ping au montage
-} = {}) {
-  const pathname = usePathname();
-  const timerRef = useRef(null);
+const JWT_SECRET = process.env.JWT_SECRET || "";
 
-  const send = () => {
-    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+/* ---------- CORS (si Expo / RN appelle ton domaine) ---------- */
+const ALLOWED_ORIGINS = [
+  "http://localhost:8081",
+  "http://localhost:19006",
+  "https://x-periences.fr",
+  "https://www.x-periences.fr",
+];
 
-    fetch("/api/me/heartbeat", {
-      method: "POST",
-      credentials: "include", // ✅ IMPORTANT
-      cache: "no-store",
-    }).catch(() => {});
-  };
+function corsHeaders(req) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : "";
+  const h = new Headers();
 
-  useEffect(() => {
-    let disposed = false;
+  if (allowed) {
+    h.set("Access-Control-Allow-Origin", allowed);
+    h.set("Vary", "Origin");
+  }
 
-    const start = () => {
-      if (immediate) send();
-      timerRef.current = window.setInterval(send, intervalMs);
-    };
+  h.set("Access-Control-Allow-Credentials", "true");
+  h.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  h.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return h;
+}
 
-    const stop = () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
+async function getUserFromRequest(req) {
+  if (!JWT_SECRET) return null;
 
-    const onFocus = () => send();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") send();
-    };
-    const onOnline = () => send();
+  // Mobile: Authorization: Bearer xxx
+  const auth = req.headers.get("authorization") || "";
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  const tokenHeader = match?.[1];
 
-    start();
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("online", onOnline);
+  // Web: cookie token
+  const cookieStore = cookies();
+  const tokenCookie = cookieStore.get("token")?.value;
 
-    return () => {
-      if (disposed) return;
-      disposed = true;
-      stop();
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("online", onOnline);
-    };
-  }, [intervalMs, immediate]);
+  const token = tokenHeader || tokenCookie;
+  if (!token) return null;
 
-  useEffect(() => {
-    send();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
 
-  return null;
+export async function OPTIONS(req) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
+}
+
+export async function POST(req) {
+  try {
+    const user = await getUserFromRequest(req);
+
+    if (!user?.id) {
+      return NextResponse.json(
+        { ok: false, error: "Non authentifié" },
+        { status: 401, headers: corsHeaders(req) }
+      );
+    }
+
+    await prisma.utilisateur.update({
+      where: { id: Number(user.id) },
+      data: {
+        lastSeenAt: new Date(),
+        statutAuto: true,
+        // ❌ IMPORTANT : ne pas écrire `statut: "en_ligne"` ici
+      },
+    });
+
+    return NextResponse.json(
+      { ok: true },
+      { status: 200, headers: corsHeaders(req) }
+    );
+  } catch (e) {
+    console.error("heartbeat error", e);
+    return NextResponse.json(
+      { ok: false, error: "Erreur serveur" },
+      { status: 500, headers: corsHeaders(req) }
+    );
+  }
 }

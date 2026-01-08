@@ -49,8 +49,17 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
       photoUrl: true,
       age: true,
       localisation: true,
-      statut: true,
       type: true,
+
+      // ✅ important pour "en ligne" fallback (lastSeenAt + statutAuto)
+      statutAuto: true,
+      lastSeenAt: true,
+
+      // ✅ optionnel (legacy)
+      statut: true,
+
+      // ✅ si tu affiches le badge vérifié
+      verificationIdentiteStatut: true,
     },
     // 🔁 Idem que ta route /api/profils (id desc) pour éviter les doublons
     orderBy: { id: "desc" },
