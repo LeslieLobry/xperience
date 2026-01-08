@@ -4,9 +4,6 @@
     border: none;
     width: 25%;
   padding: 8px;
-  display: flex;
-  position: fixed;
-  bottom: 70px;
 }
 
 .select-membre option{
@@ -44,21 +41,8 @@
   overflow-y: hidden; /* grandit, pas de scroll */
   -webkit-overflow-scrolling: touch;
 }
-.select-membre--in-input{
-  width: 110px;
-  max-width: 110px;
-  margin-right: 8px;
-  height: 40px;
-  border-radius: 8px;
-  padding: 6px 8px;
-  background: transparent;
-}
+
 
 @media (max-width: 768px) {
-  .select-membre{
-    
-    display: flex;
-    position: absolute;
-    bottom: 150px;
-  }
+ 
 }
