@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../lib/prisma";
 
+export const runtime = "nodejs";
+
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error("JWT_SECRET non défini");
 
@@ -15,15 +17,18 @@ const ALLOWED_ORIGINS = [
 ];
 
 function corsHeaders(origin = "") {
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    // ajoute tes headers custom en minuscules et majuscules (les navigateurs sont case-insensitive, mais soyons larges)
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Platform, x-platform, X-Requested-With, Accept, Origin",
-    "Access-Control-Allow-Credentials": "true", // ✅ important pour le cookie
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Platform, x-platform, X-Requested-With, Accept, Origin",
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
@@ -39,7 +44,8 @@ export async function POST(req) {
   try {
     const url = new URL(req.url);
     const isMobile =
-      req.headers.get("x-platform") === "mobile" || url.searchParams.get("mobile") === "1";
+      req.headers.get("x-platform") === "mobile" ||
+      url.searchParams.get("mobile") === "1";
 
     const { email, password } = await req.json();
     const normEmail = (email || "").toLowerCase().trim();
@@ -47,54 +53,99 @@ export async function POST(req) {
     const user = await prisma.utilisateur.findUnique({
       where: { email: normEmail },
       select: {
-        id: true, email: true, pseudo: true, password: true,
-        role: true, photoUrl: true, type: true
+        id: true,
+        email: true,
+        pseudo: true,
+        password: true,
+        role: true,
+        photoUrl: true,
+        type: true,
       },
     });
 
-    if (!user)
-      return NextResponse.json({ success: false, message: "Utilisateur introuvable" }, { status: 401, headers });
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: "Utilisateur introuvable" },
+        { status: 401, headers }
+      );
+    }
 
-    if (!user.password)
-      return NextResponse.json({ success: false, message: "Mot de passe non défini" }, { status: 400, headers });
+    if (!user.password) {
+      return NextResponse.json(
+        { success: false, message: "Mot de passe non défini" },
+        { status: 400, headers }
+      );
+    }
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid)
-      return NextResponse.json({ success: false, message: "Mot de passe incorrect" }, { status: 401, headers });
+    if (!valid) {
+      return NextResponse.json(
+        { success: false, message: "Mot de passe incorrect" },
+        { status: 401, headers }
+      );
+    }
 
-    // async/low priority
+    // async / low priority
     setTimeout(() => {
-      prisma.utilisateur.update({
-        where: { id: user.id },
-        data: { lastLogin: new Date() },
-        select: { id: true }
-      }).catch(console.error);
+      prisma.utilisateur
+        .update({
+          where: { id: user.id },
+          data: { lastLogin: new Date() },
+          select: { id: true },
+        })
+        .catch(console.error);
     }, 0);
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, pseudo: user.pseudo, role: user.role, photoUrl: user.photoUrl, type: user.type },
+      {
+        id: user.id,
+        email: user.email,
+        pseudo: user.pseudo,
+        role: user.role,
+        photoUrl: user.photoUrl,
+        type: user.type,
+      },
       secret,
       { expiresIn: "7d" }
     );
 
     const body = isMobile
-      ? { success: true, token, user: { id: user.id, email: user.email, pseudo: user.pseudo, photoUrl: user.photoUrl, type: user.type, role: user.role } }
+      ? {
+          success: true,
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            pseudo: user.pseudo,
+            photoUrl: user.photoUrl,
+            type: user.type,
+            role: user.role,
+          },
+        }
       : { success: true };
 
     const res = NextResponse.json(body, { headers });
-    // ✅ cookie (credentials côté client requis)
+
+    // ✅ Cookie partagé entre x-periences.fr et www.x-periences.fr
+    // ✅ Dev-friendly (localhost) : secure=false + sameSite=lax
+    const isProd = process.env.NODE_ENV === "production";
+
     res.cookies.set("token", token, {
       httpOnly: true,
-      secure: true,
-      sameSite: "none",
+      secure: isProd, // ✅ true en prod, false en dev (http://localhost)
+      sameSite: isProd ? "none" : "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
+      domain: isProd ? ".x-periences.fr" : undefined, // ✅ clé du fix
     });
 
     return res;
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: "Erreur serveur : " + (error?.message || "inconnue") },
+      {
+        success: false,
+        message: "Erreur serveur : " + (error?.message || "inconnue"),
+      },
       { status: 500, headers }
     );
   }
