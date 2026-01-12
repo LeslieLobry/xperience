@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ably } from "@/lib/ably";
+import { ably } from "../lib/ably";
 
 const OnlineStatusContext = createContext(null);
 
