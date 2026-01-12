@@ -1,7 +1,7 @@
 // app/api/presence/token/route.js
 import { NextResponse } from "next/server";
 import { Rest as AblyRest } from "ably";
-import { getUserFromToken } from "@/lib/auth";
+import { getUserFromToken } from "../../../../lib/auth";
 
 export const runtime = "nodejs";
 

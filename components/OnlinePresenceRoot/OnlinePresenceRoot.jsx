@@ -2,8 +2,8 @@
 "use client";
 
 import React from "react";
-import { useAuth } from "@/context/AuthContext";
-import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
+import { useAuth } from "../../context/AuthContext";
+import { OnlineStatusProvider } from "../../context/OnlineStatusContext";
 
 export default function OnlinePresenceRoot({ children }) {
   const { user, authReady } = useAuth() || {};
