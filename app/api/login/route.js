@@ -136,7 +136,8 @@ export async function POST(req) {
       sameSite: isProd ? "none" : "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
-      domain: isProd ? ".x-periences.fr" : undefined, // ✅ clé du fix
+      ...(isProd ? { domain: ".x-periences.fr" } : {}),
+
     });
 
     return res;
