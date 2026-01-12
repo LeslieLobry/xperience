@@ -135,7 +135,7 @@ function calculateProfileCompletion(user) {
 
 // ✅ Fallback (si Presence indispo) : lastSeenAt/statutAuto
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 2 min
   if (u?.statutAuto && u?.lastSeenAt) {
     const seen = new Date(u.lastSeenAt).getTime();
     if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) return "en_ligne";
@@ -149,12 +149,13 @@ export default function Profil({ user, connectedUser }) {
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
   // ✅ Online Presence (fiable) + fallback
-  const { isOnline } = useOnlineStatus();
+const { isOnline, ready } = useOnlineStatus();
 
-  const presenceOnline =
-    !isOwnProfile && typeof isOnline === "function"
-      ? isOnline(String(user?.id))
-      : undefined;
+const presenceOnline =
+  !isOwnProfile && ready && typeof isOnline === "function"
+    ? isOnline(String(user?.id))
+    : undefined;
+
 
   const statutEff =
     isOwnProfile

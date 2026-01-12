@@ -1,86 +1,90 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import "./ProfilsDisplay.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
-function melangerProfils(array) {
-  return array
-    .map((val) => ({ val, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ val }) => val);
+// ✅ shuffle stable : même input => même ordre
+function stableShuffle(list, seed) {
+  const arr = Array.isArray(list) ? [...list] : [];
+  // petit hash deterministe (pas crypto) : seed + id
+  const hash = (str) => {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  };
+
+  return arr
+    .map((u) => {
+      const id = String(u?.id ?? "");
+      return { u, k: hash(`${seed}:${id}`) };
+    })
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.u);
 }
 
 // (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence pas prête
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 min
 
-  // Si statutAuto est activé => on ne fait confiance qu'à lastSeenAt
   if (u?.statutAuto) {
     if (!u?.lastSeenAt) return "hors_ligne";
-
     const seen = new Date(u.lastSeenAt).getTime();
     if (!Number.isFinite(seen)) return "hors_ligne";
-
     return Date.now() - seen <= ONLINE_WINDOW_MS ? "en_ligne" : "hors_ligne";
   }
 
-  // Si statutAuto désactivé => on respecte le champ statut manuel
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
-export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize }) {
-  const { isOnline, ready } = useOnlineStatus(); // ✅ ready = snapshot presence OK
+export default function ProfilsDisplay({ profils, afficherPlus = false }) {
+  const { isOnline, ready } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
   const [loading, setLoading] = useState(false);
 
-  // ---- Filtre distance dynamique
   const [filtrerProches, setFiltrerProches] = useState(false);
   const [distance, setDistance] = useState(20);
 
-  // presigned URLs par userId
   const [photoUrls, setPhotoUrls] = useState({});
+
+  // ✅ seed stable (ne change pas à chaque render)
+  const seedRef = useRef(null);
+  if (seedRef.current === null) seedRef.current = Date.now().toString();
 
   // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
-    if (online === "1" || online === "true") {
-      setFiltrerEnLigne(true);
-    }
+    if (online === "1" || online === "true") setFiltrerEnLigne(true);
   }, []);
 
-  // 🔁 sync si la prop `profils` change
   useEffect(() => {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Filtre "En ligne" :
-  // - si Presence prête => on filtre UNIQUEMENT avec Presence (fiable, symétrique)
-  // - sinon => fallback DB (évite "liste vide" au tout début)
+  // ✅ Filtre + ordre stable
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
           const id = String(p?.id || "");
-
-          if (ready && typeof isOnline === "function") {
-            return isOnline(id) === true;
-          }
-
+          if (ready && typeof isOnline === "function") return isOnline(id) === true;
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
-    return filtrerEnLigne ? filtered : melangerProfils(filtered);
-
+    // ✅ IMPORTANT : on garde un ordre stable même sans filtre
+    return stableShuffle(filtered, seedRef.current);
   }, [filtrerEnLigne, profilsAffiches, isOnline, ready]);
 
-  // Quand la liste à afficher change, on (re)charge les presigned urls
+  // Presigned URLs
   useEffect(() => {
     let canceled = false;
 
@@ -96,7 +100,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
             return;
           }
 
-          // Pour éviter de spam si déjà présente
           if (photoUrls[user.id]) {
             newUrls[user.id] = photoUrls[user.id];
             return;
@@ -123,9 +126,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
         })
       );
 
-      if (!canceled) {
-        setPhotoUrls((prev) => ({ ...prev, ...newUrls }));
-      }
+      if (!canceled) setPhotoUrls((prev) => ({ ...prev, ...newUrls }));
     };
 
     loadAllUrls();
@@ -183,12 +184,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
   const handleDistanceChange = (e) => {
     const val = Number(e.target.value);
     setDistance(val);
-    if (filtrerProches) {
-      handleToggleProches(true, val);
-    }
+    if (filtrerProches) handleToggleProches(true, val);
   };
 
-  // ✅ URL "Afficher plus" qui garde le filtre online
   const hrefAfficherPlus = filtrerEnLigne
     ? { pathname: "/profils", query: { online: "1" } }
     : "/profils";
@@ -249,7 +247,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
             profilsFiltres.map((user) => {
               const id = String(user?.id || "");
 
-              // ✅ Badge: Presence si prête, sinon fallback DB
               const statutEff =
                 ready && typeof isOnline === "function"
                   ? isOnline(id)
