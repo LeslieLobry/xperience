@@ -57,49 +57,58 @@ export function OnlineStatusProvider({ user, children }) {
         return next;
       });
     };
+const syncFromGet = () => {
+  channel.presence.get((err, members) => {
+    if (err) {
+      console.log("[Presence] presence.get error:", err);
+      return;
+    }
 
-    const syncFromGet = () => {
-      try {
-        channel.presence.get((err, members) => {
-          if (err) {
-            console.log("[Presence] presence.get error:", err);
-            return;
-          }
-          const next = {};
-          for (const m of members || []) {
-            const id = memberToUserId(m);
-            if (!id) continue;
-            next[id] = (next[id] || 0) + 1;
-          }
-          setCounts(next);
-          setReady(true);
-          // debug
-          // console.log("[Presence] SNAPSHOT members:", Object.keys(next));
-        });
-      } catch (e) {
-        console.log("[Presence] presence.get exception:", e);
-      }
-    };
+    console.log(
+      "[Presence] GET members:",
+      (members || []).map((m) => ({
+        clientId: m.clientId,
+        connectionId: m.connectionId,
+        data: m.data,
+      }))
+    );
 
-    const enterPresence = () => {
-      if (enteredRef.current) return;
-      enteredRef.current = true;
+    const next = {};
+    for (const m of members || []) {
+      const id = memberToUserId(m);
+      if (!id) continue;
+      next[id] = (next[id] || 0) + 1;
+    }
+    setCounts(next);
+    setReady(true);
+  });
+};
 
-      console.log("[Presence] ENTER start userId:", myUserId);
 
-      channel.presence.enter({ pseudo: user.pseudo || "", t: Date.now() }, (err) => {
-        console.log("[Presence] ENTER callback userId:", myUserId, "err:", err || null);
+const enterPresence = () => {
+  if (enteredRef.current) return;
+  enteredRef.current = true;
 
-        if (err) {
-          enteredRef.current = false;
-          return;
-        }
+  console.log("[Presence] ENTER start", {
+    userId: String(user.id),
+    ablyClientId: ably.auth?.clientId || null,
+    connState: ably.connection.state,
+  });
 
-        // Snapshot juste après enter
-        syncFromGet();
-        setTimeout(syncFromGet, 500);
-      });
-    };
+  channel.presence.enter({ t: Date.now() }, (err) => {
+    console.log("[Presence] ENTER cb", err || "OK", {
+      userId: String(user.id),
+      ablyClientId: ably.auth?.clientId || null,
+    });
+
+    if (err) {
+      enteredRef.current = false;
+      return;
+    }
+    syncFromGet();
+    setTimeout(syncFromGet, 500);
+  });
+};
 
     const ensureEntered = () => {
       // On peut appeler souvent : c'est protégé par enteredRef
