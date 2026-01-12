@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function HeartbeatClient({
   intervalMs = 60_000,
@@ -10,7 +11,12 @@ export default function HeartbeatClient({
   const pathname = usePathname();
   const timerRef = useRef(null);
 
+  const { user, authReady } = useAuth() || {};
+
   const send = () => {
+    // ✅ pas prêt / pas connecté => pas de heartbeat
+    if (!authReady || !user?.id) return;
+
     if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
@@ -22,6 +28,15 @@ export default function HeartbeatClient({
   };
 
   useEffect(() => {
+    // ✅ tant que pas ready / pas user => on stoppe tout
+    if (!authReady || !user?.id) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+
     const start = () => {
       if (immediate) send();
       timerRef.current = window.setInterval(send, intervalMs);
@@ -51,13 +66,13 @@ export default function HeartbeatClient({
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
     };
-  }, [intervalMs, immediate]);
+  }, [intervalMs, immediate, authReady, user?.id]); // ✅ important
 
-  // ping à chaque changement de page
+  // ping à chaque changement de page (uniquement si connecté)
   useEffect(() => {
     send();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, authReady, user?.id]);
 
   return null;
 }

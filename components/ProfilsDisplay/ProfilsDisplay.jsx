@@ -14,7 +14,7 @@ function melangerProfils(array) {
 
 // (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence pas prête
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 min
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 min
 
   // Si statutAuto est activé => on ne fait confiance qu'à lastSeenAt
   if (u?.statutAuto) {
@@ -76,7 +76,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false, pageSize
         })
       : base;
 
-    return melangerProfils(filtered);
+    return filtrerEnLigne ? filtered : melangerProfils(filtered);
+
   }, [filtrerEnLigne, profilsAffiches, isOnline, ready]);
 
   // Quand la liste à afficher change, on (re)charge les presigned urls

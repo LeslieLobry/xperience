@@ -1,15 +1,13 @@
+// app/api/presence/token/route.js
 import { NextResponse } from "next/server";
 import { Rest as AblyRest } from "ably";
-import { getUserFromToken } from "../../../../lib/auth"; // adapte si ton helper est ailleurs
+import { getUserFromToken } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-const ABLY_API_KEY =
-  process.env.ABLY_API_KEY_SERVER ||
-  process.env.ABLY_API_KEY ||
-  process.env.NEXT_PUBLIC_ABLY_API_KEY;
+const ABLY_API_KEY = process.env.ABLY_API_KEY_SERVER || process.env.ABLY_API_KEY;
 
-/* ---------- CORS (si mobile) ---------- */
+/* CORS (si mobile) */
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -44,7 +42,11 @@ export async function GET(req) {
       );
     }
 
-    const user = await getUserFromToken(req); // cookie OU Bearer (comme tes autres routes)
+   const user = await getUserFromToken({
+  req,
+  select: { id: true, pseudo: true },
+});
+
     if (!user?.id) {
       return NextResponse.json(
         { error: "Non authentifié" },
@@ -54,8 +56,6 @@ export async function GET(req) {
 
     const ably = new AblyRest(ABLY_API_KEY);
 
-    // ✅ Un canal global de présence
-    // capability : présence + subscribe
     const tokenRequest = await ably.auth.createTokenRequest({
       clientId: String(user.id),
       capability: {
