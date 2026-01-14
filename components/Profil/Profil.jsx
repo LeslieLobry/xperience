@@ -153,30 +153,21 @@ export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  // ✅ Online Presence
-  const { isOnline, ready, counts } = useOnlineStatus();
-
-  // ✅ plus robuste que ready seul
-  const presenceReady = ready || (counts && Object.keys(counts).length > 0);
+  // ✅ Presence : on utilise counts DIRECTEMENT (le plus fiable)
+  const { counts } = useOnlineStatus();
 
   const cibleId = getTargetUserId(user);
 
-  const presenceOnline =
-    !isOwnProfile &&
-    presenceReady &&
-    typeof isOnline === "function" &&
-    cibleId
-      ? isOnline(cibleId)
-      : undefined;
+  // ✅ Online fiable : si counts contient l'ID, alors en ligne
+  const onlineViaPresence =
+    !isOwnProfile && cibleId ? !!counts?.[String(cibleId)] : false;
 
-  const statutEff =
-    isOwnProfile
-      ? null
-      : presenceOnline === true
-      ? "en_ligne"
-      : presenceOnline === false
-      ? "hors_ligne"
-      : computeStatut(user);
+  // ✅ Statut effectif
+  const statutEff = isOwnProfile
+    ? null
+    : onlineViaPresence
+    ? "en_ligne"
+    : computeStatut(user);
 
   const online = !isOwnProfile && statutEff === "en_ligne";
 
@@ -205,6 +196,7 @@ export default function Profil({ user, connectedUser }) {
     }
   }
 
+  // 💡 Charge la presigned URL dès que photoUrl change
   useEffect(() => {
     if (!photoUrl) {
       setPresignedPhotoUrl("/default.jpg");
@@ -228,6 +220,7 @@ export default function Profil({ user, connectedUser }) {
       .catch(() => setPresignedPhotoUrl("/default.jpg"));
   }, [photoUrl]);
 
+  // Enregistre la visite si on consulte le profil de quelqu’un d’autre
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
       fetch("/api/visites", {
@@ -239,6 +232,7 @@ export default function Profil({ user, connectedUser }) {
     }
   }, [connectedUser?.id, user.id]);
 
+  // 🔁 Rafraîchit le statut auto pour son propre profil (via /api/me)
   useEffect(() => {
     if (!isOwnProfile) return;
     const interval = setInterval(async () => {
@@ -255,6 +249,7 @@ export default function Profil({ user, connectedUser }) {
     return () => clearInterval(interval);
   }, [isOwnProfile]);
 
+  // 🧩 Synchronise si les props 'user' se mettent à jour
   useEffect(() => {
     setStatut(user.statut);
     setStatutAuto(user.statutAuto);

@@ -49,9 +49,6 @@ function getTargetUserId(u) {
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const { isOnline, ready, counts } = useOnlineStatus();
 
-  // ✅ plus robuste que ready seul : dès que counts a des infos, on bascule Presence
-  const presenceReady = ready || (counts && Object.keys(counts).length > 0);
-
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
   const [loading, setLoading] = useState(false);
@@ -61,11 +58,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   const [photoUrls, setPhotoUrls] = useState({});
 
-  // ✅ seed stable
+  // ✅ seed stable (ne change pas à chaque render)
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
 
-  // ✅ URL ?online=1
+  // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
@@ -76,21 +73,39 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
+  // ✅ Presence "vraiment prête" :
+  // - ready true, OU
+  // - counts a déjà au moins 1 membre
+  const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
+
+  // ✅ si filtre "En ligne" activé, mais presence pas encore prête -> on affiche "Chargement"
+  const onlineFilterLoading = filtrerEnLigne && !presenceReady;
+
+  // ✅ Filtre + ordre stable
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
+
+    // ✅ IMPORTANT : si on a activé "En ligne" mais Presence pas prête,
+    // on NE filtre PAS (sinon tu te retrouves avec 0 profil et un message trompeur).
+    if (onlineFilterLoading) {
+      return stableShuffle(base, seedRef.current);
+    }
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
           const id = getTargetUserId(p);
           if (!id) return false;
 
+          // Presence prioritaire
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
+
+          // Fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
     return stableShuffle(filtered, seedRef.current);
-  }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady]);
+  }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady, onlineFilterLoading]);
 
   // Presigned URLs
   useEffect(() => {
@@ -104,7 +119,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           const targetId = getTargetUserId(user);
           if (!targetId) return;
 
-          // ⚠️ pour photoUrls on garde la clé targetId (pas user.id)
           if (!user?.photoUrl) {
             newUrls[targetId] = "/default.jpg";
             return;
@@ -251,10 +265,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         <p>Chargement des profils proches...</p>
       ) : (
         <div className="grid-profil">
-          {profilsFiltres.length === 0 ? (
+          {onlineFilterLoading ? (
+            <p>Chargement des statuts en ligne…</p>
+          ) : profilsFiltres.length === 0 ? (
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
-            profilsFiltres.map((user, idx) => {
+            profilsFiltres.map((user) => {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
@@ -265,11 +281,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     : "hors_ligne"
                   : computeStatut(user);
 
-              // ⚠️ route profil : adapte si tu utilises utilisateurId
+              // route profil
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
               return (
-                <Link href={`/profil/${routeId}`} key={`${targetId}-${idx}`} className="profil-card-link">
+                <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
                   <div className="profil-card">
                     <span
                       className={`statut-badge ${
@@ -300,7 +316,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() +
+                        user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
