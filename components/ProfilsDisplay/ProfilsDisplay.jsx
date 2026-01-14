@@ -5,7 +5,6 @@ import Link from "next/link";
 import "./ProfilsDisplay.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
-// ✅ shuffle stable : même input => même ordre
 function stableShuffle(list, seed) {
   const arr = Array.isArray(list) ? [...list] : [];
   const hash = (str) => {
@@ -26,9 +25,8 @@ function stableShuffle(list, seed) {
     .map((x) => x.u);
 }
 
-// (fallback) calcul basé lastSeenAt/statutAuto — utile si Presence pas prête
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 min
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
   if (u?.statutAuto) {
     if (!u?.lastSeenAt) return "hors_ligne";
@@ -40,7 +38,6 @@ function computeStatut(u) {
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
-// ✅ récupère l'id utilisateur fiable (selon tes payloads possibles)
 function getTargetUserId(u) {
   const id = u?.id ?? u?.utilisateurId ?? u?.userId ?? null;
   return id != null ? String(id) : null;
@@ -58,11 +55,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   const [photoUrls, setPhotoUrls] = useState({});
 
-  // ✅ seed stable (ne change pas à chaque render)
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
 
-  // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
@@ -73,20 +68,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Presence "vraiment prête" :
-  // - ready true, OU
-  // - counts a déjà au moins 1 membre
   const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
-
-  // ✅ si filtre "En ligne" activé, mais presence pas encore prête -> on affiche "Chargement"
   const onlineFilterLoading = filtrerEnLigne && !presenceReady;
 
-  // ✅ Filtre + ordre stable
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    // ✅ IMPORTANT : si on a activé "En ligne" mais Presence pas prête,
-    // on NE filtre PAS (sinon tu te retrouves avec 0 profil et un message trompeur).
     if (onlineFilterLoading) {
       return stableShuffle(base, seedRef.current);
     }
@@ -96,10 +83,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           const id = getTargetUserId(p);
           if (!id) return false;
 
-          // Presence prioritaire
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
-
-          // Fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
@@ -107,7 +91,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     return stableShuffle(filtered, seedRef.current);
   }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady, onlineFilterLoading]);
 
-  // Presigned URLs
   useEffect(() => {
     let canceled = false;
 
@@ -281,16 +264,13 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     : "hors_ligne"
                   : computeStatut(user);
 
-              // route profil
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
               return (
                 <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${
-                        statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
-                      }`}
+                      className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
                       title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
 
@@ -316,8 +296,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() +
-                        user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">

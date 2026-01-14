@@ -7,11 +7,9 @@ export const runtime = "nodejs";
 
 const ABLY_API_KEY = process.env.ABLY_API_KEY_SERVER || process.env.ABLY_API_KEY;
 
-/* CORS (si mobile) */
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
-  "http://localhost:3000",
   "https://x-periences.fr",
   "https://www.x-periences.fr",
 ];
@@ -19,20 +17,15 @@ const ALLOWED_ORIGINS = [
 function corsHeaders(req) {
   const origin = req.headers.get("origin") || "";
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  const h = new Headers();
 
+  const h = new Headers();
   if (allowed) {
     h.set("Access-Control-Allow-Origin", allowed);
     h.set("Vary", "Origin");
   }
-
   h.set("Access-Control-Allow-Credentials", "true");
   h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  h.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-  );
-  h.set("Access-Control-Max-Age", "86400");
+  h.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   return h;
 }
 
@@ -40,7 +33,7 @@ export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
-async function handleToken(req) {
+async function handle(req) {
   try {
     if (!ABLY_API_KEY) {
       return NextResponse.json(
@@ -49,7 +42,6 @@ async function handleToken(req) {
       );
     }
 
-    // ✅ IMPORTANT : auth cookie -> il faut credentials côté fetch (tu l’as déjà)
     const user = await getUserFromToken({
       req,
       select: { id: true, pseudo: true },
@@ -66,7 +58,6 @@ async function handleToken(req) {
 
     const tokenRequest = await ably.auth.createTokenRequest({
       clientId: String(user.id),
-      // ✅ capacité Presence
       capability: {
         "presence:online": ["presence", "subscribe"],
       },
@@ -82,11 +73,10 @@ async function handleToken(req) {
   }
 }
 
-// ✅ Ably peut appeler en GET ou en POST selon config
 export async function GET(req) {
-  return handleToken(req);
+  return handle(req);
 }
 
 export async function POST(req) {
-  return handleToken(req);
+  return handle(req);
 }
