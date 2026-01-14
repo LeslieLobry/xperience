@@ -67,24 +67,39 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ LOG UI : ce que voit la page
-  useEffect(() => {
-    console.log("[UI ProfilsDisplay] ready=", ready, "countsIds=", Object.keys(counts || {}), "debug=", debug);
-  }, [ready, counts, debug]);
+  // ✅ presenceReady = ready OR counts non vide (fix)
+  const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
 
-  const presenceReady = !!ready;
+  // ✅ LOG UI : ce que voit réellement la page
+  useEffect(() => {
+    console.log("[UI ProfilsDisplay]", {
+      ready,
+      presenceReady,
+      countsIds: Object.keys(counts || {}),
+      debug,
+    });
+  }, [ready, presenceReady, counts, debug]);
+
+  // ✅ Si filtre En ligne activé mais presence pas prête -> on affiche un loader
   const onlineFilterLoading = filtrerEnLigne && !presenceReady;
 
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    if (onlineFilterLoading) return stableShuffle(base, seedRef.current);
+    // ⚠️ IMPORTANT : si "En ligne" est activé AVANT presenceReady, on ne filtre pas encore
+    if (onlineFilterLoading) {
+      return stableShuffle(base, seedRef.current);
+    }
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
           const id = getTargetUserId(p);
           if (!id) return false;
+
+          // Presence prioritaire
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
+
+          // Fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
@@ -92,6 +107,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     return stableShuffle(filtered, seedRef.current);
   }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady, onlineFilterLoading]);
 
+  // Presigned URLs
   useEffect(() => {
     let canceled = false;
 
@@ -168,7 +184,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             });
 
             const data = await res.json();
-            setProfilsAffiches(data);
+            setProfilsAffiches(Array.isArray(data) ? data : []);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
           } finally {
@@ -191,7 +207,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     if (filtrerProches) handleToggleProches(true, val);
   };
 
-  const hrefAfficherPlus = filtrerEnLigne ? { pathname: "/profils", query: { online: "1" } } : "/profils";
+  const hrefAfficherPlus = filtrerEnLigne
+    ? { pathname: "/profils", query: { online: "1" } }
+    : "/profils";
 
   return (
     <div className="profil-list1">
@@ -200,13 +218,21 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
       <div className="profil-toggle-wrapper">
         <div className="toggle-box">
           <label className={`toggle-label ${filtrerEnLigne ? "active" : ""}`}>
-            <input type="checkbox" checked={filtrerEnLigne} onChange={() => setFiltrerEnLigne((p) => !p)} />
+            <input
+              type="checkbox"
+              checked={filtrerEnLigne}
+              onChange={() => setFiltrerEnLigne((p) => !p)}
+            />
             <span className="slider"></span>
             En ligne
           </label>
 
           <label className="toggle-label" style={{ alignItems: "center", gap: 8 }}>
-            <input type="checkbox" checked={filtrerProches} onChange={(e) => handleToggleProches(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={filtrerProches}
+              onChange={(e) => handleToggleProches(e.target.checked)}
+            />
             <span className="slider"></span>
             Près de moi
             <input
@@ -256,7 +282,13 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               return (
                 <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
                   <div className="profil-card">
-                    <span className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`} />
+                    <span
+                      className={`statut-badge ${
+                        statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
+                      }`}
+                      title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
+                    />
+
                     <div className="profil-photo-wrapper">
                       <img
                         src={photoUrls[targetId] || "/default.jpg"}
@@ -267,14 +299,26 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                           e.target.src = "/default.jpg";
                         }}
                       />
+
                       {user.verificationIdentiteStatut && (
-                        <img src="/Profilverif.png" alt="Vérifié" className="badge-verifie-overlay" />
+                        <img
+                          src="/Profilverif.png"
+                          alt="Vérifié"
+                          className="badge-verifie-overlay"
+                          title="Profil vérifié"
+                        />
                       )}
                     </div>
+
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() +
+                        user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
-                    <p className="profil-card-details">{user.age} ans - {user.localisation}</p>
+
+                    <p className="profil-card-details">
+                      {user.age} ans - {user.localisation}
+                    </p>
+
                     <p className="profil-card-details-type">{user.type}</p>
                   </div>
                 </Link>
