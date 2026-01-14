@@ -1,3 +1,4 @@
+// components/ProfilsDisplay/ProfilsDisplay.jsx
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -25,6 +26,7 @@ function stableShuffle(list, seed) {
     .map((x) => x.u);
 }
 
+// fallback DB (si presence pas prête)
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -68,12 +70,20 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
+  // ✅ IMPORTANT : presence prête si:
+  // - ready true (snapshot reçu)
+  // - OU counts a déjà au moins 1 membre (events enter reçus)
   const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
+
+  // ✅ si on a activé "en ligne" mais presence pas prête → on affiche un état de chargement
+  // et surtout : on NE filtre PAS encore.
   const onlineFilterLoading = filtrerEnLigne && !presenceReady;
 
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
+    // ✅ tant que la presence n’est pas prête, on n’applique pas le filtre online
+    // sinon tu te retrouves avec "Aucun profil" alors que c’est juste trop tôt.
     if (onlineFilterLoading) {
       return stableShuffle(base, seedRef.current);
     }
@@ -83,14 +93,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           const id = getTargetUserId(p);
           if (!id) return false;
 
+          // Presence prioritaire
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
+
+          // fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
     return stableShuffle(filtered, seedRef.current);
-  }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady, onlineFilterLoading]);
+  }, [filtrerEnLigne, profilsAffiches, presenceReady, onlineFilterLoading, isOnline]);
 
+  // Presigned URLs
   useEffect(() => {
     let canceled = false;
 
@@ -171,7 +185,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             });
 
             const data = await res.json();
-            setProfilsAffiches(data);
+            setProfilsAffiches(Array.isArray(data) ? data : []);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
           } finally {
@@ -253,21 +267,21 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           ) : profilsFiltres.length === 0 ? (
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
-            profilsFiltres.map((user) => {
-              const targetId = getTargetUserId(user);
-              if (!targetId) return null;
+            profilsFiltres.map((u) => {
+              const id = getTargetUserId(u);
+              if (!id) return null;
 
               const statutEff =
                 presenceReady && typeof isOnline === "function"
-                  ? isOnline(targetId)
+                  ? isOnline(id)
                     ? "en_ligne"
                     : "hors_ligne"
-                  : computeStatut(user);
+                  : computeStatut(u);
 
-              const routeId = user?.id ?? user?.utilisateurId ?? targetId;
+              const routeId = u?.id ?? u?.utilisateurId ?? id;
 
               return (
-                <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
+                <Link href={`/profil/${routeId}`} key={id} className="profil-card-link">
                   <div className="profil-card">
                     <span
                       className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
@@ -276,8 +290,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
                     <div className="profil-photo-wrapper">
                       <img
-                        src={photoUrls[targetId] || "/default.jpg"}
-                        alt={user.pseudo}
+                        src={photoUrls[id] || "/default.jpg"}
+                        alt={u.pseudo}
                         className="profil-photo"
                         onError={(e) => {
                           e.target.onerror = null;
@@ -285,7 +299,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                         }}
                       />
 
-                      {user.verificationIdentiteStatut && (
+                      {u.verificationIdentiteStatut && (
                         <img
                           src="/Profilverif.png"
                           alt="Vérifié"
@@ -296,18 +310,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
+                      {u.pseudo?.charAt(0)?.toUpperCase() + u.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
-                      {user.age} ans - {user.localisation}
+                      {u.age} ans - {u.localisation}
                     </p>
 
-                    <p className="profil-card-details-type">{user.type}</p>
+                    <p className="profil-card-details-type">{u.type}</p>
 
-                    {user.distance && (
+                    {u.distance && (
                       <p className="profil-card-details" style={{ color: "#999" }}>
-                        {user.distance.toFixed(1)} km de vous
+                        {u.distance.toFixed(1)} km de vous
                       </p>
                     )}
                   </div>

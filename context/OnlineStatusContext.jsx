@@ -1,3 +1,4 @@
+// context/OnlineStatusContext.js
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -5,22 +6,16 @@ import { getAbly } from "../lib/ably";
 
 const OnlineStatusContext = createContext(null);
 
-function asId(v) {
-  if (v === null || v === undefined) return null;
-  return String(v);
-}
-
 export function OnlineStatusProvider({ user, children }) {
   const [counts, setCounts] = useState({});
   const [ready, setReady] = useState(false);
 
-  const enteredRef = useRef(false);
-  const cleanedUpRef = useRef(false);
   const channelRef = useRef(null);
+  const enteredRef = useRef(false);
   const periodicRef = useRef(null);
 
-  const userId = user?.id ? asId(user.id) : null;
-  const pseudo = user?.pseudo ? String(user.pseudo) : null;
+  const userId = user?.id ? String(user.id) : null;
+  const pseudo = user?.pseudo ? String(user.pseudo) : "";
 
   useEffect(() => {
     if (!userId) return;
@@ -28,76 +23,66 @@ export function OnlineStatusProvider({ user, children }) {
     const ably = getAbly();
     if (!ably) return;
 
-    cleanedUpRef.current = false;
-    enteredRef.current = false;
-
-    setCounts({});
-    setReady(false);
-
     const channel = ably.channels.get("presence:online");
     channelRef.current = channel;
 
+    setCounts({});
+    setReady(false);
+    enteredRef.current = false;
+
     const memberToUserId = (m) => {
-      // on privilégie data.userId si présent
       const id = m?.data?.userId ?? m?.clientId;
-      return asId(id);
+      return id != null ? String(id) : null;
     };
 
-    const syncFromGet = () => {
+    const syncSnapshot = () => {
       channel.presence.get((err, members) => {
         if (err) {
           console.log("[Presence] presence.get error:", err);
           return;
         }
-
         const next = {};
         for (const m of members || []) {
           const id = memberToUserId(m);
           if (!id) continue;
           next[id] = (next[id] || 0) + 1;
         }
-
         setCounts(next);
         setReady(true);
 
-        console.log(
-          "[Presence] GET snapshot size:",
-          (members || []).length,
-          "keys:",
-          Object.keys(next)
-        );
+        // debug utile
+        // console.log("[Presence] snapshot size:", (members || []).length, next);
       });
     };
 
-    const enterPresence = () => {
+    const enterOnce = () => {
       if (enteredRef.current) return;
+      if (ably.connection.state !== "connected") return;
+
       enteredRef.current = true;
 
-      console.log("[Presence] ENTER start", {
-        userId,
-        pseudo,
-        connState: ably.connection.state,
-        ablyClientId: ably.auth?.clientId || null,
-      });
-
       channel.presence.enter({ userId, pseudo, t: Date.now() }, (err) => {
-        console.log("[Presence] ENTER cb", err || "OK", { userId });
-
         if (err) {
+          console.log("[Presence] enter error:", err);
           enteredRef.current = false;
           return;
         }
-
-        syncFromGet();
-        setTimeout(syncFromGet, 400);
+        syncSnapshot();
       });
     };
 
-    const ensureEntered = () => {
-      if (ably.connection.state === "connected") enterPresence();
+    const onConn = (stateChange) => {
+      if (stateChange.current === "connected") {
+        enteredRef.current = false;
+        enterOnce();
+        setTimeout(syncSnapshot, 300);
+      }
+      if (stateChange.current === "disconnected" || stateChange.current === "suspended") {
+        setReady(false);
+        enteredRef.current = false;
+      }
     };
 
-    // events
     const onEnter = (m) => {
       const id = memberToUserId(m);
       if (!id) return;
@@ -116,63 +101,40 @@ export function OnlineStatusProvider({ user, children }) {
       });
     };
 
-    const onUpdate = () => setTimeout(syncFromGet, 100);
+    const onUpdate = () => setTimeout(syncSnapshot, 100);
 
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
     channel.presence.subscribe("update", onUpdate);
 
-    // connection lifecycle
-    const onConn = (stateChange) => {
-      if (stateChange.current === "connected") {
-        enteredRef.current = false; // autorise re-enter après reconnexion
-        ensureEntered();
-        setTimeout(syncFromGet, 250);
-      }
-      if (stateChange.current === "disconnected") {
-        enteredRef.current = false;
-        setReady(false);
-      }
-    };
     ably.connection.on(onConn);
 
-    // attach
     channel.attach((err) => {
       if (err) {
         console.log("[Presence] channel.attach error:", err);
         return;
       }
-      console.log("[Presence] channel ATTACHED. connState:", ably.connection.state);
-
-      syncFromGet();
-      ensureEntered();
+      syncSnapshot();
+      enterOnce();
     });
 
-    periodicRef.current = setInterval(() => {
-      syncFromGet();
-      // sécurité : si presence perdue, on retente
-      enteredRef.current = false;
-      ensureEntered();
-    }, 15000);
+    // ✅ refresh snapshot (sans re-enter)
+    periodicRef.current = setInterval(syncSnapshot, 15000);
 
     const onVis = () => {
       if (document.visibilityState === "visible") {
-        setTimeout(syncFromGet, 200);
+        setTimeout(syncSnapshot, 200);
         enteredRef.current = false;
-        ensureEntered();
+        enterOnce();
       }
     };
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      if (cleanedUpRef.current) return;
-      cleanedUpRef.current = true;
-
       if (periodicRef.current) {
         clearInterval(periodicRef.current);
         periodicRef.current = null;
       }
-
       document.removeEventListener("visibilitychange", onVis);
 
       try {
@@ -189,9 +151,9 @@ export function OnlineStatusProvider({ user, children }) {
         ably.channels.release("presence:online");
       } catch {}
     };
-  }, [userId]); // ✅ seulement userId (sinon tu re-mount tout le système)
+  }, [userId]); // ✅ uniquement userId
 
-  // update pseudo sans tout remonter
+  // ✅ update pseudo sans tout remonter
   useEffect(() => {
     if (!userId) return;
     const ch = channelRef.current;
@@ -202,8 +164,8 @@ export function OnlineStatusProvider({ user, children }) {
   }, [userId, pseudo]);
 
   const api = useMemo(() => {
-    const isOnline = (id) => !!counts[asId(id)];
-    const onlineCount = (id) => counts[asId(id)] || 0;
+    const isOnline = (id) => (counts[String(id)] || 0) > 0;
+    const onlineCount = (id) => counts[String(id)] || 0;
     return { isOnline, onlineCount, counts, ready };
   }, [counts, ready]);
 
