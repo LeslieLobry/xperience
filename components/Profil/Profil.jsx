@@ -51,7 +51,7 @@ function SimpleModal({ open, onClose, children, offsetTop = 0 }) {
       onClick={onClose}
       style={{
         position: "fixed",
-        top: offsetTop, // 0 = recouvre tout l'écran
+        top: offsetTop,
         left: 0,
         right: 0,
         bottom: 0,
@@ -71,7 +71,6 @@ function SimpleModal({ open, onClose, children, offsetTop = 0 }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ❌ Bouton de fermeture */}
         <button
           type="button"
           className="profil-photo-modal-close"
@@ -135,7 +134,7 @@ function calculateProfileCompletion(user) {
 
 // ✅ Fallback (si Presence indispo) : lastSeenAt/statutAuto
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 2 min
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 min
   if (u?.statutAuto && u?.lastSeenAt) {
     const seen = new Date(u.lastSeenAt).getTime();
     if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) return "en_ligne";
@@ -144,18 +143,31 @@ function computeStatut(u) {
   return u?.statut || "hors_ligne";
 }
 
+// ✅ récupère l'id utilisateur robuste (au cas où selon tes payloads)
+function getTargetUserId(u) {
+  const id = u?.id ?? u?.utilisateurId ?? u?.userId ?? null;
+  return id != null ? String(id) : null;
+}
+
 export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  // ✅ Online Presence (fiable) + fallback
-const { isOnline, ready } = useOnlineStatus();
+  // ✅ Online Presence
+  const { isOnline, ready, counts } = useOnlineStatus();
 
-const presenceOnline =
-  !isOwnProfile && ready && typeof isOnline === "function"
-    ? isOnline(String(user?.id))
-    : undefined;
+  // ✅ plus robuste que ready seul
+  const presenceReady = ready || (counts && Object.keys(counts).length > 0);
 
+  const cibleId = getTargetUserId(user);
+
+  const presenceOnline =
+    !isOwnProfile &&
+    presenceReady &&
+    typeof isOnline === "function" &&
+    cibleId
+      ? isOnline(cibleId)
+      : undefined;
 
   const statutEff =
     isOwnProfile
@@ -174,20 +186,16 @@ const presenceOnline =
   const [statutAuto, setStatutAuto] = useState(user.statutAuto);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // États modals d’édition
   const [openDescriptionModal, setOpenDescriptionModal] = useState(false);
   const [openProfilDetailsModal, setOpenProfilDetailsModal] = useState(false);
 
-  // Uploader photo de profil
   const [openPhotoUploader, setOpenPhotoUploader] = useState(false);
   const [uploaderKey, setUploaderKey] = useState(Date.now());
 
-  // Anti double-clic & UX bouton message
   const [startingConv, setStartingConv] = useState(false);
 
   const completion = useMemo(() => calculateProfileCompletion(user), [user]);
 
-  // Parse JSON “safe” (gère HTML/texte en cas de redirection côté API)
   async function parseJsonSafe(res) {
     const text = await res.text();
     try {
@@ -197,7 +205,6 @@ const presenceOnline =
     }
   }
 
-  // 💡 Charge la presigned URL dès que photoUrl change
   useEffect(() => {
     if (!photoUrl) {
       setPresignedPhotoUrl("/default.jpg");
@@ -221,7 +228,6 @@ const presenceOnline =
       .catch(() => setPresignedPhotoUrl("/default.jpg"));
   }, [photoUrl]);
 
-  // Enregistre la visite si on consulte le profil de quelqu’un d’autre
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
       fetch("/api/visites", {
@@ -233,7 +239,6 @@ const presenceOnline =
     }
   }, [connectedUser?.id, user.id]);
 
-  // 🔁 Rafraîchit le statut auto pour son propre profil (via /api/me)
   useEffect(() => {
     if (!isOwnProfile) return;
     const interval = setInterval(async () => {
@@ -250,13 +255,11 @@ const presenceOnline =
     return () => clearInterval(interval);
   }, [isOwnProfile]);
 
-  // 🧩 Synchronise si les props 'user' se mettent à jour
   useEffect(() => {
     setStatut(user.statut);
     setStatutAuto(user.statutAuto);
   }, [user.statut, user.statutAuto]);
 
-  // Champs à éditer via ProfilDetailsForm
   const profilDetailsFields = [
     "Taille",
     "Silhouette",
@@ -278,7 +281,7 @@ const presenceOnline =
     if (champ === "Description") setOpenDescriptionModal(true);
     else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
     else if (champ === "Photo de profil") {
-      setUploaderKey(Date.now()); // Force un composant neuf à chaque ouverture
+      setUploaderKey(Date.now());
       setOpenPhotoUploader(true);
     }
   }
@@ -295,12 +298,11 @@ const presenceOnline =
 
       const res = await fetch("/api/conversations", {
         method: "POST",
-        credentials: "include", // garantit l’envoi du cookie JWT
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ participantIds: [meId, otherId] }),
       });
 
-      // Non-auth / redirections
       if (res.status === 401 || res.status === 403) {
         router.push(`/connexion?next=${encodeURIComponent(`/messagerie`)}`);
         return;
@@ -339,12 +341,10 @@ const presenceOnline =
 
   return (
     <div className="profil-page">
-      {/* Modal d’upload photo déclenché par la complétion ou le bouton "changer photo" */}
-      {/* Ici on garde un léger offset pour rester sous le header si tu veux */}
       <SimpleModal
         open={openPhotoUploader}
         onClose={() => setOpenPhotoUploader(false)}
-        offsetTop={80} // adapte à la hauteur de ton header ou mets 0
+        offsetTop={80}
       >
         <PhotoUploader
           key={uploaderKey}
@@ -361,7 +361,6 @@ const presenceOnline =
       <div className="profil-header-horizontal">
         <div className="profil-header-row">
           <div className="profil-avatar-horizontal">
-            {/* Clique = ouvre la lightbox plein écran */}
             <div style={{ cursor: "zoom-in" }} onClick={() => setModalOpen(true)}>
               <PhotoUploader
                 priority
@@ -374,7 +373,6 @@ const presenceOnline =
               />
             </div>
 
-            {/* Affichage modal photo grand => aucun offset, recouvre tout */}
             <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
               <img
                 src={presignedPhotoUrl || "/default.jpg"}
@@ -430,7 +428,6 @@ const presenceOnline =
           </div>
 
           <div>
-            {/* ✅ Statut */}
             {isOwnProfile ? (
               <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
             ) : (
@@ -439,9 +436,7 @@ const presenceOnline =
                   className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
                   title={online ? "En ligne" : "Hors ligne"}
                 />
-                <span className="profil-statut-text">
-                  {online ? "En ligne" : "Hors ligne"}
-                </span>
+                <span className="profil-statut-text">{online ? "En ligne" : "Hors ligne"}</span>
               </div>
             )}
 

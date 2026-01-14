@@ -9,8 +9,12 @@ import styles from "./profils.module.css";
 
 const secret = process.env.JWT_SECRET;
 
+export const dynamic = "force-dynamic"; // ✅ évite tout cache RSC sur cette page (utile en debug)
+
 export default async function PageTousLesProfils() {
-  const cookieStore = cookies();
+  if (!secret) return redirect("/connexion");
+
+  const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
 
   if (!token) return redirect("/connexion");
@@ -23,6 +27,8 @@ export default async function PageTousLesProfils() {
   }
 
   const userId = Number(decoded.id);
+  if (!userId || Number.isNaN(userId)) return redirect("/connexion");
+
   const exclus = await getIdsUtilisateursExclus(userId);
 
   const utilisateurs = await prisma.utilisateur.findMany({
@@ -36,7 +42,7 @@ export default async function PageTousLesProfils() {
       age: true,
       localisation: true,
 
-      // ✅ IMPORTANT pour le badge en ligne fiable
+      // ✅ fallback si Presence indispo
       statut: true,
       statutAuto: true,
       lastSeenAt: true,

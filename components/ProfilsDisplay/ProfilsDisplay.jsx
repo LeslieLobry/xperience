@@ -8,7 +8,6 @@ import { useOnlineStatus } from "../../context/OnlineStatusContext";
 // ✅ shuffle stable : même input => même ordre
 function stableShuffle(list, seed) {
   const arr = Array.isArray(list) ? [...list] : [];
-  // petit hash deterministe (pas crypto) : seed + id
   const hash = (str) => {
     let h = 2166136261;
     for (let i = 0; i < str.length; i++) {
@@ -20,7 +19,7 @@ function stableShuffle(list, seed) {
 
   return arr
     .map((u) => {
-      const id = String(u?.id ?? "");
+      const id = String(u?.id ?? u?.utilisateurId ?? u?.userId ?? "");
       return { u, k: hash(`${seed}:${id}`) };
     })
     .sort((a, b) => a.k - b.k)
@@ -41,6 +40,12 @@ function computeStatut(u) {
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
+// ✅ récupère l'id utilisateur fiable (selon tes payloads possibles)
+function getTargetUserId(u) {
+  const id = u?.id ?? u?.utilisateurId ?? u?.userId ?? null;
+  return id != null ? String(id) : null;
+}
+
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const { isOnline, ready, counts } = useOnlineStatus();
 
@@ -56,11 +61,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   const [photoUrls, setPhotoUrls] = useState({});
 
-  // ✅ seed stable (ne change pas à chaque render)
+  // ✅ seed stable
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
 
-  // ✅ Au chargement : si URL contient ?online=1 => on active "En ligne"
+  // ✅ URL ?online=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
@@ -71,24 +76,19 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ Filtre + ordre stable
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
-          const id = p?.id != null ? String(p.id) : null;
+          const id = getTargetUserId(p);
           if (!id) return false;
 
-          // ✅ priorité Presence si dispo
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
-
-          // fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
-    // ✅ IMPORTANT : on garde un ordre stable même sans filtre
     return stableShuffle(filtered, seedRef.current);
   }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady]);
 
@@ -101,20 +101,22 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
       await Promise.all(
         profilsFiltres.map(async (user) => {
-          if (!user?.id) return;
+          const targetId = getTargetUserId(user);
+          if (!targetId) return;
 
+          // ⚠️ pour photoUrls on garde la clé targetId (pas user.id)
           if (!user?.photoUrl) {
-            newUrls[user.id] = "/default.jpg";
+            newUrls[targetId] = "/default.jpg";
             return;
           }
 
-          if (photoUrls[user.id]) {
-            newUrls[user.id] = photoUrls[user.id];
+          if (photoUrls[targetId]) {
+            newUrls[targetId] = photoUrls[targetId];
             return;
           }
 
           if (user.photoUrl.startsWith("http")) {
-            newUrls[user.id] = user.photoUrl;
+            newUrls[targetId] = user.photoUrl;
             return;
           }
 
@@ -127,9 +129,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             });
 
             const data = await res.json();
-            newUrls[user.id] = data.url || "/default.jpg";
+            newUrls[targetId] = data.url || "/default.jpg";
           } catch {
-            newUrls[user.id] = "/default.jpg";
+            newUrls[targetId] = "/default.jpg";
           }
         })
       );
@@ -252,29 +254,33 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           {profilsFiltres.length === 0 ? (
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
-            profilsFiltres.map((user) => {
-              const id = user?.id != null ? String(user.id) : null;
+            profilsFiltres.map((user, idx) => {
+              const targetId = getTargetUserId(user);
+              if (!targetId) return null;
 
               const statutEff =
-                id && presenceReady && typeof isOnline === "function"
-                  ? isOnline(id)
+                presenceReady && typeof isOnline === "function"
+                  ? isOnline(targetId)
                     ? "en_ligne"
                     : "hors_ligne"
                   : computeStatut(user);
 
+              // ⚠️ route profil : adapte si tu utilises utilisateurId
+              const routeId = user?.id ?? user?.utilisateurId ?? targetId;
+
               return (
-                <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
+                <Link href={`/profil/${routeId}`} key={`${targetId}-${idx}`} className="profil-card-link">
                   <div className="profil-card">
                     <span
                       className={`statut-badge ${
                         statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
                       }`}
-                      title={statutEff === "en_ligne" ? "En ligne (presence)" : "Hors ligne"}
+                      title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
 
                     <div className="profil-photo-wrapper">
                       <img
-                        src={photoUrls[user.id] || "/default.jpg"}
+                        src={photoUrls[targetId] || "/default.jpg"}
                         alt={user.pseudo}
                         className="profil-photo"
                         onError={(e) => {
@@ -294,7 +300,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
