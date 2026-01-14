@@ -27,13 +27,12 @@ function corsHeaders(req) {
   }
 
   h.set("Access-Control-Allow-Credentials", "true");
-  h.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   h.set(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, X-Requested-With, Accept, Origin"
   );
   h.set("Access-Control-Max-Age", "86400");
-
   return h;
 }
 
@@ -41,7 +40,7 @@ export async function OPTIONS(req) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
-export async function POST(req) {
+async function handleToken(req) {
   try {
     if (!ABLY_API_KEY) {
       return NextResponse.json(
@@ -50,6 +49,7 @@ export async function POST(req) {
       );
     }
 
+    // ✅ IMPORTANT : auth cookie -> il faut credentials côté fetch (tu l’as déjà)
     const user = await getUserFromToken({
       req,
       select: { id: true, pseudo: true },
@@ -66,6 +66,7 @@ export async function POST(req) {
 
     const tokenRequest = await ably.auth.createTokenRequest({
       clientId: String(user.id),
+      // ✅ capacité Presence
       capability: {
         "presence:online": ["presence", "subscribe"],
       },
@@ -79,4 +80,13 @@ export async function POST(req) {
       { status: 500, headers: corsHeaders(req) }
     );
   }
+}
+
+// ✅ Ably peut appeler en GET ou en POST selon config
+export async function GET(req) {
+  return handleToken(req);
+}
+
+export async function POST(req) {
+  return handleToken(req);
 }
