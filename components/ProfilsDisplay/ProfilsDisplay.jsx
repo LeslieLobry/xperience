@@ -42,7 +42,10 @@ function computeStatut(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { isOnline, ready } = useOnlineStatus();
+  const { isOnline, ready, counts } = useOnlineStatus();
+
+  // ✅ plus robuste que ready seul : dès que counts a des infos, on bascule Presence
+  const presenceReady = ready || (counts && Object.keys(counts).length > 0);
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -74,15 +77,20 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
-          const id = String(p?.id || "");
-          if (ready && typeof isOnline === "function") return isOnline(id) === true;
+          const id = p?.id != null ? String(p.id) : null;
+          if (!id) return false;
+
+          // ✅ priorité Presence si dispo
+          if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
+
+          // fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
     // ✅ IMPORTANT : on garde un ordre stable même sans filtre
     return stableShuffle(filtered, seedRef.current);
-  }, [filtrerEnLigne, profilsAffiches, isOnline, ready]);
+  }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady]);
 
   // Presigned URLs
   useEffect(() => {
@@ -245,10 +253,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
-              const id = String(user?.id || "");
+              const id = user?.id != null ? String(user.id) : null;
 
               const statutEff =
-                ready && typeof isOnline === "function"
+                id && presenceReady && typeof isOnline === "function"
                   ? isOnline(id)
                     ? "en_ligne"
                     : "hors_ligne"
@@ -261,7 +269,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                       className={`statut-badge ${
                         statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
                       }`}
-                      title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
+                      title={statutEff === "en_ligne" ? "En ligne (presence)" : "Hors ligne"}
                     />
 
                     <div className="profil-photo-wrapper">
