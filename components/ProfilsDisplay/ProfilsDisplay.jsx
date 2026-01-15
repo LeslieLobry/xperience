@@ -1,3 +1,4 @@
+// components/ProfilsDisplay/ProfilsDisplay.jsx
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -46,7 +47,8 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { isOnline, ready, counts, debug } = useOnlineStatus();
+  // ✅ on garde ready/debug pour l’UX & logs, mais la vérité = counts
+  const { ready, counts, debug } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -72,25 +74,30 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ presenceReady robuste
-  const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
+  // ✅ Présence "utilisable" : dès qu’on a au moins 1 id dans counts
+  const countsIds = Object.keys(counts || {});
+  const presenceUsable = countsIds.length > 0;
 
-  // ✅ LOG UI (hyper important)
+  // ✅ si filtre "En ligne" activé mais pas encore de snapshot counts → loader (UX)
+  const onlineFilterLoading = filtrerEnLigne && !presenceUsable && !ready;
+
+  // ✅ LOG UI
   useEffect(() => {
     console.log("[UI ProfilsDisplay]", {
       ready,
-      presenceReady,
-      countsIds: Object.keys(counts || {}),
+      presenceUsable,
+      countsIds,
       debug,
     });
-  }, [ready, presenceReady, counts, debug]);
+  }, [ready, presenceUsable, countsIds, debug]);
 
-  // ✅ si filtre "En ligne" activé, mais presence pas prête -> pas de filtre (évite 0 faux)
-  const onlineFilterLoading = filtrerEnLigne && !presenceReady;
+  // ✅ helper local : vérité = counts
+  const isOnlineViaCounts = (id) => !!counts?.[String(id)];
 
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
+    // si on a activé "En ligne" mais on n’a pas encore counts → ne filtre pas (évite 0 faux)
     if (onlineFilterLoading) return stableShuffle(base, seedRef.current);
 
     const filtered = filtrerEnLigne
@@ -98,16 +105,16 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           const id = getTargetUserId(p);
           if (!id) return false;
 
-          // Presence prioritaire
-          if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
+          // ✅ Presence prioritaire : counts
+          if (presenceUsable) return isOnlineViaCounts(id) === true;
 
-          // Fallback DB
+          // fallback DB si vraiment counts vide
           return computeStatut(p) === "en_ligne";
         })
       : base;
 
     return stableShuffle(filtered, seedRef.current);
-  }, [filtrerEnLigne, profilsAffiches, isOnline, presenceReady, onlineFilterLoading]);
+  }, [filtrerEnLigne, profilsAffiches, onlineFilterLoading, presenceUsable, counts]);
 
   // Presigned URLs
   useEffect(() => {
@@ -276,13 +283,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ le badge doit suivre counts/ably en priorité
-              const statutEff =
-                presenceReady && typeof isOnline === "function"
-                  ? isOnline(targetId)
-                    ? "en_ligne"
-                    : "hors_ligne"
-                  : computeStatut(user);
+              // ✅ BADGE : vérité = counts
+              const statutEff = presenceUsable
+                ? isOnlineViaCounts(targetId)
+                  ? "en_ligne"
+                  : "hors_ligne"
+                : computeStatut(user);
 
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
@@ -316,8 +322,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() +
-                        user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
