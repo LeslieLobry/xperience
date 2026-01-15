@@ -5,6 +5,7 @@ import Link from "next/link";
 import "./ProfilsDisplay.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
+// ✅ shuffle stable : même input => même ordre
 function stableShuffle(list, seed) {
   const arr = Array.isArray(list) ? [...list] : [];
   const hash = (str) => {
@@ -25,14 +26,17 @@ function stableShuffle(list, seed) {
     .map((x) => x.u);
 }
 
+// (fallback) calcul basé lastSeenAt/statutAuto
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
   if (u?.statutAuto) {
     if (!u?.lastSeenAt) return "hors_ligne";
     const seen = new Date(u.lastSeenAt).getTime();
     if (!Number.isFinite(seen)) return "hors_ligne";
     return Date.now() - seen <= ONLINE_WINDOW_MS ? "en_ligne" : "hors_ligne";
   }
+
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
@@ -42,7 +46,7 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { isOnline, counts, ready, presenceReady } = useOnlineStatus();
+  const { isOnline, ready, counts, debug } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -53,9 +57,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   const [photoUrls, setPhotoUrls] = useState({});
 
+  // ✅ seed stable
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
 
+  // ✅ Active filtre si ?online=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
@@ -66,29 +72,25 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ LOGS : comprendre pourquoi "Aucun profil"
-  useEffect(() => {
-    const baseIds = (profilsAffiches || []).map((p) => getTargetUserId(p)).filter(Boolean);
-    const onlineIds = Object.keys(counts || {});
-    const intersection = baseIds.filter((id) => !!counts?.[id]);
+  // ✅ presenceReady robuste
+  const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
 
+  // ✅ LOG UI (hyper important)
+  useEffect(() => {
     console.log("[UI ProfilsDisplay]", {
-      filtrerEnLigne,
       ready,
       presenceReady,
-      baseIdsCount: baseIds.length,
-      onlineIds,
-      intersection,
-      intersectionCount: intersection.length,
+      countsIds: Object.keys(counts || {}),
+      debug,
     });
-  }, [filtrerEnLigne, ready, presenceReady, counts, profilsAffiches]);
+  }, [ready, presenceReady, counts, debug]);
 
+  // ✅ si filtre "En ligne" activé, mais presence pas prête -> pas de filtre (évite 0 faux)
   const onlineFilterLoading = filtrerEnLigne && !presenceReady;
 
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    // si on veut filtrer "en ligne" mais que presence pas prête => on n'affiche pas "Aucun profil"
     if (onlineFilterLoading) return stableShuffle(base, seedRef.current);
 
     const filtered = filtrerEnLigne
@@ -96,10 +98,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           const id = getTargetUserId(p);
           if (!id) return false;
 
-          // ✅ PRESENCE PRIORITAIRE si dispo (même si ready=false)
+          // Presence prioritaire
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
 
-          // fallback DB
+          // Fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
@@ -274,7 +276,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ statut : presence > fallback
+              // ✅ le badge doit suivre counts/ably en priorité
               const statutEff =
                 presenceReady && typeof isOnline === "function"
                   ? isOnline(targetId)
@@ -288,9 +290,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                 <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${
-                        statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
-                      }`}
+                      className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
                       title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
 
@@ -325,6 +325,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </p>
 
                     <p className="profil-card-details-type">{user.type}</p>
+
+                    {user.distance && (
+                      <p className="profil-card-details" style={{ color: "#999" }}>
+                        {user.distance.toFixed(1)} km de vous
+                      </p>
+                    )}
                   </div>
                 </Link>
               );
