@@ -13,7 +13,7 @@ import Image from "next/image";
 import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
-import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ Presence
+import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
 const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
   ssr: false,
@@ -23,25 +23,19 @@ const AvisList = dynamic(() => import("../AvisList/AvisList"), {
   ssr: false,
   loading: Spinner,
 });
-const MenuProfilActions = dynamic(
-  () => import("../MenuProfilActions/MenuProfilActions"),
-  { ssr: false }
-);
+const MenuProfilActions = dynamic(() => import("../MenuProfilActions/MenuProfilActions"), {
+  ssr: false,
+});
 const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), {
   ssr: false,
   loading: Spinner,
 });
-const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), {
-  ssr: false,
-});
+const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
 const DemandesAccesGalerie = dynamic(
   () => import("../DemandesAccesGalerie/DemandesAccesGalerie"),
   { ssr: false }
 );
 
-/* -------------------------------------------------------------------------- */
-/* 🖼️ SimpleModal : offsetTop optionnel (0 = plein écran)                     */
-/* -------------------------------------------------------------------------- */
 function SimpleModal({ open, onClose, children, offsetTop = 0 }) {
   if (!open) return null;
 
@@ -64,11 +58,7 @@ function SimpleModal({ open, onClose, children, offsetTop = 0 }) {
     >
       <div
         className="profil-photo-modal-img-wrapper"
-        style={{
-          position: "relative",
-          maxWidth: "90vw",
-          maxHeight: "90vh",
-        }}
+        style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -132,9 +122,8 @@ function calculateProfileCompletion(user) {
   return Math.round((completed / fields.length) * 100);
 }
 
-// ✅ Fallback (si Presence indispo) : lastSeenAt/statutAuto
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 min
+  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
   if (u?.statutAuto && u?.lastSeenAt) {
     const seen = new Date(u.lastSeenAt).getTime();
     if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) return "en_ligne";
@@ -143,7 +132,6 @@ function computeStatut(u) {
   return u?.statut || "hors_ligne";
 }
 
-// ✅ récupère l'id utilisateur robuste (au cas où selon tes payloads)
 function getTargetUserId(u) {
   const id = u?.id ?? u?.utilisateurId ?? u?.userId ?? null;
   return id != null ? String(id) : null;
@@ -153,22 +141,25 @@ export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  // ✅ Presence : on utilise counts DIRECTEMENT (le plus fiable)
-  const { counts } = useOnlineStatus();
-
+  const { counts, presenceReady } = useOnlineStatus();
   const cibleId = getTargetUserId(user);
 
-  // ✅ Online fiable : si counts contient l'ID, alors en ligne
+  // ✅ online via counts (même si ready=false)
   const onlineViaPresence =
     !isOwnProfile && cibleId ? !!counts?.[String(cibleId)] : false;
 
-  // ✅ Statut effectif
-  const statutEff = isOwnProfile
-    ? null
-    : onlineViaPresence
-    ? "en_ligne"
-    : computeStatut(user);
+  // LOG
+  useEffect(() => {
+    console.log("[UI Profil]", {
+      cibleId,
+      isOwnProfile,
+      presenceReady,
+      countsIds: Object.keys(counts || {}),
+      onlineViaPresence,
+    });
+  }, [cibleId, isOwnProfile, presenceReady, counts, onlineViaPresence]);
 
+  const statutEff = isOwnProfile ? null : onlineViaPresence ? "en_ligne" : computeStatut(user);
   const online = !isOwnProfile && statutEff === "en_ligne";
 
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
@@ -196,7 +187,6 @@ export default function Profil({ user, connectedUser }) {
     }
   }
 
-  // 💡 Charge la presigned URL dès que photoUrl change
   useEffect(() => {
     if (!photoUrl) {
       setPresignedPhotoUrl("/default.jpg");
@@ -220,7 +210,6 @@ export default function Profil({ user, connectedUser }) {
       .catch(() => setPresignedPhotoUrl("/default.jpg"));
   }, [photoUrl]);
 
-  // Enregistre la visite si on consulte le profil de quelqu’un d’autre
   useEffect(() => {
     if (connectedUser && connectedUser.id !== user.id) {
       fetch("/api/visites", {
@@ -232,7 +221,6 @@ export default function Profil({ user, connectedUser }) {
     }
   }, [connectedUser?.id, user.id]);
 
-  // 🔁 Rafraîchit le statut auto pour son propre profil (via /api/me)
   useEffect(() => {
     if (!isOwnProfile) return;
     const interval = setInterval(async () => {
@@ -249,7 +237,6 @@ export default function Profil({ user, connectedUser }) {
     return () => clearInterval(interval);
   }, [isOwnProfile]);
 
-  // 🧩 Synchronise si les props 'user' se mettent à jour
   useEffect(() => {
     setStatut(user.statut);
     setStatutAuto(user.statutAuto);
@@ -336,11 +323,7 @@ export default function Profil({ user, connectedUser }) {
 
   return (
     <div className="profil-page">
-      <SimpleModal
-        open={openPhotoUploader}
-        onClose={() => setOpenPhotoUploader(false)}
-        offsetTop={80}
-      >
+      <SimpleModal open={openPhotoUploader} onClose={() => setOpenPhotoUploader(false)} offsetTop={80}>
         <PhotoUploader
           key={uploaderKey}
           priority
@@ -387,11 +370,7 @@ export default function Profil({ user, connectedUser }) {
             <h1 className="profil-name">
               {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
               {user.verificationIdentiteStatut && (
-                <img
-                  src="/Profilverif.png"
-                  alt="Profil vérifié"
-                  className="badge-verifie-img"
-                />
+                <img src="/Profilverif.png" alt="Profil vérifié" className="badge-verifie-img" />
               )}
             </h1>
 
@@ -405,15 +384,8 @@ export default function Profil({ user, connectedUser }) {
                   title="Envoyer un message"
                 >
                   <div className="tooltip-container">
-                    <Image
-                      src="/images/enveloppe.svg"
-                      alt="Envoyer un message"
-                      width={46}
-                      height={46}
-                    />
-                    <span className="tooltip">
-                      {startingConv ? "Ouverture…" : "Envoyer un message"}
-                    </span>
+                    <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
+                    <span className="tooltip">{startingConv ? "Ouverture…" : "Envoyer un message"}</span>
                   </div>
                 </button>
                 <BoutonLike cibleId={user.id} />
@@ -474,7 +446,6 @@ export default function Profil({ user, connectedUser }) {
         />
 
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-
         {!isOwnProfile && <AvisForm cibleId={user.id} />}
 
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />

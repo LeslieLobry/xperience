@@ -1,45 +1,28 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getAbly } from "../lib/ably";
 
 const OnlineStatusContext = createContext(null);
-
-function now() {
-  return new Date().toISOString().slice(11, 19); // HH:MM:SS
-}
 
 export function OnlineStatusProvider({ user, children }) {
   const [counts, setCounts] = useState({});
   const [ready, setReady] = useState(false);
 
-  const channelRef = useRef(null);
   const enteredRef = useRef(false);
+  const cleanedUpRef = useRef(false);
+  const channelRef = useRef(null);
   const periodicRef = useRef(null);
-
-  // ⚠️ identifie une instance provider (si ça change souvent => remount)
-  const instanceIdRef = useRef(`P${Math.random().toString(16).slice(2, 8)}`);
 
   const userId = user?.id ? String(user.id) : null;
   const pseudo = user?.pseudo || null;
-
-  // debug state (visible dans UI si tu veux)
-  const [debug, setDebug] = useState({
-    instanceId: instanceIdRef.current,
-    userId: null,
-    pseudo: null,
-    connState: null,
-    connId: null,
-    ablyClientId: null,
-    channelState: "init",
-    lastAttach: null,
-    lastEnter: null,
-    lastEnterErr: null,
-    lastSnapshot: null,
-    lastSnapshotIds: [],
-    lastEvent: null,
-    lastCleanup: null,
-  });
 
   useEffect(() => {
     if (!userId) return;
@@ -47,31 +30,11 @@ export function OnlineStatusProvider({ user, children }) {
     const ably = getAbly();
     if (!ably) return;
 
-    const instanceId = instanceIdRef.current;
-
-    console.log(`[Presence ${instanceId}] ${now()} INIT`, {
-      userId,
-      pseudo,
-      connState: ably.connection.state,
-      connId: ably.connection.id || null,
-      ablyClientId: ably.auth?.clientId || null,
-    });
+    cleanedUpRef.current = false;
+    enteredRef.current = false;
 
     setCounts({});
     setReady(false);
-    enteredRef.current = false;
-
-    setDebug((d) => ({
-      ...d,
-      instanceId,
-      userId,
-      pseudo,
-      connState: ably.connection.state,
-      connId: ably.connection.id || null,
-      ablyClientId: ably.auth?.clientId || null,
-      channelState: "init",
-      lastCleanup: null,
-    }));
 
     const channel = ably.channels.get("presence:online");
     channelRef.current = channel;
@@ -81,10 +44,11 @@ export function OnlineStatusProvider({ user, children }) {
       return id != null ? String(id) : null;
     };
 
-    const syncFromGet = (reason = "manual") => {
+    const syncFromGet = () => {
       channel.presence.get((err, members) => {
         if (err) {
-          console.log(`[Presence ${instanceId}] ${now()} GET error`, err);
+          console.log("[Presence] presence.get error:", err);
+          // important: on ne bloque pas l'UI juste parce que get a foiré
           return;
         }
 
@@ -95,95 +59,60 @@ export function OnlineStatusProvider({ user, children }) {
           next[id] = (next[id] || 0) + 1;
         }
 
-        const ids = Object.keys(next);
-
-        console.log(`[Presence ${instanceId}] ${now()} SNAPSHOT(${reason})`, {
-          size: (members || []).length,
-          ids,
-          raw: (members || []).map((m) => ({
-            clientId: m.clientId,
-            connectionId: m.connectionId,
-            data: m.data,
-          })),
-        });
-
         setCounts(next);
         setReady(true);
-        setDebug((d) => ({
-          ...d,
-          lastSnapshot: Date.now(),
-          lastSnapshotIds: ids,
-        }));
+
+        console.log(
+          "[Presence] GET snapshot ids=",
+          Object.keys(next),
+          "size=",
+          (members || []).length
+        );
       });
     };
 
-    const enterPresence = (reason = "ensure") => {
-      if (enteredRef.current) {
-        console.log(`[Presence ${instanceId}] ${now()} ENTER skip (already entered)`, { reason });
-        return;
-      }
+    const enterPresence = () => {
+      if (enteredRef.current) return;
       enteredRef.current = true;
 
-      console.log(`[Presence ${instanceId}] ${now()} ENTER start`, {
-        reason,
+      console.log("[Presence] ENTER start", {
         userId,
         pseudo,
         connState: ably.connection.state,
-        connId: ably.connection.id || null,
         ablyClientId: ably.auth?.clientId || null,
       });
 
       channel.presence.enter({ userId, pseudo, t: Date.now() }, (err) => {
-        console.log(`[Presence ${instanceId}] ${now()} ENTER cb`, err || "OK");
-
-        setDebug((d) => ({
-          ...d,
-          lastEnter: Date.now(),
-          lastEnterErr: err ? String(err?.message || err) : null,
-        }));
+        console.log("[Presence] ENTER cb", err || "OK", { userId });
 
         if (err) {
           enteredRef.current = false;
           return;
         }
 
-        // snapshot juste après enter
-        syncFromGet("after-enter");
-        setTimeout(() => syncFromGet("after-enter+400ms"), 400);
+        // tente snapshot après enter
+        syncFromGet();
+        setTimeout(syncFromGet, 500);
       });
     };
 
-    const ensureEntered = (reason = "ensureEntered") => {
-      console.log(`[Presence ${instanceId}] ${now()} ensureEntered`, {
-        reason,
-        connState: ably.connection.state,
-      });
-      if (ably.connection.state === "connected") enterPresence(reason);
+    const ensureEntered = () => {
+      if (ably.connection.state === "connected") enterPresence();
     };
 
-    // presence events
+    // --- Presence events (et IMPORTANT: on marque ready=true dès qu'on reçoit un event)
     const onEnter = (m) => {
       const id = memberToUserId(m);
-      console.log(`[Presence ${instanceId}] ${now()} EVENT enter`, {
-        id,
-        clientId: m.clientId,
-        connectionId: m.connectionId,
-        data: m.data,
-      });
       if (!id) return;
+
       setCounts((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
-      setDebug((d) => ({ ...d, lastEvent: `enter:${id}` }));
+      setReady(true);
     };
 
     const onLeave = (m) => {
       const id = memberToUserId(m);
-      console.log(`[Presence ${instanceId}] ${now()} EVENT leave`, {
-        id,
-        clientId: m.clientId,
-        connectionId: m.connectionId,
-        data: m.data,
-      });
       if (!id) return;
+
       setCounts((prev) => {
         const next = { ...prev };
         const c = (next[id] || 0) - 1;
@@ -191,102 +120,86 @@ export function OnlineStatusProvider({ user, children }) {
         else next[id] = c;
         return next;
       });
-      setDebug((d) => ({ ...d, lastEvent: `leave:${id}` }));
+      setReady(true);
     };
 
-    const onUpdate = (m) => {
-      const id = memberToUserId(m);
-      console.log(`[Presence ${instanceId}] ${now()} EVENT update`, {
-        id,
-        clientId: m.clientId,
-        connectionId: m.connectionId,
-        data: m.data,
-      });
-      setDebug((d) => ({ ...d, lastEvent: `update:${id || "?"}` }));
-      setTimeout(() => syncFromGet("after-update"), 150);
+    const onUpdate = () => {
+      setReady(true);
+      // resync léger pour corriger les états
+      setTimeout(syncFromGet, 120);
     };
 
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
     channel.presence.subscribe("update", onUpdate);
 
-    // channel state events
-    const onAttached = () => {
-      console.log(`[Presence ${instanceId}] ${now()} channel ATTACHED (event)`);
-      setDebug((d) => ({ ...d, channelState: "attached", lastAttach: Date.now() }));
-      syncFromGet("on-attached");
-      ensureEntered("on-attached");
-    };
-    const onDetached = () => {
-      console.log(`[Presence ${instanceId}] ${now()} channel DETACHED (event)`);
-      setDebug((d) => ({ ...d, channelState: "detached" }));
-    };
-    const onFailed = (st) => {
-      console.log(`[Presence ${instanceId}] ${now()} channel FAILED`, st?.reason?.message || st?.reason);
-      setDebug((d) => ({ ...d, channelState: "failed" }));
-    };
-
-    channel.on("attached", onAttached);
-    channel.on("detached", onDetached);
-    channel.on("failed", onFailed);
-
-    // connection events
-    const onConn = (stateChange) => {
-      console.log(`[Presence ${instanceId}] ${now()} conn`, stateChange.current, {
-        reason: stateChange.reason?.message || null,
-        connId: ably.connection.id || null,
-        clientId: ably.auth?.clientId || null,
+    // debug global presence events
+    const onAnyPresence = (msg) => {
+      const id = msg?.data?.userId ?? msg?.clientId;
+      console.log("[Presence] EVENT", msg.action, {
+        id: id != null ? String(id) : null,
+        clientId: msg.clientId,
+        connectionId: msg.connectionId,
+        data: msg.data,
       });
+    };
+    channel.presence.subscribe(onAnyPresence);
 
-      setDebug((d) => ({
-        ...d,
-        connState: stateChange.current,
-        connId: ably.connection.id || null,
-        ablyClientId: ably.auth?.clientId || null,
-      }));
-
+    // --- Connection lifecycle
+    const onConnState = (stateChange) => {
+      console.log(
+        "[Presence] conn:",
+        stateChange.current,
+        stateChange.reason?.message || null
+      );
       if (stateChange.current === "connected") {
         enteredRef.current = false;
-        ensureEntered("on-connected");
-        setTimeout(() => syncFromGet("on-connected+250ms"), 250);
+        ensureEntered();
+        setTimeout(syncFromGet, 300);
       }
-
       if (stateChange.current === "disconnected") {
-        setReady(false);
+        enteredRef.current = false;
       }
     };
-    ably.connection.on(onConn);
+    ably.connection.on(onConnState);
 
-    // attach
+    // --- Attach channel
     channel.attach((err) => {
       if (err) {
-        console.log(`[Presence ${instanceId}] ${now()} attach cb ERROR`, err);
-        setDebug((d) => ({ ...d, channelState: "attach_error" }));
+        console.log("[Presence] channel.attach error:", err);
         return;
       }
-      console.log(`[Presence ${instanceId}] ${now()} attach cb OK`);
-      setDebug((d) => ({ ...d, channelState: "attached_cb", lastAttach: Date.now() }));
-      syncFromGet("attach-cb");
-      ensureEntered("attach-cb");
+      console.log("[Presence] channel.attach OK, connState:", ably.connection.state);
+
+      // snapshot + enter
+      syncFromGet();
+      ensureEntered();
     });
 
-    // periodic snapshot only
-    periodicRef.current = setInterval(() => syncFromGet("interval"), 15000);
+    // periodic resync
+    periodicRef.current = setInterval(() => {
+      syncFromGet();
+      // safety re-enter
+      enteredRef.current = false;
+      ensureEntered();
+    }, 15000);
 
     // visibility
     const onVis = () => {
+      console.log("[Presence] visibility:", document.visibilityState);
       if (document.visibilityState === "visible") {
-        console.log(`[Presence ${instanceId}] ${now()} visibility: visible`);
-        setTimeout(() => syncFromGet("visible"), 250);
+        setTimeout(syncFromGet, 200);
         enteredRef.current = false;
-        ensureEntered("visible");
+        ensureEntered();
       }
     };
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      console.log(`[Presence ${instanceId}] ${now()} CLEANUP`, { userId });
-      setDebug((d) => ({ ...d, lastCleanup: Date.now() }));
+      if (cleanedUpRef.current) return;
+      cleanedUpRef.current = true;
+
+      console.log("[Presence] CLEANUP userId:", userId);
 
       if (periodicRef.current) {
         clearInterval(periodicRef.current);
@@ -302,32 +215,25 @@ export function OnlineStatusProvider({ user, children }) {
       } catch {}
 
       try {
-        channel.off("attached", onAttached);
-        channel.off("detached", onDetached);
-        channel.off("failed", onFailed);
+        channel.presence.unsubscribe(onAnyPresence);
       } catch {}
 
       try {
-        ably.connection.off(onConn);
+        ably.connection.off(onConnState);
       } catch {}
 
       try {
         ably.channels.release("presence:online");
       } catch {}
-
-      channelRef.current = null;
-      enteredRef.current = false;
     };
-  }, [userId]); // ✅ UNIQUEMENT userId
+  }, [userId]); // ⚠️ garde uniquement userId (sinon re-mount)
 
-  // pseudo update séparé
+  // update data sans reset total
   useEffect(() => {
     if (!userId) return;
     const ch = channelRef.current;
     if (!ch) return;
-
     try {
-      console.log(`[Presence ${instanceIdRef.current}] ${now()} UPDATE data`, { userId, pseudo });
       ch.presence.update({ userId, pseudo, t: Date.now() });
     } catch {}
   }, [userId, pseudo]);
@@ -335,8 +241,12 @@ export function OnlineStatusProvider({ user, children }) {
   const api = useMemo(() => {
     const isOnline = (id) => !!counts[String(id)];
     const onlineCount = (id) => counts[String(id)] || 0;
-    return { isOnline, onlineCount, counts, ready, debug };
-  }, [counts, ready, debug]);
+
+    // ✅ presenceReady fiable
+    const presenceReady = !!ready || Object.keys(counts || {}).length > 0;
+
+    return { isOnline, onlineCount, counts, ready, presenceReady };
+  }, [counts, ready]);
 
   return <OnlineStatusContext.Provider value={api}>{children}</OnlineStatusContext.Provider>;
 }
@@ -349,7 +259,7 @@ export function useOnlineStatus() {
       onlineCount: () => 0,
       counts: {},
       ready: false,
-      debug: {},
+      presenceReady: false,
     };
   }
   return ctx;

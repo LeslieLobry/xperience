@@ -1,4 +1,3 @@
-// components/ProfilsDisplay/ProfilsDisplay.jsx
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -43,7 +42,7 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { isOnline, ready, counts, debug } = useOnlineStatus();
+  const { isOnline, counts, ready, presenceReady } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -67,39 +66,40 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     setProfilsAffiches(profils);
   }, [profils]);
 
-  // ✅ presenceReady = ready OR counts non vide (fix)
-  const presenceReady = !!ready || (counts && Object.keys(counts).length > 0);
-
-  // ✅ LOG UI : ce que voit réellement la page
+  // ✅ LOGS : comprendre pourquoi "Aucun profil"
   useEffect(() => {
+    const baseIds = (profilsAffiches || []).map((p) => getTargetUserId(p)).filter(Boolean);
+    const onlineIds = Object.keys(counts || {});
+    const intersection = baseIds.filter((id) => !!counts?.[id]);
+
     console.log("[UI ProfilsDisplay]", {
+      filtrerEnLigne,
       ready,
       presenceReady,
-      countsIds: Object.keys(counts || {}),
-      debug,
+      baseIdsCount: baseIds.length,
+      onlineIds,
+      intersection,
+      intersectionCount: intersection.length,
     });
-  }, [ready, presenceReady, counts, debug]);
+  }, [filtrerEnLigne, ready, presenceReady, counts, profilsAffiches]);
 
-  // ✅ Si filtre En ligne activé mais presence pas prête -> on affiche un loader
   const onlineFilterLoading = filtrerEnLigne && !presenceReady;
 
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    // ⚠️ IMPORTANT : si "En ligne" est activé AVANT presenceReady, on ne filtre pas encore
-    if (onlineFilterLoading) {
-      return stableShuffle(base, seedRef.current);
-    }
+    // si on veut filtrer "en ligne" mais que presence pas prête => on n'affiche pas "Aucun profil"
+    if (onlineFilterLoading) return stableShuffle(base, seedRef.current);
 
     const filtered = filtrerEnLigne
       ? base.filter((p) => {
           const id = getTargetUserId(p);
           if (!id) return false;
 
-          // Presence prioritaire
+          // ✅ PRESENCE PRIORITAIRE si dispo (même si ready=false)
           if (presenceReady && typeof isOnline === "function") return isOnline(id) === true;
 
-          // Fallback DB
+          // fallback DB
           return computeStatut(p) === "en_ligne";
         })
       : base;
@@ -180,11 +180,15 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             const res = await fetch("/api/profils-proches", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ latitude, longitude, distance: customDistance || distance }),
+              body: JSON.stringify({
+                latitude,
+                longitude,
+                distance: customDistance || distance,
+              }),
             });
 
             const data = await res.json();
-            setProfilsAffiches(Array.isArray(data) ? data : []);
+            setProfilsAffiches(data);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
           } finally {
@@ -221,7 +225,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             <input
               type="checkbox"
               checked={filtrerEnLigne}
-              onChange={() => setFiltrerEnLigne((p) => !p)}
+              onChange={() => setFiltrerEnLigne((prev) => !prev)}
             />
             <span className="slider"></span>
             En ligne
@@ -270,6 +274,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
+              // ✅ statut : presence > fallback
               const statutEff =
                 presenceReady && typeof isOnline === "function"
                   ? isOnline(targetId)
