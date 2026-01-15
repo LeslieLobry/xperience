@@ -1,8 +1,6 @@
 // app/api/logout/route.js
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 const ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:19006",
@@ -26,7 +24,26 @@ function corsHeaders(origin = "") {
     Vary: "Origin",
   };
 }
-
+function getCookieDomainForOrigin(origin) {
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname.endsWith("x-periences.fr")) return ".x-periences.fr";
+    return undefined; // localhost / IP → host-only
+  } catch {
+    return undefined;
+  }
+}
+// 🔧 IMPORTANT : path: "/" (comme pour login)
+function cookieBaseOptions(origin) {
+  const domain = getCookieDomainForOrigin(origin);
+   return {
+    secure: true,
+    sameSite: "none",
+    path: "/", // ✅
+    httpOnly: true,
+        ...(domain ? { domain } : {}),
+  };
+}
 export async function OPTIONS(req) {
   const origin = req.headers.get("origin") || "";
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -51,13 +68,14 @@ export async function POST(req) {
 
   const res = NextResponse.json({ success: true }, { headers });
 
-  // 1) Supprime cookie host-only
-  res.cookies.set("token", "", buildCookieDeleteOptions({ isProd, domain: undefined }));
+  const baseOpts = cookieBaseOptions(origin);
+  const noDomainOpts = { ...baseOpts };
+  delete noDomainOpts.domain;
 
-  // 2) Supprime cookie domain-wide (prod) => couvre x-periences.fr + www
-  if (isProd) {
-    res.cookies.set("token", "", buildCookieDeleteOptions({ isProd, domain: ".x-periences.fr" }));
-  }
+ // supprime cookie posé "avec domain"
+  res.cookies.set("token", "", { ...baseOpts, maxAge: 0 });
+  // supprime cookie posé "sans domain" (host-only)
+  res.cookies.set("token", "", { ...noDomainOpts, maxAge: 0 });
 
   return res;
 }
