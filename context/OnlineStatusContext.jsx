@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getAbly } from "../lib/ably";
 
 const OnlineStatusContext = createContext(null);
@@ -18,9 +11,6 @@ function nowTag(id) {
 }
 
 function safeAblyFingerprint(ably) {
-  // ⚠️ ne log JAMAIS la clé complète
-  // Ably JS expose souvent: ably.options.keyName (ex: "xxxxx")
-  // et ably.options.restHost / realtimeHost selon config
   return {
     keyName: ably?.options?.keyName || null,
     realtimeHost: ably?.options?.realtimeHost || null,
@@ -56,17 +46,32 @@ export function OnlineStatusProvider({ user, children }) {
   const channelRef = useRef(null);
   const periodicRef = useRef(null);
 
+  // ✅ IMPORTANT: userId stable (string)
   const userId = user?.id ? String(user.id) : null;
-  const pseudo = user?.pseudo || null;
+  // ✅ pseudo peut changer sans relancer toute la machine
+  const pseudoRef = useRef(user?.pseudo || null);
+  useEffect(() => {
+    pseudoRef.current = user?.pseudo || null;
+  }, [user?.pseudo]);
 
   // ✅ computedReady = “j’ai reçu un signal réel”
-  const computedReady =
-    !!ready || !!hasSignal || (counts && Object.keys(counts).length > 0);
+  const computedReady = !!ready || !!hasSignal || (counts && Object.keys(counts).length > 0);
+
+  // ✅ refcount global anti StrictMode / remount
+  const g = globalThis;
+  const inc = () => {
+    g.__xp_presence_count = (g.__xp_presence_count || 0) + 1;
+    return g.__xp_presence_count;
+  };
+  const dec = () => {
+    g.__xp_presence_count = Math.max((g.__xp_presence_count || 1) - 1, 0);
+    return g.__xp_presence_count;
+  };
 
   useEffect(() => {
     const instanceId = instanceIdRef.current;
 
-    // ✅ IMPORTANT : si pas de user => reset propre (sinon UI incohérente)
+    // ✅ reset uniquement si pas de userId
     if (!userId) {
       setCounts({});
       setReady(false);
@@ -101,10 +106,11 @@ export function OnlineStatusProvider({ user, children }) {
     const fp = safeAblyFingerprint(ably);
     console.log(nowTag(instanceId), "ABLY fingerprint =", fp);
 
-    cleanedUpRef.current = false;
-    enteredRef.current = false;
+    // ✅ refcount: seul le premier init réellement le channel+subscriptions
+    const count = inc();
 
-    setCounts({});
+    cleanedUpRef.current = false;
+
     setReady(false);
     setHasSignal(false);
     setDebug((d) => ({
@@ -125,16 +131,17 @@ export function OnlineStatusProvider({ user, children }) {
       "INIT userId:",
       userId,
       "pseudo:",
-      pseudo,
+      pseudoRef.current,
       "connState:",
-      ably.connection.state
+      ably.connection.state,
+      "refcount:",
+      count
     );
 
     const channelName = "presence:online";
     const channel = ably.channels.get(channelName);
     channelRef.current = channel;
 
-    // ✅ On ne compte QUE data.userId (pas clientId)
     const memberToUserId = (m) => {
       const id = m?.data?.userId;
       return id != null ? String(id) : null;
@@ -184,12 +191,12 @@ export function OnlineStatusProvider({ user, children }) {
 
       console.log(nowTag(instanceId), "ENTER start", {
         userId,
-        pseudo,
+        pseudo: pseudoRef.current,
         connState: ably.connection.state,
         ablyClientId: ably.auth?.clientId || null,
       });
 
-      channel.presence.enter({ userId, pseudo, t: Date.now() }, (err) => {
+      channel.presence.enter({ userId, pseudo: pseudoRef.current, t: Date.now() }, (err) => {
         console.log(nowTag(instanceId), "ENTER cb", err || "OK", { userId });
 
         setDebug((d) => ({
@@ -210,7 +217,6 @@ export function OnlineStatusProvider({ user, children }) {
     };
 
     const ensureEntered = () => {
-      console.log(nowTag(instanceId), "ensureEntered connState =", ably.connection.state);
       if (ably.connection.state === "connected") enterPresence();
     };
 
@@ -218,7 +224,6 @@ export function OnlineStatusProvider({ user, children }) {
     const onEnter = (m) => {
       const id = memberToUserId(m);
       if (!id) return;
-
       markSignal("event:enter");
       setCounts((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
     };
@@ -226,7 +231,6 @@ export function OnlineStatusProvider({ user, children }) {
     const onLeave = (m) => {
       const id = memberToUserId(m);
       if (!id) return;
-
       markSignal("event:leave");
       setCounts((prev) => {
         const next = { ...prev };
@@ -241,10 +245,6 @@ export function OnlineStatusProvider({ user, children }) {
       markSignal("event:update");
     };
 
-    channel.presence.subscribe("enter", onEnter);
-    channel.presence.subscribe("leave", onLeave);
-    channel.presence.subscribe("update", onUpdate);
-
     const onAnyPresence = (msg) => {
       setDebug((d) => ({
         ...d,
@@ -258,7 +258,6 @@ export function OnlineStatusProvider({ user, children }) {
         id: msg.data?.userId ?? null,
       });
     };
-    channel.presence.subscribe(onAnyPresence);
 
     // -------- channel lifecycle
     const onAttached = () => {
@@ -278,10 +277,6 @@ export function OnlineStatusProvider({ user, children }) {
       setDebug((d) => ({ ...d, channelState: "failed" }));
     };
 
-    channel.on("attached", onAttached);
-    channel.on("detached", onDetached);
-    channel.on("failed", onFailed);
-
     // -------- connection lifecycle
     const onConnState = (stateChange) => {
       setDebug((d) => ({ ...d, connState: stateChange.current }));
@@ -293,92 +288,115 @@ export function OnlineStatusProvider({ user, children }) {
       );
 
       if (stateChange.current === "connected") {
-        enteredRef.current = false;
+        // ✅ ne pas remettre enteredRef=false à chaque reconnexion de manière agressive
+        // on laisse ensureEntered gérer (si déjà enter, Ably ignore/maintient)
         ensureEntered();
         setTimeout(() => syncFromGet("conn:connected->get"), 300);
       }
     };
-    ably.connection.on(onConnState);
 
-    // attach
-    channel.attach((err) => {
-      if (err) {
-        console.log(nowTag(instanceId), "channel.attach error:", err);
-        setDebug((d) => ({ ...d, channelState: "attach_error" }));
-        return;
-      }
+    // ✅ IMPORTANT : seul le 1er consumer fait les subscriptions + attach
+    if (count === 1) {
+      enteredRef.current = false;
 
-      console.log(nowTag(instanceId), "channel.attach cb OK. connState:", ably.connection.state);
-      setDebug((d) => ({ ...d, channelState: "attached_cb" }));
+      channel.presence.subscribe("enter", onEnter);
+      channel.presence.subscribe("leave", onLeave);
+      channel.presence.subscribe("update", onUpdate);
+      channel.presence.subscribe(onAnyPresence);
 
-      syncFromGet("attachcb->get");
-      ensureEntered();
-    });
+      channel.on("attached", onAttached);
+      channel.on("detached", onDetached);
+      channel.on("failed", onFailed);
 
-    // periodic snapshot (visible only)
-    periodicRef.current = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      syncFromGet("interval->get");
-    }, 15000);
+      ably.connection.on(onConnState);
 
-    const onVis = () => {
-      console.log(nowTag(instanceId), "visibility:", document.visibilityState);
-      if (document.visibilityState === "visible") {
-        setTimeout(() => syncFromGet("vis->get"), 200);
-        enteredRef.current = false;
+      channel.attach((err) => {
+        if (err) {
+          console.log(nowTag(instanceId), "channel.attach error:", err);
+          setDebug((d) => ({ ...d, channelState: "attach_error" }));
+          return;
+        }
+        console.log(nowTag(instanceId), "channel.attach cb OK. connState:", ably.connection.state);
+        setDebug((d) => ({ ...d, channelState: "attached_cb" }));
+        syncFromGet("attachcb->get");
         ensureEntered();
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
+      });
+
+      periodicRef.current = setInterval(() => {
+        if (document.visibilityState !== "visible") return;
+        syncFromGet("interval->get");
+      }, 15000);
+
+      const onVis = () => {
+        console.log(nowTag(instanceId), "visibility:", document.visibilityState);
+        if (document.visibilityState === "visible") {
+          setTimeout(() => syncFromGet("vis->get"), 200);
+          ensureEntered();
+        }
+      };
+      document.addEventListener("visibilitychange", onVis);
+
+      // stocke pour cleanup
+      g.__xp_presence_onVis = onVis;
+      g.__xp_presence_handlers = { onEnter, onLeave, onUpdate, onAnyPresence, onAttached, onDetached, onFailed, onConnState };
+    } else {
+      // ✅ pas le premier: on se contente d’un snapshot pour afficher vite
+      syncFromGet("secondary->get");
+      setReady(true);
+    }
 
     return () => {
       if (cleanedUpRef.current) return;
       cleanedUpRef.current = true;
 
-      console.log(nowTag(instanceId), "CLEANUP userId:", userId);
+      const left = dec();
+      console.log(nowTag(instanceId), "CLEANUP userId:", userId, "refcount now:", left);
+
+      // ✅ seul le dernier nettoie réellement et LEAVE
+      if (left !== 0) return;
 
       if (periodicRef.current) {
         clearInterval(periodicRef.current);
         periodicRef.current = null;
       }
 
-      document.removeEventListener("visibilitychange", onVis);
+      const onVis = g.__xp_presence_onVis;
+      if (onVis) document.removeEventListener("visibilitychange", onVis);
 
-      try {
-        channel.presence.unsubscribe("enter", onEnter);
-        channel.presence.unsubscribe("leave", onLeave);
-        channel.presence.unsubscribe("update", onUpdate);
-      } catch {}
-      try {
-        channel.presence.unsubscribe(onAnyPresence);
-      } catch {}
-      try {
-        channel.off("attached", onAttached);
-        channel.off("detached", onDetached);
-        channel.off("failed", onFailed);
-      } catch {}
-      try {
-        ably.connection.off(onConnState);
-      } catch {}
+      const h = g.__xp_presence_handlers || {};
+      try { channel.presence.unsubscribe("enter", h.onEnter); } catch {}
+      try { channel.presence.unsubscribe("leave", h.onLeave); } catch {}
+      try { channel.presence.unsubscribe("update", h.onUpdate); } catch {}
+      try { channel.presence.unsubscribe(h.onAnyPresence); } catch {}
+      try { channel.off("attached", h.onAttached); } catch {}
+      try { channel.off("detached", h.onDetached); } catch {}
+      try { channel.off("failed", h.onFailed); } catch {}
+      try { ably.connection.off(h.onConnState); } catch {}
 
-      // ✅ important: libère le channel
-      try {
-        ably.channels.release("presence:online");
-      } catch {}
+      // ✅ leave propre (au lieu de release)
+      try { channel.presence.leave(); } catch {}
+
+      // ❌ NE PAS release ici (ça fout le bazar si réutilisé juste après)
+      // try { ably.channels.release(channelName); } catch {}
+
+      // reset refs
+      enteredRef.current = false;
+      g.__xp_presence_handlers = null;
+      g.__xp_presence_onVis = null;
     };
-  }, [userId, pseudo]);
+  }, [userId]); // ✅ uniquement userId
 
-  // ✅ Update uniquement si entré
+  // ✅ Update: on peut update si connecté + entered (sans relancer la grosse init)
   useEffect(() => {
     if (!userId) return;
-    if (!enteredRef.current) return;
     const ch = channelRef.current;
     if (!ch) return;
+    if (!enteredRef.current) return;
 
     try {
-      ch.presence.update({ userId, pseudo, t: Date.now() });
+      ch.presence.update({ userId, pseudo: pseudoRef.current, t: Date.now() });
     } catch {}
-  }, [userId, pseudo]);
+  }, [userId, user?.pseudo]);
 
   const api = useMemo(() => {
     const isOnline = (id) => !!counts[String(id)];
@@ -397,11 +415,7 @@ export function OnlineStatusProvider({ user, children }) {
     };
   }, [counts, debug, computedReady]);
 
-  return (
-    <OnlineStatusContext.Provider value={api}>
-      {children}
-    </OnlineStatusContext.Provider>
-  );
+  return <OnlineStatusContext.Provider value={api}>{children}</OnlineStatusContext.Provider>;
 }
 
 export function useOnlineStatus() {
