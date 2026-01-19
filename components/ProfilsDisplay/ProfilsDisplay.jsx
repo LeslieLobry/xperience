@@ -27,7 +27,7 @@ function stableShuffle(list, seed) {
     .map((x) => x.u);
 }
 
-// (fallback) calcul basé lastSeenAt/statutAuto
+// (fallback) calcul basé lastSeenAt/statutAuto (utilisé SEULEMENT si presence pas dispo)
 function computeStatut(u) {
   const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -47,7 +47,7 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { ready, counts, debug } = useOnlineStatus();
+  const { counts } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [filtrerProches, setFiltrerProches] = useState(false);
@@ -65,34 +65,28 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
 
-  // ✅ garde la liste normale (paginated / server list) pour revenir dessus
+  // ✅ garde la liste normale pour revenir dessus
   const baseProfilsRef = useRef(profils || []);
   useEffect(() => {
     baseProfilsRef.current = profils || [];
     if (!filtrerEnLigne && !filtrerProches) {
       setProfilsAffiches(profils || []);
     }
-
-    console.log(`[ProfilsDisplay ${instanceRef.current}] props.profils len=`, (profils || []).length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profils]);
 
-  // ✅ Active filtre si ?online=1
+  // ✅ Active filtre si ?online=1 (sans filtrer en local !)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
     if (online === "1" || online === "true") {
-      console.log(`[ProfilsDisplay ${instanceRef.current}] init online param => true`);
       setFiltrerEnLigne(true);
-
-      // ✅ Filtre instantané (fallback DB) dès l'init si possible
-      const base = baseProfilsRef.current || [];
-      const instant = base.filter((u) => computeStatut(u) === "en_ligne");
-      setProfilsAffiches(instant);
+      // ✅ IMPORTANT: on garde tous les profils tant qu'Ably n'a pas donné la liste
+      setProfilsAffiches(baseProfilsRef.current || []);
     }
   }, []);
 
-  // ✅ ids présents sur Ably (tous les online du site)
+  // ✅ ids présents sur Ably
   const countsIds = useMemo(() => {
     const ids = Object.keys(counts || {});
     ids.sort();
@@ -105,55 +99,25 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   // ✅ empêche refetch si on a déjà fetch pour ce set d'ids
   const lastFetchKeyRef = useRef("");
 
-  // ✅ logs état général
-  useEffect(() => {
-    console.log(`[ProfilsDisplay ${instanceRef.current}] STATE`, {
-      filtrerEnLigne,
-      filtrerProches,
-      loading,
-      ready,
-      presenceUsable,
-      countsLen: countsIds.length,
-      countsSample: countsIds.slice(0, 15),
-      debug,
-    });
-  }, [filtrerEnLigne, filtrerProches, loading, ready, presenceUsable, countsIds, debug]);
-
-  // ✅ Quand "En ligne" est activé, on charge TOUTE la liste online via API
-  // ⚠️ Mais on ne bloque plus l'UI : on affiche d'abord un filtre fallback instantané,
-  // puis Ably remplace par la liste exacte dès que presenceUsable devient true.
+  // ✅ Quand "En ligne" est activé :
+  // - tant que presenceUsable=false : on garde la liste complète (base) => pas de "je vois plus l'autre"
+  // - dès que presenceUsable=true : on fetch la liste exacte via /api/profils-online
   useEffect(() => {
     let cancelled = false;
 
     async function loadAllOnline() {
-      if (!filtrerEnLigne) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerEnLigne=false`);
-        return;
-      }
-      if (filtrerProches) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerProches=true`);
-        return;
-      }
+      if (!filtrerEnLigne) return;
+      if (filtrerProches) return;
 
+      // ✅ pas prêt : on montre tout (pas de filtre local)
       if (!presenceUsable) {
-        console.log(
-          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline wait: presenceUsable=false (Ably pas prêt). UI fallback déjà affichée.`
-        );
+        setProfilsAffiches(baseProfilsRef.current || []);
         return;
       }
 
       const wantedKey = `online:${countsKey}`;
-      if (lastFetchKeyRef.current === wantedKey) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`, wantedKey);
-        return;
-      }
+      if (lastFetchKeyRef.current === wantedKey) return;
       lastFetchKeyRef.current = wantedKey;
-
-      console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`, {
-        wantedKey,
-        idsLen: countsIds.length,
-        idsSample: countsIds.slice(0, 20),
-      });
 
       setLoading(true);
       try {
@@ -164,40 +128,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           body: JSON.stringify({ ids: countsIds }),
         });
 
-        const txt = await res.text();
-        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online status=`, res.status);
-        console.log(
-          `[ProfilsDisplay ${instanceRef.current}] /api/profils-online text=`,
-          (txt || "").slice(0, 300)
-        );
-
-        let data = null;
-        try {
-          data = txt ? JSON.parse(txt) : null;
-        } catch (e) {
-          console.log(`[ProfilsDisplay ${instanceRef.current}] JSON parse FAILED`, e);
-        }
-
-        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online data=`, data);
-
+        const data = await res.json().catch(() => null);
         if (cancelled) return;
 
         if (res.ok && data?.ok) {
           const list = Array.isArray(data.utilisateurs) ? data.utilisateurs : [];
-          console.log(
-            `[ProfilsDisplay ${instanceRef.current}] setProfilsAffiches len=`,
-            list.length,
-            "ids=",
-            list.map((x) => x.id).slice(0, 30)
-          );
           setProfilsAffiches(list);
         } else {
-          console.log(`[ProfilsDisplay ${instanceRef.current}] API not ok => setProfilsAffiches([])`);
-          setProfilsAffiches([]);
+          // ✅ si API fail, on revient à la base (pas vide)
+          setProfilsAffiches(baseProfilsRef.current || []);
         }
       } catch (e) {
-        console.error(`[ProfilsDisplay ${instanceRef.current}] Erreur /api/profils-online:`, e);
-        if (!cancelled) setProfilsAffiches([]);
+        if (!cancelled) setProfilsAffiches(baseProfilsRef.current || []);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -212,15 +154,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   // ✅ LISTE RENDUE
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
-    const shuffled = stableShuffle(base, seedRef.current);
-
-    console.log(`[ProfilsDisplay ${instanceRef.current}] RENDER LIST`, {
-      profilsAffichesLen: base.length,
-      profilsFiltresLen: shuffled.length,
-      sampleIds: shuffled.slice(0, 20).map((u) => getTargetUserId(u)),
-    });
-
-    return shuffled;
+    return stableShuffle(base, seedRef.current);
   }, [profilsAffiches]);
 
   // Presigned URLs
@@ -277,21 +211,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   }, [profilsFiltres]);
 
   const handleToggleProches = async (active, customDistance) => {
-    console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle PROCHES =>`, active);
-
     setFiltrerProches(active);
 
     // ✅ priorité proches => coupe online
     if (active) {
       setFiltrerEnLigne(false);
-      lastFetchKeyRef.current = ""; // reset
+      lastFetchKeyRef.current = "";
     }
 
     if (active) {
       setLoading(true);
 
       if (!navigator.geolocation) {
-        console.error("Géolocalisation non supportée");
         setLoading(false);
         return;
       }
@@ -312,17 +243,13 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             });
 
             const data = await res.json().catch(() => null);
-            console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-proches data=`, data);
-
             setProfilsAffiches(Array.isArray(data) ? data : []);
           } catch (err) {
-            console.error("Erreur chargement profils proches :", err);
           } finally {
             setLoading(false);
           }
         },
-        (error) => {
-          console.error("Erreur géolocalisation :", error);
+        () => {
           setLoading(false);
         }
       );
@@ -352,22 +279,17 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               type="checkbox"
               checked={filtrerEnLigne}
               onChange={() => {
-                console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle EN LIGNE click`);
-
                 // coupe proches
                 setFiltrerProches(false);
 
                 setFiltrerEnLigne((prev) => {
                   const next = !prev;
 
-                  if (next) {
-                    // ✅ Filtre instantané dès l’activation (fallback DB)
-                    const base = baseProfilsRef.current || [];
-                    const instant = base.filter((u) => computeStatut(u) === "en_ligne");
-                    setProfilsAffiches(instant);
-                  } else {
-                    // retour à la liste normale
+                  if (!next) {
                     lastFetchKeyRef.current = "";
+                    setProfilsAffiches(baseProfilsRef.current || []);
+                  } else {
+                    // ✅ IMPORTANT: on garde tous les profils tant qu'Ably n'est pas prêt
                     setProfilsAffiches(baseProfilsRef.current || []);
                   }
 
@@ -420,9 +342,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ Badge instantané :
-              // - fallback DB immédiat (computeStatut)
-              // - puis Ably override dès que presenceUsable=true
+              // ✅ badge : presence si dispo, sinon fallback DB
               const fallback = computeStatut(user);
               const ablyOnline = !!counts?.[String(targetId)];
               const statutEff = presenceUsable ? (ablyOnline ? "en_ligne" : "hors_ligne") : fallback;
