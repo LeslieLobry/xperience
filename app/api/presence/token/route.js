@@ -18,17 +18,25 @@ const ALLOWED_ORIGINS = [
 
 function corsHeaders(req) {
   const origin = req.headers.get("origin") || "";
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
+
+  // ✅ fallback solide même si origin est vide (WebView/iOS) ou non listé
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : "https://www.x-periences.fr";
 
   const h = new Headers();
-  if (allowOrigin) {
-    h.set("Access-Control-Allow-Origin", allowOrigin);
-    h.set("Vary", "Origin");
-  }
+
+  h.set("Access-Control-Allow-Origin", allowOrigin);
+  h.set("Vary", "Origin");
 
   h.set("Access-Control-Allow-Credentials", "true");
   h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  h.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // ✅ headers plus complets (évite des preflight bloqués selon device)
+  h.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Platform, x-platform, X-Requested-With, Accept, Origin"
+  );
 
   // ✅ hyper important : pas de cache
   h.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
