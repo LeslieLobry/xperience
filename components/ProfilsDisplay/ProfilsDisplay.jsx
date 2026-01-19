@@ -47,7 +47,7 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { ready, counts } = useOnlineStatus();
+  const { ready, counts, debug } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [filtrerProches, setFiltrerProches] = useState(false);
@@ -57,6 +57,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const [profilsAffiches, setProfilsAffiches] = useState(profils || []);
   const [photoUrls, setPhotoUrls] = useState({});
 
+  const instanceRef = useRef(
+    Math.random().toString(16).slice(2, 6) + "-" + Date.now().toString(16).slice(-4)
+  );
+
   // ✅ seed stable
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
@@ -65,10 +69,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const baseProfilsRef = useRef(profils || []);
   useEffect(() => {
     baseProfilsRef.current = profils || [];
-    // si on n'est dans aucun mode spécial, on garde la liste normale
     if (!filtrerEnLigne && !filtrerProches) {
       setProfilsAffiches(profils || []);
     }
+
+    console.log(`[ProfilsDisplay ${instanceRef.current}] props.profils len=`, (profils || []).length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profils]);
 
@@ -76,39 +81,74 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
-    if (online === "1" || online === "true") setFiltrerEnLigne(true);
+    if (online === "1" || online === "true") {
+      console.log(`[ProfilsDisplay ${instanceRef.current}] init online param => true`);
+      setFiltrerEnLigne(true);
+    }
   }, []);
 
   // ✅ ids présents sur Ably (tous les online du site)
   const countsIds = useMemo(() => {
     const ids = Object.keys(counts || {});
-    ids.sort(); // important pour stabilité
+    ids.sort();
     return ids;
   }, [counts]);
 
   const presenceUsable = countsIds.length > 0;
-
-  // ✅ clé stable (évite les boucles)
   const countsKey = useMemo(() => countsIds.join(","), [countsIds]);
 
   // ✅ empêche refetch si on a déjà fetch pour ce set d'ids
   const lastFetchKeyRef = useRef("");
+
+  // ✅ logs état général
+  useEffect(() => {
+    console.log(`[ProfilsDisplay ${instanceRef.current}] STATE`, {
+      filtrerEnLigne,
+      filtrerProches,
+      loading,
+      ready,
+      presenceUsable,
+      countsLen: countsIds.length,
+      countsSample: countsIds.slice(0, 15),
+      debug,
+    });
+  }, [filtrerEnLigne, filtrerProches, loading, ready, presenceUsable, countsIds, debug]);
 
   // ✅ Quand "En ligne" est activé, on charge TOUTE la liste online via API
   useEffect(() => {
     let cancelled = false;
 
     async function loadAllOnline() {
-      if (!filtrerEnLigne) return;
-      if (filtrerProches) return; // priorité au mode proches
+      if (!filtrerEnLigne) {
+        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerEnLigne=false`);
+        return;
+      }
+      if (filtrerProches) {
+        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerProches=true`);
+        return;
+      }
 
-      // tant qu'on n'a pas d'ids online, on attend (sans boucle)
-      if (!presenceUsable) return;
+      if (!presenceUsable) {
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline wait: presenceUsable=false (counts empty)`
+        );
+        return;
+      }
 
-      // anti-boucle : si mêmes ids, on ne refetch pas
       const wantedKey = `online:${countsKey}`;
-      if (lastFetchKeyRef.current === wantedKey) return;
+      if (lastFetchKeyRef.current === wantedKey) {
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`,
+          wantedKey
+        );
+        return;
+      }
       lastFetchKeyRef.current = wantedKey;
+
+      console.log(
+        `[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`,
+        { wantedKey, idsLen: countsIds.length, idsSample: countsIds.slice(0, 20) }
+      );
 
       setLoading(true);
       try {
@@ -119,17 +159,39 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           body: JSON.stringify({ ids: countsIds }),
         });
 
-        const data = await res.json().catch(() => null);
+        const txt = await res.text();
+        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online status=`, res.status);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] /api/profils-online text=`,
+          (txt || "").slice(0, 300)
+        );
+
+        let data = null;
+        try {
+          data = txt ? JSON.parse(txt) : null;
+        } catch (e) {
+          console.log(`[ProfilsDisplay ${instanceRef.current}] JSON parse FAILED`, e);
+        }
+
+        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online data=`, data);
+
         if (cancelled) return;
 
         if (res.ok && data?.ok) {
           const list = Array.isArray(data.utilisateurs) ? data.utilisateurs : [];
+          console.log(
+            `[ProfilsDisplay ${instanceRef.current}] setProfilsAffiches len=`,
+            list.length,
+            "ids=",
+            list.map((x) => x.id).slice(0, 30)
+          );
           setProfilsAffiches(list);
         } else {
+          console.log(`[ProfilsDisplay ${instanceRef.current}] API not ok => setProfilsAffiches([])`);
           setProfilsAffiches([]);
         }
       } catch (e) {
-        console.error("Erreur /api/profils-online:", e);
+        console.error(`[ProfilsDisplay ${instanceRef.current}] Erreur /api/profils-online:`, e);
         if (!cancelled) setProfilsAffiches([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -145,7 +207,15 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   // ✅ LISTE RENDUE
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
-    return stableShuffle(base, seedRef.current);
+    const shuffled = stableShuffle(base, seedRef.current);
+
+    console.log(`[ProfilsDisplay ${instanceRef.current}] RENDER LIST`, {
+      profilsAffichesLen: base.length,
+      profilsFiltresLen: shuffled.length,
+      sampleIds: shuffled.slice(0, 20).map((u) => getTargetUserId(u)),
+    });
+
+    return shuffled;
   }, [profilsAffiches]);
 
   // Presigned URLs
@@ -183,8 +253,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               body: JSON.stringify({ key: user.photoUrl }),
             });
 
-            const data = await res.json();
-            newUrls[targetId] = data.url || "/default.jpg";
+            const data = await res.json().catch(() => null);
+            newUrls[targetId] = data?.url || "/default.jpg";
           } catch {
             newUrls[targetId] = "/default.jpg";
           }
@@ -202,6 +272,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   }, [profilsFiltres]);
 
   const handleToggleProches = async (active, customDistance) => {
+    console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle PROCHES =>`, active);
+
     setFiltrerProches(active);
 
     // ✅ priorité proches => coupe online
@@ -234,7 +306,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               }),
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => null);
+            console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-proches data=`, data);
+
             setProfilsAffiches(Array.isArray(data) ? data : []);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
@@ -273,6 +347,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               type="checkbox"
               checked={filtrerEnLigne}
               onChange={() => {
+                console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle EN LIGNE click`);
+
                 // coupe proches
                 setFiltrerProches(false);
 
@@ -283,11 +359,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                   if (!next) {
                     lastFetchKeyRef.current = "";
                     setProfilsAffiches(baseProfilsRef.current || []);
-                  } else {
-                    // si on active : on clear la liste le temps du fetch
-                    setProfilsAffiches([]);
                   }
-
+                  // ✅ IMPORTANT : on NE vide PAS la liste quand on active
+                  // sinon écran vide si fetch est bloqué / n'arrive pas.
                   return next;
                 });
               }}
@@ -386,8 +460,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() +
-                        user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
