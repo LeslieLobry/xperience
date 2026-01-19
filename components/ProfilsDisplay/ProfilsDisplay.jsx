@@ -90,6 +90,18 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
       debug,
     });
   }, [ready, presenceUsable, countsIds, debug]);
+useEffect(() => {
+  const sample = (Array.isArray(profilsAffiches) ? profilsAffiches : [])
+    .slice(0, 15)
+    .map((p) => ({
+      id: getTargetUserId(p),
+      pseudo: p?.pseudo,
+      online: !!counts?.[String(getTargetUserId(p))],
+    }));
+
+  console.log("[UI ProfilsDisplay] COUNTS KEYS =", Object.keys(counts || {}));
+  console.log("[UI ProfilsDisplay] PROFILS SAMPLE =", sample);
+}, [counts, profilsAffiches]);
 
   // ✅ helper local : vérité = counts
   const isOnlineViaCounts = (id) => !!counts?.[String(id)];
