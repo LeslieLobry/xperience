@@ -84,6 +84,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     if (online === "1" || online === "true") {
       console.log(`[ProfilsDisplay ${instanceRef.current}] init online param => true`);
       setFiltrerEnLigne(true);
+
+      // ✅ Filtre instantané (fallback DB) dès l'init si possible
+      const base = baseProfilsRef.current || [];
+      const instant = base.filter((u) => computeStatut(u) === "en_ligne");
+      setProfilsAffiches(instant);
     }
   }, []);
 
@@ -115,6 +120,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   }, [filtrerEnLigne, filtrerProches, loading, ready, presenceUsable, countsIds, debug]);
 
   // ✅ Quand "En ligne" est activé, on charge TOUTE la liste online via API
+  // ⚠️ Mais on ne bloque plus l'UI : on affiche d'abord un filtre fallback instantané,
+  // puis Ably remplace par la liste exacte dès que presenceUsable devient true.
   useEffect(() => {
     let cancelled = false;
 
@@ -130,25 +137,23 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
       if (!presenceUsable) {
         console.log(
-          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline wait: presenceUsable=false (counts empty)`
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline wait: presenceUsable=false (Ably pas prêt). UI fallback déjà affichée.`
         );
         return;
       }
 
       const wantedKey = `online:${countsKey}`;
       if (lastFetchKeyRef.current === wantedKey) {
-        console.log(
-          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`,
-          wantedKey
-        );
+        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`, wantedKey);
         return;
       }
       lastFetchKeyRef.current = wantedKey;
 
-      console.log(
-        `[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`,
-        { wantedKey, idsLen: countsIds.length, idsSample: countsIds.slice(0, 20) }
-      );
+      console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`, {
+        wantedKey,
+        idsLen: countsIds.length,
+        idsSample: countsIds.slice(0, 20),
+      });
 
       setLoading(true);
       try {
@@ -355,13 +360,17 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                 setFiltrerEnLigne((prev) => {
                   const next = !prev;
 
-                  // si on désactive : retour à la liste normale
-                  if (!next) {
+                  if (next) {
+                    // ✅ Filtre instantané dès l’activation (fallback DB)
+                    const base = baseProfilsRef.current || [];
+                    const instant = base.filter((u) => computeStatut(u) === "en_ligne");
+                    setProfilsAffiches(instant);
+                  } else {
+                    // retour à la liste normale
                     lastFetchKeyRef.current = "";
                     setProfilsAffiches(baseProfilsRef.current || []);
                   }
-                  // ✅ IMPORTANT : on NE vide PAS la liste quand on active
-                  // sinon écran vide si fetch est bloqué / n'arrive pas.
+
                   return next;
                 });
               }}
@@ -400,13 +409,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         </div>
       </div>
 
-      {/* ✅ message de synch (non bloquant) */}
-      {filtrerEnLigne && (!presenceUsable || !ready) && (
-        <p style={{ marginTop: 10, opacity: 0.8 }}>
-          Synchronisation des statuts en ligne…
-        </p>
-      )}
-
       {loading ? (
         <p>Chargement…</p>
       ) : (
@@ -418,13 +420,12 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ badge : on reste cohérent (presence si dispo, sinon fallback DB)
-              const statutEff =
-                presenceUsable && counts?.[String(targetId)]
-                  ? "en_ligne"
-                  : presenceUsable
-                  ? "hors_ligne"
-                  : computeStatut(user);
+              // ✅ Badge instantané :
+              // - fallback DB immédiat (computeStatut)
+              // - puis Ably override dès que presenceUsable=true
+              const fallback = computeStatut(user);
+              const ablyOnline = !!counts?.[String(targetId)];
+              const statutEff = presenceUsable ? (ablyOnline ? "en_ligne" : "hors_ligne") : fallback;
 
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
