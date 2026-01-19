@@ -58,6 +58,10 @@ export function OnlineStatusProvider({ user, children }) {
     const ably = getAbly();
     if (!ably) return;
 
+console.log(nowTag(instanceIdRef.current), "ABLY INSTANCE =", ably);
+console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyName, "clientId =", ably?.auth?.clientId);
+
+
     cleanedUpRef.current = false;
     enteredRef.current = false;
 
