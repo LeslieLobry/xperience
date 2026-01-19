@@ -26,23 +26,19 @@ export async function POST(req) {
     const body = await req.json().catch(() => null);
     const ids = Array.isArray(body?.ids) ? body.ids.map(String) : [];
 
-    if (ids.length === 0) {
+    const idsNum = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n));
+    if (idsNum.length === 0) {
       return NextResponse.json({ ok: true, utilisateurs: [] });
     }
 
-    // ✅ exclure les ids invalides
-    const idsNum = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n));
-
     let where = { id: { in: idsNum } };
 
-    // ✅ appliquer les exclusions
     if (userId) {
       const exclus = await getIdsUtilisateursExclus(userId);
       where = {
         AND: [
           { id: { in: idsNum } },
-          { id: { notIn: exclus } }, // on exclut les bloqués etc.
-          { id: { not: userId } },   // on ne montre pas "moi"
+          { id: { notIn: [...exclus, userId] } }, // ✅ exclut bloqués + moi
         ],
       };
     }

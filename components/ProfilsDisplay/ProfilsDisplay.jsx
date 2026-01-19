@@ -1,4 +1,3 @@
-// components/ProfilsDisplay/ProfilsDisplay.jsx
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -47,7 +46,7 @@ function getTargetUserId(u) {
 }
 
 export default function ProfilsDisplay({ profils, afficherPlus = false }) {
-  const { ready, counts, debug } = useOnlineStatus();
+  const { counts } = useOnlineStatus();
 
   const [filtrerEnLigne, setFiltrerEnLigne] = useState(false);
   const [profilsAffiches, setProfilsAffiches] = useState(profils);
@@ -58,18 +57,17 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
   const [photoUrls, setPhotoUrls] = useState({});
 
-  // ✅ garde une copie stable de la liste "normale"
-  const baseProfilsRef = useRef(profils);
-  useEffect(() => {
-    baseProfilsRef.current = profils;
-    // si pas en mode online et pas proches => on refresh la liste affichée
-    if (!filtrerEnLigne && !filtrerProches) setProfilsAffiches(profils);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profils]);
-
   // ✅ seed stable
   const seedRef = useRef(null);
   if (seedRef.current === null) seedRef.current = Date.now().toString();
+
+  // ✅ garder la liste "normale"
+  const baseProfilsRef = useRef(profils);
+  useEffect(() => {
+    baseProfilsRef.current = profils;
+    if (!filtrerEnLigne && !filtrerProches) setProfilsAffiches(profils);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profils]);
 
   // ✅ Active filtre si ?online=1
   useEffect(() => {
@@ -78,42 +76,58 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     if (online === "1" || online === "true") setFiltrerEnLigne(true);
   }, []);
 
-  // ✅ Présence "utilisable" : dès qu’on a au moins 1 id dans counts
-  const countsIds = Object.keys(counts || {});
-  const presenceUsable = countsIds.length > 0;
+  // ✅ ids online STABLES (memo) + key stable (string) => évite boucle
+  const onlineIds = useMemo(() => {
+    return Object.keys(counts || {}).map(String).sort();
+  }, [counts]);
 
-  // loader UI : si filtre ON mais pas encore de counts
-  const onlineFilterLoading = filtrerEnLigne && !presenceUsable && !ready;
+  const onlineKey = useMemo(() => onlineIds.join(","), [onlineIds]);
 
-  // ✅ LOG UI
-  useEffect(() => {
-    console.log("[UI ProfilsDisplay]", {
-      ready,
-      presenceUsable,
-      countsIds,
-      debug,
-      filtrerEnLigne,
-      filtrerProches,
-      listSize: Array.isArray(profilsAffiches) ? profilsAffiches.length : 0,
-    });
-  }, [ready, presenceUsable, countsIds, debug, filtrerEnLigne, filtrerProches, profilsAffiches]);
+  const presenceUsable = onlineIds.length > 0;
 
-  // ✅ Quand on coche "En ligne" => on charge la vraie liste online depuis l'API
+  // ✅ helper local
+  const isOnlineViaCounts = (id) => !!counts?.[String(id)];
+
+  // ✅ anti-spam fetch
+  const lastKeyRef = useRef("");
+  const abortRef = useRef(null);
+
+  // ✅ Quand on active "En ligne" : fetch liste online via API
+  // ✅ IMPORTANT : dépendances stables via onlineKey
   useEffect(() => {
     let cancelled = false;
 
-    async function loadOnline() {
-      // si pas activé => on revient à la liste normale (si pas proches)
-      if (!filtrerEnLigne) {
+    async function loadOnlineFromApi() {
+      // mode off -> reset propre
+      if (!filtrerEnLigne || filtrerProches) {
+        // si on sort du mode en ligne, on revient à la liste normale
         if (!filtrerProches) setProfilsAffiches(baseProfilsRef.current || []);
+        setLoading(false);
+        lastKeyRef.current = "";
         return;
       }
 
-      // si "près de moi" est actif, on ne mélange pas (priorité au proche)
-      if (filtrerProches) return;
+      // pas de présence : on ne fetch pas (et on ne bloque pas)
+      if (!presenceUsable) {
+        setLoading(false);
+        return;
+      }
 
-      // attendre la présence
-      if (!presenceUsable) return;
+      // ✅ si mêmes IDs -> ne refetch pas
+      if (lastKeyRef.current === onlineKey) {
+        setLoading(false);
+        return;
+      }
+      lastKeyRef.current = onlineKey;
+
+      // abort ancien fetch
+      if (abortRef.current) {
+        try {
+          abortRef.current.abort();
+        } catch {}
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       setLoading(true);
       try {
@@ -121,54 +135,48 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ ids: countsIds }),
+          body: JSON.stringify({ ids: onlineIds }),
+          signal: controller.signal,
         });
 
         const data = await res.json().catch(() => null);
+        if (cancelled) return;
 
-        if (!cancelled) {
-          if (res.ok && data?.ok) {
-            setProfilsAffiches(Array.isArray(data.utilisateurs) ? data.utilisateurs : []);
-          } else {
-            setProfilsAffiches([]);
-          }
+        if (res.ok && data?.ok) {
+          setProfilsAffiches(Array.isArray(data.utilisateurs) ? data.utilisateurs : []);
+        } else {
+          setProfilsAffiches([]);
         }
       } catch (e) {
-        console.error("Erreur loadOnline:", e);
+        if (e?.name === "AbortError") return;
+        console.error("Erreur /api/profils-online:", e);
         if (!cancelled) setProfilsAffiches([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    loadOnline();
+    loadOnlineFromApi();
 
     return () => {
       cancelled = true;
     };
-  }, [filtrerEnLigne, filtrerProches, presenceUsable, countsIds]);
+  }, [filtrerEnLigne, filtrerProches, presenceUsable, onlineKey, onlineIds]);
 
-  // helper local : vérité = counts
-  const isOnlineViaCounts = (id) => !!counts?.[String(id)];
-
-  // ✅ FILTRAGE FINAL
-  // - si "En ligne" est activé : profilsAffiches est déjà la liste online (API)
-  // - sinon : on affiche la liste normale (avec shuffle)
+  // ✅ FILTRAGE :
+  // - si "En ligne" activé :
+  //    - si présenceUsable => profilsAffiches = ceux de l'API (déjà filtrés)
+  //    - sinon => fallback DB computeStatut (pas d'écran vide)
   const profilsFiltres = useMemo(() => {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
 
-    // pendant le chargement presence -> on ne filtre pas
-    if (onlineFilterLoading) return stableShuffle(base, seedRef.current);
+    if (!filtrerEnLigne) return stableShuffle(base, seedRef.current);
 
-    // si le toggle en ligne est activé, la liste vient déjà de /api/profils-online
-    // on garde juste un ordre stable
-    if (filtrerEnLigne && !filtrerProches) {
-      return stableShuffle(base, seedRef.current);
-    }
+    if (presenceUsable) return stableShuffle(base, seedRef.current);
 
-    // sinon liste normale
-    return stableShuffle(base, seedRef.current);
-  }, [filtrerEnLigne, filtrerProches, profilsAffiches, onlineFilterLoading]);
+    const fallback = base.filter((p) => computeStatut(p) === "en_ligne");
+    return stableShuffle(fallback, seedRef.current);
+  }, [filtrerEnLigne, presenceUsable, profilsAffiches]);
 
   // Presigned URLs
   useEffect(() => {
@@ -226,7 +234,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const handleToggleProches = async (active, customDistance) => {
     setFiltrerProches(active);
 
-    // si on active "près de moi", on coupe "en ligne" (évite conflit UX)
+    // ✅ priorité : "près de moi" coupe "en ligne"
     if (active) setFiltrerEnLigne(false);
 
     if (active) {
@@ -267,7 +275,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         }
       );
     } else {
-      // retour liste normale
       setProfilsAffiches(baseProfilsRef.current || []);
     }
   };
@@ -293,9 +300,14 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               type="checkbox"
               checked={filtrerEnLigne}
               onChange={() => {
-                // si on active en ligne, on coupe proche
                 setFiltrerProches(false);
                 setFiltrerEnLigne((prev) => !prev);
+
+                // si on coupe, on revient à la liste normale
+                if (filtrerEnLigne) {
+                  setProfilsAffiches(baseProfilsRef.current || []);
+                  lastKeyRef.current = "";
+                }
               }}
             />
             <span className="slider"></span>
@@ -327,27 +339,29 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                 pointerEvents: filtrerProches ? "auto" : "none",
               }}
             />
-            <span style={{ minWidth: 32, display: "inline-block" }}>
-              {distance} km
-            </span>
+            <span style={{ minWidth: 32, display: "inline-block" }}>{distance} km</span>
           </label>
         </div>
       </div>
+
+      {/* ✅ statut non bloquant */}
+      {filtrerEnLigne && !presenceUsable && (
+        <p style={{ marginTop: 10, opacity: 0.8 }}>
+          Synchronisation des statuts en ligne…
+        </p>
+      )}
 
       {loading ? (
         <p>Chargement…</p>
       ) : (
         <div className="grid-profil">
-          {onlineFilterLoading ? (
-            <p>Chargement des statuts en ligne…</p>
-          ) : profilsFiltres.length === 0 ? (
+          {profilsFiltres.length === 0 ? (
             <p>Aucun profil trouvé pour ce filtre.</p>
           ) : (
             profilsFiltres.map((user) => {
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ badge : vérité = counts (si dispo), sinon fallback DB
               const statutEff = presenceUsable
                 ? isOnlineViaCounts(targetId)
                   ? "en_ligne"
@@ -357,16 +371,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
               return (
-                <Link
-                  href={`/profil/${routeId}`}
-                  key={targetId}
-                  className="profil-card-link"
-                >
+                <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${
-                        statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"
-                      }`}
+                      className={`statut-badge ${statutEff === "en_ligne" ? "en-ligne" : "hors-ligne"}`}
                       title={statutEff === "en_ligne" ? "En ligne" : "Hors ligne"}
                     />
 
@@ -392,8 +400,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() +
-                        user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
