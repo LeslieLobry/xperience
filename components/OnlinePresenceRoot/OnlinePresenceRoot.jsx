@@ -9,6 +9,11 @@ export default function OnlinePresenceRoot({ children }) {
   const auth = useAuth() || {};
   const userId = auth?.user?.id ? String(auth.user.id) : null;
   const authReady = !!auth?.authReady;
+console.log("[OnlinePresenceRoot]", {
+  authReady,
+  authUserId: auth?.user?.id,
+  authPseudo: auth?.user?.pseudo,
+});
 
   // ✅ Tant que l'auth n'est pas prête, on rend l'app telle quelle
   // (mais on évite de changer le tree trop souvent)

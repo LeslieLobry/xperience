@@ -4,8 +4,12 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "../../../lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET non défini");
+
 // INIT_TOKEN est optionnel ; si tu ne veux pas l'utiliser, laisse vide en env
 const INIT_TOKEN = process.env.INIT_TOKEN || "";
 
@@ -22,6 +26,7 @@ function corsHeaders(origin = "") {
   const allowOrigin = origin
     ? (ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.x-periences.fr")
     : "*";
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
@@ -33,12 +38,16 @@ function corsHeaders(origin = "") {
 
 export async function OPTIONS(req) {
   const origin = req.headers.get("origin") || "";
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  const headers = corsHeaders(origin);
+  headers["Cache-Control"] = "no-store";
+  return new Response(null, { status: 204, headers });
 }
 
 export async function HEAD(req) {
   const origin = req.headers.get("origin") || "";
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  const headers = corsHeaders(origin);
+  headers["Cache-Control"] = "no-store";
+  return new Response(null, { status: 204, headers });
 }
 
 // ---- helpers ----
@@ -46,7 +55,11 @@ function safeEqual(a = "", b = "") {
   const A = Buffer.from(a);
   const B = Buffer.from(b);
   if (A.length !== B.length) return false;
-  try { return crypto.timingSafeEqual(A, B); } catch { return false; }
+  try {
+    return crypto.timingSafeEqual(A, B);
+  } catch {
+    return false;
+  }
 }
 
 function extractTokenFromReq(req) {
@@ -55,10 +68,9 @@ function extractTokenFromReq(req) {
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (m?.[1]) return m[1];
 
-  // 2) cookie token=...
-  const cookie = req.headers.get("cookie") || "";
-  const c = cookie.split(/;\s*/).find((x) => x.startsWith("token="));
-  if (c) return c.split("=")[1];
+  // 2) cookie token=... (✅ parser Next, pas de split("=") dangereux)
+  const cookieToken = req.cookies?.get?.("token")?.value;
+  if (cookieToken) return cookieToken;
 
   // 3) query ?token=... (fallback)
   const url = new URL(req.url);
@@ -71,6 +83,7 @@ function extractTokenFromReq(req) {
 export async function GET(req) {
   const origin = req.headers.get("origin") || "";
   const headers = corsHeaders(origin);
+  headers["Cache-Control"] = "no-store";
 
   try {
     // --- Auth ---
@@ -113,56 +126,59 @@ export async function GET(req) {
     }
 
     // --- Data (TA LOGIQUE EXISTANTE, inchangée) ---
-    const [utilisateur, conversations, notifications, articles, evenementsRaw] = await Promise.all([
-      prisma.utilisateur.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          pseudo: true,
-          type: true,
-          email: true,
-          photoUrl: true,
-          role: true,
-          age: true,
-          localisation: true,
-          verificationDeadline: true,
-          verificationIdentiteStatut: true,
-        },
-      }),
-      prisma.conversation.findMany({
-        where: {
-          participants: {
-            some: { utilisateurId: userId },
+    const [utilisateur, conversations, notifications, articles, evenementsRaw] =
+      await Promise.all([
+        prisma.utilisateur.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            pseudo: true,
+            type: true,
+            email: true,
+            photoUrl: true,
+            role: true,
+            age: true,
+            localisation: true,
+            verificationDeadline: true,
+            verificationIdentiteStatut: true,
           },
-        },
-        include: {
-          participants: {
-            take: 2,
-            select: {
-              utilisateurId: true,
-              utilisateur: { select: { id: true, pseudo: true, photoUrl: true } },
+        }),
+        prisma.conversation.findMany({
+          where: {
+            participants: {
+              some: { utilisateurId: userId },
             },
           },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: 10,
-      }),
-      prisma.notification.findMany({
-        where: { utilisateurId: userId, lu: false },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: { id: true, message: true, lien: true, createdAt: true },
-      }),
-      prisma.article.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: { images: { take: 1, select: { url: true } } },
-      }),
-      prisma.evenement.findMany({
-        select: { id: true, titre: true, imageUrl: true, dates: true, lieu: true },
-        take: 20,
-      }),
-    ]);
+          include: {
+            participants: {
+              take: 2,
+              select: {
+                utilisateurId: true,
+                utilisateur: {
+                  select: { id: true, pseudo: true, photoUrl: true },
+                },
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 10,
+        }),
+        prisma.notification.findMany({
+          where: { utilisateurId: userId, lu: false },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: { id: true, message: true, lien: true, createdAt: true },
+        }),
+        prisma.article.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: { images: { take: 1, select: { url: true } } },
+        }),
+        prisma.evenement.findMany({
+          select: { id: true, titre: true, imageUrl: true, dates: true, lieu: true },
+          take: 20,
+        }),
+      ]);
 
     if (!utilisateur) {
       console.warn("[/api/init] utilisateur introuvable:", userId);
@@ -175,10 +191,15 @@ export async function GET(req) {
     // événements à venir
     const now = new Date();
     const evenements = (evenementsRaw || [])
-      .filter((evt) => Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now))
+      .filter(
+        (evt) =>
+          Array.isArray(evt.dates) && evt.dates.some((d) => new Date(d) >= now)
+      )
       .sort((a, b) => {
-        const nextA = (a.dates || []).find((d) => new Date(d) >= now) || a.dates?.[0];
-        const nextB = (b.dates || []).find((d) => new Date(d) >= now) || b.dates?.[0];
+        const nextA =
+          (a.dates || []).find((d) => new Date(d) >= now) || a.dates?.[0];
+        const nextB =
+          (b.dates || []).find((d) => new Date(d) >= now) || b.dates?.[0];
         return new Date(nextA) - new Date(nextB);
       })
       .slice(0, 5);
