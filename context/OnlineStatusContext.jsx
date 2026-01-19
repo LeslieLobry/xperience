@@ -20,11 +20,8 @@ function nowTag(id) {
 export function OnlineStatusProvider({ user, children }) {
   const [counts, setCounts] = useState({});
   const [ready, setReady] = useState(false);
-
-  // ✅ on marque "prêt" dès qu’on a AU MOINS un signal fiable (snapshot OU event)
   const [hasSignal, setHasSignal] = useState(false);
 
-  // debug
   const [debug, setDebug] = useState({
     instanceId: null,
     channelState: "init",
@@ -48,7 +45,6 @@ export function OnlineStatusProvider({ user, children }) {
   const userId = user?.id ? String(user.id) : null;
   const pseudo = user?.pseudo || null;
 
-  // ✅ prêt = ready OR hasSignal OR counts non vide
   const computedReady =
     !!ready || !!hasSignal || (counts && Object.keys(counts).length > 0);
 
@@ -58,14 +54,11 @@ export function OnlineStatusProvider({ user, children }) {
     const ably = getAbly();
     if (!ably) return;
 
-console.log(nowTag(instanceIdRef.current), "ABLY INSTANCE =", ably);
-console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyName, "clientId =", ably?.auth?.clientId);
-
+    console.log(nowTag(instanceIdRef.current), "ABLY INSTANCE =", ably);
 
     cleanedUpRef.current = false;
     enteredRef.current = false;
 
-    // reset states
     setCounts({});
     setReady(false);
     setHasSignal(false);
@@ -94,14 +87,13 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
     const channel = ably.channels.get("presence:online");
     channelRef.current = channel;
 
-    // -------- utils
+    // ✅ On ne compte que sur data.userId (pas clientId, évite "1")
     const memberToUserId = (m) => {
-      const id = m?.data?.userId ?? m?.clientId;
+      const id = m?.data?.userId;
       return id != null ? String(id) : null;
     };
 
     const markSignal = (why) => {
-      // ✅ on déclare que la présence est exploitable
       setHasSignal(true);
       setDebug((d) => ({
         ...d,
@@ -125,11 +117,8 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
         }
 
         setCounts(next);
-
-        // ✅ snapshot = prêt “officiel”
         setReady(true);
         markSignal(why);
-
         setDebug((d) => ({ ...d, lastSnapshotSize: (members || []).length }));
 
         console.log(
@@ -169,7 +158,7 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
           return;
         }
 
-        // ✅ après enter on force un snapshot
+        // ✅ snapshot après enter (une fois)
         syncFromGet("enter->get");
         setTimeout(() => syncFromGet("enter->get+500ms"), 500);
       });
@@ -212,17 +201,16 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
       });
     };
 
+    // ✅ Pas de resync sur update (évite spam/boucle)
     const onUpdate = () => {
       markSignal("event:update");
-      // petit resync derrière
-      setTimeout(() => syncFromGet("event:update->get"), 100);
     };
 
     channel.presence.subscribe("enter", onEnter);
     channel.presence.subscribe("leave", onLeave);
     channel.presence.subscribe("update", onUpdate);
 
-    // catch-all
+    // catch-all (debug)
     const onAnyPresence = (msg) => {
       setDebug((d) => ({
         ...d,
@@ -233,7 +221,7 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
         clientId: msg.clientId,
         connectionId: msg.connectionId,
         data: msg.data,
-        id: msg.data?.userId ?? msg.clientId,
+        id: msg.data?.userId ?? null,
       });
     };
     channel.presence.subscribe(onAnyPresence);
@@ -275,7 +263,7 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
       );
 
       if (stateChange.current === "connected") {
-        enteredRef.current = false;
+        enteredRef.current = false; // ✅ ok sur reconnect
         ensureEntered();
         setTimeout(() => syncFromGet("conn:connected->get"), 300);
       }
@@ -301,11 +289,10 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
       ensureEntered();
     });
 
-    // periodic
+    // ✅ periodic : snapshot seulement (pas de re-enter)
     periodicRef.current = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       syncFromGet("interval->get");
-      enteredRef.current = false;
-      ensureEntered();
     }, 15000);
 
     // visibility
@@ -317,6 +304,7 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
       );
       if (document.visibilityState === "visible") {
         setTimeout(() => syncFromGet("vis->get"), 200);
+        // ✅ on peut re-ensure uniquement au retour visible
         enteredRef.current = false;
         ensureEntered();
       }
@@ -362,11 +350,14 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
     };
   }, [userId, pseudo]);
 
-  // update data (ok)
+  // ✅ Update présence uniquement si on est déjà entré
   useEffect(() => {
     if (!userId) return;
+    if (!enteredRef.current) return;
+
     const ch = channelRef.current;
     if (!ch) return;
+
     try {
       ch.presence.update({ userId, pseudo, t: Date.now() });
     } catch {}
@@ -380,7 +371,7 @@ console.log(nowTag(instanceIdRef.current), "ABLY keyName =", ably?.options?.keyN
       isOnline,
       onlineCount,
       counts,
-      ready: computedReady, // ✅ IMPORTANT : on expose computedReady
+      ready: computedReady,
       debug: {
         ...debug,
         computedReady,
