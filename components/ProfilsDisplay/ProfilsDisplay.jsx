@@ -340,6 +340,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const hrefAfficherPlus = filtrerEnLigne
     ? { pathname: "/profils", query: { online: "1" } }
     : "/profils";
+const listIds = new Set((profilsAffiches || []).map(getTargetUserId).filter(Boolean));
+const onlineIds = Object.keys(counts || {});
+const missingOnline = onlineIds.filter((id) => !listIds.has(String(id)));
+
+console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", missingOnline);
 
   return (
     <div className="profil-list1">
