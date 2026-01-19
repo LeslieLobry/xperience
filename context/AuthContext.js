@@ -11,7 +11,7 @@ import {
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // ✅ undefined = "pas encore vérifié"
+  // ✅ undefined = "pas encore vérifié" (évite redirect au refresh)
   const [user, setUser] = useState(undefined);
 
   const [conversations, setConversations] = useState([]);
@@ -20,8 +20,10 @@ export function AuthProvider({ children }) {
   const [evenements, setEvenements] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  // ✅ devient true après le 1er check auth, et ne repasse jamais à false
   const [authReady, setAuthReady] = useState(false);
 
+  // helper safe json (évite crash si API renvoie HTML/erreur)
   const safeJson = async (res) => {
     const text = await res.text();
     try {
@@ -31,36 +33,16 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ✅ /api/me = vérité pour l'identité
-  const refreshUser = useCallback(async () => {
-    try {
-      const res = await fetch("/api/me", {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const data = await safeJson(res);
-
-      if (!res.ok || !data?.success || !data?.utilisateur?.id) {
-        setUser(null);
-        return null;
-      }
-
-      setUser(data.utilisateur);
-      return data.utilisateur;
-    } catch (err) {
-      console.error("Erreur refreshUser:", err);
-      setUser(null);
-      return null;
-    }
-  }, []);
-
-  // ✅ init = récupère les données, mais ne doit pas décider l'identité
+  // Memoïser fetchUser (pas fetchInit)
   const fetchUser = useCallback(async () => {
     setLoading(true);
     try {
-      // 1) Identité fiable
-      const me = await refreshUser();
-      if (!me?.id) {
+      const res = await fetch("/api/init", { credentials: "include" });
+      const data = await safeJson(res);
+
+      // si non-OK → on considère non connecté (et on clean)
+      if (!res.ok || !data?.success) {
+        setUser(null);
         setConversations([]);
         setNotifications([]);
         setArticles([]);
@@ -68,29 +50,13 @@ export function AuthProvider({ children }) {
         return null;
       }
 
-      // 2) Données d'init
-      const res = await fetch("/api/init", {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const data = await safeJson(res);
-
-      if (!res.ok || !data?.success) {
-        // on garde l'identité (me) mais on vide les datas si init échoue
-        setConversations([]);
-        setNotifications([]);
-        setArticles([]);
-        setEvenements([]);
-        return me;
-      }
-
-      // ⚠️ IMPORTANT : on ne prend pas data.utilisateur ici
+      setUser(data.utilisateur ?? null);
       setConversations(Array.isArray(data.conversations) ? data.conversations : []);
       setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
       setArticles(Array.isArray(data.articles) ? data.articles : []);
       setEvenements(Array.isArray(data.evenements) ? data.evenements : []);
 
-      return me;
+      return data.utilisateur ?? null;
     } catch (err) {
       console.error("❌ fetchUser error :", err);
       setUser(null);
@@ -103,14 +69,29 @@ export function AuthProvider({ children }) {
       setLoading(false);
       setAuthReady(true);
     }
-  }, [refreshUser]);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/me", { credentials: "include" });
+      const data = await safeJson(res);
+
+      if (!res.ok || !data?.success || !data?.utilisateur) {
+        // optionnel : si /api/me dit non connecté, on peut nettoyer
+        setUser(null);
+        return;
+      }
+      setUser(data.utilisateur);
+    } catch (err) {
+      console.error("Erreur refreshUser:", err);
+    }
+  }, []);
 
   const logout = async () => {
     try {
       await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
-        cache: "no-store",
       });
     } catch (err) {
       console.error("❌ Erreur logout :", err);
@@ -144,7 +125,7 @@ export function AuthProvider({ children }) {
         articles,
         evenements,
         loading,
-        authReady,
+        authReady, // ✅ NOUVEAU
         logout,
         fetchUser,
         updateUser,
