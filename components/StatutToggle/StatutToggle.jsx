@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import "./StatutToggle.css";
 
 export default function StatutToggle({ statut, editable = false, onUpdate }) {
-  // statut en base : "en_ligne" (visible) | "hors_ligne" (invisible)
   const [etat, setEtat] = useState(statut);
 
   useEffect(() => {
@@ -42,13 +41,17 @@ export default function StatutToggle({ statut, editable = false, onUpdate }) {
 
   return (
     <div className="statut-switch-container">
-      <span className="statut-label">
-        {invisible ? "🙈 Invisible" : "👀 Visible"}
+      <span className={`statut-label ${invisible ? "is-invisible" : "is-visible"}`}>
+        {invisible ? "Mode invisible" : "Visible"}
       </span>
 
       {editable && (
         <label className="statut-switch">
-          <input type="checkbox" checked={!invisible} onChange={toggleInvisible} />
+          <input
+            type="checkbox"
+            checked={!invisible}
+            onChange={toggleInvisible}
+          />
           <span className="slider"></span>
         </label>
       )}

@@ -21,6 +21,28 @@
   width: 0;
   height: 0;
 }
+.statut-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.statut-label::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.statut-label.is-visible::before {
+  background: #2ecc71; /* vert */
+}
+
+.statut-label.is-invisible::before {
+  background: #7f8c8d; /* gris */
+}
 
 .statut-switch .slider {
   position: absolute;
