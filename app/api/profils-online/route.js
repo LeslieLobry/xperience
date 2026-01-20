@@ -13,7 +13,10 @@ const secret = process.env.JWT_SECRET;
 
 function noStoreJson(body, init = {}) {
   const res = NextResponse.json(body, init);
-  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate"
+  );
   res.headers.set("Pragma", "no-cache");
   res.headers.set("Expires", "0");
   return res;
@@ -75,7 +78,12 @@ export async function POST(req) {
     // ------------------- Exclusions (blocages etc.) -------------------
     let exclus = [];
     let exclusNum = [];
-    let where = { id: { in: idsNum } };
+
+    // ✅ Mode invisible : on ne renvoie que les profils VISIBLES (statut=en_ligne)
+    // Donc même si un user est connecté Ably, s'il est invisible => il ne remonte pas.
+    let where = {
+      AND: [{ id: { in: idsNum } }, { statut: "en_ligne" }],
+    };
 
     if (userId) {
       exclus = await getIdsUtilisateursExclus(userId);
@@ -99,6 +107,7 @@ export async function POST(req) {
           { id: { in: idsNum } },
           { id: { not: userId } }, // pas moi
           { id: { notIn: exclusNum } }, // pas les bloqués/exclus
+          { statut: "en_ligne" }, // ✅ uniquement visibles
         ],
       };
     }
@@ -108,6 +117,7 @@ export async function POST(req) {
       idsNumLen: idsNum.length,
       hasUserId: !!userId,
       exclusNumLen: exclusNum.length,
+      onlyVisible: true,
     });
 
     // ------------------- DB query -------------------
@@ -119,9 +129,7 @@ export async function POST(req) {
         photoUrl: true,
         age: true,
         localisation: true,
-        statut: true,
-        statutAuto: true,
-        lastSeenAt: true,
+        statut: true, // "en_ligne" (visible) seulement ici, logique
         type: true,
         verificationIdentiteStatut: true,
       },
@@ -137,9 +145,15 @@ export async function POST(req) {
     const missingFromDb = idsNum.filter((id) => !returnedIdSet.has(id));
 
     // ✅ LOG: cas "profil connecté mais pas renvoyé"
+    // (ici, un profil peut manquer car invisible => "NOT_FOUND_OR_FILTERED")
     const missingBreakdown = missingFromDb.map((id) => ({
       id,
-      reason: userId && id === userId ? "IS_SELF" : exclusNum.includes(id) ? "EXCLUDED" : "NOT_FOUND_OR_FILTERED",
+      reason:
+        userId && id === userId
+          ? "IS_SELF"
+          : exclusNum.includes(id)
+          ? "EXCLUDED"
+          : "NOT_FOUND_OR_FILTERED",
     }));
 
     console.log(
@@ -156,7 +170,9 @@ export async function POST(req) {
 
     // ✅ LOG: si un id demandé = moi, on le note explicitement
     if (userId && idsNum.includes(userId)) {
-      console.log(`[profils-online:${reqId}] NOTE: requested list contains SELF id=${userId} (filtered out)`);
+      console.log(
+        `[profils-online:${reqId}] NOTE: requested list contains SELF id=${userId} (filtered out)`
+      );
     }
 
     return noStoreJson({
@@ -184,6 +200,9 @@ export async function POST(req) {
     });
   } catch (e) {
     console.error(`[profils-online:${reqId}] ERROR`, e);
-    return noStoreJson({ ok: false, error: "Erreur serveur", debug: { reqId } }, { status: 500 });
+    return noStoreJson(
+      { ok: false, error: "Erreur serveur", debug: { reqId } },
+      { status: 500 }
+    );
   }
 }

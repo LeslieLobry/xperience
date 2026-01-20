@@ -27,17 +27,10 @@ function stableShuffle(list, seed) {
     .map((x) => x.u);
 }
 
-// (fallback) calcul basé lastSeenAt/statutAuto
+// ✅ mode invisible : le statut DB = préférence visible/invisible
+// - "en_ligne" => visible
+// - "hors_ligne" => invisible
 function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-
-  if (u?.statutAuto) {
-    if (!u?.lastSeenAt) return "hors_ligne";
-    const seen = new Date(u.lastSeenAt).getTime();
-    if (!Number.isFinite(seen)) return "hors_ligne";
-    return Date.now() - seen <= ONLINE_WINDOW_MS ? "en_ligne" : "hors_ligne";
-  }
-
   return u?.statut === "en_ligne" ? "en_ligne" : "hors_ligne";
 }
 
@@ -73,7 +66,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
       setProfilsAffiches(profils || []);
     }
 
-    console.log(`[ProfilsDisplay ${instanceRef.current}] props.profils len=`, (profils || []).length);
+    console.log(
+      `[ProfilsDisplay ${instanceRef.current}] props.profils len=`,
+      (profils || []).length
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profils]);
 
@@ -82,7 +78,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     const params = new URLSearchParams(window.location.search);
     const online = params.get("online");
     if (online === "1" || online === "true") {
-      console.log(`[ProfilsDisplay ${instanceRef.current}] init online param => true`);
+      console.log(
+        `[ProfilsDisplay ${instanceRef.current}] init online param => true`
+      );
       setFiltrerEnLigne(true);
 
       // ✅ Filtre instantané (fallback DB) dès l'init si possible
@@ -99,7 +97,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     return ids;
   }, [counts]);
 
+  // ✅ présence utilisable si on a un set non vide (ta logique actuelle)
+  // (Tu peux aussi baser ça sur `ready` si ton context est fiable)
   const presenceUsable = countsIds.length > 0;
+
   const countsKey = useMemo(() => countsIds.join(","), [countsIds]);
 
   // ✅ empêche refetch si on a déjà fetch pour ce set d'ids
@@ -117,7 +118,15 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
       countsSample: countsIds.slice(0, 15),
       debug,
     });
-  }, [filtrerEnLigne, filtrerProches, loading, ready, presenceUsable, countsIds, debug]);
+  }, [
+    filtrerEnLigne,
+    filtrerProches,
+    loading,
+    ready,
+    presenceUsable,
+    countsIds,
+    debug,
+  ]);
 
   // ✅ Quand "En ligne" est activé, on charge TOUTE la liste online via API
   // ⚠️ Mais on ne bloque plus l'UI : on affiche d'abord un filtre fallback instantané,
@@ -127,11 +136,15 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
     async function loadAllOnline() {
       if (!filtrerEnLigne) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerEnLigne=false`);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerEnLigne=false`
+        );
         return;
       }
       if (filtrerProches) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerProches=true`);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: filtrerProches=true`
+        );
         return;
       }
 
@@ -144,16 +157,22 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
       const wantedKey = `online:${countsKey}`;
       if (lastFetchKeyRef.current === wantedKey) {
-        console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`, wantedKey);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] loadAllOnline skip: same wantedKey`,
+          wantedKey
+        );
         return;
       }
       lastFetchKeyRef.current = wantedKey;
 
-      console.log(`[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`, {
-        wantedKey,
-        idsLen: countsIds.length,
-        idsSample: countsIds.slice(0, 20),
-      });
+      console.log(
+        `[ProfilsDisplay ${instanceRef.current}] loadAllOnline FETCH start`,
+        {
+          wantedKey,
+          idsLen: countsIds.length,
+          idsSample: countsIds.slice(0, 20),
+        }
+      );
 
       setLoading(true);
       try {
@@ -165,7 +184,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         });
 
         const txt = await res.text();
-        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online status=`, res.status);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] /api/profils-online status=`,
+          res.status
+        );
         console.log(
           `[ProfilsDisplay ${instanceRef.current}] /api/profils-online text=`,
           (txt || "").slice(0, 300)
@@ -175,10 +197,16 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         try {
           data = txt ? JSON.parse(txt) : null;
         } catch (e) {
-          console.log(`[ProfilsDisplay ${instanceRef.current}] JSON parse FAILED`, e);
+          console.log(
+            `[ProfilsDisplay ${instanceRef.current}] JSON parse FAILED`,
+            e
+          );
         }
 
-        console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-online data=`, data);
+        console.log(
+          `[ProfilsDisplay ${instanceRef.current}] /api/profils-online data=`,
+          data
+        );
 
         if (cancelled) return;
 
@@ -192,11 +220,16 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
           );
           setProfilsAffiches(list);
         } else {
-          console.log(`[ProfilsDisplay ${instanceRef.current}] API not ok => setProfilsAffiches([])`);
+          console.log(
+            `[ProfilsDisplay ${instanceRef.current}] API not ok => setProfilsAffiches([])`
+          );
           setProfilsAffiches([]);
         }
       } catch (e) {
-        console.error(`[ProfilsDisplay ${instanceRef.current}] Erreur /api/profils-online:`, e);
+        console.error(
+          `[ProfilsDisplay ${instanceRef.current}] Erreur /api/profils-online:`,
+          e
+        );
         if (!cancelled) setProfilsAffiches([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -312,7 +345,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             });
 
             const data = await res.json().catch(() => null);
-            console.log(`[ProfilsDisplay ${instanceRef.current}] /api/profils-proches data=`, data);
+            console.log(
+              `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches data=`,
+              data
+            );
 
             setProfilsAffiches(Array.isArray(data) ? data : []);
           } catch (err) {
@@ -340,11 +376,20 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const hrefAfficherPlus = filtrerEnLigne
     ? { pathname: "/profils", query: { online: "1" } }
     : "/profils";
-const listIds = new Set((profilsAffiches || []).map(getTargetUserId).filter(Boolean));
-const onlineIds = Object.keys(counts || {});
-const missingOnline = onlineIds.filter((id) => !listIds.has(String(id)));
 
-console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", missingOnline);
+  // Debug online missing (conserve tes logs)
+  const listIds = new Set(
+    (profilsAffiches || []).map(getTargetUserId).filter(Boolean)
+  );
+  const onlineIds = Object.keys(counts || {});
+  const missingOnline = onlineIds.filter((id) => !listIds.has(String(id)));
+
+  console.log(
+    "[ONLINE DEBUG] onlineIds=",
+    onlineIds.length,
+    "missingOnline=",
+    missingOnline
+  );
 
   return (
     <div className="profil-list1">
@@ -357,7 +402,9 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
               type="checkbox"
               checked={filtrerEnLigne}
               onChange={() => {
-                console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle EN LIGNE click`);
+                console.log(
+                  `[ProfilsDisplay ${instanceRef.current}] Toggle EN LIGNE click`
+                );
 
                 // coupe proches
                 setFiltrerProches(false);
@@ -368,7 +415,9 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
                   if (next) {
                     // ✅ Filtre instantané dès l’activation (fallback DB)
                     const base = baseProfilsRef.current || [];
-                    const instant = base.filter((u) => computeStatut(u) === "en_ligne");
+                    const instant = base.filter(
+                      (u) => computeStatut(u) === "en_ligne"
+                    );
                     setProfilsAffiches(instant);
                   } else {
                     // retour à la liste normale
@@ -384,7 +433,10 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
             En ligne
           </label>
 
-          <label className="toggle-label" style={{ alignItems: "center", gap: 8 }}>
+          <label
+            className="toggle-label"
+            style={{ alignItems: "center", gap: 8 }}
+          >
             <input
               type="checkbox"
               checked={filtrerProches}
@@ -409,7 +461,9 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
                 pointerEvents: filtrerProches ? "auto" : "none",
               }}
             />
-            <span style={{ minWidth: 32, display: "inline-block" }}>{distance} km</span>
+            <span style={{ minWidth: 32, display: "inline-block" }}>
+              {distance} km
+            </span>
           </label>
         </div>
       </div>
@@ -425,17 +479,27 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
               const targetId = getTargetUserId(user);
               if (!targetId) return null;
 
-              // ✅ Badge instantané :
-              // - fallback DB immédiat (computeStatut)
-              // - puis Ably override dès que presenceUsable=true
-              const fallback = computeStatut(user);
+              // ✅ Badge :
+              // - fallback DB immédiat (visible/invisible)
+              // - Ably override ensuite, MAIS respecte l'invisible
+              const fallback = computeStatut(user); // visible/invisible depuis DB
               const ablyOnline = !!counts?.[String(targetId)];
-              const statutEff = presenceUsable ? (ablyOnline ? "en_ligne" : "hors_ligne") : fallback;
+              const isVisible = user?.statut === "en_ligne";
+
+              const statutEff = presenceUsable
+                ? ablyOnline && isVisible
+                  ? "en_ligne"
+                  : "hors_ligne"
+                : fallback;
 
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
 
               return (
-                <Link href={`/profil/${routeId}`} key={targetId} className="profil-card-link">
+                <Link
+                  href={`/profil/${routeId}`}
+                  key={targetId}
+                  className="profil-card-link"
+                >
                   <div className="profil-card">
                     <span
                       className={`statut-badge ${
@@ -466,7 +530,8 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo?.charAt(0)?.toUpperCase() + user.pseudo?.slice(1)?.toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() +
+                        user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
@@ -476,7 +541,10 @@ console.log("[ONLINE DEBUG] onlineIds=", onlineIds.length, "missingOnline=", mis
                     <p className="profil-card-details-type">{user.type}</p>
 
                     {user.distance && (
-                      <p className="profil-card-details" style={{ color: "#999" }}>
+                      <p
+                        className="profil-card-details"
+                        style={{ color: "#999" }}
+                      >
                         {user.distance.toFixed(1)} km de vous
                       </p>
                     )}
