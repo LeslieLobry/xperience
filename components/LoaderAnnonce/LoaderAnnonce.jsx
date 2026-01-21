@@ -36,6 +36,9 @@ export default function LoaderAnnonce() {
   const abortRef = useRef(null);
   const timerRef = useRef(null);
 
+  // ✅ mémorise l'overflow précédent pour le restaurer proprement
+  const prevOverflowRef = useRef(null);
+
   // index courant dans la file d'annonces
   const [idx, setIdx] = useState(0);
 
@@ -73,19 +76,37 @@ export default function LoaderAnnonce() {
 
   const current = queue[idx] || null;
 
-  // Démarrage de l’overlay : une fois par jour
+  // ✅ Décider d'afficher (une fois par jour)
   useEffect(() => {
     if (!current) return;
     if (!hasOneDayPassed()) return;
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     setVisible(true);
+  }, [current]);
+
+  // ✅ Lock/Unlock scroll basé sur "visible"
+  // (évite le bug où le scroll reste bloqué après fermeture)
+  useEffect(() => {
+    if (!visible) {
+      // unlock
+      if (prevOverflowRef.current !== null) {
+        document.body.style.overflow = prevOverflowRef.current;
+        prevOverflowRef.current = null;
+      }
+      return;
+    }
+
+    // lock
+    prevOverflowRef.current = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = prevOverflow;
+      // sécurité si unmount pendant visible
+      if (prevOverflowRef.current !== null) {
+        document.body.style.overflow = prevOverflowRef.current;
+        prevOverflowRef.current = null;
+      }
     };
-  }, [current]);
+  }, [visible]);
 
   // Avancer à l’annonce suivante ou fermer si fin
   const closeOrNext = useCallback(() => {
@@ -162,7 +183,13 @@ export default function LoaderAnnonce() {
   };
 
   return (
-    <div className="loader-annonce" style={overlayStyle} role="dialog" aria-modal="true" aria-label="Annonce">
+    <div
+      className="loader-annonce"
+      style={overlayStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Annonce"
+    >
       <div className="loader-contenu fade-in" style={boxStyle} ref={contenuRef}>
         {/* bouton fermer */}
         <button
@@ -190,7 +217,15 @@ export default function LoaderAnnonce() {
 
         {/* barre d’actions (facultative) */}
         {queue.length > 1 && (
-          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+            }}
+          >
             <small style={{ opacity: 0.7 }}>
               {idx + 1} / {queue.length}
             </small>
