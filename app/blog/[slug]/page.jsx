@@ -1,20 +1,13 @@
-
 import { prisma } from "../../../lib/prisma";
-import { getUserFromToken } from "../../../lib/auth";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import "./article.css";
 import Link from "next/link";
 import ArticleWrapper from "./ArticleWrapper";
 import ArticleImagesWithPresign from "./ArticleImagesWithPresign";
 
 export default async function ArticlePage({ params }) {
-  // ✅ Ajout d'une sécurité avec optional chaining
   const slug = params?.slug;
-
   if (!slug) return notFound();
-
-  const user = await getUserFromToken();
-  if (!user) return redirect("/connexion");
 
   const article = await prisma.article.findUnique({
     where: { slug },
@@ -32,6 +25,7 @@ export default async function ArticlePage({ params }) {
       <ArticleWrapper articleId={article.id} />
 
       <h2 className="article-title">{article.titre}</h2>
+
       <p className="article-meta">
         {new Date(article.createdAt).toLocaleDateString("fr-FR")}{" "}
         {article.vues} vues
