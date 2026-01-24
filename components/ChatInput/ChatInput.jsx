@@ -568,19 +568,32 @@ export default function ChatInput({
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
         {/* ✅ SELECT "qui parle" DANS L'INPUT */}
-        {utilisateur.type === "couple" && prenomsOK && (
-          <select
-            className="select-membre select-membre--in-input"
-            value={membreParlant}
-            onChange={(e) => setMembreParlant(e.target.value)}
-            disabled={isSending}
-            title="Qui parle ?"
-          >
-            <option value={pr1}>{pr1}</option>
-            <option value={pr2}>{pr2}</option>
-            <option value="couple">Le couple</option>
-          </select>
-        )}
+     {utilisateur.type === "couple" && (
+  <select
+    className="select-membre select-membre--in-input"
+    value={membreParlant}
+    onChange={(e) => setMembreParlant(e.target.value)}
+    disabled={isSending}
+    title="Qui parle ?"
+  >
+    {/* ✅ Toujours dispo */}
+    <option value="couple">Le couple</option>
+
+    {/* ✅ Tant que les prénoms ne sont pas prêts : placeholders */}
+    {!prenomsOK ? (
+      <>
+        <option value="membre1">Membre 1</option>
+        <option value="membre2">Membre 2</option>
+      </>
+    ) : (
+      <>
+        <option value={pr1}>{pr1}</option>
+        <option value={pr2}>{pr2}</option>
+      </>
+    )}
+  </select>
+)}
+
 
         <textarea
           className="input-text"
