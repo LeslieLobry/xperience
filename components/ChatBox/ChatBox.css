@@ -1582,7 +1582,7 @@
   }
   /* .chat-messages{
     height: 68%; */
-  }
+  /* } */
   .author-info { gap: 4px; }
   .author-avatar { width: 22px; height: 22px; }
 }
