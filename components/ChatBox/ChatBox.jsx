@@ -1250,67 +1250,64 @@ useEffect(() => {
             </strong>
           </span>
           <button
-  type="button"
-  className="btn-edit-prenoms"
-  onMouseDown={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }}
-  onTouchStart={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }}
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowEditPrenoms(true);
-  }}
->
-  Modifier
-</button>
-
+            type="button"
+            className="btn-edit-prenoms"
+            onClick={() => setShowEditPrenoms(true)}
+          >
+            Modifier
+          </button>
         </div>
       )}
 
-    {showEditPrenoms && utilisateur?.type === "couple" && (
-  <div
-    className="edit-prenoms-modal"
-    onMouseDown={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }}
-    onTouchStart={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }}
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // clic sur le fond => ferme
-      setShowEditPrenoms(false);
-      setErrorPrenoms("");
-    }}
-  >
-    <div
-      className="edit-prenoms-modal__content"
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      onTouchStart={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-    >
-      {/* ... ton contenu inchangé ... */}
-    </div>
-  </div>
-)}
+      {showEditPrenoms && utilisateur?.type === "couple" && (
+        <div className="edit-prenoms-modal">
+          <div className="edit-prenoms-modal__content">
+            <h3>Modifier les prénoms du couple</h3>
 
+            <label className="edit-prenoms-modal__label">
+              Prénom 1
+              <input
+                type="text"
+                value={prenom1}
+                onChange={(e) => setPrenom1(e.target.value)}
+              />
+            </label>
+
+            <label className="edit-prenoms-modal__label">
+              Prénom 2
+              <input
+                type="text"
+                value={prenom2}
+                onChange={(e) => setPrenom2(e.target.value)}
+              />
+            </label>
+
+            {errorPrenoms && (
+              <div className="edit-prenoms-modal__error">{errorPrenoms}</div>
+            )}
+
+            <div className="edit-prenoms-modal__buttons">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditPrenoms(false);
+                  setErrorPrenoms("");
+                }}
+                disabled={savingPrenoms}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePrenomsCouple}
+                disabled={savingPrenoms}
+              >
+                {savingPrenoms ? "Enregistrement..." : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {inCall && <div className="call-timer-badge">⏱️ {callDuration}</div>}
 
