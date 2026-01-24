@@ -1151,12 +1151,20 @@
    sticky peut bug -> on garde sticky en haut et scroll ici.
    ========================================================= */
 
-.chat-messages {
+/* ✅ zone messages = seule zone scrollable */
+.chat-messages{
+  flex: 1 1 auto;
+  min-height: 0;              /* IMPORTANT pour flex scroll */
+  overflow-y: auto;
+  overflow-x: hidden;
 
- overflow-x: hidden;
-  height: 100%;
-  padding-bottom: 10px;
+  /* ✅ réserve de place pour l'input + safe area + clavier */
+  padding-bottom: calc(160px + env(safe-area-inset-bottom) + var(--kb, 0px));
+  scroll-padding-bottom: calc(160px + env(safe-area-inset-bottom) + var(--kb, 0px));
+
+  -webkit-overflow-scrolling: touch;
 }
+
 
 /* === Messages & Bubbles === */
 .message-bubble {
@@ -1572,8 +1580,8 @@
     max-width: 94vw;
     padding: 10px 10px 6px;
   }
-  .chat-messages{
-    height: 68%;
+  /* .chat-messages{
+    height: 68%; */
   }
   .author-info { gap: 4px; }
   .author-avatar { width: 22px; height: 22px; }
