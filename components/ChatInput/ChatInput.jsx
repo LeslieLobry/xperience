@@ -280,24 +280,58 @@ export default function ChatInput({
     setImageFile(null);
   };
 
-  // --- PRENOMS COUPLE ---
+  // --- PRENOMS COUPLE (BONUS + SAFE) ---
   useEffect(() => {
     if (utilisateur.type !== "couple") return;
+
+    // ✅ si conversationId pas encore dispo (création), on garde le select visible (placeholders)
+    if (!conversationId) {
+      setPrenomsOK(false);
+      setPr1("");
+      setPr2("");
+      setMembreParlant("couple");
+      return;
+    }
+
+    // ✅ reset quand on change de conversation
+    setPrenomsOK(false);
+    setPr1("");
+    setPr2("");
+    setMembreParlant("couple");
+
+    const controller = new AbortController();
     setLoadingPrenoms(true);
-    fetch(`/api/prenoms-couple?conversationId=${conversationId}`)
+
+    fetch(`/api/prenoms-couple?conversationId=${conversationId}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then((res) => res.json())
       .then((data) => {
-        if (data.prenoms) {
-          setPr1(data.prenoms.prenom1 || "");
-          setPr2(data.prenoms.prenom2 || "");
+        const p1 = data?.prenoms?.prenom1 || "";
+        const p2 = data?.prenoms?.prenom2 || "";
+
+        if (p1 || p2) {
+          setPr1(p1);
+          setPr2(p2);
           setPrenomsOK(true);
 
-          setMembreParlant((prev) => prev || "couple");
+          // ✅ si l’utilisateur avait choisi membre1/membre2 avant, on map sur les vrais prénoms
+          setMembreParlant((prev) => {
+            if (prev === "membre1") return p1 || "couple";
+            if (prev === "membre2") return p2 || "couple";
+            return prev || "couple";
+          });
         } else {
           setPrenomsOK(false);
         }
       })
+      .catch((e) => {
+        if (e.name !== "AbortError") console.error(e);
+      })
       .finally(() => setLoadingPrenoms(false));
+
+    return () => controller.abort();
   }, [conversationId, utilisateur.type]);
 
   const handlePrenomsSubmit = async (e) => {
@@ -347,6 +381,14 @@ export default function ChatInput({
       requestAnimationFrame(autoResize);
     }
 
+    // ✅ calc "qui parle" même si prénoms pas encore OK
+    const membreToSend = (() => {
+      if (utilisateur.type !== "couple") return undefined;
+      if (membreParlant === "membre1") return pr1 || "membre1";
+      if (membreParlant === "membre2") return pr2 || "membre2";
+      return membreParlant; // "couple" ou prénom
+    })();
+
     // ✅ CACHE LA MINIATURE DIRECT (UI), mais garde le fichier en ref
     if (imageFile && imagePreview) {
       pendingImageRef.current = {
@@ -359,7 +401,11 @@ export default function ChatInput({
     }
 
     if (audioBlob && audioUrl) {
-      pendingAudioRef.current = { blob: audioBlob, url: audioUrl, ephemere: ephemereToSend };
+      pendingAudioRef.current = {
+        blob: audioBlob,
+        url: audioUrl,
+        ephemere: ephemereToSend,
+      };
     }
 
     setIsSending(true);
@@ -378,13 +424,16 @@ export default function ChatInput({
         formData.append("optimisticKey", optimisticKey);
         if (texteTrim) formData.append("contenu", texteToSend);
 
-        if (utilisateur.type === "couple" && prenomsOK) {
-          formData.append("membreParlant", membreParlant);
-          formData.append("prenom1", pr1);
-          formData.append("prenom2", pr2);
+        // ✅ BONUS: on envoie membreParlant même si prenomsOK false
+        if (utilisateur.type === "couple") {
+          formData.append("membreParlant", membreToSend || "couple");
+          if (prenomsOK) {
+            formData.append("prenom1", pr1);
+            formData.append("prenom2", pr2);
+          }
         }
 
-        await onMessageSent(formData, "IMAGE", membreParlant, true, optimisticKey);
+        await onMessageSent(formData, "IMAGE", membreToSend, true, optimisticKey);
 
         if (pendingImageRef.current?.previewUrl) {
           URL.revokeObjectURL(pendingImageRef.current.previewUrl);
@@ -415,13 +464,16 @@ export default function ChatInput({
         formData.append("optimisticKey", optimisticKey);
         if (texteTrim) formData.append("contenu", texteToSend);
 
-        if (utilisateur.type === "couple" && prenomsOK) {
-          formData.append("membreParlant", membreParlant);
-          formData.append("prenom1", pr1);
-          formData.append("prenom2", pr2);
+        // ✅ BONUS: on envoie membreParlant même si prenomsOK false
+        if (utilisateur.type === "couple") {
+          formData.append("membreParlant", membreToSend || "couple");
+          if (prenomsOK) {
+            formData.append("prenom1", pr1);
+            formData.append("prenom2", pr2);
+          }
         }
 
-        await onMessageSent(formData, "AUDIO", membreParlant, false, optimisticKey);
+        await onMessageSent(formData, "AUDIO", membreToSend, false, optimisticKey);
 
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioBlob(null);
@@ -442,19 +494,26 @@ export default function ChatInput({
 
       const optimisticKey = generateOptimisticKey();
 
-      if (utilisateur.type === "couple" && prenomsOK) {
+      if (utilisateur.type === "couple") {
+        // ✅ Bonus : même sans prenomsOK, on envoie "membre1/membre2/couple"
         await onMessageSent(
           {
             contenu: texteToSend,
             type: ephemereToSend ? "EPHEMERE" : "TEXTE",
             conversationId,
             optimisticKey,
-            prenomEnvoyeur: membreParlant === "couple" ? "Le couple" : membreParlant,
-            prenom1: pr1,
-            prenom2: pr2,
+            prenomEnvoyeur:
+              membreToSend === "couple"
+                ? "Le couple"
+                : membreToSend === "membre1"
+                ? "Membre 1"
+                : membreToSend === "membre2"
+                ? "Membre 2"
+                : membreToSend,
+            ...(prenomsOK ? { prenom1: pr1, prenom2: pr2 } : {}),
           },
           "TEXTE",
-          membreParlant,
+          membreToSend,
           false,
           optimisticKey
         );
@@ -527,7 +586,7 @@ export default function ChatInput({
               value={pr1}
               onChange={(e) => setPr1(e.target.value)}
               style={{ width: 120 }}
-              disabled={loadingPrenoms}
+              disabled={loadingPrenoms || !conversationId}
               autoFocus
             />
             <input
@@ -537,9 +596,9 @@ export default function ChatInput({
               value={pr2}
               onChange={(e) => setPr2(e.target.value)}
               style={{ width: 120 }}
-              disabled={loadingPrenoms}
+              disabled={loadingPrenoms || !conversationId}
             />
-            <button type="submit" disabled={loadingPrenoms || !pr1 || !pr2}>
+            <button type="submit" disabled={loadingPrenoms || !pr1 || !pr2 || !conversationId}>
               Valider
             </button>
           </div>
@@ -567,33 +626,30 @@ export default function ChatInput({
       )}
 
       <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-        {/* ✅ SELECT "qui parle" DANS L'INPUT */}
-     {utilisateur.type === "couple" && (
-  <select
-    className="select-membre select-membre--in-input"
-    value={membreParlant}
-    onChange={(e) => setMembreParlant(e.target.value)}
-    disabled={isSending}
-    title="Qui parle ?"
-  >
-    {/* ✅ Toujours dispo */}
-    <option value="couple">Le couple</option>
+        {/* ✅ BONUS: SELECT visible immédiatement, placeholders si prénoms pas prêts */}
+        {utilisateur.type === "couple" && (
+          <select
+            className="select-membre select-membre--in-input"
+            value={membreParlant}
+            onChange={(e) => setMembreParlant(e.target.value)}
+            disabled={isSending}
+            title="Qui parle ?"
+          >
+            <option value="couple">Le couple</option>
 
-    {/* ✅ Tant que les prénoms ne sont pas prêts : placeholders */}
-    {!prenomsOK ? (
-      <>
-        <option value="membre1">Membre 1</option>
-        <option value="membre2">Membre 2</option>
-      </>
-    ) : (
-      <>
-        <option value={pr1}>{pr1}</option>
-        <option value={pr2}>{pr2}</option>
-      </>
-    )}
-  </select>
-)}
-
+            {!prenomsOK ? (
+              <>
+                <option value="membre1">Membre 1</option>
+                <option value="membre2">Membre 2</option>
+              </>
+            ) : (
+              <>
+                <option value={pr1}>{pr1}</option>
+                <option value={pr2}>{pr2}</option>
+              </>
+            )}
+          </select>
+        )}
 
         <textarea
           className="input-text"
@@ -603,6 +659,7 @@ export default function ChatInput({
           rows={1}
           onChange={(e) => {
             setTexte(e.target.value);
+            onTyping?.(); // si tu as une notif "typing"
             requestAnimationFrame(autoResize);
           }}
           onInput={() => requestAnimationFrame(autoResize)}
