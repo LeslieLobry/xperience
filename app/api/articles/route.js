@@ -1,58 +1,132 @@
-// app/api/articles/route.js
-import { prisma } from "../../../lib/prisma";
-import { okJSON, errorJSON, preflight } from "../../../lib/cors";
+import { NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
 
-export async function OPTIONS(req) {
-  return preflight(req);
+const isNumericId = (s = "") => /^\d+$/.test(String(s));
+const isCuidLike = (s = "") => /^c[a-z0-9]+$/i.test(String(s));
+
+function buildWhere(idOrSlug) {
+  if (isNumericId(idOrSlug)) return { id: Number(idOrSlug) };
+  if (isCuidLike(idOrSlug)) return { id: idOrSlug };
+  return { slug: idOrSlug };
 }
 
-// GET — liste, ou 1 article via ?slug= / ?id=
-export async function GET(req) {
+/* (Optionnel) ✅ OPTIONS pour préflight (utile si appel cross-origin) */
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
+// ✅ GET : récupérer un article
+export async function GET(_req, { params }) {
+  const idOrSlug = params?.id; // <-- IMPORTANT : [id] => params.id
+  if (!idOrSlug)
+    return NextResponse.json({ error: "id manquant" }, { status: 400 });
+
   try {
-    const { searchParams } = new URL(req.url);
-    const slug = searchParams.get("slug");
-    const idParam = searchParams.get("id");
-
-    const include = {
-      images: true,
-      auteur: { select: { id: true, pseudo: true, photoUrl: true } },
-    };
-
-    // 1) Détail par slug
-    if (slug) {
-      const article = await prisma.article.findUnique({
-        where: { slug }, // ⚠️ slug doit être @unique dans Prisma
-        include,
-      });
-      if (!article) return errorJSON(req, { ok: false, error: "Not found" }, 404);
-      return okJSON(req, { ok: true, article });
-    }
-
-    // 2) (optionnel) Détail par id
-    if (idParam) {
-      const id = Number(idParam);
-      if (!Number.isFinite(id)) {
-        return errorJSON(req, { ok: false, error: "id invalide" }, 400);
-      }
-      const article = await prisma.article.findUnique({ where: { id }, include });
-      if (!article) return errorJSON(req, { ok: false, error: "Not found" }, 404);
-      return okJSON(req, { ok: true, article });
-    }
-
-    // 3) Liste paginée
-    const take = Number(searchParams.get("take") ?? 20);
-    const skip = Number(searchParams.get("skip") ?? 0);
-
-    const articles = await prisma.article.findMany({
-      orderBy: { createdAt: "desc" },
-      take,
-      skip,
-      include,
+    const article = await prisma.article.findUnique({
+      where: buildWhere(idOrSlug),
+      include: { auteur: true, images: true },
     });
 
-    return okJSON(req, { ok: true, articles });
+    if (!article)
+      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+
+    return NextResponse.json(article);
   } catch (err) {
-    console.error("❌ Erreur GET /api/articles :", err);
-    return errorJSON(req, { ok: false, error: "Erreur serveur" }, 500);
+    console.error("[GET /api/articles/[id]]", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ✅ PUT : mettre à jour un article
+export async function PUT(req, { params }) {
+  const idOrSlug = params?.id; // <-- idem
+  if (!idOrSlug)
+    return NextResponse.json({ error: "id manquant" }, { status: 400 });
+
+  const body = await req.json();
+  const { titre, description, contenu, images } = body || {};
+
+  if (!titre || !contenu)
+    return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+
+  try {
+    const where = buildWhere(idOrSlug);
+
+    const existing = await prisma.article.findUnique({
+      where,
+      include: { images: true },
+    });
+    if (!existing)
+      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+
+    const newKeys = Array.isArray(images) ? images.filter(Boolean) : [];
+    const oldKeys = existing.images
+      .map((img) => img.key ?? img.url ?? img.path)
+      .filter(Boolean);
+
+    const toDelete = oldKeys.filter((k) => !newKeys.includes(k));
+    const toCreate = newKeys.filter((k) => !oldKeys.includes(k));
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.article.update({
+        where,
+        data: { titre, description: description ?? null, contenu },
+      });
+
+      if (toDelete.length)
+        await tx.articleImage.deleteMany({
+          where: { articleId: existing.id, key: { in: toDelete } },
+        });
+
+      if (toCreate.length)
+        await tx.articleImage.createMany({
+          data: toCreate.map((key) => ({ articleId: existing.id, key })),
+        });
+
+      return tx.article.findUnique({
+        where: { id: existing.id },
+        include: { auteur: true, images: true },
+      });
+    });
+
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error("[PUT /api/articles/[id]]", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ✅ DELETE : supprimer un article (et ses images en DB)
+export async function DELETE(_req, { params }) {
+  const idOrSlug = params?.id;
+  if (!idOrSlug)
+    return NextResponse.json({ error: "id manquant" }, { status: 400 });
+
+  try {
+    const where = buildWhere(idOrSlug);
+
+    const existing = await prisma.article.findUnique({
+      where,
+      include: { images: true },
+    });
+
+    if (!existing)
+      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+
+    await prisma.$transaction(async (tx) => {
+      // supprime d'abord les images liées si ta DB n'a pas de cascade
+      await tx.articleImage.deleteMany({
+        where: { articleId: existing.id },
+      });
+
+      await tx.article.delete({
+        where: { id: existing.id },
+      });
+    });
+
+    return NextResponse.json({ ok: true, deletedId: existing.id });
+  } catch (err) {
+    console.error("[DELETE /api/articles/[id]]", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
