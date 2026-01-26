@@ -42,6 +42,18 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* ✅ WRAPPER ancre du picker */
+.chat-input-shell{
+  position: relative;
+}
+
+/* ✅ Picker qui s’ouvre vers le haut */
+.emoji-picker-container.emoji-picker--top{
+  position: absolute;
+  bottom: calc(100% + 10px); /* au-dessus de la barre input */
+  right: 10px;              /* à droite (mets left: 10px si tu préfères) */
+  z-index: 2000;
+}
 
 @media (max-width: 768px) {
  

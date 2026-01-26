@@ -625,284 +625,287 @@ export default function ChatInput({
         </div>
       )}
 
-      <form className="chat-input" onSubmit={handleSubmitWithNotif}>
-        {/* ✅ BONUS: SELECT visible immédiatement, placeholders si prénoms pas prêts */}
-        {utilisateur.type === "couple" && (
-          <select
-            className="select-membre select-membre--in-input"
-            value={membreParlant}
-            onChange={(e) => setMembreParlant(e.target.value)}
-            disabled={isSending}
-            title="Qui parle ?"
-          >
-            <option value="couple">Le couple</option>
+      {/* ✅ WRAPPER pour ancrer le picker et le faire s’ouvrir vers le haut */}
+      <div className="chat-input-shell">
+        <form className="chat-input" onSubmit={handleSubmitWithNotif}>
+          {/* ✅ BONUS: SELECT visible immédiatement, placeholders si prénoms pas prêts */}
+          {utilisateur.type === "couple" && (
+            <select
+              className="select-membre select-membre--in-input"
+              value={membreParlant}
+              onChange={(e) => setMembreParlant(e.target.value)}
+              disabled={isSending}
+              title="Qui parle ?"
+            >
+              <option value="couple">Le couple</option>
 
-            {!prenomsOK ? (
-              <>
-                <option value="membre1">Membre 1</option>
-                <option value="membre2">Membre 2</option>
-              </>
-            ) : (
-              <>
-                <option value={pr1}>{pr1}</option>
-                <option value={pr2}>{pr2}</option>
-              </>
-            )}
-          </select>
-        )}
+              {!prenomsOK ? (
+                <>
+                  <option value="membre1">Membre 1</option>
+                  <option value="membre2">Membre 2</option>
+                </>
+              ) : (
+                <>
+                  <option value={pr1}>{pr1}</option>
+                  <option value={pr2}>{pr2}</option>
+                </>
+              )}
+            </select>
+          )}
 
-        <textarea
-          className="input-text"
-          ref={textareaRef}
-          value={texte}
-          placeholder="Écris un message…"
-          rows={1}
-          onChange={(e) => {
-            setTexte(e.target.value);
-            onTyping?.(); // si tu as une notif "typing"
-            requestAnimationFrame(autoResize);
-          }}
-          onInput={() => requestAnimationFrame(autoResize)}
-          style={{ resize: "none" }}
-        />
+          <textarea
+            className="input-text"
+            ref={textareaRef}
+            value={texte}
+            placeholder="Écris un message…"
+            rows={1}
+            onChange={(e) => {
+              setTexte(e.target.value);
+              onTyping?.(); // si tu as une notif "typing"
+              requestAnimationFrame(autoResize);
+            }}
+            onInput={() => requestAnimationFrame(autoResize)}
+            style={{ resize: "none" }}
+          />
 
-        <div className="input-wrapper" style={{ alignItems: "center" }}>
-          {/* ✅ Aperçu image (disparaît dès qu’on envoie) */}
-          {imagePreview && (
-            <div style={{ position: "relative", marginRight: 8 }}>
-              <img
-                src={imagePreview}
-                alt="Aperçu"
-                style={{
-                  maxWidth: 60,
-                  maxHeight: 60,
-                  borderRadius: 8,
-                  objectFit: "cover",
-                  border: "1px solid #ccc",
-                }}
-              />
-              {ephemere && (
-                <div
+          <div className="input-wrapper" style={{ alignItems: "center" }}>
+            {/* ✅ Aperçu image (disparaît dès qu’on envoie) */}
+            {imagePreview && (
+              <div style={{ position: "relative", marginRight: 8 }}>
+                <img
+                  src={imagePreview}
+                  alt="Aperçu"
+                  style={{
+                    maxWidth: 60,
+                    maxHeight: 60,
+                    borderRadius: 8,
+                    objectFit: "cover",
+                    border: "1px solid #ccc",
+                  }}
+                />
+                {ephemere && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 2,
+                      left: 2,
+                      backgroundColor: "#e53",
+                      color: "#fff",
+                      padding: "2px 4px",
+                      fontSize: 10,
+                      borderRadius: 3,
+                    }}
+                  >
+                    Photo éphémère
+                  </div>
+                )}
+                <button
+                  type="button"
                   style={{
                     position: "absolute",
-                    bottom: 2,
-                    left: 2,
-                    backgroundColor: "#e53",
-                    color: "#fff",
-                    padding: "2px 4px",
-                    fontSize: 10,
-                    borderRadius: 3,
+                    top: -8,
+                    right: -8,
+                    background: "#fff",
+                    border: "1px solid #ccc",
+                    borderRadius: "50%",
+                    width: 22,
+                    height: 22,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    color: "#d00",
                   }}
+                  onClick={removePreview}
+                  title="Supprimer"
+                  disabled={isSending}
                 >
-                  Photo éphémère
-                </div>
-              )}
-              <button
-                type="button"
-                style={{
-                  position: "absolute",
-                  top: -8,
-                  right: -8,
-                  background: "#fff",
-                  border: "1px solid #ccc",
-                  borderRadius: "50%",
-                  width: 22,
-                  height: 22,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  color: "#d00",
-                }}
-                onClick={removePreview}
-                title="Supprimer"
-                disabled={isSending}
-              >
-                ×
-              </button>
-            </div>
-          )}
+                  ×
+                </button>
+              </div>
+            )}
 
-          {/* Aperçu audio */}
-          {audioBlob && !isRecording && (
-            <div
-              className="audio-file-ready"
+            {/* Aperçu audio */}
+            {audioBlob && !isRecording && (
+              <div
+                className="audio-file-ready"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginLeft: 8,
+                  background: "transparent",
+                  borderRadius: 8,
+                  fontSize: 8,
+                }}
+              >
+                <span>Message audio prêt à envoyer</span>
+                <button
+                  type="button"
+                  onClick={removeAudioPreview}
+                  title="Supprimer l'audio"
+                  style={{
+                    color: "#d00",
+                    fontSize: 12,
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                  disabled={isSending}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              id="file-upload"
+              style={{ display: "none" }}
+              onChange={handleImageUpload}
+              disabled={!!imageFile || isSending}
+            />
+            <label
+              htmlFor="file-upload"
+              className="chat-input-photo-btn"
+              title="Envoyer une photo"
               style={{
-                display: "flex",
-                alignItems: "center",
-                marginLeft: 8,
-                background: "transparent",
-                borderRadius: 8,
-                fontSize: 8,
+                pointerEvents: !!imageFile || isSending ? "none" : "auto",
+                opacity: !!imageFile || isSending ? 0.5 : 1,
               }}
             >
-              <span>Message audio prêt à envoyer</span>
-              <button
-                type="button"
-                onClick={removeAudioPreview}
-                title="Supprimer l'audio"
-                style={{
-                  color: "#d00",
-                  fontSize: 12,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-                disabled={isSending}
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* Upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            id="file-upload"
-            style={{ display: "none" }}
-            onChange={handleImageUpload}
-            disabled={!!imageFile || isSending}
-          />
-          <label
-            htmlFor="file-upload"
-            className="chat-input-photo-btn"
-            title="Envoyer une photo"
-            style={{
-              pointerEvents: !!imageFile || isSending ? "none" : "auto",
-              opacity: !!imageFile || isSending ? 0.5 : 1,
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="lucide lucide-image-up-icon lucide-image-up"
-            >
-              <path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21" />
-              <path d="m14 19.5 3-3 3 3" />
-              <path d="M17 22v-5.5" />
-              <circle cx="9" cy="9" r="2" />
-            </svg>
-          </label>
-
-          {/* SABLIER */}
-          <button
-            type="button"
-            className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
-            onClick={() => {
-              if (!imageFile) {
-                setEphemere(true);
-                fileInputRef.current?.click();
-              } else {
-                setEphemere((v) => !v);
-              }
-            }}
-            title="Message éphémère (Snap)"
-            disabled={isSending}
-          >
-            <svg
-              width="24px"
-              height="24px"
-              viewBox="0 0 1024 1024"
-              fill="#e0c084"
-              className="icon"
-              version="1.1"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z"
-                fill=""
-              />
-              <path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H184c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-112 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" />
-            </svg>
-          </button>
-
-          {/* MICRO */}
-          <button
-            type="button"
-            className="chat-input-mic-btn"
-            onClick={isRecording ? stopAudioRecording : startAudioRecording}
-            title={isRecording ? "Arrêter l'enregistrement" : "Envoyer un message audio"}
-            disabled={isSending}
-          >
-            {isRecording ? (
-              <CircleStop />
-            ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
                 height="24"
-                fill="#e0c084"
-                className="bi bi-mic"
-                viewBox="0 0 16 16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-image-up-icon lucide-image-up"
               >
-                <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
-                <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3" />
+                <path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21" />
+                <path d="m14 19.5 3-3 3 3" />
+                <path d="M17 22v-5.5" />
+                <circle cx="9" cy="9" r="2" />
               </svg>
-            )}
-          </button>
+            </label>
 
-          {/* EMOJI (caché sur mobile) */}
-          {!isMobile && (
+            {/* SABLIER */}
             <button
               type="button"
-              className="chat-input-emoji-btn"
-              onClick={() => setShowEmojiPicker((v) => !v)}
-              title="Insérer un emoji"
+              className={`chat-input-ephemere-btn${ephemere ? " active" : ""}`}
+              onClick={() => {
+                if (!imageFile) {
+                  setEphemere(true);
+                  fileInputRef.current?.click();
+                } else {
+                  setEphemere((v) => !v);
+                }
+              }}
+              title="Message éphémère (Snap)"
               disabled={isSending}
             >
               <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
+                width="24px"
+                height="24px"
+                viewBox="0 0 1024 1024"
                 fill="#e0c084"
-                className="bi bi-emoji-smile"
-                viewBox="0 0 16 16"
+                className="icon"
+                version="1.1"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
-                <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5" />
+                <path
+                  d="M834.4 92H189.6c-13.6 0-24-11.2-24-24 0-13.6 11.2-24 24-24h644.8c13.6 0 24 11.2 24 24 0.8 12.8-10.4 24-24 24zM866.4 992.8H158.4c-14.4 0-26.4-12-26.4-26.4 0-14.4 12-26.4 26.4-26.4h708c14.4 0 26.4 12 26.4 26.4 0 14.4-12 26.4-26.4 26.4z"
+                  fill=""
+                />
+                <path d="M766.4 666.4l-0.8-1.6c-40.8-71.2-95.2-117.6-152.8-145.6 57.6-28.8 111.2-74.4 152.8-145.6l0.8-1.6c40.8-70.4 68-166.4 72.8-294.4H184c4.8 128 32 223.2 72.8 294.4l0.8 1.6C297.6 445.6 352 491.2 409.6 520c-57.6 28-112 74.4-152.8 145.6l-0.8 1.6c-38.4 67.2-65.6 156.8-71.2 276h652.8c-5.6-120-32-209.6-71.2-276.8z" />
               </svg>
             </button>
-          )}
-        </div>
 
-        <button
-          type="submit"
-          className="message-btn"
-          disabled={
-            isSending ||
-            !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
-          }
-        >
-          {isSending
-            ? "Envoi…"
-            : imageFile
-            ? "Envoyer l'image"
-            : audioBlob
-            ? "Envoyer l'audio"
-            : "Envoyer"}
-        </button>
-      </form>
+            {/* MICRO */}
+            <button
+              type="button"
+              className="chat-input-mic-btn"
+              onClick={isRecording ? stopAudioRecording : startAudioRecording}
+              title={isRecording ? "Arrêter l'enregistrement" : "Envoyer un message audio"}
+              disabled={isSending}
+            >
+              {isRecording ? (
+                <CircleStop />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  fill="#e0c084"
+                  className="bi bi-mic"
+                  viewBox="0 0 16 16"
+                >
+                  <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
+                  <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3" />
+                </svg>
+              )}
+            </button>
 
-      {/* ✅ Picker emoji caché sur mobile */}
-      {!isMobile && showEmojiPicker && (
-        <div className="emoji-picker-container">
-          <Picker
-            data={data}
-            onEmojiSelect={(emoji) => {
-              setTexte((prev) => prev + emoji.native);
-              setShowEmojiPicker(false);
-            }}
-            theme="light"
-          />
-        </div>
-      )}
+            {/* EMOJI (caché sur mobile) */}
+            {!isMobile && (
+              <button
+                type="button"
+                className="chat-input-emoji-btn"
+                onClick={() => setShowEmojiPicker((v) => !v)}
+                title="Insérer un emoji"
+                disabled={isSending}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  fill="#e0c084"
+                  className="bi bi-emoji-smile"
+                  viewBox="0 0 16 16"
+                >
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                  <path d="M4.285 9.567a.5.5 0 0 1 .683.183A3.5 3.5 0 0 0 8 11.5a3.5 3.5 0 0 0 3.032-1.75.5.5 0 1 1 .866.5A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1-3.898-2.25.5.5 0 0 1 .183-.683M7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5m4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="message-btn"
+            disabled={
+              isSending ||
+              !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
+            }
+          >
+            {isSending
+              ? "Envoi…"
+              : imageFile
+              ? "Envoyer l'image"
+              : audioBlob
+              ? "Envoyer l'audio"
+              : "Envoyer"}
+          </button>
+        </form>
+
+        {/* ✅ Picker emoji caché sur mobile + ✅ s’ouvre vers le haut */}
+        {!isMobile && showEmojiPicker && (
+          <div className="emoji-picker-container emoji-picker--top">
+            <Picker
+              data={data}
+              onEmojiSelect={(emoji) => {
+                setTexte((prev) => prev + emoji.native);
+                setShowEmojiPicker(false);
+              }}
+              theme="light"
+            />
+          </div>
+        )}
+      </div>
     </>
   );
 }
