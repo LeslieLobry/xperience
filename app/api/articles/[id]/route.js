@@ -124,8 +124,16 @@ export async function DELETE(_req, { params }) {
     });
 
     return NextResponse.json({ ok: true, deletedId: existing.id });
-  } catch (err) {
-    console.error("[DELETE /api/articles/[id]]", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
+} catch (err) {
+  console.error("[DELETE /api/articles/[id]]", err);
+  return NextResponse.json(
+    {
+      error: "Erreur serveur",
+      detail: err?.message || String(err),
+      code: err?.code || null,
+    },
+    { status: 500 }
+  );
+}
+
 }
