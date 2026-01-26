@@ -17,7 +17,7 @@ export async function OPTIONS() {
 
 // ✅ GET : récupérer un article
 export async function GET(_req, { params }) {
-  const idOrSlug = params?.id; // <-- IMPORTANT : [id] => params.id
+  const idOrSlug = params?.id;
   if (!idOrSlug)
     return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
@@ -39,7 +39,7 @@ export async function GET(_req, { params }) {
 
 // ✅ PUT : mettre à jour un article
 export async function PUT(req, { params }) {
-  const idOrSlug = params?.id; // <-- idem
+  const idOrSlug = params?.id;
   if (!idOrSlug)
     return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
@@ -59,13 +59,11 @@ export async function PUT(req, { params }) {
     if (!existing)
       return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
 
-    const newKeys = Array.isArray(images) ? images.filter(Boolean) : [];
-    const oldKeys = existing.images
-      .map((img) => img.key ?? img.url ?? img.path)
-      .filter(Boolean);
+    const newUrls = Array.isArray(images) ? images.filter(Boolean) : [];
+    const oldUrls = existing.images.map((img) => img.url).filter(Boolean);
 
-    const toDelete = oldKeys.filter((k) => !newKeys.includes(k));
-    const toCreate = newKeys.filter((k) => !oldKeys.includes(k));
+    const toDelete = oldUrls.filter((u) => !newUrls.includes(u));
+    const toCreate = newUrls.filter((u) => !oldUrls.includes(u));
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.article.update({
@@ -73,15 +71,18 @@ export async function PUT(req, { params }) {
         data: { titre, description: description ?? null, contenu },
       });
 
-      if (toDelete.length)
-        await tx.articleImage.deleteMany({
-          where: { articleId: existing.id, key: { in: toDelete } },
+      // ✅ ICI : on supprime dans ImageArticle (pas articleImage)
+      if (toDelete.length) {
+        await tx.imageArticle.deleteMany({
+          where: { articleId: existing.id, url: { in: toDelete } },
         });
+      }
 
-      if (toCreate.length)
-        await tx.articleImage.createMany({
-          data: toCreate.map((key) => ({ articleId: existing.id, key })),
+      if (toCreate.length) {
+        await tx.imageArticle.createMany({
+          data: toCreate.map((url) => ({ articleId: existing.id, url })),
         });
+      }
 
       return tx.article.findUnique({
         where: { id: existing.id },
@@ -96,7 +97,7 @@ export async function PUT(req, { params }) {
   }
 }
 
-// ✅ DELETE : supprimer un article (+ ses images en DB)
+// ✅ DELETE : supprimer un article + ses images
 export async function DELETE(_req, { params }) {
   const idOrSlug = params?.id;
   if (!idOrSlug)
@@ -107,14 +108,15 @@ export async function DELETE(_req, { params }) {
 
     const existing = await prisma.article.findUnique({
       where,
-      include: { images: true },
+      select: { id: true },
     });
 
     if (!existing)
       return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
-      await tx.articleImage.deleteMany({
+      // ✅ IMPORTANT : modèle = imageArticle
+      await tx.imageArticle.deleteMany({
         where: { articleId: existing.id },
       });
 
@@ -124,16 +126,15 @@ export async function DELETE(_req, { params }) {
     });
 
     return NextResponse.json({ ok: true, deletedId: existing.id });
-} catch (err) {
-  console.error("[DELETE /api/articles/[id]]", err);
-  return NextResponse.json(
-    {
-      error: "Erreur serveur",
-      detail: err?.message || String(err),
-      code: err?.code || null,
-    },
-    { status: 500 }
-  );
-}
-
+  } catch (err) {
+    console.error("[DELETE /api/articles/[id]]", err);
+    return NextResponse.json(
+      {
+        error: "Erreur serveur",
+        detail: err?.message || String(err),
+        code: err?.code || null,
+      },
+      { status: 500 }
+    );
+  }
 }
