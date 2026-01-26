@@ -10,6 +10,11 @@ function buildWhere(idOrSlug) {
   return { slug: idOrSlug };
 }
 
+/* ✅ OPTIONS (préflight) */
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
 // ✅ GET : récupérer un article
 export async function GET(_req, { params }) {
   const idOrSlug = params?.id; // <-- IMPORTANT : [id] => params.id
@@ -87,6 +92,40 @@ export async function PUT(req, { params }) {
     return NextResponse.json(updated);
   } catch (err) {
     console.error("[PUT /api/articles/[id]]", err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ✅ DELETE : supprimer un article (+ ses images en DB)
+export async function DELETE(_req, { params }) {
+  const idOrSlug = params?.id;
+  if (!idOrSlug)
+    return NextResponse.json({ error: "id manquant" }, { status: 400 });
+
+  try {
+    const where = buildWhere(idOrSlug);
+
+    const existing = await prisma.article.findUnique({
+      where,
+      include: { images: true },
+    });
+
+    if (!existing)
+      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.articleImage.deleteMany({
+        where: { articleId: existing.id },
+      });
+
+      await tx.article.delete({
+        where: { id: existing.id },
+      });
+    });
+
+    return NextResponse.json({ ok: true, deletedId: existing.id });
+  } catch (err) {
+    console.error("[DELETE /api/articles/[id]]", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
