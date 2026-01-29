@@ -58,6 +58,17 @@ const ADMIN_ROLES = ["admin", "superadmin", "owner", "root"];
 const normalizeRole = (r) => String(r ?? "").trim().toLowerCase();
 const isAdminRole = (r) => ADMIN_ROLES.includes(normalizeRole(r));
 
+/** ✅ compare "même jour" en timezone Europe/Paris */
+function sameDayParis(d1, d2) {
+  if (!d1 || !d2) return false;
+  const a = new Date(d1);
+  const b = new Date(d2);
+  if (isNaN(a) || isNaN(b)) return false;
+  const sa = a.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  const sb = b.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  return sa === sb;
+}
+
 export async function GET() {
   const reqHeaders = await getHeaders();
   const origin = reqHeaders.get("origin") || "";
@@ -121,6 +132,20 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Utilisateur introuvable." }, { status: 401, headers });
     }
 
+    // ✅ MAJ "lastLogin" une seule fois par jour (auto-login inclus)
+    // -> comme ça, si tu reviens aujourd’hui, tu verras bien la date d’aujourd’hui
+    const nowDate = new Date();
+    let lastLoginEffective = u.lastLogin;
+
+    if (!u.lastLogin || !sameDayParis(u.lastLogin, nowDate)) {
+      const updated = await prisma.utilisateur.update({
+        where: { id: userId },
+        data: { lastLogin: nowDate },
+        select: { lastLogin: true },
+      });
+      lastLoginEffective = updated.lastLogin;
+    }
+
     // 🧠 Calcul léger du statut en ligne si mode auto
     const ONLINE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
     const now = Date.now();
@@ -137,6 +162,7 @@ export async function GET() {
         success: true,
         user: {
           ...u,
+          lastLogin: lastLoginEffective, // ✅ renvoie la vraie valeur après MAJ
           statut: statutComputed, // ⬅️ remplace côté réponse (non destructif pour le reste)
           roleNormalized,
           isAdmin,
