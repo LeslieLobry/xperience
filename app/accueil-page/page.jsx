@@ -14,6 +14,10 @@ import RechercheWrapper from "../../components/RechercheWrapper/RechercheWrapper
 
 import { Suspense } from "react";
 import "./accueil.css";
+export const metadata = {
+  title: "Site échangiste sérieux et sécurisé | X-Périences",
+  description: "Site échangiste et libertin pour adultes consentants. Rencontres réelles, profils vérifiés, confidentialité totale."
+};
 
 /* --------------------------------------------------------------------------
    👥 Section profils : server component autonome
