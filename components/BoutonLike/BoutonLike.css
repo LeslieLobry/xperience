@@ -56,3 +56,8 @@
 .like-label.not-liked {
   color: white;
 }
+.btn-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
