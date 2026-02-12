@@ -385,7 +385,6 @@ export default function Profil({ user, connectedUser }) {
                 >
                   <div className="tooltip-container">
                     <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
-                    <span className="tooltip">{startingConv ? "Ouverture…" : "Envoyer un message"}</span>
                   </div>
                 </button>
                 <BoutonLike cibleId={user.id} />
