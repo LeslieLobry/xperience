@@ -35,12 +35,12 @@ function layout({ origin, title, bodyHtml }) {
   return `
   <div style="font-family: Raleway, Arial, sans-serif; color:#1a1a1a; font-size:16px; line-height:1.6; background:#f7f8fa; padding:32px 24px;">
     <div style="text-align:center; margin-bottom:18px;">
-      <img src="${origin}/logo.png" alt="Xpérience" style="height:60px;"/>
+      <img src="${origin}/logo.png" alt="Xperiences" style="height:60px;"/>
     </div>
     <h2 style="font-weight:700; margin:0 0 12px;">${esc(title)}</h2>
     ${bodyHtml}
     <p style="margin-top:24px; font-size:13px; color:#777">
-      — L’équipe Xpérience • <a href="${origin}/parametres/notifications">Gérer mes emails</a>
+      — L’équipe Xperiences • <a href="${origin}/parametres/notifications">Gérer mes emails</a>
     </p>
   </div>`;
 }
@@ -192,25 +192,25 @@ async function runJob(req, { dry = false } = {}) {
         <div style="margin:20px 0;">
           <a href="${origin}/accueil-page"
              style="display:inline-block;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;">
-            Ouvrir Xpérience
+            Ouvrir Xperiences
           </a>
         </div>
       `;
       const text = `Bonjour ${u.pseudo || ""},
 
-Voici votre activité des dernières 24h sur Xpérience :
+Voici votre activité des dernières 24h sur Xperiences :
 - Messages reçus : ${messagesRecus}
 - Visites de profil : ${visitesRecues}
 - Likes : ${likesRecus}
 
 Ouvrir : ${origin}/accueil
 
-— L’équipe Xpérience`;
+— L’équipe Xperiences`;
 
       personalized.push({
         from: FROM,
         to: [u.email],
-        subject: "Votre activité sur Xpérience — 24h",
+        subject: "Votre activité sur Xperiences",
         html: layout({ origin, title, bodyHtml }),
         text,
         headers: {
