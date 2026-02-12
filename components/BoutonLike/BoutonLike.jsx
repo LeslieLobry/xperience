@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import "./BoutonLike.css";
 
 export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
-  const [hasLiked, setHasLiked] = useState(null); // null = on ne sait pas encore
+  const [hasLiked, setHasLiked] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const checkLike = useCallback(async () => {
@@ -20,9 +20,8 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
         const data = await res.json();
         const value = !!data.hasLiked;
         setHasLiked(value);
-        onChange?.(value); // ✅ sync parent dès le chargement
+        onChange?.(value);
       } else {
-        console.error("Erreur fetch like status:", res.status);
         setHasLiked(false);
         onChange?.(false);
       }
@@ -44,9 +43,9 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
     const prev = hasLiked;
     const next = !prev;
 
-    // ✅ Optimistic UI : on update tout de suite
+    // ✅ Optimistic UI
     setHasLiked(next);
-    onChange?.(next); // ✅ parent instantané
+    onChange?.(next);
     setLoading(true);
 
     try {
@@ -59,22 +58,13 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
       });
 
       if (!res.ok) {
-        // ❌ on revert si erreur API
         setHasLiked(prev);
         onChange?.(prev);
-
-        let errorData = null;
-        try {
-          errorData = await res.json();
-        } catch {}
-        console.error("Erreur API:", errorData || res.status);
-        return;
       }
     } catch (err) {
-      // ❌ on revert si crash réseau
+      console.error("Erreur toggleLike", err);
       setHasLiked(prev);
       onChange?.(prev);
-      console.error("Erreur toggleLike", err);
     } finally {
       setLoading(false);
     }
@@ -97,16 +87,21 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
         aria-busy={loading ? "true" : "false"}
         aria-pressed={liked ? "true" : "false"}
       >
-        <div className="tooltip-container">
-          <img
-            key={liked ? "liked" : "unliked"}
-            src={liked ? "/images/coeur.svg" : "/images/coeurnon.svg"}
-            alt={liked ? "J’aime" : "J’aime pas"}
-            className="btn-like-icon"
-            style={{ width: "46px", height: "46px", opacity: loading ? 0.6 : 1 }}
+        <svg
+          viewBox="0 0 24 24"
+          className={`btn-like-icon ${liked ? "liked pop" : ""}`}
+          width="46"
+          height="46"
+        >
+          <path
+            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5
+               2 6 4 4 6.5 4
+               8.04 4 9.54 4.81 10.4 6.09
+               11.26 4.81 12.76 4 14.3 4
+               16.8 4 18.8 6 18.8 8.5
+               18.8 12.28 15.4 15.36 10.25 19.99L12 21.35z"
           />
-          <span className="tooltip">{liked ? "J’aime" : "J’aime pas"}</span>
-        </div>
+        </svg>
       </button>
 
       {showLabel && (

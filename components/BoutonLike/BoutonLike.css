@@ -1,60 +1,52 @@
-.btn-like{
-    background-color: transparent;
-    border: none;
-    cursor: pointer;
-}
-
-.tooltip-container {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip {
-  visibility: hidden;
-  background-color: #fff;
-  color: #000;
-  text-align: center;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  white-space: nowrap;
-  position: absolute;
-  z-index: 999;
-  bottom: 125%; /* au-dessus de l'élément */
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%; /* flèche en bas du tooltip */
-  left: 50%;
-  margin-left: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: #fff transparent transparent;
-}
-
-.tooltip-container:hover .tooltip {
-  visibility: visible;
-  opacity: 1;
-}
 .like-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
 }
 
+.btn-like {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.btn-like:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Coeur */
+.btn-like-icon {
+  fill: white;
+  transition: fill 0.25s ease, transform 0.15s ease;
+}
+
+.btn-like-icon:hover {
+  transform: scale(1.1);
+}
+
+.btn-like-icon.liked {
+  fill: #e0c084; /* Or X-Periences */
+}
+
+/* Petit effet pop quand on like */
+.pop {
+  animation: popAnim 0.25s ease;
+}
+
+@keyframes popAnim {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* Label */
 .like-label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.9;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
 }
 
 .like-label.liked {
@@ -62,10 +54,5 @@
 }
 
 .like-label.not-liked {
-  color: #8c6a5d;
-}
-.btn-row{
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  color: white;
 }
