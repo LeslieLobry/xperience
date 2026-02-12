@@ -51,7 +51,7 @@
   right: 0;
   width: 320px;
   max-height: 500px;
-  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
+  background-image: url("https://i.postimg.cc/6qq0z1gV/background.png");
   color: #e0c084;
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -64,6 +64,7 @@
   overflow-y: auto;
   animation: fade-in-up 0.2s ease-out;
 }
+
 .navbar-pseudo {
   color: #a2b9c1;
   font-size: 18px;
@@ -126,26 +127,30 @@
 
   .nav-combined-popup {
     position: static;
-    top: auto ;
+    top: auto;
     right: auto;
-    width: 100% ;
+    width: 100%;
     max-height: none;
     border: none;
     box-shadow: none;
-    background-image: none ;
+    background-image: none;
   }
-  .navbar-pseudo{
+
+  .navbar-pseudo {
     font-size: 18px;
   }
-.navbar-left img {
-  width: 60px;
-  height: 60px;
-}
-.navbar-left{
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
+
+  .navbar-left img {
+    width: 60px;
+    height: 60px;
+  }
+
+  .navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
   .nav-links {
     display: flex;
     align-items: flex-start;
@@ -159,8 +164,13 @@
     border-left: 1px solid #ddd;
     border-bottom: 1px solid #ddd;
     z-index: 998;
-    overflow: visible;
     gap: 0;
+
+    /* ✅ FIX SCROLL MOBILE (le menu peut descendre jusqu'à Déconnexion) */
+    max-height: calc(100vh - 60px); /* hauteur écran - hauteur navbar (approx) */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .nav-links.active {
@@ -194,7 +204,7 @@
   position: absolute;
   top: -6px;
   right: -6px;
-  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
+  background-image: url("https://i.postimg.cc/6qq0z1gV/background.png");
   color: white;
   border-radius: 50%;
   padding: 2px 7px;
@@ -209,27 +219,6 @@
   box-shadow: 0 0 2px rgb(0 0 0 / 30%);
   z-index: 10;
 }
-
-/* Popup notifications + actions */
-/* .nav-combined-popup {
-  position: absolute;
-  top: 60px;
-  right: 0;
-  width: 320px;
-  max-height: 500px;
-  background-image: url('https://i.postimg.cc/6qq0z1gV/background.png');
-  color: #e0c084;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
-  z-index: 1000;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  animation: fade-in-up 0.2s ease-out;
-} */
 
 @keyframes fade-in-up {
   from {
@@ -254,7 +243,6 @@
 }
 
 .nav-combined-popup a {
- 
   text-decoration: none;
   font-weight: 500;
 }
@@ -266,7 +254,6 @@
 }
 
 .btn-mark-read {
-  
   color: white;
   border: none;
   padding: 6px 12px;
@@ -314,7 +301,6 @@
   box-shadow: 0 1px 2px #0002;
 }
 
-
-.nav-combined-popup{
+.nav-combined-popup {
   z-index: 10001;
 }
