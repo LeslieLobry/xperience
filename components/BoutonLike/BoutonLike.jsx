@@ -106,7 +106,7 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
 
       {showLabel && (
         <div className={`like-label ${liked ? "liked" : "not-liked"}`}>
-          {liked ? "J’aime" : "J’aime pas"}
+          {liked ? "" : ""}
         </div>
       )}
     </div>
