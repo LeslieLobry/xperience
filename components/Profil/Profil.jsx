@@ -376,6 +376,7 @@ export default function Profil({ user, connectedUser }) {
 
             {!isOwnProfile && (
               <>
+              <div className="btn-row">
                 <button
                   className="btn-envoyer-message"
                   onClick={handleStartConversation}
@@ -390,6 +391,7 @@ export default function Profil({ user, connectedUser }) {
                 </button>
                 <BoutonLike cibleId={user.id} />
                 <MenuProfilActions cibleId={user.id} />
+                </div>
               </>
             )}
           </div>
