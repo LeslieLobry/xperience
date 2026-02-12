@@ -58,9 +58,13 @@
 }
 
 .like-label.liked {
-  color: #ff3b7a;
+  color: #e0c084;
 }
 
 .like-label.not-liked {
-  color: #9aa0a6;
+  color: #8c6a5d;
+}
+.btn-row{
+  display: flex;
+  justify-content: space-between;
 }
