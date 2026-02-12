@@ -10,15 +10,14 @@ export default function LikesSection() {
   const [likes, setLikes] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const endpoint =
-    onglet === "recus" ? "/api/likes/recus" : "/api/likes/donnes";
+  const endpoint = onglet === "recus" ? "/api/likes/recus" : "/api/likes/donnes";
 
   // Petite fonction utilitaire pour avoir une vraie URL d'image
   async function resolvePhotoUrl(photoUrl, cache) {
     if (!photoUrl) return "/default.jpg";
 
     // Si c'est déjà une URL complète => on renvoie tel quel
-    if (photoUrl.startsWith("http")) {
+    if (typeof photoUrl === "string" && photoUrl.startsWith("http")) {
       return photoUrl;
     }
 
@@ -54,7 +53,10 @@ export default function LikesSection() {
     async function loadLikes() {
       setLoading(true);
       try {
-        const res = await fetch(endpoint, { cache: "no-store" });
+        const res = await fetch(endpoint, {
+          cache: "no-store",
+          credentials: "include",
+        });
         const data = await res.json();
 
         if (!Array.isArray(data)) {
@@ -63,20 +65,24 @@ export default function LikesSection() {
           return;
         }
 
+        // ✅ Tri pour que le dernier like apparaisse en haut
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
         const seen = new Set();
         const processed = [];
 
-        for (const item of data) {
-          const rawUser = item.from || item.to;
+        for (const item of sorted) {
+          // ✅ IMPORTANT : on choisit le bon user selon l'onglet
+          const rawUser = onglet === "recus" ? item.from : item.to;
           if (!rawUser?.id) continue;
 
+          // (Optionnel) Si tu veux voir plusieurs likes du même profil, supprime ce bloc
           if (seen.has(rawUser.id)) continue;
           seen.add(rawUser.id);
 
-          const resolvedPhotoUrl = await resolvePhotoUrl(
-            rawUser.photoUrl,
-            photoCache
-          );
+          const resolvedPhotoUrl = await resolvePhotoUrl(rawUser.photoUrl, photoCache);
 
           processed.push({
             id: item.id,
@@ -104,7 +110,7 @@ export default function LikesSection() {
     return () => {
       cancelled = true;
     };
-  }, [endpoint]);
+  }, [endpoint, onglet]); // ✅ on ajoute onglet car il influence rawUser
 
   return (
     <div className="likes-container">
@@ -141,11 +147,11 @@ export default function LikesSection() {
                   <div className="like-content">
                     <Image
                       src={utilisateur.resolvedPhotoUrl || "/default.jpg"}
-                      alt={utilisateur.pseudo}
+                      alt={utilisateur.pseudo || "Profil"}
                       width={50}
                       height={50}
                       className="like-avatar"
-                      unoptimized // comme ta modale, on évite les soucis de domaine au début
+                      unoptimized
                     />
 
                     <div className="like-info">
