@@ -63,7 +63,7 @@ export default function MenuProfilActions({ cibleId }) {
       width={46}
       height={46}
     />
-    <span className="tooltip">{open ? "Fermer le menu" : "Signaler ou bloquer"}</span>
+    <span className="tooltip">{open ? "Fermer le menu" : ""}</span>
   </div>
 </button>
 

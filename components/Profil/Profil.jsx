@@ -382,7 +382,6 @@ export default function Profil({ user, connectedUser }) {
                   onClick={handleStartConversation}
                   disabled={startingConv}
                   aria-busy={startingConv ? "true" : "false"}
-                  title="Envoyer un message"
                 >
                   <div className="tooltip-container">
                     <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
