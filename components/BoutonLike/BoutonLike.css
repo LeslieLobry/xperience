@@ -44,3 +44,23 @@
   visibility: visible;
   opacity: 1;
 }
+.like-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.like-label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.like-label.liked {
+  color: #ff3b7a;
+}
+
+.like-label.not-liked {
+  color: #9aa0a6;
+}
