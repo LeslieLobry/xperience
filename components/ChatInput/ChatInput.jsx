@@ -110,6 +110,9 @@ export default function ChatInput({
   const [prenomsOK, setPrenomsOK] = useState(false);
   const [membreParlant, setMembreParlant] = useState("couple");
 
+  // ✅ NEW: force refresh des prénoms après POST (sans reload)
+  const [prenomsVersion, setPrenomsVersion] = useState(0);
+
   // EMOJI
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
@@ -332,7 +335,7 @@ export default function ChatInput({
       .finally(() => setLoadingPrenoms(false));
 
     return () => controller.abort();
-  }, [conversationId, utilisateur.type]);
+  }, [conversationId, utilisateur.type, prenomsVersion]);
 
   const handlePrenomsSubmit = async (e) => {
     e.preventDefault();
@@ -344,7 +347,22 @@ export default function ChatInput({
       body: JSON.stringify({ conversationId, prenom1: pr1, prenom2: pr2 }),
     });
     const dataRes = await res.json();
-    if (dataRes.success) setPrenomsOK(true);
+
+    if (dataRes.success) {
+      // ✅ on met à jour direct côté UI
+      setPrenomsOK(true);
+
+      // ✅ si le select était sur membre1/membre2, on bascule sur les vrais prénoms
+      setMembreParlant((prev) => {
+        if (prev === "membre1") return pr1.trim();
+        if (prev === "membre2") return pr2.trim();
+        return prev || "couple";
+      });
+
+      // ✅ force un refetch sans refresh page
+      setPrenomsVersion((v) => v + 1);
+    }
+
     setLoadingPrenoms(false);
   };
 

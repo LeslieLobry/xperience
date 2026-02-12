@@ -66,7 +66,7 @@ export async function POST(req) {
         textColor: body.textColor || null,
         bgColor: body.bgColor || null,
         overlayColor: body.overlayColor || null,
-        fontSizePx: num(body.fontSizePx),           // ✅ renommé
+        fontSizePx: num(body.fontSizePx ?? body.fontSize),
         borderRadiusPx: num(body.borderRadiusPx),
         maxWidthPx: num(body.maxWidthPx),
       },
