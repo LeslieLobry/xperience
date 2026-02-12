@@ -66,14 +66,16 @@ export default function AvisList({ cibleId, connectedUserId, refreshKey = 0 }) {
     <div className="avis-list">
       <h2>Ils parlent de moi</h2>
 
-      {avisRecus.map((avis) => (
-        <AvisCard
-          key={avis.id}
-          avis={avis}
-          connectedUserId={connectedUserId}
-          onRefresh={fetchAvis}
-        />
-      ))}
+   {avisRecus.map((avis) => (
+  <AvisCard
+    key={avis.id}
+    avis={avis}
+    connectedUserId={connectedUserId}
+    cibleId={cibleId}          // ✅ AJOUT ICI
+    onRefresh={fetchAvis}
+  />
+))}
+
     </div>
   );
 }

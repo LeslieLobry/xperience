@@ -1,11 +1,10 @@
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma"; // ⬅️ IMPORTANT : on importe le singleton
+import { prisma } from "../../../../lib/prisma";
 
 const secret = process.env.JWT_SECRET;
 
-// Pas besoin d'async, on lit juste les cookies + JWT
 function getUserIdFromToken() {
   const token = cookies().get("token")?.value;
   if (!token) return null;
@@ -13,10 +12,7 @@ function getUserIdFromToken() {
   try {
     const decoded = jwt.verify(token, secret);
     const id = decoded?.id;
-
     if (!id) return null;
-
-    // On renvoie toujours un nombre
     return typeof id === "number" ? id : parseInt(id, 10);
   } catch {
     return null;
@@ -31,11 +27,11 @@ export async function PATCH(req, { params }) {
 
   const { id } = params;
   const { commentaire } = await req.json();
-
   const avisId = parseInt(id, 10);
 
   const avis = await prisma.avis.findUnique({ where: { id: avisId } });
 
+  // ✅ Seul l'auteur peut modifier
   if (!avis || avis.auteurId !== userId) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
@@ -57,9 +53,26 @@ export async function DELETE(req, { params }) {
   const { id } = params;
   const avisId = parseInt(id, 10);
 
-  const avis = await prisma.avis.findUnique({ where: { id: avisId } });
+  // ✅ On récupère juste ce qu'il faut
+  const avis = await prisma.avis.findUnique({
+    where: { id: avisId },
+    select: {
+      id: true,
+      auteurId: true,
+      cibleId: true, // ⬅️ IMPORTANT : doit exister dans ton modèle Avis
+    },
+  });
 
-  if (!avis || avis.auteurId !== userId) {
+  if (!avis) {
+    return NextResponse.json({ error: "Avis introuvable" }, { status: 404 });
+  }
+
+  // ✅ Autorisé si :
+  // - l'auteur supprime son avis
+  // - OU la cible (propriétaire du profil) supprime un avis reçu sur son profil
+  const canDelete = avis.auteurId === userId || avis.cibleId === userId;
+
+  if (!canDelete) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 

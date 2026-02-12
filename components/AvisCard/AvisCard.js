@@ -5,12 +5,18 @@ import Image from "next/image";
 import Button from "../Button/Button";
 import "./AvisCard.css";
 
-export default function AvisCard({ avis, connectedUserId, onRefresh }) {
+export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) {
   const [isEditing, setIsEditing] = useState(false);
   const [commentaire, setCommentaire] = useState(avis.commentaire || "");
   const [loading, setLoading] = useState(false);
 
   const isAuteur = connectedUserId === avis.auteurId;
+
+  // ✅ NOUVEAU : on est sur SON profil (profil consulté = user connecté)
+  const isOwnerProfile = Number(connectedUserId) === Number(cibleId);
+
+  // ✅ NOUVEAU : peut supprimer si auteur OU propriétaire du profil
+  const canDelete = isAuteur || isOwnerProfile;
 
   const avatarSrc = useMemo(() => {
     // champs normalisés côté API → avis.auteur.avatarUrl
@@ -88,7 +94,11 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
             maxLength={500}
           />
           <div className="avis-edit-actions">
-            <Button title="Enregistrer" onClick={handleEdit} disabled={loading || !commentaire.trim()} />
+            <Button
+              title="Enregistrer"
+              onClick={handleEdit}
+              disabled={loading || !commentaire.trim()}
+            />
             <Button
               title="Annuler"
               onClick={() => {
@@ -104,6 +114,7 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
         <p className="avis-commentaire">{avis.commentaire}</p>
       )}
 
+      {/* ✅ Modifier = auteur seulement (inchangé) */}
       {isAuteur && !isEditing && (
         <footer className="avis-footer">
           <Button
@@ -113,6 +124,21 @@ export default function AvisCard({ avis, connectedUserId, onRefresh }) {
             disabled={loading}
             style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
           />
+
+          {/* ✅ Supprimer visible aussi si propriétaire du profil */}
+          <Button
+            title="Supprimer"
+            onClick={handleDelete}
+            color="#8c6a5d"
+            disabled={loading}
+            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
+          />
+        </footer>
+      )}
+
+      {/* ✅ NOUVEAU : si pas auteur, mais propriétaire du profil => bouton supprimer seul */}
+      {!isAuteur && canDelete && !isEditing && (
+        <footer className="avis-footer">
           <Button
             title="Supprimer"
             onClick={handleDelete}
