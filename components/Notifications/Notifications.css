@@ -3,23 +3,27 @@
   border: 1px solid #e0c084;
   border-radius: 12px;
   padding: 1rem;
-  width: 280px;
-  position: absolute;
-  top: 60px;
-  right: 10px;
+
+  /* ✅ IMPORTANT : dans un menu, on ne doit PAS flotter */
+  width: 100%;
+  max-width: 320px;
+  position: relative; /* ✅ au lieu de absolute */
+  top: auto;
+  right: auto;
+
   z-index: 1000;
   box-shadow: 0 4px 15px rgb(0 0 0 / 40%);
   backdrop-filter: blur(8px);
   color: #f5ece0;
 
-  /* ✅ CORRECTION */
-  max-height: min(60vh, 520px);  /* limite la hauteur */
-  overflow-y: auto;              /* scroll interne */
-  overscroll-behavior: contain;  /* évite de bloquer le scroll parent */
-  -webkit-overflow-scrolling: touch; /* scroll fluide mobile */
+  /* ✅ limite pour que le menu reste scrollable jusqu’à Déconnexion */
+  max-height: 35vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Scrollbar stylée (optionnel mais propre) */
+/* Scrollbar stylée (optionnel) */
 .notifications-popup::-webkit-scrollbar {
   width: 6px;
 }
