@@ -573,7 +573,7 @@ export default function ChatInput({
   return (
     <>
       {utilisateur.type === "couple" && !prenomsOK && (
-        <form
+        {/* <form
           className="chat-input"
           onSubmit={handlePrenomsSubmit}
           style={{ flexDirection: "column", gap: 8 }}
@@ -602,7 +602,7 @@ export default function ChatInput({
               Valider
             </button>
           </div>
-        </form>
+        </form> */}
       )}
 
       {showEphemereNotif && (
