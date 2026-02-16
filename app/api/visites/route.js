@@ -101,11 +101,14 @@ export async function POST(req) {
     // 📡 Ably : event temps réel pour la bannière in-app
     try {
       const channelName = `user-${visiteIdNum}`;
-      await ably.channels.get(channelName).publish("new-visit", {
-        pseudo: pseudoVisiteur,
-        visiteurId: Number(user.id),
-        lien: `/profil/${user.id}`,
-      });
+     await ably.channels.get(channelName).publish("new-visit", {
+  pseudo: pseudoVisiteur,              // (compat)
+  fromPseudo: pseudoVisiteur,          // ✅ AJOUT
+  visiteurId: Number(user.id),         // (compat)
+  fromId: Number(user.id),             // ✅ AJOUT
+  lien: `/profil/${user.id}`,
+});
+
       console.log("📡 Ably new-visit envoyé sur", channelName);
     } catch (e) {
       console.warn("⚠️ Ably new-visit error:", e?.message || e);

@@ -348,14 +348,16 @@ export async function POST(req) {
 
       for (const destId of autresParticipants) {
         try {
-          await ably.channels
-            .get(`user-${destId}`)
-            .publish("new-message", {
-              conversationId: Number(conversationId),
-              fromPseudo: message.auteur.pseudo,
-              preview,
-              type: message.type,
-            });
+        await ably.channels
+  .get(`user-${destId}`)
+  .publish("new-message", {
+    conversationId: Number(conversationId),
+    fromId: auteurId,                 // ✅ AJOUT
+    fromPseudo: message.auteur.pseudo,
+    preview,
+    type: message.type,
+  });
+
 
           console.log(`📡 Ably new-message envoyé sur user-${destId}`);
         } catch (e) {

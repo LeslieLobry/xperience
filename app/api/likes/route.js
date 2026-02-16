@@ -164,12 +164,14 @@ export async function POST(req) {
       const channelName = `user-${cibleIdNum}`;
       const channel = ably.channels.get(channelName);
 
-      await channel.publish("new-like", {
-        pseudo: auteur?.pseudo ?? "Un membre",
-        likerId: auteurId,
-        cibleId: cibleIdNum,
-        lien: `/profil/${auteurId}`,
-      });
+     await channel.publish("new-like", {
+  pseudo: auteur?.pseudo ?? "Un membre",     // (ok)
+  fromPseudo: auteur?.pseudo ?? "Un membre", // ✅ AJOUT (standard)
+  likerId: auteurId,                         // (compat)
+  fromId: auteurId,                          // ✅ AJOUT (standard)
+  cibleId: cibleIdNum,
+  lien: `/profil/${auteurId}`,
+});
 
       console.log("📡 Ably new-like envoyé sur", channelName);
     } catch (e) {

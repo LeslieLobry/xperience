@@ -25,7 +25,7 @@ async function publishNotif(userId, payload) {
   }
 }
 
-async function sendEmailAccepted(toEmail, ownerPseudo) {
+async function sendEmailAccepted(toEmail, ownerPseudo, ownerProfileUrl) {
   if (!toEmail) return;
   try {
     await resend.emails.send({
@@ -35,7 +35,20 @@ async function sendEmailAccepted(toEmail, ownerPseudo) {
       html: `
         <div style="font-family:Arial,sans-serif;line-height:1.5">
           <h2>Bonne nouvelle 🎉</h2>
-          <p><strong>${ownerPseudo}</strong> a accepté votre demande d’accès à sa galerie privée.</p>
+          <p>
+            <strong>${ownerPseudo}</strong> a accepté votre demande d’accès à sa galerie privée.
+          </p>
+
+          ${
+            ownerProfileUrl
+              ? `<p>
+                   👉 <a href="${ownerProfileUrl}" target="_blank" rel="noopener noreferrer">
+                     Voir le profil de ${ownerPseudo}
+                   </a>
+                 </p>`
+              : ""
+          }
+
           <p>Vous pouvez maintenant consulter sa galerie depuis son profil.</p>
           <p style="color:#666;font-size:12px">Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.</p>
         </div>
@@ -88,7 +101,16 @@ export async function PATCH(req, { params }) {
     });
 
     const ownerPseudo = demande.proprietaire?.pseudo || "Un utilisateur";
-    const lien = `/profil/${demande.proprietaireId}`; 
+
+    // lien interne (pour notif DB + app)
+    const lien = `/profil/${demande.proprietaireId}`;
+
+    // ✅ lien absolu (pour email)
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      "https://www.x-periences.fr";
+    const ownerProfileUrl = `${baseUrl}${lien}`;
 
     // ✅ 1) Notification en DB (pour le demandeur)
     await prisma.notification.create({
@@ -112,8 +134,8 @@ export async function PATCH(req, { params }) {
       at: Date.now(),
     });
 
-    // ✅ 3) Email
-    await sendEmailAccepted(demande.demandeur?.email, ownerPseudo);
+    // ✅ 3) Email (avec lien profil)
+    await sendEmailAccepted(demande.demandeur?.email, ownerPseudo, ownerProfileUrl);
 
     return NextResponse.json(updated);
   } catch (e) {
