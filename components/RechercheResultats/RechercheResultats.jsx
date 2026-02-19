@@ -29,10 +29,11 @@ function usePresignedPhotos(users) {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({ key }),
             });
-            const data = await res.json();
-            result[user.id] = data.url || "/default.jpg";
+            const data = await res.json().catch(() => null);
+            result[user.id] = data?.url || "/default.jpg";
           } catch {
             result[user.id] = "/default.jpg";
           }
@@ -49,15 +50,9 @@ function usePresignedPhotos(users) {
   return photoUrls;
 }
 
-export default function RechercheResultats({
-  className = "",
-  // ✅ NEW props (autour de moi)
-  autourDeMoi = false,
-  latitude = null,
-  longitude = null,
-  loadingGeo = false,
-  geoError = null,
-}) {
+const DEFAULT_RAYON = 20;
+
+export default function RechercheResultats({ className = "" }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
@@ -69,7 +64,6 @@ export default function RechercheResultats({
   // ✅ ONLINE via Ably presence
   const { isOnline } = useOnlineStatus();
 
-  // ✅ plus robuste que toString()
   const hasParams = useMemo(
     () => Array.from(searchParams.keys()).length > 0,
     [searchParams]
@@ -90,64 +84,122 @@ export default function RechercheResultats({
     setLoading(true);
     setHasSearched(true);
 
-    // ✅ distance = rayon query (fallback 20)
-    const distance = Number(searchParams.get("rayon") || 20);
+    // ✅ détecte autourDeMoi
+    const autour = (searchParams.get("autourDeMoi") || "") === "true";
+    const distance = Number(searchParams.get("rayon") || DEFAULT_RAYON);
 
-    // ✅ MODE AUTOUR DE MOI : on attend la géoloc puis on appelle /api/profils-proches
-    if (autourDeMoi) {
-      // si géoloc en cours, on ne fetch pas encore
-      if (loadingGeo) {
-        setLoading(true);
-        return () => controller.abort();
-      }
+    // ✅ construit les filtres à envoyer à /api/profils-proches
+    const filters = {
+      pseudo: searchParams.get("pseudo") || "",
+      statut: searchParams.get("statut") || "all",
+      ageMin: searchParams.get("ageMin") || "",
+      ageMax: searchParams.get("ageMax") || "",
+      photo: searchParams.get("photo") === "true",
+      description: searchParams.get("description") === "true",
+      localisation: searchParams.get("localisation") || "",
 
-      // si pas de coords, on stop proprement (sinon ça renvoie tout le monde)
-      if (latitude == null || longitude == null) {
-        setLoading(false);
-        // on garde hasSearched=true pour afficher un message
-        setUtilisateurs([]);
-        return () => controller.abort();
-      }
+      // arrays
+      type: searchParams.getAll("type"),
+      orientation: searchParams.getAll("orientation"),
+      rechercheType: searchParams.getAll("rechercheType"),
+      experience: searchParams.getAll("experience"),
+      fumeur: searchParams.getAll("fumeur"),
+      silhouette: searchParams.getAll("silhouette"),
+      taille: searchParams.getAll("taille"),
+      origines: searchParams.getAll("origines"),
+      yeux: searchParams.getAll("yeux"),
+      cheveux: searchParams.getAll("cheveux"),
+      recherches: searchParams.getAll("recherches"),
+      envies: searchParams.getAll("envies"),
+    };
 
-      fetch("/api/profils-proches", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        credentials: "include",
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          distance,
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          // ton endpoint renvoie un array (comme dans ProfilsDisplay)
-          setUtilisateurs(Array.isArray(data) ? data : []);
-          setLoading(false);
-        })
-        .catch((err) => {
-          if (err?.name !== "AbortError") setLoading(false);
+    // normalise numbers (si vide => null)
+    const ageMinNum = filters.ageMin !== "" ? Number(filters.ageMin) : null;
+    const ageMaxNum = filters.ageMax !== "" ? Number(filters.ageMax) : null;
+
+    async function load() {
+      try {
+        if (autour) {
+          // ✅ 1) géoloc côté client
+          if (!navigator.geolocation) {
+            alert("La géolocalisation n'est pas supportée sur ton appareil.");
+            setUtilisateurs([]);
+            setLoading(false);
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              try {
+                const latitude = pos.coords.latitude;
+                const longitude = pos.coords.longitude;
+
+                // ✅ 2) POST vers /api/profils-proches + filtres
+                const res = await fetch("/api/profils-proches", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  signal: controller.signal,
+                  body: JSON.stringify({
+                    latitude,
+                    longitude,
+                    distance,
+                    filters: {
+                      ...filters,
+                      ageMin: ageMinNum,
+                      ageMax: ageMaxNum,
+                    },
+                  }),
+                });
+
+                const data = await res.json().catch(() => null);
+
+                // tu as peut-être déjà un format Array direct
+                const list = Array.isArray(data)
+                  ? data
+                  : Array.isArray(data?.utilisateurs)
+                  ? data.utilisateurs
+                  : [];
+
+                setUtilisateurs(list);
+              } catch (e) {
+                if (e?.name !== "AbortError") setUtilisateurs([]);
+              } finally {
+                setLoading(false);
+              }
+            },
+            (err) => {
+              console.error("Erreur géolocalisation :", err);
+              alert("Impossible de récupérer ta position.");
+              setUtilisateurs([]);
+              setLoading(false);
+            },
+            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+          );
+
+          return;
+        }
+
+        // ✅ recherche classique (ville / filtres sans GPS)
+        const res = await fetch(`/api/recherche?${paramsStr}`, {
+          signal: controller.signal,
+          credentials: "include",
         });
 
-      return () => controller.abort();
-    }
-
-    // ✅ MODE CLASSIQUE : /api/recherche
-    fetch(`/api/recherche?${paramsStr}`, { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data) => {
+        const data = await res.json().catch(() => null);
         setUtilisateurs(
           Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
         );
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (err?.name !== "AbortError") setLoading(false);
-      });
+      }
+    }
+
+    load();
 
     return () => controller.abort();
-  }, [searchParams, autourDeMoi, latitude, longitude, loadingGeo]);
+  }, [searchParams]);
 
   if (!hasSearched) return null;
 
@@ -178,15 +230,6 @@ export default function RechercheResultats({
       )}
 
       <h1 className="profil-list1-title">Résultats de recherche</h1>
-
-      {/* ✅ Message utile en mode autourDeMoi */}
-      {autourDeMoi && (geoError || (latitude == null && longitude == null)) && (
-        <p style={{ color: "#e0c084", fontWeight: 600 }}>
-          {geoError
-            ? `⚠️ ${geoError}`
-            : "⚠️ Active la localisation pour voir les profils près de toi."}
-        </p>
-      )}
 
       {loading ? (
         <p>Chargement...</p>
@@ -233,8 +276,8 @@ export default function RechercheResultats({
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo.charAt(0).toUpperCase() +
-                        user.pseudo.slice(1).toLowerCase()}
+                      {user.pseudo?.charAt(0)?.toUpperCase() +
+                        user.pseudo?.slice(1)?.toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
