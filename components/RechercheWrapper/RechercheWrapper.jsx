@@ -1,54 +1,72 @@
 "use client";
+
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import RechercheSidebar from "../RechercheSidebar/RechercheSidebar";
+
+const DEFAULT_RAYON = 20;
 
 export default function RechercheWrapper() {
   const router = useRouter();
 
-  const handleSearch = (form) => {
-    console.log("[handleSearch] Reçu :", form, typeof form.autourDeMoi, form.latitude, form.longitude);
-  console.log("[handleSearch] Reçu :", form);
-    // PATCH : force autourDeMoi en booléen si c'est une string (cas vocal)
-    if (typeof form.autourDeMoi === "string") {
-      form.autourDeMoi = form.autourDeMoi === "true";
-    }
-    console.log("handleSearch appelé avec :", form, "typeof autourDeMoi:", typeof form.autourDeMoi);
+  // anti-rafale (vocal / multi change)
+  const debounceRef = useRef(null);
 
-    if (form.autourDeMoi) {
-      if (!navigator.geolocation) {
-        alert("La géolocalisation n'est pas supportée !");
-        return;
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  const handleSearch = useCallback(
+    (formRaw) => {
+      // ✅ on ne mute jamais l’objet reçu
+      const form = { ...(formRaw || {}) };
+
+      // force bool si string
+      if (typeof form.autourDeMoi === "string") {
+        form.autourDeMoi = form.autourDeMoi === "true";
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          console.log("Position GPS récupérée :", pos.coords.latitude, pos.coords.longitude);
-          const latitude = pos.coords.latitude;
-          const longitude = pos.coords.longitude;
-          const query = new URLSearchParams();
-          Object.entries(form).forEach(([key, value]) => {
-            if (Array.isArray(value)) value.forEach((v) => query.append(key, v));
-            else if (value !== undefined && value !== null && value !== "") query.append(key, value);
-          });
-          query.set("latitude", latitude);
-          query.set("longitude", longitude);
-          query.set("rayon", rayon); 
-          router.push("/recherche?" + query.toString());
-        },
-        () => {
-          alert("Impossible de récupérer ta position géographique !");
-        }
-      );
-      return;
-    }
 
-    // Sinon (recherche classique)
-    const query = new URLSearchParams();
-    Object.entries(form).forEach(([key, value]) => {
-      if (Array.isArray(value)) value.forEach((v) => query.append(key, v));
-      else if (value !== undefined && value !== null && value !== "") query.append(key, value);
-    });
-    router.push("/recherche?" + query.toString());
-  };
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const query = new URLSearchParams();
+
+        Object.entries(form).forEach(([key, value]) => {
+          // ✅ IMPORTANT : jamais lat/lng dans l’URL
+          if (key === "latitude" || key === "longitude") return;
+
+          // ignore vides
+          if (
+            (key === "rayon" || key === "ageMin" || key === "ageMax") &&
+            (value === "" || value == null)
+          )
+            return;
+
+          if (Array.isArray(value)) {
+            value.forEach((v) => {
+              if (v !== undefined && v !== null && v !== "") query.append(key, String(v));
+            });
+          } else if (typeof value === "boolean") {
+            // ✅ on écrit "true" seulement si true
+            if (value) query.set(key, "true");
+          } else if (value !== undefined && value !== null && value !== "") {
+            query.set(key, String(value));
+          }
+        });
+
+        // ✅ Sécurité autourDeMoi
+        if (form.autourDeMoi) {
+          // force rayon si pas fourni
+          const r = Number(form.rayon || DEFAULT_RAYON);
+          query.set("autourDeMoi", "true");
+          query.set("rayon", String(r));
+          query.delete("localisation");
+        }
+
+        router.push("/recherche?" + query.toString());
+      }, 200);
+    },
+    [router]
+  );
 
   return <RechercheSidebar onSearch={handleSearch} />;
 }
