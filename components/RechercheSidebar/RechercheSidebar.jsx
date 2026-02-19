@@ -197,6 +197,22 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
   const toggleSection = (key) =>
     setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
+  /* ===================== ✅ FIX: toggle autour de moi (source unique) ===================== */
+  function toggleAutourDeMoi(checked) {
+    setForm((prev) => ({
+      ...prev,
+      autourDeMoi: checked,
+      localisation: checked ? "" : prev.localisation,
+    }));
+
+    if (checked) {
+      setCityText("");
+      setCityOpen(false);
+      setCityItems([]);
+      setCityHighlight(-1);
+    }
+  }
+
   /* -------------------- Effet d'autocomplétion ville -------------------- */
   useEffect(() => {
     const q = (cityText || "").trim();
@@ -394,7 +410,11 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
       return;
     }
 
-    const candidateCity = (f.localisation || cityText || "").trim();
+    // ✅ FIX: si autourDeMoi est ON, on ignore totalement cityText
+    const candidateCity = f.autourDeMoi
+      ? ""
+      : (f.localisation || cityText || "").trim();
+
     if (candidateCity) {
       f.localisation = candidateCity;
       f.rayon = Number(f.rayon || DEFAULT_RAYON);
@@ -429,6 +449,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
         if (next.localisation) {
           delete next.latitude;
           delete next.longitude;
+          next.autourDeMoi = false;
         }
         setCityText(next.localisation || "");
         handleSearch(next);
@@ -670,22 +691,28 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               autoCapitalize="off"
               spellCheck={false}
               ref={cityInputRef}
+              disabled={form.autourDeMoi} // ✅ FIX: ville disabled si autourDeMoi
               onFocus={() => {
+                if (form.autourDeMoi) return;
                 const v = (cityText || "").trim();
                 if (v.length >= 2 && cityItems.length) setCityOpen(true);
               }}
               onChange={(e) => {
+                if (form.autourDeMoi) return;
                 const v = e.target.value;
                 setCityText(v);
                 // on ne met pas form.localisation à jour à chaque frappe,
                 // seulement au moment de la recherche ou de la sélection
               }}
-              onKeyDown={onCityKeyDown}
+              onKeyDown={(e) => {
+                if (form.autourDeMoi) return;
+                onCityKeyDown(e);
+              }}
             />
 
-            {cityLoading && <div className="city-hint">Recherche…</div>}
+            {cityLoading && !form.autourDeMoi && <div className="city-hint">Recherche…</div>}
 
-            {cityOpen && cityItems.length > 0 && (
+            {cityOpen && !form.autourDeMoi && cityItems.length > 0 && (
               <ul
                 className="city-dropdown"
                 tabIndex={-1}
@@ -721,6 +748,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
             value={form.rayon}
             onChange={handleChange}
             ref={rayonRef}
+            disabled={!form.autourDeMoi} // ✅ FIX: rayon actif seulement si autourDeMoi
           />
 
           <label>
@@ -728,12 +756,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               type="checkbox"
               name="autourDeMoi"
               checked={form.autourDeMoi}
-              onChange={handleChange}
+              onChange={handleChange} // on garde handleChange mais il intercepte autourDeMoi
             />
             Autour de moi
-          </label> 
+          </label>
 
-        <label>
+          <label>
             <input
               type="checkbox"
               name="photo"
@@ -741,7 +769,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onChange={handleChange}
             />
             Avec photo
-          </label> 
+          </label>
 
           <label>
             <input
@@ -751,7 +779,8 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
               onChange={handleChange}
             />
             Avec description
-          </label> 
+          </label>
+
           <h4>Statut</h4>
           <label>
             <input
@@ -835,6 +864,12 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
     // La ville est gérée par cityText et l'autocomplétion
     if (name === "localisation") return;
 
+    // ✅ FIX: intercepte autourDeMoi pour vider cityText et éviter les conflits
+    if (name === "autourDeMoi") {
+      toggleAutourDeMoi(checked);
+      return;
+    }
+
     // 🔢 Champs numériques : âge min / max / rayon
     if (name === "ageMin" || name === "ageMax" || name === "rayon") {
       const cleaned = value.replace(/[^\d]/g, "");
@@ -855,7 +890,7 @@ const RechercheSidebar = forwardRef(function RechercheSidebar(
           : prev[name].filter((v) => v !== value),
       }));
     }
-    // ✅ Checkbox simple (photo, description, autourDeMoi etc.)
+    // ✅ Checkbox simple (photo, description, etc.)
     else if (type === "checkbox") {
       setForm((prev) => ({ ...prev, [name]: checked }));
     }
