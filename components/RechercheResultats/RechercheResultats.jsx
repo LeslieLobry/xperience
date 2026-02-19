@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import "../ProfilsDisplay/ProfilsDisplay.css";
 import "./RechercheResultats.css";
-import { useOnlineStatus } from "../../context/OnlineStatusContext"; // ✅ AJOUT
+import { useOnlineStatus } from "../../context/OnlineStatusContext";
 
 /* ---------------- Hook presign ---------------- */
 function usePresignedPhotos(users) {
@@ -49,7 +49,15 @@ function usePresignedPhotos(users) {
   return photoUrls;
 }
 
-export default function RechercheResultats({ className = "" }) {
+export default function RechercheResultats({
+  className = "",
+  // ✅ NEW props (autour de moi)
+  autourDeMoi = false,
+  latitude = null,
+  longitude = null,
+  loadingGeo = false,
+  geoError = null,
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
@@ -58,20 +66,20 @@ export default function RechercheResultats({ className = "" }) {
 
   const photoUrls = usePresignedPhotos(utilisateurs);
 
-  // ✅ ONLINE via Ably presence (comme les autres pages)
+  // ✅ ONLINE via Ably presence
   const { isOnline } = useOnlineStatus();
 
-  // ✅ plus robuste que toString() (gère le cas de params vides ou ordre différent)
+  // ✅ plus robuste que toString()
   const hasParams = useMemo(
     () => Array.from(searchParams.keys()).length > 0,
     [searchParams]
   );
 
   useEffect(() => {
-    const params = searchParams.toString();
+    const paramsStr = searchParams.toString();
 
-    // 🔁 Si plus de paramètres -> on vide la liste et on repasse en "pas encore cherché"
-    if (!params) {
+    // 🔁 Si plus de paramètres -> reset
+    if (!paramsStr) {
       setUtilisateurs([]);
       setHasSearched(false);
       setLoading(false);
@@ -79,41 +87,87 @@ export default function RechercheResultats({ className = "" }) {
     }
 
     const controller = new AbortController();
-
     setLoading(true);
     setHasSearched(true);
 
-    fetch(`/api/recherche?${params}`, { signal: controller.signal })
+    // ✅ distance = rayon query (fallback 20)
+    const distance = Number(searchParams.get("rayon") || 20);
+
+    // ✅ MODE AUTOUR DE MOI : on attend la géoloc puis on appelle /api/profils-proches
+    if (autourDeMoi) {
+      // si géoloc en cours, on ne fetch pas encore
+      if (loadingGeo) {
+        setLoading(true);
+        return () => controller.abort();
+      }
+
+      // si pas de coords, on stop proprement (sinon ça renvoie tout le monde)
+      if (latitude == null || longitude == null) {
+        setLoading(false);
+        // on garde hasSearched=true pour afficher un message
+        setUtilisateurs([]);
+        return () => controller.abort();
+      }
+
+      fetch("/api/profils-proches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        credentials: "include",
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          distance,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          // ton endpoint renvoie un array (comme dans ProfilsDisplay)
+          setUtilisateurs(Array.isArray(data) ? data : []);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (err?.name !== "AbortError") setLoading(false);
+        });
+
+      return () => controller.abort();
+    }
+
+    // ✅ MODE CLASSIQUE : /api/recherche
+    fetch(`/api/recherche?${paramsStr}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
-        setUtilisateurs(Array.isArray(data.utilisateurs) ? data.utilisateurs : []);
+        setUtilisateurs(
+          Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
+        );
         setLoading(false);
       })
       .catch((err) => {
         if (err?.name !== "AbortError") setLoading(false);
       });
 
-    // Annule la requête précédente si les params changent
     return () => controller.abort();
-  }, [searchParams]);
+  }, [searchParams, autourDeMoi, latitude, longitude, loadingGeo]);
 
   if (!hasSearched) return null;
 
   const handleResetSearch = () => {
-    // 🧹 vide immédiatement l’affichage AVANT de naviguer
     setUtilisateurs([]);
     setHasSearched(false);
     setLoading(false);
     router.push("/recherche");
   };
 
-  const handleGoHome = () => router.push("/accueil-page"); // ou "/" selon ton routing
+  const handleGoHome = () => router.push("/accueil-page");
 
   return (
     <div className={`profil-list1 ${className}`}>
-      {/* Barre d’actions (visible même en chargement) */}
       {hasParams && (
-        <div className="recherche-toolbar2" role="region" aria-label="Actions de recherche">
+        <div
+          className="recherche-toolbar2"
+          role="region"
+          aria-label="Actions de recherche"
+        >
           <button className="btn-outlined" onClick={handleResetSearch}>
             Nouvelle recherche
           </button>
@@ -125,6 +179,15 @@ export default function RechercheResultats({ className = "" }) {
 
       <h1 className="profil-list1-title">Résultats de recherche</h1>
 
+      {/* ✅ Message utile en mode autourDeMoi */}
+      {autourDeMoi && (geoError || (latitude == null && longitude == null)) && (
+        <p style={{ color: "#e0c084", fontWeight: 600 }}>
+          {geoError
+            ? `⚠️ ${geoError}`
+            : "⚠️ Active la localisation pour voir les profils près de toi."}
+        </p>
+      )}
+
       {loading ? (
         <p>Chargement...</p>
       ) : (
@@ -133,13 +196,19 @@ export default function RechercheResultats({ className = "" }) {
             <p>Aucun utilisateur trouvé.</p>
           ) : (
             utilisateurs.map((user) => {
-              const online = isOnline(user?.id); // ✅ ICI
+              const online = isOnline(user?.id);
 
               return (
-                <Link href={`/profil/${user.id}`} key={user.id} className="profil-card-link">
+                <Link
+                  href={`/profil/${user.id}`}
+                  key={user.id}
+                  className="profil-card-link"
+                >
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
+                      className={`statut-badge ${
+                        online ? "en-ligne" : "hors-ligne"
+                      }`}
                       title={online ? "En ligne" : "Hors ligne"}
                     />
 
@@ -164,7 +233,8 @@ export default function RechercheResultats({ className = "" }) {
                     </div>
 
                     <h2 className="profil-card-title">
-                      {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+                      {user.pseudo.charAt(0).toUpperCase() +
+                        user.pseudo.slice(1).toLowerCase()}
                     </h2>
 
                     <p className="profil-card-details">
