@@ -120,6 +120,14 @@ export default function Navbar() {
   }, [user]);
 
   /* ------------------------------------------------------------------------ */
+  /* ✅ NOUVEAU : fermer menus à chaque navigation                            */
+  /* ------------------------------------------------------------------------ */
+  useEffect(() => {
+    setDropdownOpen(false);
+    setMenuOpen(false);
+  }, [pathname]);
+
+  /* ------------------------------------------------------------------------ */
   /* 🔁 Sync propre : initial + Ably temps réel + petit fallback 60s          */
   /* ------------------------------------------------------------------------ */
   useEffect(() => {
@@ -133,7 +141,10 @@ export default function Navbar() {
       if (isCancelled) return;
 
       // On évite de poller si onglet pas visible (optimisation)
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      ) {
         return;
       }
 
@@ -209,13 +220,12 @@ export default function Navbar() {
 
   // ✅ Affichage prénom/pseudo auteur (si l’API le renvoie)
   const getNotifText = useCallback((notif) => {
-   const actor =
-  notif?.auteur?.pseudo ||
-  notif?.auteur?.prenom ||
-  notif?.acteur?.pseudo ||
-  notif?.acteur?.prenom ||
-  "";
-
+    const actor =
+      notif?.auteur?.pseudo ||
+      notif?.auteur?.prenom ||
+      notif?.acteur?.pseudo ||
+      notif?.acteur?.prenom ||
+      "";
 
     // Si ton message est du style "a aimé votre profil" → on préfixe
     return actor ? `${actor} ${notif.message}` : notif.message;
@@ -261,6 +271,7 @@ export default function Navbar() {
 
   const handleGoTo = (href) => {
     setDropdownOpen(false);
+    setMenuOpen(false);
     router.push(href);
   };
 
@@ -280,14 +291,18 @@ export default function Navbar() {
             priority
           />
         </Link>
-        {localUser && <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>}
+        {localUser && (
+          <h3 className="navbar-pseudo">Bienvenue, {localUser.pseudo}</h3>
+        )}
       </div>
 
       <div
         className={`burger${menuOpen ? " open" : ""}`}
         onClick={() => setMenuOpen(!menuOpen)}
       >
-        {burgerBadgeCount > 0 && <span className="burger-badge">{burgerBadgeCount}</span>}
+        {burgerBadgeCount > 0 && (
+          <span className="burger-badge">{burgerBadgeCount}</span>
+        )}
         <div className="line top"></div>
         <div className="line middle"></div>
         <div className="line bottom"></div>
@@ -304,7 +319,9 @@ export default function Navbar() {
           >
             <Link
               href={link.href}
-              className={link.href === "/messagerie" ? "nav-messagerie-link" : ""}
+              className={
+                link.href === "/messagerie" ? "nav-messagerie-link" : ""
+              }
             >
               {link.label}
               {link.href === "/messagerie" && unreadCount > 0 && (
@@ -330,7 +347,9 @@ export default function Navbar() {
                 height={40}
                 className="nav-avatar"
               />
-              {notifCount > 0 && <span className="notif-badge-on-avatar">{notifCount}</span>}
+              {notifCount > 0 && (
+                <span className="notif-badge-on-avatar">{notifCount}</span>
+              )}
             </div>
 
             {dropdownOpen && (
@@ -358,7 +377,9 @@ export default function Navbar() {
                   </div>
 
                   <ul>
-                    {notifications.length === 0 && <li>Aucune notification</li>}
+                    {notifications.length === 0 && (
+                      <li>Aucune notification</li>
+                    )}
 
                     {notifications.map((notif) => (
                       <li key={notif.id}>
@@ -368,6 +389,7 @@ export default function Navbar() {
                             onClick={() => {
                               markNotificationRead(notif.id);
                               setDropdownOpen(false);
+                              setMenuOpen(false); // ✅ FIX : fermer la nav aussi
                               router.push(notif.lien);
                             }}
                           >
@@ -377,10 +399,13 @@ export default function Navbar() {
                           <a
                             href={notif.lien || "#"}
                             target={notif.lien ? "_blank" : undefined}
-                            rel={notif.lien ? "noopener noreferrer" : undefined}
+                            rel={
+                              notif.lien ? "noopener noreferrer" : undefined
+                            }
                             onClick={() => {
                               markNotificationRead(notif.id);
                               setDropdownOpen(false);
+                              setMenuOpen(false); // ✅ FIX : fermer la nav aussi
                             }}
                           >
                             {getNotifText(notif)}
