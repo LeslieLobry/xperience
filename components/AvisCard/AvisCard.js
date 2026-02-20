@@ -24,6 +24,32 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
     return url && typeof url === "string" && url.length ? url : "/default.jpg";
   }, [avis?.auteur?.avatarUrl]);
 
+  // ✅ NOUVEAU : date formatée (si avis.createdAt existe)
+  const publishedAtLabel = useMemo(() => {
+    const raw = avis?.createdAt || avis?.dateCreation || avis?.created_at || null;
+    if (!raw) return null;
+
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+
+    // Format FR : "20 févr. 2026 à 14:32"
+    try {
+      const datePart = new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(d);
+      const timePart = new Intl.DateTimeFormat("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d);
+
+      return `${datePart} à ${timePart}`;
+    } catch {
+      return d.toLocaleString("fr-FR");
+    }
+  }, [avis?.createdAt, avis?.dateCreation, avis?.created_at]);
+
   const handleDelete = useCallback(async () => {
     if (!confirm("Supprimer cet avis ?")) return;
     try {
@@ -74,14 +100,23 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
   return (
     <article className="avis-card">
       <header className="avis-header">
-        <Image
-          src={avatarSrc}
-          alt={`Avatar de ${avis?.auteur?.pseudo || "utilisateur"}`}
-          width={24}
-          height={24}
-          className="avis-avatar"
-        />
-        <strong className="avis-author">{avis?.auteur?.pseudo} :</strong>
+        <div className="avis-header-left">
+          <Image
+            src={avatarSrc}
+            alt={`Avatar de ${avis?.auteur?.pseudo || "utilisateur"}`}
+            width={24}
+            height={24}
+            className="avis-avatar"
+          />
+          <strong className="avis-author">{avis?.auteur?.pseudo} :</strong>
+        </div>
+
+        {/* ✅ NOUVEAU : date de publication */}
+        {publishedAtLabel && (
+          <time className="avis-date" dateTime={String(avis?.createdAt || "")}>
+            {publishedAtLabel}
+          </time>
+        )}
       </header>
 
       {isEditing ? (
@@ -122,7 +157,12 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={() => setIsEditing(true)}
             color="#e0c084"
             disabled={loading}
-            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
+            style={{
+              padding: "4px 10px",
+              fontSize: 13,
+              borderRadius: 5,
+              minWidth: 0,
+            }}
           />
 
           {/* ✅ Supprimer visible aussi si propriétaire du profil */}
@@ -131,12 +171,17 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={handleDelete}
             color="#8c6a5d"
             disabled={loading}
-            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
+            style={{
+              padding: "4px 10px",
+              fontSize: 13,
+              borderRadius: 5,
+              minWidth: 0,
+            }}
           />
         </footer>
       )}
 
-      {/* ✅ NOUVEAU : si pas auteur, mais propriétaire du profil => bouton supprimer seul */}
+      {/* ✅ si pas auteur, mais propriétaire du profil => bouton supprimer seul */}
       {!isAuteur && canDelete && !isEditing && (
         <footer className="avis-footer">
           <Button
@@ -144,7 +189,12 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={handleDelete}
             color="#8c6a5d"
             disabled={loading}
-            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
+            style={{
+              padding: "4px 10px",
+              fontSize: 13,
+              borderRadius: 5,
+              minWidth: 0,
+            }}
           />
         </footer>
       )}
