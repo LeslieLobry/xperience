@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import Button from "../Button/Button";
 import "./AvisCard.css";
 
@@ -12,19 +13,23 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
 
   const isAuteur = connectedUserId === avis.auteurId;
 
-  // ✅ NOUVEAU : on est sur SON profil (profil consulté = user connecté)
+  // ✅ on est sur SON profil (profil consulté = user connecté)
   const isOwnerProfile = Number(connectedUserId) === Number(cibleId);
 
-  // ✅ NOUVEAU : peut supprimer si auteur OU propriétaire du profil
+  // ✅ peut supprimer si auteur OU propriétaire du profil
   const canDelete = isAuteur || isOwnerProfile;
 
-  const avatarSrc = useMemo(() => {
-    // champs normalisés côté API → avis.auteur.avatarUrl
-    const url = avis?.auteur?.avatarUrl;
-    return url && typeof url === "string" && url.length ? url : "/default.jpg";
-  }, [avis?.auteur?.avatarUrl]);
+  // ✅ ID auteur (pour lien)
+  const auteurProfilId = avis?.auteur?.id ?? avis?.auteurId ?? null;
+  const auteurHref = auteurProfilId ? `/profil/${auteurProfilId}` : null;
 
-  // ✅ NOUVEAU : date formatée (si avis.createdAt existe)
+  // ✅ Photo : accepte avatarUrl OU photoUrl
+  const avatarSrc = useMemo(() => {
+    const url = avis?.auteur?.avatarUrl || avis?.auteur?.photoUrl;
+    return url && typeof url === "string" && url.length ? url : "/default.jpg";
+  }, [avis?.auteur?.avatarUrl, avis?.auteur?.photoUrl]);
+
+  // ✅ Date formatée (si createdAt existe)
   const publishedAtLabel = useMemo(() => {
     const raw = avis?.createdAt || avis?.dateCreation || avis?.created_at || null;
     if (!raw) return null;
@@ -32,7 +37,6 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return null;
 
-    // Format FR : "20 févr. 2026 à 14:32"
     try {
       const datePart = new Intl.DateTimeFormat("fr-FR", {
         day: "2-digit",
@@ -97,21 +101,34 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
     }
   }, [avis.id, commentaire, onRefresh]);
 
+  const AuthorWrapper = ({ children }) => {
+    if (!auteurHref) return children;
+    return (
+      <Link href={auteurHref} className="avis-author-link" title="Voir le profil">
+        {children}
+      </Link>
+    );
+  };
+
   return (
     <article className="avis-card">
       <header className="avis-header">
         <div className="avis-header-left">
-          <Image
-            src={avatarSrc}
-            alt={`Avatar de ${avis?.auteur?.pseudo || "utilisateur"}`}
-            width={24}
-            height={24}
-            className="avis-avatar"
-          />
-          <strong className="avis-author">{avis?.auteur?.pseudo} :</strong>
+          <AuthorWrapper>
+            <Image
+              src={avatarSrc}
+              alt={`Avatar de ${avis?.auteur?.pseudo || "utilisateur"}`}
+              width={28}
+              height={28}
+              className="avis-avatar"
+            />
+          </AuthorWrapper>
+
+          <AuthorWrapper>
+            <strong className="avis-author">{avis?.auteur?.pseudo} :</strong>
+          </AuthorWrapper>
         </div>
 
-        {/* ✅ NOUVEAU : date de publication */}
         {publishedAtLabel && (
           <time className="avis-date" dateTime={String(avis?.createdAt || "")}>
             {publishedAtLabel}
@@ -149,7 +166,6 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
         <p className="avis-commentaire">{avis.commentaire}</p>
       )}
 
-      {/* ✅ Modifier = auteur seulement (inchangé) */}
       {isAuteur && !isEditing && (
         <footer className="avis-footer">
           <Button
@@ -165,7 +181,6 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             }}
           />
 
-          {/* ✅ Supprimer visible aussi si propriétaire du profil */}
           <Button
             title="Supprimer"
             onClick={handleDelete}
@@ -181,7 +196,6 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
         </footer>
       )}
 
-      {/* ✅ si pas auteur, mais propriétaire du profil => bouton supprimer seul */}
       {!isAuteur && canDelete && !isEditing && (
         <footer className="avis-footer">
           <Button

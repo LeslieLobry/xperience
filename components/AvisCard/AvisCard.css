@@ -65,3 +65,19 @@
   opacity: 0.75;
   white-space: nowrap;
 }
+.avis-author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.avis-author-link:hover {
+  text-decoration: underline;
+}
+
+.avis-avatar {
+  border-radius: 999px;
+  object-fit: cover;
+}
