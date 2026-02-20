@@ -80,4 +80,5 @@
 .avis-avatar {
   border-radius: 999px;
   object-fit: cover;
+  width: 24px;
 }
