@@ -1,10 +1,45 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import Image from "next/image";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Button from "../Button/Button";
 import "./AvisCard.css";
+
+/* -------------------------------------------------------------------------- */
+/* ✅ Presign cache (comme ta liste conv)                                     */
+/* -------------------------------------------------------------------------- */
+const PRESIGN_TTL_MS = 50 * 60 * 1000;
+const presignCache = new Map(); // key -> { url, exp }
+const presignInflight = new Map(); // key -> Promise
+
+async function getPresignedUrl(key) {
+  if (!key) return "/default.jpg";
+  if (key.startsWith("http")) return key;
+
+  const now = Date.now();
+  const cached = presignCache.get(key);
+  if (cached && cached.exp > now) return cached.url;
+
+  if (presignInflight.has(key)) return presignInflight.get(key);
+
+  const p = fetch("/api/photos/presign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+    credentials: "include",
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      const url = data?.url || "/default.jpg";
+      presignCache.set(key, { url, exp: now + PRESIGN_TTL_MS });
+      return url;
+    })
+    .catch(() => "/default.jpg")
+    .finally(() => presignInflight.delete(key));
+
+  presignInflight.set(key, p);
+  return p;
+}
 
 export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -12,26 +47,50 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
   const [loading, setLoading] = useState(false);
 
   const isAuteur = connectedUserId === avis.auteurId;
-
-  // ✅ on est sur SON profil (profil consulté = user connecté)
   const isOwnerProfile = Number(connectedUserId) === Number(cibleId);
-
-  // ✅ peut supprimer si auteur OU propriétaire du profil
   const canDelete = isAuteur || isOwnerProfile;
 
-  // ✅ ID auteur (pour lien)
   const auteurProfilId = avis?.auteur?.id ?? avis?.auteurId ?? null;
   const auteurHref = auteurProfilId ? `/profil/${auteurProfilId}` : null;
 
-  // ✅ Photo : accepte avatarUrl OU photoUrl
-  const avatarSrc = useMemo(() => {
-    const url = avis?.auteur?.avatarUrl || avis?.auteur?.photoUrl;
-    return url && typeof url === "string" && url.length ? url : "/default.jpg";
-  }, [avis?.auteur?.avatarUrl, avis?.auteur?.photoUrl]);
+  const auteurPseudo = avis?.auteur?.pseudo || "Utilisateur";
 
-  // ✅ Date formatée (si createdAt existe)
+  const rawPhoto = avis?.auteur?.photoUrl || avis?.auteur?.avatarUrl || "";
+
+  const [avatarUrl, setAvatarUrl] = useState("/default.jpg");
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function run() {
+      if (!rawPhoto) {
+        setAvatarUrl("/default.jpg");
+        return;
+      }
+
+      if (rawPhoto.startsWith("http")) {
+        setAvatarUrl(rawPhoto);
+        return;
+      }
+
+      if (rawPhoto.startsWith("/")) {
+        setAvatarUrl(`https://www.x-periences.fr${rawPhoto}`);
+        return;
+      }
+
+      const u = await getPresignedUrl(rawPhoto);
+      if (!canceled) setAvatarUrl(u || "/default.jpg");
+    }
+
+    run().catch(() => setAvatarUrl("/default.jpg"));
+
+    return () => {
+      canceled = true;
+    };
+  }, [rawPhoto]);
+
   const publishedAtLabel = useMemo(() => {
-    const raw = avis?.createdAt || avis?.dateCreation || avis?.created_at || null;
+    const raw = avis?.createdAt || null;
     if (!raw) return null;
 
     const d = new Date(raw);
@@ -52,7 +111,7 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
     } catch {
       return d.toLocaleString("fr-FR");
     }
-  }, [avis?.createdAt, avis?.dateCreation, avis?.created_at]);
+  }, [avis?.createdAt]);
 
   const handleDelete = useCallback(async () => {
     if (!confirm("Supprimer cet avis ?")) return;
@@ -101,38 +160,45 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
     }
   }, [avis.id, commentaire, onRefresh]);
 
-  const AuthorWrapper = ({ children }) => {
-    if (!auteurHref) return children;
-    return (
-      <Link href={auteurHref} className="avis-author-link" title="Voir le profil">
-        {children}
-      </Link>
-    );
-  };
+  const HeaderContent = (
+    <>
+      <div className="avis-header-left">
+        {avatarUrl && avatarUrl !== "/default.jpg" ? (
+          <img
+            src={avatarUrl}
+            alt={`Avatar de ${auteurPseudo}`}
+            className="avis-avatar"
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/default.jpg";
+            }}
+          />
+        ) : (
+          <div className="avis-avatar-placeholder">{getInitials(auteurPseudo)}</div>
+        )}
+
+        <strong className="avis-author">{auteurPseudo} :</strong>
+      </div>
+
+      {publishedAtLabel && (
+        <time className="avis-date" dateTime={String(avis?.createdAt || "")}>
+          {publishedAtLabel}
+        </time>
+      )}
+    </>
+  );
 
   return (
     <article className="avis-card">
       <header className="avis-header">
-        <div className="avis-header-left">
-          <AuthorWrapper>
-            <Image
-              src={avatarSrc}
-              alt={`Avatar de ${avis?.auteur?.pseudo || "utilisateur"}`}
-              width={28}
-              height={28}
-              className="avis-avatar"
-            />
-          </AuthorWrapper>
-
-          <AuthorWrapper>
-            <strong className="avis-author">{avis?.auteur?.pseudo} :</strong>
-          </AuthorWrapper>
-        </div>
-
-        {publishedAtLabel && (
-          <time className="avis-date" dateTime={String(avis?.createdAt || "")}>
-            {publishedAtLabel}
-          </time>
+        {auteurHref ? (
+          <Link href={auteurHref} className="avis-author-link" title="Voir le profil">
+            {HeaderContent}
+          </Link>
+        ) : (
+          <div className="avis-author-link">{HeaderContent}</div>
         )}
       </header>
 
@@ -154,8 +220,8 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             <Button
               title="Annuler"
               onClick={() => {
-                setCommentaire(avis.commentaire || "");
-                setIsEditing(false);
+        setCommentaire(avis.commentaire || "");
+        setIsEditing(false);
               }}
               variant="ghost"
               disabled={loading}
@@ -173,12 +239,7 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={() => setIsEditing(true)}
             color="#e0c084"
             disabled={loading}
-            style={{
-              padding: "4px 10px",
-              fontSize: 13,
-              borderRadius: 5,
-              minWidth: 0,
-            }}
+            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
           />
 
           <Button
@@ -186,12 +247,7 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={handleDelete}
             color="#8c6a5d"
             disabled={loading}
-            style={{
-              padding: "4px 10px",
-              fontSize: 13,
-              borderRadius: 5,
-              minWidth: 0,
-            }}
+            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
           />
         </footer>
       )}
@@ -203,12 +259,7 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
             onClick={handleDelete}
             color="#8c6a5d"
             disabled={loading}
-            style={{
-              padding: "4px 10px",
-              fontSize: 13,
-              borderRadius: 5,
-              minWidth: 0,
-            }}
+            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 5, minWidth: 0 }}
           />
         </footer>
       )}
@@ -216,7 +267,16 @@ export default function AvisCard({ avis, connectedUserId, cibleId, onRefresh }) 
   );
 }
 
-/* Helpers */
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 async function safeJson(res) {
   try {
     const txt = await res.text();
