@@ -52,15 +52,7 @@ function usePresignedPhotos(users) {
 
 const DEFAULT_RAYON = 20;
 
-export default function RechercheResultats({
-  className = "",
-  // ✅ props venant du parent (RechercheClient)
-  autourDeMoi = false,
-  latitude = null,
-  longitude = null,
-  loadingGeo = false,
-  geoError = null,
-}) {
+export default function RechercheResultats({ className = "" }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
@@ -92,10 +84,8 @@ export default function RechercheResultats({
     setLoading(true);
     setHasSearched(true);
 
-    // ✅ détecte autourDeMoi (depuis l’URL OU prop)
-    const autourUrl = (searchParams.get("autourDeMoi") || "") === "true";
-    const autour = Boolean(autourDeMoi || autourUrl);
-
+    // ✅ détecte autourDeMoi
+    const autour = (searchParams.get("autourDeMoi") || "") === "true";
     const distance = Number(searchParams.get("rayon") || DEFAULT_RAYON);
 
     // ✅ construit les filtres à envoyer à /api/profils-proches
@@ -130,60 +120,63 @@ export default function RechercheResultats({
     async function load() {
       try {
         if (autour) {
-          // ✅ ON N’APPELLE PAS navigator.geolocation ici.
-          // On attend les coords du parent.
-          if (loadingGeo) {
+          // ✅ 1) géoloc côté client
+          if (!navigator.geolocation) {
+            alert("La géolocalisation n'est pas supportée sur ton appareil.");
             setUtilisateurs([]);
             setLoading(false);
             return;
           }
 
-          if (geoError) {
-            console.error("Geo error:", geoError);
-            setUtilisateurs([]);
-            setLoading(false);
-            return;
-          }
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              try {
+                const latitude = pos.coords.latitude;
+                const longitude = pos.coords.longitude;
 
-          if (latitude == null || longitude == null) {
-            // coords pas prêtes
-            setUtilisateurs([]);
-            setLoading(false);
-            return;
-          }
+                // ✅ 2) POST vers /api/profils-proches + filtres
+                const res = await fetch("/api/profils-proches", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  signal: controller.signal,
+                  body: JSON.stringify({
+                    latitude,
+                    longitude,
+                    distance,
+                    filters: {
+                      ...filters,
+                      ageMin: ageMinNum,
+                      ageMax: ageMaxNum,
+                    },
+                  }),
+                });
 
-          // ✅ POST vers /api/profils-proches + filtres
-          const res = await fetch("/api/profils-proches", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            signal: controller.signal,
-            body: JSON.stringify({
-              latitude,
-              longitude,
-              distance,
-              filters: {
-                ...filters,
-                ageMin: ageMinNum,
-                ageMax: ageMaxNum,
-              },
-            }),
-          });
+                const data = await res.json().catch(() => null);
 
-          const data = await res.json().catch(() => null);
+                // tu as peut-être déjà un format Array direct
+                const list = Array.isArray(data)
+                  ? data
+                  : Array.isArray(data?.utilisateurs)
+                  ? data.utilisateurs
+                  : [];
 
-          // ✅ debug visible dans la console navigateur
-          console.log("🔎 DEBUG PROCHES:", data?.debug);
-          console.log(
-            "📌 LISTE PROCHES len:",
-            Array.isArray(data?.proches) ? data.proches.length : 0
+                setUtilisateurs(list);
+              } catch (e) {
+                if (e?.name !== "AbortError") setUtilisateurs([]);
+              } finally {
+                setLoading(false);
+              }
+            },
+            (err) => {
+              console.error("Erreur géolocalisation :", err);
+              alert("Impossible de récupérer ta position.");
+              setUtilisateurs([]);
+              setLoading(false);
+            },
+            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
           );
 
-          // ✅ l’API renvoie maintenant { proches, debug }
-          const list = Array.isArray(data?.proches) ? data.proches : [];
-          setUtilisateurs(list);
-
-          setLoading(false);
           return;
         }
 
@@ -194,7 +187,9 @@ export default function RechercheResultats({
         });
 
         const data = await res.json().catch(() => null);
-        setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
+        setUtilisateurs(
+          Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
+        );
         setLoading(false);
       } catch (err) {
         if (err?.name !== "AbortError") setLoading(false);
@@ -204,7 +199,7 @@ export default function RechercheResultats({
     load();
 
     return () => controller.abort();
-  }, [searchParams, autourDeMoi, latitude, longitude, loadingGeo, geoError]);
+  }, [searchParams]);
 
   if (!hasSearched) return null;
 
@@ -216,9 +211,6 @@ export default function RechercheResultats({
   };
 
   const handleGoHome = () => router.push("/accueil-page");
-
-  const autourUrl = (searchParams.get("autourDeMoi") || "") === "true";
-  const autour = Boolean(autourDeMoi || autourUrl);
 
   return (
     <div className={`profil-list1 ${className}`}>
@@ -238,10 +230,6 @@ export default function RechercheResultats({
       )}
 
       <h1 className="profil-list1-title">Résultats de recherche</h1>
-
-      {/* ✅ état géoloc lisible */}
-      {autour && loadingGeo && <p>Géolocalisation en cours…</p>}
-      {autour && !loadingGeo && geoError && <p>{geoError}</p>}
 
       {loading ? (
         <p>Chargement...</p>
