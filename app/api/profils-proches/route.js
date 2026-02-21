@@ -17,6 +17,7 @@ export async function POST(req) {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("🚀 /api/profils-proches CALL");
 
+    // ✅ on récupère distance + filters
     const body = await req.json().catch(() => ({}));
     const { latitude, longitude, distance, filters } = body || {};
 
@@ -24,9 +25,20 @@ export async function POST(req) {
 
     if (!latitude || !longitude) {
       console.log("❌ Pas de latitude/longitude reçus");
-      return NextResponse.json([], { status: 200 });
+      return NextResponse.json(
+        {
+          proches: [],
+          debug: {
+            error: "NO_GEO",
+            message: "Pas de latitude/longitude reçus",
+            body,
+          },
+        },
+        { status: 200 }
+      );
     }
 
+    // Valeur par défaut si jamais le front oublie d’envoyer
     const rayon =
       typeof distance === "number" && !isNaN(distance) ? distance : 20;
 
@@ -48,6 +60,7 @@ export async function POST(req) {
     console.log("📊 TOTAL USERS:", totalUsers);
     console.log("📊 USERS AVEC GPS:", usersWithGPS);
 
+    // ✅ Prisma where (tous les filtres qui peuvent être traités en DB)
     const where = {
       latitude: { not: null },
       longitude: { not: null },
@@ -56,8 +69,9 @@ export async function POST(req) {
     // --- TYPE ---
     const typeArr = normalizeArray(f.type);
     if (typeArr.length) {
+      // ✅ plus tolérant que equals
       where.OR = typeArr.map((t) => ({
-        type: { contains: t, mode: "insensitive" }, // 👈 contains au lieu de equals
+        type: { contains: t, mode: "insensitive" },
       }));
     }
 
@@ -73,6 +87,7 @@ export async function POST(req) {
         : f.ageMin != null && f.ageMin !== ""
         ? Number(f.ageMin)
         : null;
+
     const ageMax =
       typeof f.ageMax === "number"
         ? f.ageMax
@@ -103,6 +118,7 @@ export async function POST(req) {
 
     // --- PHOTO ---
     if (f.photo === true) {
+      // (optionnel) si tu veux exclure les "" aussi : { notIn: [null, ""] }
       where.photoUrl = { not: null };
     }
 
@@ -131,7 +147,7 @@ export async function POST(req) {
 
     console.log("👥 USERS après filtres Prisma:", utilisateurs.length);
 
-    // DISTANCE
+    // ✅ filtre distance
     const proches = utilisateurs
       .map((u) => {
         const dist = haversine(latitude, longitude, u.latitude, u.longitude);
@@ -141,15 +157,32 @@ export async function POST(req) {
 
     console.log("📌 USERS après filtre distance:", proches.length);
 
-    proches.forEach((u) =>
-      console.log(`🧭 ${u.pseudo} → ${u.distance.toFixed(2)} km`)
+    // (optionnel) sample
+    proches.slice(0, 10).forEach((u) =>
+      console.log(`🧭 ${u.pseudo} → ${Number(u.distance).toFixed(2)} km`)
     );
 
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    return NextResponse.json(proches);
+    // ✅ IMPORTANT : on renvoie debug POUR LA CONSOLE NAVIGATEUR
+    return NextResponse.json({
+      proches,
+      debug: {
+        totalUsers,
+        usersWithGPS,
+        afterPrisma: utilisateurs.length,
+        afterDistance: proches.length,
+        rayon,
+        userPos: { latitude, longitude },
+        filters: f,
+        where,
+      },
+    });
   } catch (err) {
     console.error("❌ Erreur API profils-proches :", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur", details: String(err?.message || err) },
+      { status: 500 }
+    );
   }
 }

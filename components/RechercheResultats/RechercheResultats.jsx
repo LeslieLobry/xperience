@@ -172,13 +172,17 @@ export default function RechercheResultats({
 
           const data = await res.json().catch(() => null);
 
-          const list = Array.isArray(data)
-            ? data
-            : Array.isArray(data?.utilisateurs)
-            ? data.utilisateurs
-            : [];
+          // ✅ debug visible dans la console navigateur
+          console.log("🔎 DEBUG PROCHES:", data?.debug);
+          console.log(
+            "📌 LISTE PROCHES len:",
+            Array.isArray(data?.proches) ? data.proches.length : 0
+          );
 
+          // ✅ l’API renvoie maintenant { proches, debug }
+          const list = Array.isArray(data?.proches) ? data.proches : [];
           setUtilisateurs(list);
+
           setLoading(false);
           return;
         }
