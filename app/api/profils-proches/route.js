@@ -14,43 +14,59 @@ function normalizeArray(arr) {
 
 export async function POST(req) {
   try {
-    // ✅ on récupère distance + filters
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🚀 /api/profils-proches CALL");
+
     const body = await req.json().catch(() => ({}));
     const { latitude, longitude, distance, filters } = body || {};
 
+    console.log("📦 body reçu:", body);
+
     if (!latitude || !longitude) {
+      console.log("❌ Pas de latitude/longitude reçus");
       return NextResponse.json([], { status: 200 });
     }
 
-    // Valeur par défaut si jamais le front oublie d’envoyer
     const rayon =
       typeof distance === "number" && !isNaN(distance) ? distance : 20;
 
-    const f = filters || {};
+    console.log("📍 Position user:", latitude, longitude);
+    console.log("📏 Rayon:", rayon);
 
-    // ✅ Prisma where (tous les filtres qui peuvent être traités en DB)
+    const f = filters || {};
+    console.log("🎛️ Filtres reçus:", f);
+
+    // 📊 DEBUG GLOBAL USERS
+    const totalUsers = await prisma.utilisateur.count();
+    const usersWithGPS = await prisma.utilisateur.count({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+    });
+
+    console.log("📊 TOTAL USERS:", totalUsers);
+    console.log("📊 USERS AVEC GPS:", usersWithGPS);
+
     const where = {
       latitude: { not: null },
       longitude: { not: null },
     };
 
-    // --- type (ton URL envoie type=femme etc.) ---
+    // --- TYPE ---
     const typeArr = normalizeArray(f.type);
     if (typeArr.length) {
-      // si en DB tu stockes "Femme" / "Homme" etc. mais normalisé côté recherche,
-      // on compare en mode insensible à la casse via equals + mode.
-      // (Si ton champ `type` est un enum strict, dis-moi et j’adapte.)
-      where.OR = typeArr.map((t) => ({ type: { equals: t, mode: "insensitive" } }));
+      where.OR = typeArr.map((t) => ({
+        type: { contains: t, mode: "insensitive" }, // 👈 contains au lieu de equals
+      }));
     }
 
-    // --- statut ---
-    // UI: "all" ou "en_ligne"
+    // --- STATUT ---
     if (f.statut === "en_ligne") {
       where.statut = "en_ligne";
     }
 
-    // --- âge ---
-    // si ton champ age est number en DB
+    // --- AGE ---
     const ageMin =
       typeof f.ageMin === "number"
         ? f.ageMin
@@ -72,12 +88,12 @@ export async function POST(req) {
       where.age = { lte: ageMax };
     }
 
-    // --- pseudo ---
+    // --- PSEUDO ---
     if (f.pseudo && String(f.pseudo).trim()) {
       where.pseudo = { contains: String(f.pseudo).trim(), mode: "insensitive" };
     }
 
-    // --- localisation (si quelqu’un met ville + autourDeMoi ça peut arriver) ---
+    // --- LOCALISATION ---
     if (f.localisation && String(f.localisation).trim()) {
       where.localisation = {
         contains: String(f.localisation).trim(),
@@ -85,21 +101,17 @@ export async function POST(req) {
       };
     }
 
-    // --- photo / description (si tes champs existent) ---
-    // photo=true => photoUrl non null/non vide
+    // --- PHOTO ---
     if (f.photo === true) {
       where.photoUrl = { not: null };
     }
-    // description=true => description non vide (si ton champ s’appelle autrement, dis-moi)
+
+    // --- DESCRIPTION ---
     if (f.description === true) {
-      // si tu as un champ `description` en DB :
       where.description = { not: null };
     }
 
-    // ✅ IMPORTANT :
-    // Si ton schema Prisma n’a pas `description`, Prisma plantera.
-    // Dans ce cas, commente juste le bloc description ci-dessus
-    // OU donne-moi le nom exact du champ.
+    console.log("🔎 WHERE PRISMA:", where);
 
     const utilisateurs = await prisma.utilisateur.findMany({
       where,
@@ -117,7 +129,9 @@ export async function POST(req) {
       },
     });
 
-    // On filtre sur la distance dynamique
+    console.log("👥 USERS après filtres Prisma:", utilisateurs.length);
+
+    // DISTANCE
     const proches = utilisateurs
       .map((u) => {
         const dist = haversine(latitude, longitude, u.latitude, u.longitude);
@@ -125,9 +139,13 @@ export async function POST(req) {
       })
       .filter((u) => u.distance <= rayon);
 
+    console.log("📌 USERS après filtre distance:", proches.length);
+
     proches.forEach((u) =>
       console.log(`🧭 ${u.pseudo} → ${u.distance.toFixed(2)} km`)
     );
+
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     return NextResponse.json(proches);
   } catch (err) {
