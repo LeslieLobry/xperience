@@ -81,28 +81,28 @@ export default function Notifications() {
     );
   }, []);
 
-  // ✅ FIX doublon pseudo : si notif.message contient déjà le pseudo en tête,
-  // on n’ajoute rien. Sinon on préfixe avec notif.auteur.pseudo si dispo.
+  // ✅ VERSION "BLINDÉE" anti-doublon pseudo :
+  // - si le pseudo apparaît déjà N’IMPORTE OÙ dans le message => on n’ajoute pas de préfixe
+  // - si le message commence par "Pseudo Pseudo ..." ou "Pseudo: Pseudo ..." => on nettoie le début
+  // - sinon => on préfixe "Pseudo : message"
   const formatNotifText = useCallback((notif) => {
     const pseudo = (notif?.auteur?.pseudo || "").trim();
     const msg = (notif?.message || "").trim();
 
     if (!pseudo) return msg;
 
-    const lower = msg.toLowerCase();
     const p = pseudo.toLowerCase();
+    const lower = msg.toLowerCase();
 
-    // Cas déjà préfixé : "Pseudo: ..." ou "Pseudo ..." => on garde tel quel
-    if (lower.startsWith(`${p}:`) || lower.startsWith(`${p} `)) {
-      return msg;
-    }
-
-    // Cas où le pseudo apparaît 2 fois dans le message (ex: "Pseudo Pseudo ...")
-    // On tente de nettoyer seulement le début (safe)
+    // Nettoyage safe si on reçoit déjà un doublon collé au début
     const double1 = `${pseudo} ${pseudo}`;
     const double2 = `${pseudo}: ${pseudo}`;
     if (msg.startsWith(double1)) return msg.replace(double1, pseudo);
     if (msg.startsWith(double2)) return msg.replace(double2, `${pseudo}:`);
+
+    // ✅ Blindage : si le pseudo est déjà dans le message (début, milieu, fin),
+    // on ne le rajoute pas du tout.
+    if (lower.includes(p)) return msg;
 
     return `${pseudo} : ${msg}`;
   }, []);
