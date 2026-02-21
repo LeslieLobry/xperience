@@ -1,11 +1,33 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import "./BoutonLike.css";
 
 export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
   const [hasLiked, setHasLiked] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // ✅ Toast overlay + burst
+  const [toast, setToast] = useState({ open: false, text: "", sub: "", type: "success" });
+  const [burstOn, setBurstOn] = useState(false);
+  const toastTimerRef = useRef(null);
+  const burstTimerRef = useRef(null);
+
+  const openToast = useCallback((text, sub = "", type = "success") => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+
+    setToast({ open: true, text, sub, type });
+
+    toastTimerRef.current = setTimeout(() => {
+      setToast((t) => ({ ...t, open: false }));
+    }, 1800);
+  }, []);
+
+  const triggerBurst = useCallback(() => {
+    if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+    setBurstOn(true);
+    burstTimerRef.current = setTimeout(() => setBurstOn(false), 650);
+  }, []);
 
   const checkLike = useCallback(async () => {
     if (!cibleId) return;
@@ -35,6 +57,11 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
   useEffect(() => {
     setHasLiked(null);
     checkLike();
+
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+    };
   }, [checkLike]);
 
   const toggleLike = async () => {
@@ -48,6 +75,14 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
     onChange?.(next);
     setLoading(true);
 
+    // ✅ UX feedback immédiat
+    if (next) {
+      openToast("💖 Profil liké !", "Envoyez-lui un message maintenant 😉", "success");
+      triggerBurst();
+    } else {
+      openToast("💔 Like retiré", "", "neutral");
+    }
+
     try {
       const res = await fetch("/api/likes", {
         method: next ? "POST" : "DELETE",
@@ -58,13 +93,16 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
       });
 
       if (!res.ok) {
+        // rollback
         setHasLiked(prev);
         onChange?.(prev);
+        openToast("⚠️ Oups…", "Impossible d’enregistrer, réessayez.", "error");
       }
     } catch (err) {
       console.error("Erreur toggleLike", err);
       setHasLiked(prev);
       onChange?.(prev);
+      openToast("⚠️ Erreur réseau", "Vérifiez votre connexion.", "error");
     } finally {
       setLoading(false);
     }
@@ -87,6 +125,18 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
         aria-busy={loading ? "true" : "false"}
         aria-pressed={liked ? "true" : "false"}
       >
+        {/* ✅ Burst FX (autour du bouton) */}
+        <div className={`like-burst ${burstOn ? "show" : ""}`} aria-hidden="true">
+          <span className="p p1" />
+          <span className="p p2" />
+          <span className="p p3" />
+          <span className="p p4" />
+          <span className="p p5" />
+          <span className="p p6" />
+          <span className="p p7" />
+          <span className="p p8" />
+        </div>
+
         <svg
           viewBox="0 0 24 24"
           className={`btn-like-icon ${liked ? "liked pop" : ""}`}
@@ -109,6 +159,14 @@ export default function BoutonLike({ cibleId, onChange, showLabel = true }) {
           {liked ? "" : ""}
         </div>
       )}
+
+      {/* ✅ Toast overlay centré */}
+      <div className={`like-toast-overlay ${toast.open ? "open" : ""}`} aria-live="polite">
+        <div className={`like-toast-card ${toast.type}`}>
+          <div className="like-toast-title">{toast.text}</div>
+          {toast.sub ? <div className="like-toast-sub">{toast.sub}</div> : null}
+        </div>
+      </div>
     </div>
   );
 }

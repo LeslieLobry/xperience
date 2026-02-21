@@ -68,7 +68,13 @@ function buildProfileUrl(userId) {
 /* -------------------------------------------------------------------------- */
 /*                           EMAIL TEMPLATE (SITE)                             */
 /* -------------------------------------------------------------------------- */
-function renderAvisEmailHTML({ toPseudo, fromPseudo, commentaire, profilUrl }) {
+function renderAvisEmailHTML({
+  toPseudo,
+  fromPseudo,
+  commentaire,
+  profilUrl,
+  fromProfilUrl,
+}) {
   const gold = "#e0c084";
   const bg = "#0b1220"; // bleu nuit
   const card = "#0f1b2f"; // bleu nuit + clair
@@ -79,7 +85,15 @@ function renderAvisEmailHTML({ toPseudo, fromPseudo, commentaire, profilUrl }) {
   const safeTo = escapeHtml(toPseudo || "");
   const safeFrom = escapeHtml(fromPseudo || "Un membre");
   const safeComment = escapeHtml(commentaire || "").replaceAll("\n", "<br/>");
+
   const safeUrl = profilUrl;
+  const safeFromUrl = fromProfilUrl || "#";
+
+  // ✅ Pseudo cliquable vers le profil de l'auteur
+  const fromBlock =
+    fromProfilUrl && fromProfilUrl !== "#"
+      ? `<a href="${safeFromUrl}" target="_blank" style="color:${text};font-weight:800;text-decoration:none;">${safeFrom}</a>`
+      : `<strong style="color:${text};">${safeFrom}</strong>`;
 
   return `
   <div style="margin:0;padding:0;background:${bg};">
@@ -128,7 +142,7 @@ function renderAvisEmailHTML({ toPseudo, fromPseudo, commentaire, profilUrl }) {
                     margin:0 0 14px;
                   ">
                     <div style="font-size:13px;color:${muted};margin-bottom:6px;">
-                      De <strong style="color:${text};">${safeFrom}</strong>
+                      De ${fromBlock}
                     </div>
                     <div style="font-size:14px;line-height:1.6;color:${text};">
                       ${safeComment}
@@ -190,6 +204,7 @@ async function sendAvisEmail({
   fromPseudo,
   commentaire,
   cibleId,
+  auteurId,
   requestId,
 }) {
   if (!resend) {
@@ -199,6 +214,7 @@ async function sendAvisEmail({
   if (!toEmail) return;
 
   const profilUrl = buildProfileUrl(cibleId);
+  const fromProfilUrl = auteurId ? buildProfileUrl(auteurId) : null;
 
   try {
     await resend.emails.send({
@@ -210,6 +226,7 @@ async function sendAvisEmail({
         fromPseudo,
         commentaire,
         profilUrl,
+        fromProfilUrl,
       }),
     });
   } catch (e) {
@@ -309,7 +326,7 @@ export async function POST(req) {
       );
     }
 
-    // ✅ Create avis (on récupère createdAt pour l'affichage)
+    // Create avis
     const avis = await prisma.avis.create({
       data: { auteurId, cibleId, commentaire },
       select: {
@@ -321,15 +338,13 @@ export async function POST(req) {
       },
     });
 
-    // ✅ digestNotification (non bloquant) — CORRIGÉ : eventType et pas type
+    // digestNotification (non bloquant)
     try {
       await prisma.digestNotification.create({
         data: {
           eventType: "AVIS",
           destinataireId: cibleId,
           avisId: avis.id,
-          // conversationId: null
-          // messageId: null
         },
       });
     } catch (e) {
@@ -340,7 +355,7 @@ export async function POST(req) {
       });
     }
 
-    // ✅ Email (non bloquant)
+    // Email (non bloquant)
     try {
       const [dest, auteur] = await Promise.all([
         prisma.utilisateur.findUnique({
@@ -357,6 +372,7 @@ export async function POST(req) {
         toEmail: dest?.email,
         toPseudo: dest?.pseudo,
         fromPseudo: auteur?.pseudo,
+        auteurId,
         commentaire,
         cibleId,
         requestId,

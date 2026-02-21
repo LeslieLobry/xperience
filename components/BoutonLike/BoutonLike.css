@@ -61,3 +61,147 @@
   align-items: center;
   justify-content: space-around;
 }
+
+/* ------------------------------ */
+/* Toast overlay (centre écran)   */
+/* ------------------------------ */
+
+.like-toast-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.like-toast-overlay.open {
+  opacity: 1;
+}
+
+.like-toast-card {
+  pointer-events: none;
+  min-width: 240px;
+  max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: translateY(8px) scale(0.98);
+  animation: likeToastPop 650ms ease forwards;
+  border: 1px solid rgba(224, 192, 132, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(20, 20, 22, 0.88);
+  color: #fff;
+  text-align: center;
+}
+
+.like-toast-card.success {
+  border-color: rgba(224, 192, 132, 0.35);
+}
+
+.like-toast-card.neutral {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.like-toast-card.error {
+  border-color: rgba(255, 90, 90, 0.45);
+}
+
+.like-toast-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.like-toast-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: 0.88;
+}
+
+@keyframes likeToastPop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(0) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ------------------------------ */
+/* Burst FX (petits cœurs)        */
+/* ------------------------------ */
+
+.btn-like {
+  position: relative; /* important: burst en absolute */
+  overflow: visible;
+}
+
+.like-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.like-burst.show {
+  opacity: 1;
+}
+
+.like-burst .p {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+/* on dessine un mini "cœur" en CSS */
+.like-burst .p::before,
+.like-burst .p::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 8px 8px 0 0;
+  transform: rotate(-45deg);
+  transform-origin: 0 100%;
+  background: rgba(224, 192, 132, 0.95);
+}
+
+.like-burst .p::after {
+  left: 5px;
+  transform: rotate(45deg);
+  transform-origin: 100% 100%;
+}
+
+/* Positions + trajectoires (8 particules) */
+.like-burst.show .p1 { animation: burst1 650ms ease forwards; }
+.like-burst.show .p2 { animation: burst2 650ms ease forwards; }
+.like-burst.show .p3 { animation: burst3 650ms ease forwards; }
+.like-burst.show .p4 { animation: burst4 650ms ease forwards; }
+.like-burst.show .p5 { animation: burst5 650ms ease forwards; }
+.like-burst.show .p6 { animation: burst6 650ms ease forwards; }
+.like-burst.show .p7 { animation: burst7 650ms ease forwards; }
+.like-burst.show .p8 { animation: burst8 650ms ease forwards; }
+
+@keyframes burst1 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% - 22px), calc(-50% - 34px)) scale(1.1);} }
+@keyframes burst2 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% + 8px),  calc(-50% - 44px))  scale(1.1);} }
+@keyframes burst3 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% + 34px), calc(-50% - 26px)) scale(1.1);} }
+@keyframes burst4 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% + 44px), calc(-50% + 6px))  scale(1.1);} }
+@keyframes burst5 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% + 26px), calc(-50% + 34px)) scale(1.1);} }
+@keyframes burst6 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% - 6px),  calc(-50% + 44px))  scale(1.1);} }
+@keyframes burst7 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% - 34px), calc(-50% + 26px)) scale(1.1);} }
+@keyframes burst8 { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.7);} 20%{opacity:1;} 100%{opacity:0;transform:translate(calc(-50% - 44px), calc(-50% - 6px))  scale(1.1);} }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Ably from "ably";
 import "./Notifications.css";
@@ -17,7 +17,7 @@ export default function Notifications() {
   const pendingRef = useRef(false);
   const timerRef = useRef(null);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (inFlightRef.current) {
       pendingRef.current = true;
       return;
@@ -47,40 +47,65 @@ export default function Notifications() {
         fetchNotifications();
       }
     }
-  };
+  }, []);
 
   // ⚠️ Ton PATCH actuel marque TOUT lu et vide tout.
   // On le garde pour "Tout marquer lu" (ou clic notif si tu veux),
   // mais ce n’est pas ce qui doit se passer quand tu lis dans une conversation.
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     try {
       await fetch("/api/notifications", { method: "PATCH", credentials: "include" });
       setNotifications([]);
     } catch (err) {
       console.error("Erreur marquer notifications lues", err);
     }
-  };
+  }, []);
 
-  const scheduleRefreshSoon = () => {
+  const scheduleRefreshSoon = useCallback(() => {
     if (timerRef.current) return;
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       fetchNotifications();
     }, 400);
-  };
+  }, [fetchNotifications]);
 
   // ✅ retire localement les notifs liées à une conversation (basé sur lien)
-  const clearConversationNotifsLocally = (conversationId) => {
+  const clearConversationNotifsLocally = useCallback((conversationId) => {
     const convStr = String(conversationId);
     setNotifications((prev) =>
       prev.filter((n) => {
         const lien = n?.lien || "";
         const msg = n?.message || "";
-        // on retire si lien (ou message) contient l'id conv
         return !(lien.includes(convStr) || msg.includes(convStr));
       })
     );
-  };
+  }, []);
+
+  // ✅ FIX doublon pseudo : si notif.message contient déjà le pseudo en tête,
+  // on n’ajoute rien. Sinon on préfixe avec notif.auteur.pseudo si dispo.
+  const formatNotifText = useCallback((notif) => {
+    const pseudo = (notif?.auteur?.pseudo || "").trim();
+    const msg = (notif?.message || "").trim();
+
+    if (!pseudo) return msg;
+
+    const lower = msg.toLowerCase();
+    const p = pseudo.toLowerCase();
+
+    // Cas déjà préfixé : "Pseudo: ..." ou "Pseudo ..." => on garde tel quel
+    if (lower.startsWith(`${p}:`) || lower.startsWith(`${p} `)) {
+      return msg;
+    }
+
+    // Cas où le pseudo apparaît 2 fois dans le message (ex: "Pseudo Pseudo ...")
+    // On tente de nettoyer seulement le début (safe)
+    const double1 = `${pseudo} ${pseudo}`;
+    const double2 = `${pseudo}: ${pseudo}`;
+    if (msg.startsWith(double1)) return msg.replace(double1, pseudo);
+    if (msg.startsWith(double2)) return msg.replace(double2, `${pseudo}:`);
+
+    return `${pseudo} : ${msg}`;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +170,7 @@ export default function Notifications() {
       } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchNotifications, scheduleRefreshSoon, clearConversationNotifsLocally]);
 
   if (error) return <p>{error}</p>;
   if (notifications.length === 0) return <p>{loading ? "Chargement..." : "Aucune notification"}</p>;
@@ -158,12 +183,11 @@ export default function Notifications() {
             <Link
               href={notif.lien || "#"}
               onClick={async () => {
-                // garde ton comportement actuel si tu veux :
-                // cliquer une notif => tout marquer lu
+                // clic notif => tout marquer lu (comportement actuel)
                 await markAllAsRead();
               }}
             >
-              {notif.message}
+              {formatNotifText(notif)}
             </Link>
             <small>{new Date(notif.createdAt).toLocaleString()}</small>
           </li>
