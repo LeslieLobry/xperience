@@ -12,6 +12,60 @@ function normalizeArray(arr) {
   return Array.isArray(arr) ? arr.map(normalizeToDb).filter(Boolean) : [];
 }
 
+/**
+ * Convertit proprement en number:
+ * - Prisma Decimal -> Number(decimal)
+ * - string "50.12" -> 50.12
+ * - string "50,12" -> 50.12
+ * - null/undefined -> NaN
+ */
+function toNumber(val) {
+  if (val === null || val === undefined) return NaN;
+
+  // Prisma Decimal (decimal.js) ou autre objet convertible
+  if (typeof val === "object" && val !== null) {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  if (typeof val === "string") {
+    const s = val.trim().replace(",", ".");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  const n = Number(val);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function isValidGps(lat, lon) {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lon) <= 180
+  );
+}
+
+/**
+ * Bounding box approx (km -> degrees).
+ * Utile pour préfiltrer en DB et éviter de charger trop de monde.
+ */
+function boundingBox(lat, lon, radiusKm) {
+  const earthKmPerDegLat = 110.574;
+  const earthKmPerDegLon = 111.320 * Math.cos((lat * Math.PI) / 180);
+
+  const dLat = radiusKm / earthKmPerDegLat;
+  const dLon = radiusKm / earthKmPerDegLon;
+
+  return {
+    minLat: lat - dLat,
+    maxLat: lat + dLat,
+    minLon: lon - dLon,
+    maxLon: lon + dLon,
+  };
+}
+
 export async function POST(req) {
   try {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -22,16 +76,25 @@ export async function POST(req) {
 
     console.log("📦 body reçu:", body);
 
-    if (!latitude || !longitude) {
-      console.log("❌ Pas de latitude/longitude reçus");
+    const userLat = toNumber(latitude);
+    const userLon = toNumber(longitude);
+
+    if (!isValidGps(userLat, userLon)) {
+      console.log("❌ Latitude/longitude invalides:", { latitude, longitude, userLat, userLon });
       return NextResponse.json([], { status: 200 });
     }
 
     const rayon =
-      typeof distance === "number" && !isNaN(distance) ? distance : 20;
+      typeof distance === "number" && !isNaN(distance)
+        ? distance
+        : distance != null && distance !== ""
+        ? Number(distance)
+        : 20;
 
-    console.log("📍 Position user:", latitude, longitude);
-    console.log("📏 Rayon:", rayon);
+    const rayonFinal = Number.isFinite(rayon) && rayon > 0 ? rayon : 20;
+
+    console.log("📍 Position user:", userLat, userLon);
+    console.log("📏 Rayon:", rayonFinal);
 
     const f = filters || {};
     console.log("🎛️ Filtres reçus:", f);
@@ -39,25 +102,29 @@ export async function POST(req) {
     // 📊 DEBUG GLOBAL USERS
     const totalUsers = await prisma.utilisateur.count();
     const usersWithGPS = await prisma.utilisateur.count({
-      where: {
-        latitude: { not: null },
-        longitude: { not: null },
-      },
+      where: { latitude: { not: null }, longitude: { not: null } },
     });
-
     console.log("📊 TOTAL USERS:", totalUsers);
     console.log("📊 USERS AVEC GPS:", usersWithGPS);
 
+    // ✅ Base where
     const where = {
       latitude: { not: null },
       longitude: { not: null },
     };
 
+    // (optionnel mais très utile) préfiltre bounding box
+    const box = boundingBox(userLat, userLon, rayonFinal);
+    where.latitude = { not: null, gte: box.minLat, lte: box.maxLat };
+    where.longitude = { not: null, gte: box.minLon, lte: box.maxLon };
+
     // --- TYPE ---
     const typeArr = normalizeArray(f.type);
     if (typeArr.length) {
+      // ⚠️ si type est un ENUM Prisma, "contains" ne marche pas.
+      // Ici je garde ta logique, mais je te conseille de passer en equals si tu peux.
       where.OR = typeArr.map((t) => ({
-        type: { contains: t, mode: "insensitive" }, // 👈 contains au lieu de equals
+        type: { contains: t, mode: "insensitive" },
       }));
     }
 
@@ -103,11 +170,14 @@ export async function POST(req) {
 
     // --- PHOTO ---
     if (f.photo === true) {
+      // ⚠️ si tu stockes parfois "" (string vide), tu peux renforcer:
+      // where.photoUrl = { notIn: [null, ""] }
       where.photoUrl = { not: null };
     }
 
     // --- DESCRIPTION ---
     if (f.description === true) {
+      // Idem: { notIn: [null, ""] } si nécessaire
       where.description = { not: null };
     }
 
@@ -132,14 +202,36 @@ export async function POST(req) {
     console.log("👥 USERS après filtres Prisma:", utilisateurs.length);
 
     // DISTANCE
-    const proches = utilisateurs
-      .map((u) => {
-        const dist = haversine(latitude, longitude, u.latitude, u.longitude);
-        return { ...u, distance: dist };
-      })
-      .filter((u) => u.distance <= rayon);
+    const proches = [];
+    let invalidGpsCount = 0;
+    let nanDistCount = 0;
+
+    for (const u of utilisateurs) {
+      const uLat = toNumber(u.latitude);
+      const uLon = toNumber(u.longitude);
+
+      if (!isValidGps(uLat, uLon)) {
+        invalidGpsCount++;
+        console.log("⚠️ GPS invalide en BDD:", u.pseudo, u.latitude, u.longitude);
+        continue;
+      }
+
+      const dist = haversine(userLat, userLon, uLat, uLon);
+
+      if (!Number.isFinite(dist)) {
+        nanDistCount++;
+        console.log("⚠️ Distance NaN:", u.pseudo, { userLat, userLon, uLat, uLon });
+        continue;
+      }
+
+      if (dist <= rayonFinal) {
+        proches.push({ ...u, latitude: uLat, longitude: uLon, distance: dist });
+      }
+    }
 
     console.log("📌 USERS après filtre distance:", proches.length);
+    console.log("🧨 GPS invalides:", invalidGpsCount);
+    console.log("🧨 distances NaN:", nanDistCount);
 
     proches.forEach((u) =>
       console.log(`🧭 ${u.pseudo} → ${u.distance.toFixed(2)} km`)
