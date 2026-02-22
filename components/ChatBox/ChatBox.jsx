@@ -1352,7 +1352,7 @@ useEffect(() => {
       />
 
       <ChatInput
-        utilisateur={utilisateur}
+        utilisateur={userWithPrenoms}
         conversationId={conversationId}
         texte={texte}
         setTexte={setTexte}
