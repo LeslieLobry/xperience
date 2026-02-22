@@ -19,11 +19,12 @@ function getSupportedAudioType() {
 
 export default function ChatInput({
   utilisateur,
-  conversationId,
+  conversationId, 
   texte,
   setTexte,
   onMessageSent,
   onTyping,
+  prenomsCouple
 }) {
   // ✅ MOBILE DETECT (pour cacher emoji)
   const [isMobile, setIsMobile] = useState(false);
@@ -110,8 +111,6 @@ export default function ChatInput({
   const [prenomsOK, setPrenomsOK] = useState(false);
   const [membreParlant, setMembreParlant] = useState("couple");
 
-  // ✅ NEW: force refresh des prénoms après POST (sans reload)
-  const [prenomsVersion, setPrenomsVersion] = useState(0);
 
   // EMOJI
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -284,58 +283,45 @@ export default function ChatInput({
   };
 
   // --- PRENOMS COUPLE (BONUS + SAFE) ---
-  useEffect(() => {
-    if (utilisateur.type !== "couple") return;
+ // ✅ OPTION B : plus de fetch ici, on synchronise depuis la prop prenomsCouple
+useEffect(() => {
+  if (utilisateur.type !== "couple") return;
 
-    // ✅ si conversationId pas encore dispo (création), on garde le select visible (placeholders)
-    if (!conversationId) {
-      setPrenomsOK(false);
-      setPr1("");
-      setPr2("");
-      setMembreParlant("couple");
-      return;
-    }
-
-    // ✅ reset quand on change de conversation
+  // si conversation pas encore prête
+  if (!conversationId) {
+    setLoadingPrenoms(false);
     setPrenomsOK(false);
     setPr1("");
     setPr2("");
     setMembreParlant("couple");
+    return;
+  }
 
-    const controller = new AbortController();
-    setLoadingPrenoms(true);
+  const p1 = (prenomsCouple?.prenom1 || "").trim();
+  const p2 = (prenomsCouple?.prenom2 || "").trim();
 
-    fetch(`/api/prenoms-couple?conversationId=${conversationId}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        const p1 = data?.prenoms?.prenom1 || "";
-        const p2 = data?.prenoms?.prenom2 || "";
+  setPr1(p1);
+  setPr2(p2);
+  setPrenomsOK(!!(p1 || p2));
+  setLoadingPrenoms(false);
 
-        if (p1 || p2) {
-          setPr1(p1);
-          setPr2(p2);
-          setPrenomsOK(true);
+  // ✅ garde une valeur valide dans le select si les prénoms changent
+  setMembreParlant((prev) => {
+    // si l’utilisateur était sur placeholders
+    if (prev === "membre1") return p1 || "couple";
+    if (prev === "membre2") return p2 || "couple";
 
-          // ✅ si l’utilisateur avait choisi membre1/membre2 avant, on map sur les vrais prénoms
-          setMembreParlant((prev) => {
-            if (prev === "membre1") return p1 || "couple";
-            if (prev === "membre2") return p2 || "couple";
-            return prev || "couple";
-          });
-        } else {
-          setPrenomsOK(false);
-        }
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError") console.error(e);
-      })
-      .finally(() => setLoadingPrenoms(false));
+    // si l’utilisateur était sur un ancien prénom qui n’existe plus
+    if (prev && prev !== "couple" && prev !== p1 && prev !== p2) return "couple";
 
-    return () => controller.abort();
-  }, [conversationId, utilisateur.type, prenomsVersion]);
+    return prev || "couple";
+  });
+}, [
+  utilisateur.type,
+  conversationId,
+  prenomsCouple?.prenom1,
+  prenomsCouple?.prenom2,
+]);
 
   const handlePrenomsSubmit = async (e) => {
     e.preventDefault();
@@ -359,8 +345,6 @@ export default function ChatInput({
         return prev || "couple";
       });
 
-      // ✅ force un refetch sans refresh page
-      setPrenomsVersion((v) => v + 1);
     }
 
     setLoadingPrenoms(false);

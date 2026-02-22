@@ -1363,6 +1363,7 @@ useEffect(() => {
         startRecording={startRecording}
         stopRecording={stopRecording}
         recording={recording}
+        prenomsCouple={prenomsCouple}
       />
 
       {showEmojiPicker && (
