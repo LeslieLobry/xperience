@@ -19,7 +19,7 @@ export default function AdminAnnoncesPage() {
     textColor: "",
     bgColor: "",
     overlayColor: "",
-    fontSize: null,         // ✅ fontSize (plus de fontSizePx)
+    fontSizePx: null, // ✅ on standardise sur fontSizePx
     borderRadiusPx: null,
     maxWidthPx: null,
   });
@@ -30,7 +30,7 @@ export default function AdminAnnoncesPage() {
       const res = await fetch("/api/admin/annonces", { cache: "no-store" });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Erreur");
-      setList(json.data);
+      setList(json.data || []);
     } catch (e) {
       console.error(e);
       alert("Impossible de charger les annonces");
@@ -54,7 +54,7 @@ export default function AdminAnnoncesPage() {
       textColor: "",
       bgColor: "",
       overlayColor: "",
-      fontSize: null,       // ✅
+      fontSizePx: null,
       borderRadiusPx: null,
       maxWidthPx: null,
     });
@@ -63,10 +63,9 @@ export default function AdminAnnoncesPage() {
   function startEdit(id) {
     const a = list.find((x) => x.id === id);
     if (!a) return;
-    // sécurité: expireAt peut être Date ou string selon ton endpoint
-    const expireStr = a.expireAt
-      ? new Date(a.expireAt).toISOString().slice(0, 10)
-      : "";
+
+    // expireAt peut être Date ou string selon endpoint
+    const expireStr = a.expireAt ? new Date(a.expireAt).toISOString().slice(0, 10) : "";
 
     setEditingId(id);
     setDraft({
@@ -74,11 +73,15 @@ export default function AdminAnnoncesPage() {
       message: a.message || "",
       actif: !!a.actif,
       expireAt: expireStr,
+
       durationMs: a.durationMs ?? null,
       textColor: a.textColor ?? "",
       bgColor: a.bgColor ?? "",
       overlayColor: a.overlayColor ?? "",
-      fontSize: a.fontSize ?? null,        // ✅
+
+      // ✅ IMPORTANT: on lit fontSizePx (pas fontSize)
+      fontSizePx: a.fontSizePx ?? null,
+
       borderRadiusPx: a.borderRadiusPx ?? null,
       maxWidthPx: a.maxWidthPx ?? null,
     });
@@ -94,10 +97,13 @@ export default function AdminAnnoncesPage() {
       expireAt: draft.expireAt ? `${draft.expireAt}T23:59:59` : null,
 
       durationMs: draft.durationMs ?? null,
-      textColor: draft.textColor || null,
-      bgColor: draft.bgColor || null,
-      overlayColor: draft.overlayColor || null,
-      fontSize: draft.fontSize ?? null,        // ✅
+      textColor: draft.textColor ? draft.textColor : null,
+      bgColor: draft.bgColor ? draft.bgColor : null,
+      overlayColor: draft.overlayColor ? draft.overlayColor : null,
+
+      // ✅ on envoie fontSizePx (align DB)
+      fontSizePx: draft.fontSizePx ?? null,
+
       borderRadiusPx: draft.borderRadiusPx ?? null,
       maxWidthPx: draft.maxWidthPx ?? null,
     };
@@ -108,6 +114,7 @@ export default function AdminAnnoncesPage() {
     }
 
     try {
+      // ⚠️ garde ton routing si c’est volontaire
       const url = editingId === "NEW" ? "/api/annonces" : `/api/annonces/${editingId}`;
       const method = editingId === "NEW" ? "POST" : "PUT";
 
@@ -116,6 +123,7 @@ export default function AdminAnnoncesPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Erreur");
 
@@ -235,7 +243,7 @@ export default function AdminAnnoncesPage() {
                 type="text"
                 placeholder="#e0c084"
                 value={draft.textColor ?? ""}
-                onChange={(e) => setDraft({ ...draft, textColor: e.target.value || null })}
+                onChange={(e) => setDraft({ ...draft, textColor: e.target.value || "" })}
               />
             </div>
 
@@ -245,7 +253,7 @@ export default function AdminAnnoncesPage() {
                 type="text"
                 placeholder="white"
                 value={draft.bgColor ?? ""}
-                onChange={(e) => setDraft({ ...draft, bgColor: e.target.value || null })}
+                onChange={(e) => setDraft({ ...draft, bgColor: e.target.value || "" })}
               />
             </div>
 
@@ -255,7 +263,7 @@ export default function AdminAnnoncesPage() {
                 type="text"
                 placeholder="rgba(0,0,0,.6)"
                 value={draft.overlayColor ?? ""}
-                onChange={(e) => setDraft({ ...draft, overlayColor: e.target.value || null })}
+                onChange={(e) => setDraft({ ...draft, overlayColor: e.target.value || "" })}
               />
             </div>
 
@@ -266,11 +274,11 @@ export default function AdminAnnoncesPage() {
                 min="12"
                 max="72"
                 step="1"
-                value={draft.fontSize ?? ""}  // ✅
+                value={draft.fontSizePx ?? ""}
                 onChange={(e) =>
                   setDraft({
                     ...draft,
-                    fontSize: e.target.value ? parseInt(e.target.value, 10) : null, // ✅
+                    fontSizePx: e.target.value ? parseInt(e.target.value, 10) : null,
                   })
                 }
               />
@@ -311,7 +319,7 @@ export default function AdminAnnoncesPage() {
             </div>
           </div>
 
-          {/* Aperçu live (non bloquant) */}
+          {/* Aperçu live */}
           <div className="preview">
             <div
               className="loader-annonce is-preview"
@@ -329,7 +337,7 @@ export default function AdminAnnoncesPage() {
                   className="fade-in"
                   style={{
                     color: draft.textColor || "#e0c084",
-                    fontSize: (draft.fontSize ?? 36) + "px",  // ✅
+                    fontSize: (draft.fontSizePx ?? 36) + "px",
                     textAlign: "center",
                   }}
                 >
@@ -345,11 +353,7 @@ export default function AdminAnnoncesPage() {
             <button className="btn btn-primary" type="submit">
               💾 Enregistrer
             </button>
-            <button
-              className="btn btn-secondary"
-              type="button"
-              onClick={() => setEditingId(null)}
-            >
+            <button className="btn btn-secondary" type="button" onClick={() => setEditingId(null)}>
               Annuler
             </button>
           </div>
@@ -377,15 +381,21 @@ export default function AdminAnnoncesPage() {
                   </button>
                 </div>
               </div>
+
               <div className="annonce-card__message">{a.message}</div>
+
               <div className="annonce-card__meta">
                 {a.expireAt
                   ? `Expire le ${new Date(a.expireAt).toLocaleDateString()}`
                   : "Sans expiration"}
+
                 <span className={`badge ${a.actif ? "badge--on" : "badge--off"}`}>
                   {a.actif ? "Actif" : "Inactif"}
                 </span>
               </div>
+
+              {/* Debug léger */}
+              {/* <div className="muted">fontSizePx: {String(a.fontSizePx ?? "null")}</div> */}
             </div>
           ))}
         </div>
