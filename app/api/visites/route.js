@@ -57,18 +57,18 @@ export async function POST(req) {
 
     console.log("✅ Visite enregistrée :", created);
 
-    // ✅ notif interne (FIX: auteurId + message sans "Quelqu'un")
+    // ✅ notif interne (DB)
     await prisma.notification.create({
       data: {
-        utilisateurId: visiteIdNum,       // destinataire
-        auteurId: Number(user.id),        // ✅ auteur (visiteur)
-        message: "a visité ton profil",   // ✅ plus "Quelqu'un ..."
-        lien: `/profil/${user.id}`,
+        utilisateurId: visiteIdNum,
+        auteurId: Number(user.id),
+        message: "a visité ton profil",
+        lien: `/profil/${user.id}`, // ⚠️ on garde pour le web
         lu: false,
       },
     });
 
-    // récupérer cible + pseudo visiteur (pour push & Ably)
+    // récupérer cible + pseudo visiteur
     const [cible, visiteur] = await Promise.all([
       prisma.utilisateur.findUnique({
         where: { id: visiteIdNum },
@@ -82,13 +82,18 @@ export async function POST(req) {
 
     const pseudoVisiteur = visiteur?.pseudo ?? "Un membre";
 
-    // 🔔 push Expo
+    // 🔔 PUSH EXPO (CORRIGÉE POUR REDIRECTION MOBILE)
     if (cible?.pushEnabled && cible.expoPushToken) {
       try {
         await sendPush(cible.expoPushToken, {
           title: "Nouvelle visite 👀",
           body: `@${pseudoVisiteur} a visité ton profil`,
-          data: { type: "VISITE", visiteurId: Number(user.id) },
+          data: {
+            url: `/(tabs)/profil/${Number(user.id)}`, // ✅ mobile route
+            type: "visit",
+            userId: Number(user.id),
+            visiteurId: Number(user.id), // compat ancien mapping
+          },
         });
         console.log("🔔 Push VISITE envoyée");
       } catch (e) {
@@ -98,16 +103,22 @@ export async function POST(req) {
       console.log("ℹ️ Aucun token/opt-in pour le visité — pas de push envoyée");
     }
 
-    // 📡 Ably : event temps réel pour la bannière in-app
+    // 📡 Ably temps réel (CORRIGÉ MOBILE + WEB)
     try {
       const channelName = `user-${visiteIdNum}`;
-     await ably.channels.get(channelName).publish("new-visit", {
-  pseudo: pseudoVisiteur,              // (compat)
-  fromPseudo: pseudoVisiteur,          // ✅ AJOUT
-  visiteurId: Number(user.id),         // (compat)
-  fromId: Number(user.id),             // ✅ AJOUT
-  lien: `/profil/${user.id}`,
-});
+
+      await ably.channels.get(channelName).publish("new-visit", {
+        pseudo: pseudoVisiteur,
+        fromPseudo: pseudoVisiteur,
+        visiteurId: Number(user.id),
+        fromId: Number(user.id),
+
+        // ✅ mobile
+        url: `/(tabs)/profil/${Number(user.id)}`,
+
+        // ✅ web (on garde pour compatibilité)
+        lien: `/profil/${Number(user.id)}`,
+      });
 
       console.log("📡 Ably new-visit envoyé sur", channelName);
     } catch (e) {

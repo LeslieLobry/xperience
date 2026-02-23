@@ -150,10 +150,14 @@ export async function POST(req) {
     if (cible?.pushEnabled && cible.expoPushToken) {
       try {
         await sendPush(cible.expoPushToken, {
-          title: "Nouveau like ❤️",
-          body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
-          data: { type: "LIKE", auteurId },
-        });
+  title: "Nouveau like ❤️",
+  body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
+  data: {
+    url: `/(tabs)/profil/${auteurId}`, // ✅ route mobile pour expo-router
+    type: "like",                      // (optionnel mais propre)
+    userId: auteurId,                  // (optionnel)
+  },
+});
       } catch (e) {
         console.warn("⚠️ Échec push LIKE:", e?.message || e);
       }
@@ -164,13 +168,18 @@ export async function POST(req) {
       const channelName = `user-${cibleIdNum}`;
       const channel = ably.channels.get(channelName);
 
-     await channel.publish("new-like", {
-  pseudo: auteur?.pseudo ?? "Un membre",     // (ok)
-  fromPseudo: auteur?.pseudo ?? "Un membre", // ✅ AJOUT (standard)
-  likerId: auteurId,                         // (compat)
-  fromId: auteurId,                          // ✅ AJOUT (standard)
+    await channel.publish("new-like", {
+  pseudo: auteur?.pseudo ?? "Un membre",
+  fromPseudo: auteur?.pseudo ?? "Un membre",
+  likerId: auteurId,
+  fromId: auteurId,
   cibleId: cibleIdNum,
-  lien: `/profil/${auteurId}`,
+
+  // ✅ route mobile
+  url: `/(tabs)/profil/${auteurId}`,
+
+  // (optionnel) garder le lien web si tu en as besoin ailleurs
+  webLien: `/profil/${auteurId}`,
 });
 
       console.log("📡 Ably new-like envoyé sur", channelName);
