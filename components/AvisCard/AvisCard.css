@@ -1,74 +1,50 @@
+/* ===================== Card ===================== */
 .avis-card {
   background: rgb(31 29 27 / 60%);
   border: 1px solid #e0c084;
   border-radius: 12px;
   margin-bottom: 1rem;
   color: #e0c084;
-  padding: 16px;
+
+  padding: 14px;
+
+  /* ✅ important : plus de flex horizontal qui casse sur mobile */
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
+
+  /* ✅ évite les débordements */
+  min-width: 0;
 }
 
+/* ===================== Header ===================== */
 .avis-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.avis-avatar {
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e0c084;
-}
-
-.avis-author {
-  color: #d6a98c;
-  font-size: 10px;
-}
-.avis-commentaire{
-  font-size:12px ;
-}
-
-
-.avis-textarea {
-  width: 100%;
-  min-height: 90px;
-  padding: .6rem;
-  border-radius: 8px;
-  border: 1px solid #8c6a5d;
-  background: rgb(0 0 0 / 25%);
-  color: #f0e4d2;
-  resize: vertical;
-}
-
-.avis-edit-actions,
-.avis-footer {
-  display: flex;
-  gap: .6rem;
-}
-.avis-header {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+
+  min-width: 0;
 }
 
 .avis-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+
+  min-width: 0;
 }
 
-.avis-date {
-  font-size: 12px;
-  opacity: 0.75;
-  white-space: nowrap;
-}
+/* lien qui contient tout le header */
 .avis-author-link {
-  display: inline-flex;
+  display: flex;              /* ✅ au lieu de inline-flex */
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
+
+  width: 100%;
+  min-width: 0;
+
   text-decoration: none;
   color: inherit;
 }
@@ -78,7 +54,116 @@
 }
 
 .avis-avatar {
+  width: 28px;                /* un poil plus lisible */
+  height: 28px;
   border-radius: 999px;
   object-fit: cover;
-  width: 24px;
+  border: 2px solid #e0c084;
+  flex: 0 0 auto;
+}
+
+.avis-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid #e0c084;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: #f0e4d2;
+  background: rgb(0 0 0 / 20%);
+  flex: 0 0 auto;
+}
+
+.avis-author {
+  color: #d6a98c;
+  font-size: 12px;            /* 10px c’est vraiment petit sur mobile */
+  line-height: 1.2;
+
+  /* ✅ évite que ça pousse le layout */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.avis-date {
+  font-size: 12px;
+  opacity: 0.75;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ===================== Body ===================== */
+.avis-commentaire {
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 0;
+
+  /* ✅ force les longs mots/urls à couper */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ===================== Edit ===================== */
+.avis-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.avis-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #8c6a5d;
+  background: rgb(0 0 0 / 25%);
+  color: #f0e4d2;
+  resize: vertical;
+}
+
+/* ===================== Actions (footer) ===================== */
+.avis-footer,
+.avis-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;            /* ✅ le truc le + important */
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.avis-footer > * ,
+.avis-edit-actions > * {
+  max-width: 100%;
+}
+
+/* ✅ Sur mobile : boutons plus compacts + 2 colonnes si besoin */
+@media (max-width: 480px) {
+  .avis-card {
+    padding: 12px;
+  }
+
+  .avis-author {
+    font-size: 12px;
+  }
+
+  .avis-date {
+    font-size: 11px;
+  }
+
+  .avis-footer,
+  .avis-edit-actions {
+    justify-content: stretch;
+  }
+
+  /* Si tes <Button> rendent un <button> ou <a>, ça marchera.
+     Sinon, garde juste flex-wrap ci-dessus (ça suffit souvent). */
+  .avis-footer button,
+  .avis-edit-actions button,
+  .avis-footer a,
+  .avis-edit-actions a {
+    flex: 1 1 calc(50% - 8px);   /* 2 colonnes */
+    min-width: 0;
+  }
 }
