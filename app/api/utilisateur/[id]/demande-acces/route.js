@@ -85,15 +85,7 @@ async function sendEmailDemandeAcces({
                     style="background:#111827;border-radius:16px;padding:12px;">
                     <tr>
                       
-                      <!-- Avatar -->
-                      <td width="70" valign="top" style="padding:10px;">
-                        <a href="${profilUrl}">
-                          <img src="${avatar}" width="60" height="60"
-                            style="border-radius:14px;display:block;border:1px solid #e0c084;background:#1f2937;"
-                            alt="avatar" />
-                        </a>
-                      </td>
-
+                      
                       <!-- Infos -->
                       <td valign="top" style="padding:10px;">
                         <div style="font-size:16px;font-weight:800;">
