@@ -85,27 +85,55 @@ export default function Notifications() {
   // - si le pseudo apparaît déjà N’IMPORTE OÙ dans le message => on n’ajoute pas de préfixe
   // - si le message commence par "Pseudo Pseudo ..." ou "Pseudo: Pseudo ..." => on nettoie le début
   // - sinon => on préfixe "Pseudo : message"
-  const formatNotifText = useCallback((notif) => {
-    const pseudo = (notif?.auteur?.pseudo || "").trim();
-    const msg = (notif?.message || "").trim();
+const formatNotifText = useCallback((notif) => {
+  const pseudoRaw = (notif?.auteur?.pseudo || "").trim();
+  const msgRaw = (notif?.message || "").trim();
 
-    if (!pseudo) return msg;
+  if (!pseudoRaw) return msgRaw;
 
-    const p = pseudo.toLowerCase();
-    const lower = msg.toLowerCase();
+  const normalize = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // Nettoyage safe si on reçoit déjà un doublon collé au début
-    const double1 = `${pseudo} ${pseudo}`;
-    const double2 = `${pseudo}: ${pseudo}`;
-    if (msg.startsWith(double1)) return msg.replace(double1, pseudo);
-    if (msg.startsWith(double2)) return msg.replace(double2, `${pseudo}:`);
+  const pseudo = normalize(pseudoRaw);
+  const msg = normalize(msgRaw);
 
-    // ✅ Blindage : si le pseudo est déjà dans le message (début, milieu, fin),
-    // on ne le rajoute pas du tout.
-    if (lower.includes(p)) return msg;
+  // 🔥 1) Cas galerie (demande / accepté / refusé)
+  const isGalleryEvent =
+    msg.includes("galerie") ||
+    msg.includes("acces") ||
+    msg.includes("demande") ||
+    msg.includes("accepte") ||
+    msg.includes("refuse");
 
-    return `${pseudo} : ${msg}`;
-  }, []);
+  if (isGalleryEvent) return msgRaw;
+
+  // 🔥 2) Nettoyage doublon collé au début
+  const doubleStartRegex = new RegExp(`^(${pseudoRaw})\\s*[:\\-]?\\s*\\1\\b`);
+  if (doubleStartRegex.test(msgRaw)) {
+    return msgRaw.replace(doubleStartRegex, pseudoRaw);
+  }
+
+  // 🔥 3) Si le pseudo est déjà présent quelque part dans le message
+  const pseudoWords = pseudo
+    .split(" ")
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3);
+
+  const pseudoAlreadyInMsg =
+    msg.includes(pseudo) ||
+    pseudoWords.some((w) => msg.includes(w));
+
+  if (pseudoAlreadyInMsg) return msgRaw;
+
+  // 🔥 4) Sinon on préfixe normalement
+  return `${pseudoRaw} : ${msgRaw}`;
+}, []);
 
   useEffect(() => {
     let cancelled = false;
