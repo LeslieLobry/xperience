@@ -87,7 +87,7 @@ export default function Notifications() {
   // - sinon => on préfixe "Pseudo : message"
 const formatNotifText = useCallback((notif) => {
   const pseudoRaw = (notif?.auteur?.pseudo || "").trim();
-  const msgRaw = (notif?.message || "").trim();
+  let msgRaw = (notif?.message || "").trim();
 
   if (!pseudoRaw) return msgRaw;
 
@@ -101,9 +101,23 @@ const formatNotifText = useCallback((notif) => {
       .trim();
 
   const pseudo = normalize(pseudoRaw);
+
+  // ✅ 1) Nettoyage ultra-safe du début si le backend a déjà mis le pseudo
+  // ex: "Gael : a accepté..." / "Gael - ..." / "Gael Gael ..." / "GAEL: ..."
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pEsc = escapeRegExp(pseudoRaw);
+
+  const startPrefixRe = new RegExp(
+    `^\\s*(?:${pEsc}\\s*(?::|-)?\\s*)+(?=\\S)`,
+    "i"
+  );
+
+  // On applique 2 fois max pour virer "Pseudo Pseudo :"
+  msgRaw = msgRaw.replace(startPrefixRe, "").replace(startPrefixRe, "").trim();
+
   const msg = normalize(msgRaw);
 
-  // 🔥 1) Cas galerie (demande / accepté / refusé)
+  // ✅ 2) Cas galerie (demande / accepté / refusé / accès / galerie) => on NE préfixe JAMAIS
   const isGalleryEvent =
     msg.includes("galerie") ||
     msg.includes("acces") ||
@@ -113,28 +127,14 @@ const formatNotifText = useCallback((notif) => {
 
   if (isGalleryEvent) return msgRaw;
 
-  // 🔥 2) Nettoyage doublon collé au début
-  const doubleStartRegex = new RegExp(`^(${pseudoRaw})\\s*[:\\-]?\\s*\\1\\b`);
-  if (doubleStartRegex.test(msgRaw)) {
-    return msgRaw.replace(doubleStartRegex, pseudoRaw);
-  }
-
-  // 🔥 3) Si le pseudo est déjà présent quelque part dans le message
-  const pseudoWords = pseudo
-    .split(" ")
-    .map((w) => w.trim())
-    .filter((w) => w.length >= 3);
-
-  const pseudoAlreadyInMsg =
-    msg.includes(pseudo) ||
-    pseudoWords.some((w) => msg.includes(w));
-
+  // ✅ 3) Si le pseudo est déjà dans le message (même partiellement) => pas de préfixe
+  const pseudoWords = pseudo.split(" ").filter((w) => w.length >= 3);
+  const pseudoAlreadyInMsg = msg.includes(pseudo) || pseudoWords.some((w) => msg.includes(w));
   if (pseudoAlreadyInMsg) return msgRaw;
 
-  // 🔥 4) Sinon on préfixe normalement
+  // ✅ 4) Sinon on préfixe
   return `${pseudoRaw} : ${msgRaw}`;
 }, []);
-
   useEffect(() => {
     let cancelled = false;
 
