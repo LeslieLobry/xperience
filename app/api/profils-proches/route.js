@@ -22,7 +22,6 @@ function normalizeArray(arr) {
 function toNumber(val) {
   if (val === null || val === undefined) return NaN;
 
-  // Prisma Decimal (decimal.js) ou autre objet convertible
   if (typeof val === "object" && val !== null) {
     const n = Number(val);
     return Number.isFinite(n) ? n : NaN;
@@ -55,8 +54,11 @@ function boundingBox(lat, lon, radiusKm) {
   const earthKmPerDegLat = 110.574;
   const earthKmPerDegLon = 111.320 * Math.cos((lat * Math.PI) / 180);
 
+  // sécurité (au cas où)
+  const safeLon = earthKmPerDegLon === 0 ? 0.000001 : earthKmPerDegLon;
+
   const dLat = radiusKm / earthKmPerDegLat;
-  const dLon = radiusKm / earthKmPerDegLon;
+  const dLon = radiusKm / safeLon;
 
   return {
     minLat: lat - dLat,
@@ -72,7 +74,7 @@ export async function POST(req) {
     console.log("🚀 /api/profils-proches CALL");
 
     const body = await req.json().catch(() => ({}));
-    const { latitude, longitude, distance, filters } = body || {};
+    const { latitude, longitude, distance, filters /*, userId*/ } = body || {};
 
     console.log("📦 body reçu:", body);
 
@@ -80,18 +82,18 @@ export async function POST(req) {
     const userLon = toNumber(longitude);
 
     if (!isValidGps(userLat, userLon)) {
-      console.log("❌ Latitude/longitude invalides:", { latitude, longitude, userLat, userLon });
+      console.log("❌ Latitude/longitude invalides:", {
+        latitude,
+        longitude,
+        userLat,
+        userLon,
+      });
       return NextResponse.json([], { status: 200 });
     }
 
-    const rayon =
-      typeof distance === "number" && !isNaN(distance)
-        ? distance
-        : distance != null && distance !== ""
-        ? Number(distance)
-        : 20;
-
-    const rayonFinal = Number.isFinite(rayon) && rayon > 0 ? rayon : 20;
+    // ✅ distance robuste (number OU string)
+    const distParsed = toNumber(distance);
+    const rayonFinal = Number.isFinite(distParsed) && distParsed > 0 ? distParsed : 20;
 
     console.log("📍 Position user:", userLat, userLon);
     console.log("📏 Rayon:", rayonFinal);
@@ -107,81 +109,92 @@ export async function POST(req) {
     console.log("📊 TOTAL USERS:", totalUsers);
     console.log("📊 USERS AVEC GPS:", usersWithGPS);
 
-    // ✅ Base where
-    const where = {
-      latitude: { not: null },
-      longitude: { not: null },
-    };
+    // ✅ Construire un AND propre
+    const AND = [];
 
-    // (optionnel mais très utile) préfiltre bounding box
+    // Base GPS
+    AND.push({ latitude: { not: null } });
+    AND.push({ longitude: { not: null } });
+
+    // Bounding box
     const box = boundingBox(userLat, userLon, rayonFinal);
-    where.latitude = { not: null, gte: box.minLat, lte: box.maxLat };
-    where.longitude = { not: null, gte: box.minLon, lte: box.maxLon };
+    AND.push({ latitude: { gte: box.minLat, lte: box.maxLat } });
+    AND.push({ longitude: { gte: box.minLon, lte: box.maxLon } });
+
+    console.log("🧰 BOX:", box);
 
     // --- TYPE ---
-    const typeArr = normalizeArray(f.type);
-    if (typeArr.length) {
-      // ⚠️ si type est un ENUM Prisma, "contains" ne marche pas.
-      // Ici je garde ta logique, mais je te conseille de passer en equals si tu peux.
-      where.OR = typeArr.map((t) => ({
-        type: { contains: t, mode: "insensitive" },
-      }));
+    // ⚠️ Si "type" est un ENUM Prisma: contains ne marche pas.
+    // => On préfère "in" avec les valeurs reçues par le front (sans normalize).
+    // Si tu as des valeurs en DB genre "HOMME/FEMME/COUPLE/GROUPE", ajuste ici.
+    const typeRaw = Array.isArray(f.type) ? f.type.filter(Boolean) : [];
+    if (typeRaw.length) {
+      AND.push({ type: { in: typeRaw } });
     }
 
     // --- STATUT ---
     if (f.statut === "en_ligne") {
-      where.statut = "en_ligne";
+      AND.push({ statut: "en_ligne" });
     }
 
     // --- AGE ---
-    const ageMin =
-      typeof f.ageMin === "number"
-        ? f.ageMin
-        : f.ageMin != null && f.ageMin !== ""
-        ? Number(f.ageMin)
-        : null;
-    const ageMax =
-      typeof f.ageMax === "number"
-        ? f.ageMax
-        : f.ageMax != null && f.ageMax !== ""
-        ? Number(f.ageMax)
-        : null;
+    const ageMin = toNumber(f.ageMin);
+    const ageMax = toNumber(f.ageMax);
 
-    if (!isNaN(ageMin) && ageMin != null && !isNaN(ageMax) && ageMax != null) {
-      where.age = { gte: ageMin, lte: ageMax };
-    } else if (!isNaN(ageMin) && ageMin != null) {
-      where.age = { gte: ageMin };
-    } else if (!isNaN(ageMax) && ageMax != null) {
-      where.age = { lte: ageMax };
+    if (Number.isFinite(ageMin) && Number.isFinite(ageMax)) {
+      AND.push({ age: { gte: ageMin, lte: ageMax } });
+    } else if (Number.isFinite(ageMin)) {
+      AND.push({ age: { gte: ageMin } });
+    } else if (Number.isFinite(ageMax)) {
+      AND.push({ age: { lte: ageMax } });
     }
 
     // --- PSEUDO ---
     if (f.pseudo && String(f.pseudo).trim()) {
-      where.pseudo = { contains: String(f.pseudo).trim(), mode: "insensitive" };
+      AND.push({
+        pseudo: { contains: String(f.pseudo).trim(), mode: "insensitive" },
+      });
     }
 
     // --- LOCALISATION ---
     if (f.localisation && String(f.localisation).trim()) {
-      where.localisation = {
-        contains: String(f.localisation).trim(),
-        mode: "insensitive",
-      };
+      AND.push({
+        localisation: {
+          contains: String(f.localisation).trim(),
+          mode: "insensitive",
+        },
+      });
     }
 
     // --- PHOTO ---
     if (f.photo === true) {
-      // ⚠️ si tu stockes parfois "" (string vide), tu peux renforcer:
-      // where.photoUrl = { notIn: [null, ""] }
-      where.photoUrl = { not: null };
+      AND.push({ photoUrl: { notIn: [null, ""] } });
     }
 
     // --- DESCRIPTION ---
     if (f.description === true) {
-      // Idem: { notIn: [null, ""] } si nécessaire
-      where.description = { not: null };
+      AND.push({ description: { notIn: [null, ""] } });
     }
 
-    console.log("🔎 WHERE PRISMA:", where);
+    // (optionnel) Exclure l’utilisateur courant si tu l’envoies dans body.userId
+    // if (userId) AND.push({ id: { not: userId } });
+
+    const where = { AND };
+
+    console.log("🔎 WHERE PRISMA:", JSON.stringify(where, null, 2));
+
+    // 🧪 Debug : combien dans la box AVANT les autres filtres
+    const inBoxCount = await prisma.utilisateur.count({
+      where: {
+        AND: [
+          { latitude: { not: null } },
+          { longitude: { not: null } },
+          { latitude: { gte: box.minLat, lte: box.maxLat } },
+          { longitude: { gte: box.minLon, lte: box.maxLon } },
+        ],
+      },
+    });
+    console.log("📦 USERS dans la BOX:", inBoxCount);
 
     const utilisateurs = await prisma.utilisateur.findMany({
       where,
@@ -199,7 +212,7 @@ export async function POST(req) {
       },
     });
 
-    console.log("👥 USERS après filtres Prisma:", utilisateurs.length);
+    console.log("👥 USERS après where Prisma:", utilisateurs.length);
 
     // DISTANCE
     const proches = [];
@@ -229,11 +242,14 @@ export async function POST(req) {
       }
     }
 
+    // ✅ tri par distance
+    proches.sort((a, b) => a.distance - b.distance);
+
     console.log("📌 USERS après filtre distance:", proches.length);
     console.log("🧨 GPS invalides:", invalidGpsCount);
     console.log("🧨 distances NaN:", nanDistCount);
 
-    proches.forEach((u) =>
+    proches.slice(0, 30).forEach((u) =>
       console.log(`🧭 ${u.pseudo} → ${u.distance.toFixed(2)} km`)
     );
 
