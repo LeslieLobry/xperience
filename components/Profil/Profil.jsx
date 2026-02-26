@@ -446,7 +446,12 @@ export default function Profil({ user, connectedUser }) {
         />
 
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-        {!isOwnProfile && <AvisForm cibleId={user.id} />}
+       {!isOwnProfile && (
+  <AvisForm
+    cibleId={user.id}
+    onStartConversation={handleStartConversation}
+  />
+)}
 
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>

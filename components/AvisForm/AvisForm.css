@@ -22,3 +22,16 @@
 .form-css textarea {
     width: 100%;
 }
+.private-message-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.private-message-btn:hover {
+  opacity: 0.85;
+}

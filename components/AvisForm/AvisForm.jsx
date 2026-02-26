@@ -1,16 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import "./AvisForm.css";
 
-export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
+export default function AvisForm({ cibleId, onCommentaireEnvoye, onStartConversation }) {
   const [commentaire, setCommentaire] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [loadingConv, setLoadingConv] = useState(false);
-
-  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +17,7 @@ export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cibleId, commentaire }),
+        credentials: "include",
       });
 
       if (res.ok) {
@@ -29,43 +26,11 @@ export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
         if (onCommentaireEnvoye) onCommentaireEnvoye();
         setTimeout(() => setSuccess(false), 3000);
       } else {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         setError(data.error || "Une erreur est survenue.");
       }
     } catch (err) {
       setError("Impossible de publier la recommandation. Veuillez réessayer.");
-    }
-  };
-
-  const goToConversation = async () => {
-    try {
-      setLoadingConv(true);
-      setError("");
-
-      const res = await fetch("/api/conversations/get-or-create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ cibleId }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data?.error || "Impossible d’ouvrir la conversation.");
-        return;
-      }
-
-      if (!data?.conversationId) {
-        setError("Conversation introuvable.");
-        return;
-      }
-
-      router.push(`/messagerie?conversationId=${data.conversationId}`);
-    } catch (e) {
-      setError("Impossible d’ouvrir la conversation.");
-    } finally {
-      setLoadingConv(false);
     }
   };
 
@@ -76,17 +41,15 @@ export default function AvisForm({ cibleId, onCommentaireEnvoye }) {
       <p className="avis-hint">
         Cette recommandation sera visible publiquement sur le profil.
         <br />
-        Pour envoyer un message privé :
-        {" "}
+        Pour envoyer un message privé, cliquez sur{" "}
         <button
           type="button"
-          onClick={goToConversation}
           className="private-message-btn"
-          disabled={loadingConv}
-          aria-label="Ouvrir la conversation"
+          onClick={onStartConversation}
         >
-          {loadingConv ? "Ouverture..." : "✉️ Message privé"}
+          ✉️ l’enveloppe
         </button>
+        .
       </p>
 
       {success && <p className="success">Merci pour votre recommandation !</p>}
