@@ -51,7 +51,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   const [photoUrls, setPhotoUrls] = useState({});
 
   const instanceRef = useRef(
-    Math.random().toString(16).slice(2, 6) + "-" + Date.now().toString(16).slice(-4)
+    Math.random().toString(16).slice(2, 6) +
+      "-" +
+      Date.now().toString(16).slice(-4)
   );
 
   // ✅ seed stable
@@ -98,7 +100,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   }, [counts]);
 
   // ✅ présence utilisable si on a un set non vide (ta logique actuelle)
-  // (Tu peux aussi baser ça sur `ready` si ton context est fiable)
   const presenceUsable = countsIds.length > 0;
 
   const countsKey = useMemo(() => countsIds.join(","), [countsIds]);
@@ -129,8 +130,6 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   ]);
 
   // ✅ Quand "En ligne" est activé, on charge TOUTE la liste online via API
-  // ⚠️ Mais on ne bloque plus l'UI : on affiche d'abord un filtre fallback instantané,
-  // puis Ably remplace par la liste exacte dès que presenceUsable devient true.
   useEffect(() => {
     let cancelled = false;
 
@@ -247,9 +246,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
     const base = Array.isArray(profilsAffiches) ? profilsAffiches : [];
     const shuffled = stableShuffle(base, seedRef.current);
 
+    const has24 = shuffled.some((u) => String(getTargetUserId(u)) === "24");
     console.log(`[ProfilsDisplay ${instanceRef.current}] RENDER LIST`, {
       profilsAffichesLen: base.length,
       profilsFiltresLen: shuffled.length,
+      has24,
       sampleIds: shuffled.slice(0, 20).map((u) => getTargetUserId(u)),
     });
 
@@ -310,7 +311,10 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
   }, [profilsFiltres]);
 
   const handleToggleProches = async (active, customDistance) => {
-    console.log(`[ProfilsDisplay ${instanceRef.current}] Toggle PROCHES =>`, active);
+    console.log(
+      `[ProfilsDisplay ${instanceRef.current}] Toggle PROCHES =>`,
+      active
+    );
 
     setFiltrerProches(active);
 
@@ -333,24 +337,58 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
         async (position) => {
           const { latitude, longitude } = position.coords;
 
+          const payload = {
+            latitude,
+            longitude,
+            distance: customDistance || distance,
+            // ✅ active le debug ciblé côté API si tu l’as ajouté
+            debugId: 24,
+          };
+
+          console.log(
+            `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches payload=`,
+            payload
+          );
+
           try {
             const res = await fetch("/api/profils-proches", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                latitude,
-                longitude,
-                distance: customDistance || distance,
-              }),
+              body: JSON.stringify(payload),
             });
 
             const data = await res.json().catch(() => null);
-            console.log(
-              `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches data=`,
-              data
-            );
 
-            setProfilsAffiches(Array.isArray(data) ? data : []);
+            // ✅ supporte les 2 formats:
+            // - API retourne directement un array
+            // - API retourne { proches, debug }
+            const list = Array.isArray(data) ? data : Array.isArray(data?.proches) ? data.proches : [];
+            const debugApi = data?.debug ?? null;
+
+            const ids = list
+              .map((u) => String(u?.id ?? u?.utilisateurId ?? u?.userId ?? ""))
+              .filter(Boolean);
+
+            console.log(
+              `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches listLen=`,
+              list.length
+            );
+            console.log(
+              `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches contains 24 ?`,
+              ids.includes("24")
+            );
+            console.log(
+              `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches ids sample=`,
+              ids.slice(0, 50)
+            );
+            if (debugApi) {
+              console.log(
+                `[ProfilsDisplay ${instanceRef.current}] /api/profils-proches DEBUG API=`,
+                debugApi
+              );
+            }
+
+            setProfilsAffiches(list);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
           } finally {
@@ -540,11 +578,9 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
                     <p className="profil-card-details-type">{user.type}</p>
 
-                    {user.distance && (
-                      <p
-                        className="profil-card-details"
-                        style={{ color: "#999" }}
-                      >
+                    {/* ✅ FIX: 0km doit s'afficher */}
+                    {user.distance != null && Number.isFinite(user.distance) && (
+                      <p className="profil-card-details" style={{ color: "#999" }}>
                         {user.distance.toFixed(1)} km de vous
                       </p>
                     )}
