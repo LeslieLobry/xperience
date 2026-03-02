@@ -669,7 +669,7 @@ useEffect(() => {
             onInput={() => requestAnimationFrame(autoResize)}
             style={{ resize: "none" }}
           />
-
+ <div className="input-bas">
           <div className="input-wrapper" style={{ alignItems: "center" }}>
             {/* ✅ Aperçu image (disparaît dès qu’on envoie) */}
             {imagePreview && (
@@ -892,6 +892,7 @@ useEffect(() => {
               ? "Envoyer l'audio"
               : "Envoyer"}
           </button>
+          </div>
         </form>
 
         {/* ✅ Picker emoji caché sur mobile + ✅ s’ouvre vers le haut */}
