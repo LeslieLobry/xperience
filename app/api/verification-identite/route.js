@@ -1,11 +1,4 @@
 // app/api/verification-identite/route.js
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "20mb",
-    },
-  },
-};
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -26,43 +19,61 @@ export async function POST(req) {
         { status: 401 }
       );
     }
-const existing = await prisma.verificationIdentite.findFirst({
-  where: {
-    utilisateurId: utilisateur.id,
-    statut: {
-      in: ["EN_ATTENTE", "ACCEPTEE"],
-    },
-  },
-});
 
-if (existing) {
-  return NextResponse.json(
-    { success: false, message: "Vous avez déjà une demande en cours ou acceptée." },
-    { status: 400 }
-  );
-}
+    // ✅ Bloque uniquement si EN_ATTENTE ou ACCEPTEE
+    const existing = await prisma.verificationIdentite.findFirst({
+      where: {
+        utilisateurId: utilisateur.id,
+        statut: { in: ["EN_ATTENTE", "ACCEPTEE"] },
+      },
+      select: { id: true, statut: true },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        { success: false, message: "Vous avez déjà une demande en cours ou acceptée." },
+        { status: 400 }
+      );
+    }
 
     // 2) Lecture du form-data
     const formData = await req.formData();
-    const type     = formData.get("type") || "SIMPLE";
+    const type = formData.get("type") || "SIMPLE";
+
     const photoCI1 = formData.get("photoCI1");
-    const selfie1  = formData.get("selfie1");
-    let photoCI2, selfie2;
+    const selfie1 = formData.get("selfie1");
+
+    let photoCI2 = null;
+    let selfie2 = null;
+
     if (type === "COUPLE") {
       photoCI2 = formData.get("photoCI2");
-      selfie2  = formData.get("selfie2");
+      selfie2 = formData.get("selfie2");
     }
 
-    // 3) Vérification basique des fichiers
-    const isImage = file =>
-      file && typeof file !== "string" && file.type.startsWith("image/");
+    // 3) Vérification fichiers
+    const isFile = (f) =>
+      f && typeof f !== "string" && typeof f.arrayBuffer === "function";
+
+    const isImage = (f) =>
+      isFile(f) && typeof f.type === "string" && f.type.startsWith("image/");
+    const isPdf = (f) => isFile(f) && f.type === "application/pdf";
+
+    // ✅ CI: image OU pdf
+    const isCIValid = (f) => isImage(f) || isPdf(f);
+
+    // ✅ Selfie: image uniquement
     if (
-      !isImage(photoCI1) ||
+      !isCIValid(photoCI1) ||
       !isImage(selfie1) ||
-      (type === "COUPLE" && (!isImage(photoCI2) || !isImage(selfie2)))
+      (type === "COUPLE" && (!isCIValid(photoCI2) || !isImage(selfie2)))
     ) {
       return NextResponse.json(
-        { success: false, message: "Fichiers invalides ou non images." },
+        {
+          success: false,
+          message:
+            "Fichiers invalides. Carte d'identité: image ou PDF. Selfie: image uniquement.",
+        },
         { status: 400 }
       );
     }
@@ -70,8 +81,19 @@ if (existing) {
     // 4) Upload helper
     async function upload(file, prefix) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext    = file.name.split(".").pop();
-      const key    = `${prefix}/${utilisateur.id}_${Date.now()}.${ext}`;
+      const name = String(file.name || "file");
+      const ext = name.includes(".") ? name.split(".").pop() : null;
+
+      const finalExt =
+        ext ||
+        (file.type === "application/pdf"
+          ? "pdf"
+          : file.type?.split("/")?.[1] || "bin");
+
+      const key = `${prefix}/${utilisateur.id}_${Date.now()}_${Math.random()
+        .toString(16)
+        .slice(2)}.${finalExt}`;
+
       await s3.send(
         new PutObjectCommand({
           Bucket: process.env.AWS_S3_BUCKET,
@@ -80,17 +102,18 @@ if (existing) {
           ContentType: file.type,
         })
       );
+
       return key;
     }
 
-    // 5) Analyse adulte
+    // 5) Analyse adulte (selfie uniquement)
     const analyse1 = await analyzeImageWithSightengineFromFile(selfie1);
     let analyse2 = null;
     if (type === "COUPLE") {
       analyse2 = await analyzeImageWithSightengineFromFile(selfie2);
     }
 
-    if (!analyse1.isAdult || (type === "COUPLE" && !analyse2?.isAdult)) {
+    if (!analyse1?.isAdult || (type === "COUPLE" && !analyse2?.isAdult)) {
       return NextResponse.json(
         { success: false, message: "Selfie non adulte détecté." },
         { status: 400 }
@@ -99,27 +122,40 @@ if (existing) {
 
     // 6) Upload sur S3
     const photoCI1Key = await upload(photoCI1, "verification-ci");
-    const selfie1Key  = await upload(selfie1,  "verification-selfie");
-    const photoCI2Key = type === "COUPLE" ? await upload(photoCI2, "verification-ci")        : null;
-    const selfie2Key  = type === "COUPLE" ? await upload(selfie2,  "verification-selfie")     : null;
+    const selfie1Key = await upload(selfie1, "verification-selfie");
+    const photoCI2Key =
+      type === "COUPLE" ? await upload(photoCI2, "verification-ci") : null;
+    const selfie2Key =
+      type === "COUPLE"
+        ? await upload(selfie2, "verification-selfie")
+        : null;
 
-    // 7) Enregistrement en base Prisma
-    const demande = await prisma.verificationIdentite.create({
-      data: {
-        utilisateur:  { connect: { id: utilisateur.id } },
+    // 7) ✅ Upsert (important car utilisateurId est UNIQUE)
+    // + reset des infos de refus quand l’utilisateur renvoie
+    const demande = await prisma.verificationIdentite.upsert({
+      where: { utilisateurId: utilisateur.id },
+      update: {
         type,
-        photoCI1Url:  photoCI1Key,
-        selfie1Url:   selfie1Key,
-        photoCI2Url:  photoCI2Key,
-        selfie2Url:   selfie2Key,
-        statut:       "EN_ATTENTE",
+        photoCI1Url: photoCI1Key,
+        selfie1Url: selfie1Key,
+        photoCI2Url: photoCI2Key,
+        selfie2Url: selfie2Key,
+        statut: "EN_ATTENTE",
+        commentaire: null,
+        documentsRefuses: null, // ✅ reset
+      },
+      create: {
+        utilisateur: { connect: { id: utilisateur.id } },
+        type,
+        photoCI1Url: photoCI1Key,
+        selfie1Url: selfie1Key,
+        photoCI2Url: photoCI2Key,
+        selfie2Url: selfie2Key,
+        statut: "EN_ATTENTE",
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      demande,
-    });
+    return NextResponse.json({ success: true, demande });
   } catch (err) {
     console.error("Erreur upload/verif identite:", err);
     return NextResponse.json(
@@ -128,6 +164,7 @@ if (existing) {
     );
   }
 }
+
 export async function GET() {
   try {
     const cookieStore = cookies();
@@ -139,7 +176,6 @@ export async function GET() {
       );
     }
 
-    // on prend la dernière demande (si elle existe)
     const last = await prisma.verificationIdentite.findFirst({
       where: { utilisateurId: utilisateur.id },
       orderBy: { createdAt: "desc" },
@@ -155,7 +191,7 @@ export async function GET() {
         success: true,
         verified,
         pending,
-        statut,            // pour affichage si besoin
+        statut,
         demandeId: last?.id ?? null,
         updatedAt: last?.updatedAt ?? null,
       },

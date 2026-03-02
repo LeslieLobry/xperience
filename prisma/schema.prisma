@@ -27,7 +27,6 @@ model VerificationIdentite {
   utilisateur   Utilisateur @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
 
   type          String
-
   photoCI1Url   String      @map("photoci1url")
   selfie1Url    String      @map("selfie1url")
   photoCI2Url   String?     @map("photoci2url")
@@ -35,6 +34,10 @@ model VerificationIdentite {
 
   statut        VerificationStatut @default(EN_ATTENTE)
   commentaire   String?
+
+  // ✅ nouveau : liste des documents rejetés
+  documentsRefuses Json?    @map("documents_refuses")
+
   createdAt     DateTime    @default(now()) @map("createdat")
   updatedAt     DateTime    @updatedAt      @map("updatedat")
 }
