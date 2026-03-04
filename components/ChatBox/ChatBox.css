@@ -1963,3 +1963,14 @@
   transform: translateY(calc(-1 * var(--kb, 0px))) !important;
   will-change: transform;
 }
+
+/* =========================================================
+   ✅ PATCH FINAL : ORDI = bouton réaction toujours visible
+   ========================================================= */
+@media (hover: hover) and (pointer: fine){
+  .message-react-btn{
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex !important;
+  }
+}
