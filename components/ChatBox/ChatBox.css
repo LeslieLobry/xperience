@@ -1963,3 +1963,36 @@
   transform: translateY(calc(-1 * var(--kb, 0px))) !important;
   will-change: transform;
 }
+/* =========================================================
+   PATCH FINAL REACTIONS (NE SUPPRIME RIEN AU-DESSUS)
+   Objectif:
+   - Desktop (souris) : bouton visible
+   - Mobile (tactile) : bouton caché (long press)
+   ========================================================= */
+
+/* 💻 Desktop souris/trackpad */
+@media (hover: hover) and (pointer: fine) {
+  .message-react-btn{
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* 📱 Mobile tactile (cas principal) */
+@media (hover: none) and (pointer: coarse) {
+  .message-react-btn{
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+/* 📱 Sécurité: certains mobiles matchent hover:none sans pointer coarse */
+@media (hover: none) {
+  .message-react-btn{
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
