@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import "../ProfilsDisplay/ProfilsDisplay.css";
@@ -52,144 +52,220 @@ function usePresignedPhotos(users) {
 
 const DEFAULT_RAYON = 20;
 
-export default function RechercheResultats({ className = "" }) {
-  const searchParams = useSearchParams();
+// ✅ helpers
+function normalizeType(val) {
+  return String(val || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export default function RechercheResultats({
+  className = "",
+
+  pseudo = "",
+  type = [],
+  orientation = [],
+  rechercheType = [],
+  ageMin = "",
+  ageMax = "",
+  localisation = "",
+  photo = false,
+  description = false,
+  statut = "all",
+  experience = [],
+  fumeur = [],
+  silhouette = [],
+  taille = [],
+  origines = [],
+  yeux = [],
+  cheveux = [],
+  recherches = [],
+  envies = [],
+  rayon = "",
+
+  autourDeMoi = false,
+  latitude = null,
+  longitude = null,
+  loadingGeo = false,
+  geoError = null,
+}) {
   const router = useRouter();
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   const photoUrls = usePresignedPhotos(utilisateurs);
-
-  // ✅ ONLINE via Ably presence
   const { isOnline } = useOnlineStatus();
 
-  const hasParams = useMemo(
-    () => Array.from(searchParams.keys()).length > 0,
-    [searchParams]
-  );
+  const hasParams = useMemo(() => {
+    // On considère qu'il y a recherche si on a autourDeMoi ou un des filtres non vides
+    return (
+      !!autourDeMoi ||
+      !!pseudo ||
+      (Array.isArray(type) && type.length) ||
+      (Array.isArray(orientation) && orientation.length) ||
+      (Array.isArray(rechercheType) && rechercheType.length) ||
+      ageMin !== "" ||
+      ageMax !== "" ||
+      !!localisation ||
+      photo ||
+      description ||
+      (statut && statut !== "all") ||
+      (Array.isArray(experience) && experience.length) ||
+      (Array.isArray(fumeur) && fumeur.length) ||
+      (Array.isArray(silhouette) && silhouette.length) ||
+      (Array.isArray(taille) && taille.length) ||
+      (Array.isArray(origines) && origines.length) ||
+      (Array.isArray(yeux) && yeux.length) ||
+      (Array.isArray(cheveux) && cheveux.length) ||
+      (Array.isArray(recherches) && recherches.length) ||
+      (Array.isArray(envies) && envies.length)
+    );
+  }, [
+    autourDeMoi,
+    pseudo,
+    type,
+    orientation,
+    rechercheType,
+    ageMin,
+    ageMax,
+    localisation,
+    photo,
+    description,
+    statut,
+    experience,
+    fumeur,
+    silhouette,
+    taille,
+    origines,
+    yeux,
+    cheveux,
+    recherches,
+    envies,
+  ]);
 
   useEffect(() => {
-    const paramsStr = searchParams.toString();
+    const controller = new AbortController();
 
-    // 🔁 Si plus de paramètres -> reset
-    if (!paramsStr) {
+    // pas de recherche = reset
+    if (!hasParams) {
       setUtilisateurs([]);
       setHasSearched(false);
       setLoading(false);
-      return;
+      return () => controller.abort();
     }
 
-    const controller = new AbortController();
-    setLoading(true);
     setHasSearched(true);
+    setLoading(true);
 
-    // ✅ détecte autourDeMoi
-    const autour = (searchParams.get("autourDeMoi") || "") === "true";
-    const distance = Number(searchParams.get("rayon") || DEFAULT_RAYON);
+    const distance = Number(rayon || DEFAULT_RAYON);
 
-    // ✅ construit les filtres à envoyer à /api/profils-proches
+    // ✅ construit les filtres à envoyer (depuis les props)
     const filters = {
-      pseudo: searchParams.get("pseudo") || "",
-      statut: searchParams.get("statut") || "all",
-      ageMin: searchParams.get("ageMin") || "",
-      ageMax: searchParams.get("ageMax") || "",
-      photo: searchParams.get("photo") === "true",
-      description: searchParams.get("description") === "true",
-      localisation: searchParams.get("localisation") || "",
+      pseudo: pseudo || "",
+      statut: statut || "all",
+      ageMin: ageMin !== "" ? Number(ageMin) : null,
+      ageMax: ageMax !== "" ? Number(ageMax) : null,
+      photo: !!photo,
+      description: !!description,
+      localisation: localisation || "",
 
       // arrays
-      type: searchParams.getAll("type"),
-      orientation: searchParams.getAll("orientation"),
-      rechercheType: searchParams.getAll("rechercheType"),
-      experience: searchParams.getAll("experience"),
-      fumeur: searchParams.getAll("fumeur"),
-      silhouette: searchParams.getAll("silhouette"),
-      taille: searchParams.getAll("taille"),
-      origines: searchParams.getAll("origines"),
-      yeux: searchParams.getAll("yeux"),
-      cheveux: searchParams.getAll("cheveux"),
-      recherches: searchParams.getAll("recherches"),
-      envies: searchParams.getAll("envies"),
+      type: (type || []).map(normalizeType),
+      orientation: orientation || [],
+      rechercheType: rechercheType || [],
+      experience: experience || [],
+      fumeur: fumeur || [],
+      silhouette: silhouette || [],
+      taille: taille || [],
+      origines: origines || [],
+      yeux: yeux || [],
+      cheveux: cheveux || [],
+      recherches: recherches || [],
+      envies: envies || [],
     };
-
-    // normalise numbers (si vide => null)
-    const ageMinNum = filters.ageMin !== "" ? Number(filters.ageMin) : null;
-    const ageMaxNum = filters.ageMax !== "" ? Number(filters.ageMax) : null;
 
     async function load() {
       try {
-        if (autour) {
-          // ✅ 1) géoloc côté client
-          if (!navigator.geolocation) {
-            alert("La géolocalisation n'est pas supportée sur ton appareil.");
+        if (autourDeMoi) {
+          // ✅ plus de géoloc ici : on attend celle du parent
+          if (loadingGeo) {
+            setLoading(false);
+            return;
+          }
+
+          if (geoError) {
+            console.error("geoError:", geoError);
             setUtilisateurs([]);
             setLoading(false);
             return;
           }
 
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-              try {
-                const latitude = pos.coords.latitude;
-                const longitude = pos.coords.longitude;
+          if (latitude == null || longitude == null) {
+            // pas encore dispo
+            setUtilisateurs([]);
+            setLoading(false);
+            return;
+          }
 
-                // ✅ 2) POST vers /api/profils-proches + filtres
-                const res = await fetch("/api/profils-proches", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  credentials: "include",
-                  signal: controller.signal,
-                  body: JSON.stringify({
-                    latitude,
-                    longitude,
-                    distance,
-                    filters: {
-                      ...filters,
-                      ageMin: ageMinNum,
-                      ageMax: ageMaxNum,
-                    },
-                  }),
-                });
+          const res = await fetch("/api/profils-proches", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            signal: controller.signal,
+            body: JSON.stringify({
+              latitude,
+              longitude,
+              distance,
+              filters,
+            }),
+          });
 
-                const data = await res.json().catch(() => null);
+          const data = await res.json().catch(() => null);
 
-                // tu as peut-être déjà un format Array direct
-                const list = Array.isArray(data)
-                  ? data
-                  : Array.isArray(data?.utilisateurs)
-                  ? data.utilisateurs
-                  : [];
+          const list = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.proches)
+            ? data.proches
+            : [];
 
-                setUtilisateurs(list);
-              } catch (e) {
-                if (e?.name !== "AbortError") setUtilisateurs([]);
-              } finally {
-                setLoading(false);
-              }
-            },
-            (err) => {
-              console.error("Erreur géolocalisation :", err);
-              alert("Impossible de récupérer ta position.");
-              setUtilisateurs([]);
-              setLoading(false);
-            },
-            { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
-          );
-
+          setUtilisateurs(list);
+          setLoading(false);
           return;
         }
 
-        // ✅ recherche classique (ville / filtres sans GPS)
-        const res = await fetch(`/api/recherche?${paramsStr}`, {
+        // ✅ recherche classique (ville / filtres sans GPS) => on peut appeler /api/recherche avec query string
+        // Ici, comme tu as déjà l'URL en sync via RechercheClient, on peut reconstruire params pour rester safe
+        const params = new URLSearchParams();
+        if (pseudo) params.set("pseudo", pseudo);
+        (type || []).forEach((x) => params.append("type", x));
+        (orientation || []).forEach((x) => params.append("orientation", x));
+        (rechercheType || []).forEach((x) => params.append("rechercheType", x));
+        if (ageMin !== "") params.set("ageMin", String(ageMin));
+        if (ageMax !== "") params.set("ageMax", String(ageMax));
+        if (localisation) params.set("localisation", localisation);
+        if (photo) params.set("photo", "true");
+        if (description) params.set("description", "true");
+        if (statut && statut !== "all") params.set("statut", statut);
+        (experience || []).forEach((x) => params.append("experience", x));
+        (fumeur || []).forEach((x) => params.append("fumeur", x));
+        (silhouette || []).forEach((x) => params.append("silhouette", x));
+        (taille || []).forEach((x) => params.append("taille", x));
+        (origines || []).forEach((x) => params.append("origines", x));
+        (yeux || []).forEach((x) => params.append("yeux", x));
+        (cheveux || []).forEach((x) => params.append("cheveux", x));
+        (recherches || []).forEach((x) => params.append("recherches", x));
+        (envies || []).forEach((x) => params.append("envies", x));
+        if (rayon !== "") params.set("rayon", String(rayon));
+
+        const res = await fetch(`/api/recherche?${params.toString()}`, {
           signal: controller.signal,
           credentials: "include",
         });
 
         const data = await res.json().catch(() => null);
-        setUtilisateurs(
-          Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
-        );
+        setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
         setLoading(false);
       } catch (err) {
         if (err?.name !== "AbortError") setLoading(false);
@@ -199,7 +275,36 @@ export default function RechercheResultats({ className = "" }) {
     load();
 
     return () => controller.abort();
-  }, [searchParams]);
+  }, [
+    hasParams,
+
+    pseudo,
+    type,
+    orientation,
+    rechercheType,
+    ageMin,
+    ageMax,
+    localisation,
+    photo,
+    description,
+    statut,
+    experience,
+    fumeur,
+    silhouette,
+    taille,
+    origines,
+    yeux,
+    cheveux,
+    recherches,
+    envies,
+    rayon,
+
+    autourDeMoi,
+    latitude,
+    longitude,
+    loadingGeo,
+    geoError,
+  ]);
 
   if (!hasSearched) return null;
 
@@ -215,11 +320,7 @@ export default function RechercheResultats({ className = "" }) {
   return (
     <div className={`profil-list1 ${className}`}>
       {hasParams && (
-        <div
-          className="recherche-toolbar2"
-          role="region"
-          aria-label="Actions de recherche"
-        >
+        <div className="recherche-toolbar2" role="region" aria-label="Actions de recherche">
           <button className="btn-outlined" onClick={handleResetSearch}>
             Nouvelle recherche
           </button>
@@ -230,6 +331,9 @@ export default function RechercheResultats({ className = "" }) {
       )}
 
       <h1 className="profil-list1-title">Résultats de recherche</h1>
+
+      {autourDeMoi && loadingGeo && <p>📍 Récupération de ta position…</p>}
+      {autourDeMoi && geoError && <p style={{ color: "red" }}>{geoError}</p>}
 
       {loading ? (
         <p>Chargement...</p>
@@ -249,9 +353,7 @@ export default function RechercheResultats({ className = "" }) {
                 >
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${
-                        online ? "en-ligne" : "hors-ligne"
-                      }`}
+                      className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
                       title={online ? "En ligne" : "Hors ligne"}
                     />
 
