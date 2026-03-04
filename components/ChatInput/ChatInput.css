@@ -38,7 +38,7 @@
   word-break: break-word;
   line-height: 1.35;
 
-  overflow-y: auto; 
+  overflow-y: hidden; /* grandit, pas de scroll */
   -webkit-overflow-scrolling: touch;
 }
 
