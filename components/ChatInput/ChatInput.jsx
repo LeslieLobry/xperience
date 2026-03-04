@@ -306,13 +306,9 @@ export default function ChatInput({
 
     // ✅ garde une valeur valide dans le select si les prénoms changent
     setMembreParlant((prev) => {
-      // si l’utilisateur était sur placeholders
       if (prev === "membre1") return p1 || "couple";
       if (prev === "membre2") return p2 || "couple";
-
-      // si l’utilisateur était sur un ancien prénom qui n’existe plus
       if (prev && prev !== "couple" && prev !== p1 && prev !== p2) return "couple";
-
       return prev || "couple";
     });
   }, [utilisateur.type, conversationId, prenomsCouple?.prenom1, prenomsCouple?.prenom2]);
@@ -329,10 +325,7 @@ export default function ChatInput({
     const dataRes = await res.json();
 
     if (dataRes.success) {
-      // ✅ on met à jour direct côté UI
       setPrenomsOK(true);
-
-      // ✅ si le select était sur membre1/membre2, on bascule sur les vrais prénoms
       setMembreParlant((prev) => {
         if (prev === "membre1") return pr1.trim();
         if (prev === "membre2") return pr2.trim();
@@ -343,28 +336,36 @@ export default function ChatInput({
     setLoadingPrenoms(false);
   };
 
+  // =========================================================
+  // ✅ FIX TEXTAREA : autogrow jusqu’à 140px puis scroll interne
+  // - Résiste à tes overrides CSS (même !important) via setProperty(...,"important")
+  // =========================================================
   const MAX_HEIGHT = 140;
 
-  // ✅ FIX: permet de remonter dans tout le message si > MAX_HEIGHT
   function autoResize() {
     const ta = textareaRef.current;
     if (!ta) return;
 
-    const prevScrollTop = ta.scrollTop;
-
     ta.style.height = "auto";
     const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
-    ta.style.height = next + "px";
+    ta.style.height = `${next}px`;
 
     const needsScroll = ta.scrollHeight > MAX_HEIGHT;
-    ta.style.overflowY = needsScroll ? "auto" : "hidden";
 
-    if (needsScroll) ta.scrollTop = prevScrollTop;
+    // ✅ force le comportement même si CSS override
+    ta.style.setProperty("overflow-y", needsScroll ? "auto" : "hidden", "important");
+    ta.style.setProperty("-webkit-overflow-scrolling", "touch", "important");
   }
 
   useEffect(() => {
     autoResize();
   }, [texte]);
+
+  useEffect(() => {
+    // au montage, 2 frames pour layout + fonts
+    requestAnimationFrame(() => requestAnimationFrame(autoResize));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -379,7 +380,7 @@ export default function ChatInput({
     // ✅ vide l’input direct
     if (texteToSend.length) {
       setTexte("");
-      requestAnimationFrame(autoResize);
+      requestAnimationFrame(() => requestAnimationFrame(autoResize));
     }
 
     // ✅ calc "qui parle" même si prénoms pas encore OK
@@ -425,7 +426,6 @@ export default function ChatInput({
         formData.append("optimisticKey", optimisticKey);
         if (texteTrim) formData.append("contenu", texteToSend);
 
-        // ✅ BONUS: on envoie membreParlant même si prenomsOK false
         if (utilisateur.type === "couple") {
           formData.append("membreParlant", membreToSend || "couple");
           if (prenomsOK) {
@@ -465,7 +465,6 @@ export default function ChatInput({
         formData.append("optimisticKey", optimisticKey);
         if (texteTrim) formData.append("contenu", texteToSend);
 
-        // ✅ BONUS: on envoie membreParlant même si prenomsOK false
         if (utilisateur.type === "couple") {
           formData.append("membreParlant", membreToSend || "couple");
           if (prenomsOK) {
@@ -496,7 +495,6 @@ export default function ChatInput({
       const optimisticKey = generateOptimisticKey();
 
       if (utilisateur.type === "couple") {
-        // ✅ Bonus : même sans prenomsOK, on envoie "membre1/membre2/couple"
         await onMessageSent(
           {
             contenu: texteToSend,
@@ -540,7 +538,7 @@ export default function ChatInput({
       // ✅ rollback texte
       if (texteTrim) {
         setTexte(texteToSend);
-        requestAnimationFrame(autoResize);
+        requestAnimationFrame(() => requestAnimationFrame(autoResize));
       }
 
       // ✅ rollback image preview si on l’a cachée
@@ -573,39 +571,6 @@ export default function ChatInput({
 
   return (
     <>
-      {/* {utilisateur.type === "couple" && !prenomsOK && (
-        <form
-          className="chat-input"
-          onSubmit={handlePrenomsSubmit}
-          style={{ flexDirection: "column", gap: 8 }}
-        >
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input
-              type="text"
-              className="input-prenom"
-              placeholder="Prénom membre 1"
-              value={pr1}
-              onChange={(e) => setPr1(e.target.value)}
-              style={{ width: 120 }}
-              disabled={loadingPrenoms || !conversationId}
-              autoFocus
-            />
-            <input
-              type="text"
-              className="input-prenom"
-              placeholder="Prénom membre 2"
-              value={pr2}
-              onChange={(e) => setPr2(e.target.value)}
-              style={{ width: 120 }}
-              disabled={loadingPrenoms || !conversationId}
-            />
-            <button type="submit" disabled={loadingPrenoms || !pr1 || !pr2 || !conversationId}>
-              Valider
-            </button>
-          </div>
-        </form>
-      )} */}
-
       {showEphemereNotif && (
         <div
           style={{
@@ -662,15 +627,17 @@ export default function ChatInput({
             rows={1}
             onChange={(e) => {
               setTexte(e.target.value);
-              onTyping?.(); // si tu as une notif "typing"
+              onTyping?.();
               requestAnimationFrame(autoResize);
             }}
             onInput={() => requestAnimationFrame(autoResize)}
+            onFocus={() => requestAnimationFrame(autoResize)}
             style={{ resize: "none" }}
           />
+
           <div className="input-bas">
             <div className="input-wrapper" style={{ alignItems: "center" }}>
-              {/* ✅ Aperçu image (disparaît dès qu’on envoie) */}
+              {/* ✅ Aperçu image */}
               {imagePreview && (
                 <div style={{ position: "relative", marginRight: 8 }}>
                   <img
@@ -878,9 +845,18 @@ export default function ChatInput({
             <button
               type="submit"
               className="message-btn"
-              disabled={isSending || !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))}
+              disabled={
+                isSending ||
+                !((audioBlob && !isRecording) || imageFile || (texte && texte.trim()))
+              }
             >
-              {isSending ? "Envoi…" : imageFile ? "Envoyer l'image" : audioBlob ? "Envoyer l'audio" : "Envoyer"}
+              {isSending
+                ? "Envoi…"
+                : imageFile
+                ? "Envoyer l'image"
+                : audioBlob
+                ? "Envoyer l'audio"
+                : "Envoyer"}
             </button>
           </div>
         </form>
@@ -893,6 +869,7 @@ export default function ChatInput({
               onEmojiSelect={(emoji) => {
                 setTexte((prev) => prev + emoji.native);
                 setShowEmojiPicker(false);
+                requestAnimationFrame(autoResize);
               }}
               theme="light"
             />
