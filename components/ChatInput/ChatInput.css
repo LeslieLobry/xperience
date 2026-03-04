@@ -38,7 +38,7 @@
   word-break: break-word;
   line-height: 1.35;
 
-  overflow-y: auto; /* ✅ permet de remonter dans le texte si ça dépasse */
+  overflow-y: auto; 
   -webkit-overflow-scrolling: touch;
 }
 
