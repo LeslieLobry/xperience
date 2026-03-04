@@ -1967,10 +1967,26 @@
 /* =========================================================
    ✅ PATCH FINAL : ORDI = bouton réaction toujours visible
    ========================================================= */
+/* =========================================================
+   PATCH FINAL REACTIONS
+   Desktop = bouton visible
+   Mobile = bouton caché (long press)
+   ========================================================= */
+
+/* 💻 Desktop */
 @media (hover: hover) and (pointer: fine){
   .message-react-btn{
     opacity: 1 !important;
     pointer-events: auto !important;
     display: flex !important;
+  }
+}
+
+/* 📱 Mobile */
+@media (hover: none) and (pointer: coarse){
+  .message-react-btn{
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 }
