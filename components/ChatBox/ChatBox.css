@@ -1791,24 +1791,20 @@
   font-size: 0.9rem;
   color: #e0c084;
 }
-/* ✅ Le dernier message ne doit jamais passer sous l'input (iPhone compris) */
-/* .chat-messages{
-  scroll-padding-bottom: calc(140px + env(safe-area-inset-bottom) + var(--kb, 0px));
-  padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--kb, 0px));
-} */
+
 
 /* ✅ AUTOGROW TEXTAREA (override final) */
 .input-text{
   min-height: 40px;
   height: auto;
-  max-height: 140px;     /* match ton MAX_TA_HEIGHT */
+  max-height: 140px;    
 
-  overflow-y: hidden;    /* clé: sinon elle scroll au lieu de grandir */
+  overflow-y: auto;     
   resize: none;
   box-sizing: border-box;
+
+  -webkit-overflow-scrolling: touch;
 }
-
-
 /* =========================================================
    ✅ PATCH iPhone clavier (à coller TOUT EN BAS)
    ========================================================= */
@@ -1939,7 +1935,6 @@
 }
 /* =========================================================
    ✅ PATCH FINAL : ChatInput FIXE en bas (tous devices)
-   À coller TOUT EN BAS du ChatBox.css
    ========================================================= */
 
 
