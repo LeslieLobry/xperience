@@ -1291,7 +1291,7 @@ useEffect(() => {
         </div>
       )}
 
-      {showEditPrenoms && utilisateur?.type === "couple"&& !hidePrenomsUI && (
+      {showEditPrenoms && utilisateur?.type === "couple" && (
         <div className="edit-prenoms-modal">
           <div className="edit-prenoms-modal__content">
             <h3>Modifier les prénoms du couple</h3>
