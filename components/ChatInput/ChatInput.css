@@ -69,4 +69,8 @@
   resize: none;
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
+      color: rgb(224, 192, 132);
+    border-radius: 16px;
+    padding: 6px;
+    overflow-y: hidden !important;
 }
