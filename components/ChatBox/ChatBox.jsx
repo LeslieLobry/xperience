@@ -138,7 +138,7 @@ export default function ChatBox({
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
   const hasScrolledInitialRef = useRef(false);
-
+const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
   // ✅ Perf: état "at bottom" maintenu par listener scroll
   const atBottomRef = useRef(true);
   const SCROLL_TOLERANCE_PX = 140;
@@ -515,7 +515,39 @@ useEffect(() => {
       } catch (_) {}
     }, 1800);
   }, []);
+useEffect(() => {
+  const root = document.querySelector(".chatbox-container");
+  if (!root) return;
 
+  const isTextField = (t) => {
+    if (!t) return false;
+    if (t.tagName === "TEXTAREA") return true;
+    if (t.tagName === "INPUT") {
+      const type = (t.getAttribute("type") || "text").toLowerCase();
+      return ["text", "search", "email", "tel", "url", "password"].includes(type);
+    }
+    return false;
+  };
+
+  const onFocusIn = (e) => {
+    if (isTextField(e.target)) {
+      setHidePrenomsUI(true); // ✅ on masque pendant la saisie
+    }
+  };
+
+  const onFocusOut = () => {
+    // ✅ on ré-affiche quand on sort du champ (petit délai safe pour iOS)
+    setTimeout(() => setHidePrenomsUI(false), 80);
+  };
+
+  root.addEventListener("focusin", onFocusIn);
+  root.addEventListener("focusout", onFocusOut);
+
+  return () => {
+    root.removeEventListener("focusin", onFocusIn);
+    root.removeEventListener("focusout", onFocusOut);
+  };
+}, []);
   /* --------------------- Notifications d'appel Ably ---------------------- */
   useEffect(() => {
     if (!utilisateur?.id) return;
@@ -1231,7 +1263,7 @@ useEffect(() => {
         />
       </div>
 
-      {utilisateur?.type === "couple" && (
+      {utilisateur?.type === "couple"&& !hidePrenomsUI && (
         <div className="couple-prenoms-bar">
           <span>
             Prénoms du couple :{" "}
@@ -1259,7 +1291,7 @@ useEffect(() => {
         </div>
       )}
 
-      {showEditPrenoms && utilisateur?.type === "couple" && (
+      {showEditPrenoms && utilisateur?.type === "couple"&& !hidePrenomsUI && (
         <div className="edit-prenoms-modal">
           <div className="edit-prenoms-modal__content">
             <h3>Modifier les prénoms du couple</h3>
