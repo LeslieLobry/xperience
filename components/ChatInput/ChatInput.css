@@ -60,3 +60,13 @@
   display: flex;
 }
 }
+/* ✅ AUTOGROW TEXTAREA (override final) */
+.input-text{
+  min-height: 40px;
+  height: auto;
+  max-height: 140px;    
+  overflow-y: auto;     
+  resize: none;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
