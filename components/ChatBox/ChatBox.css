@@ -1995,7 +1995,7 @@
 
 /* ✅ FIX FINAL : input toujours “fixe” (tous devices) */
 .chat-input{
-  position: fixed !important;
+  
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
