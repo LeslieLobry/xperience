@@ -577,6 +577,7 @@ export default function ChatInput({
             position: "fixed",
             bottom: 10,
             left: "50%",
+            transform: "translateX(-50%)",
             backgroundColor: "#e53",
             color: "#fff",
             padding: "10px 20px",
