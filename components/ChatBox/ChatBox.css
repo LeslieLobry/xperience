@@ -1418,7 +1418,7 @@
   position: absolute;
   bottom: 125%;
   left: 50%;
-  /* transform: translateX(-50%); */
+  transform: translateX(-50%);
   background: #222;
   color: #fff;
   font-size: 11px;
