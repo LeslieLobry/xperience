@@ -573,7 +573,7 @@
   .message-bubble.other { width: 60%; }
 
   .input-wrapper { display: flex; gap: 16px; }
-  .message-btn { padding: 0.7rem 2rem !important; }
+  .message-btn { padding: 0.5rem 1rem !important; }
 
   .message-bubble {
     max-width: 94vw;
@@ -694,6 +694,7 @@
   .chat-input { 
     flex-direction: column;
     position: fixed;
+    gap: 0;
 }
 
   .participant-name {
@@ -1572,7 +1573,7 @@
   .message-bubble.other { width: 60%; }
 
   .input-wrapper { display: flex; gap: 16px; }
-  .message-btn { padding: 0.7rem 2rem !important; }
+  .message-btn { padding: 0.5rem 1rem !important; }
 
   .message-bubble {
     max-width: 94vw;
