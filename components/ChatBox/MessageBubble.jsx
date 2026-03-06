@@ -653,7 +653,6 @@ function MessageBubble({
               ? {
                   left: pickerPos.x,
                   top: pickerPos.y,
-                  transform: "translateX(-50%)",
                 }
               : undefined
           }
