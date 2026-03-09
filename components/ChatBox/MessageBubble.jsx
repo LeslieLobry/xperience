@@ -229,14 +229,16 @@ function MessageBubble({
       const clientX = e.clientX ?? e.touches?.[0]?.clientX;
       const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
-      if (typeof clientX === "number" && typeof clientY === "number") {
-        const x = clamp(clientX, 8, vw - 8);
-        const y = clamp(clientY - 70, 8, vh - 8); // un peu au-dessus
-        setPickerPos({ x, y });
-        setIsPickerOpen(true);
-      } else {
-        openPickerFromEl(triggerRef.current || pressableRef.current);
-      }
+   if (typeof clientX === "number" && typeof clientY === "number") {
+  const isMobile = vw <= 768;
+  const x = isMobile ? clamp(clientX, 8, vw - 8) : clamp(clientX - 20, 8, vw - 8);
+  const y = clamp(clientY - 70, 8, vh - 8);
+
+  setPickerPos({ x, y });
+  setIsPickerOpen(true);
+} else {
+  openPickerFromEl(triggerRef.current || pressableRef.current);
+}
     },
     [openPickerFromEl]
   );
@@ -356,45 +358,51 @@ function MessageBubble({
     if (isCoarsePointer()) e.preventDefault();
   };
 
-  useLayoutEffect(() => {
-    if (!isPickerOpen) return;
+ useLayoutEffect(() => {
+  if (!isPickerOpen) return;
 
-    let raf1 = 0;
-    let raf2 = 0;
+  let raf1 = 0;
+  let raf2 = 0;
 
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        const el = pickerRef.current;
+  raf1 = requestAnimationFrame(() => {
+    raf2 = requestAnimationFrame(() => {
+      const el = pickerRef.current;
 
-        if (el) {
-          el.scrollLeft = 0;
-          el.scrollTo?.({ left: 0, behavior: "auto" });
+      if (el) {
+        el.scrollLeft = 0;
+        el.scrollTo?.({ left: 0, behavior: "auto" });
+      }
+
+      if (pickerPos && el) {
+        const pr = el.getBoundingClientRect();
+        const margin = 8;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const isMobile = vw <= 768;
+
+        let x = pickerPos.x;
+        let y = pickerPos.y;
+
+        if (isMobile) {
+          x = clamp(x, margin + pr.width / 2, vw - margin - pr.width / 2);
+        } else {
+          x = clamp(x, margin, vw - margin - pr.width);
         }
 
-        if (pickerPos && el) {
-          const pr = el.getBoundingClientRect();
-          const margin = 8;
-          const vw = window.innerWidth;
-          const vh = window.innerHeight;
+        y = clamp(y, margin, vh - margin - pr.height);
 
-          let x = clamp(
-            pickerPos.x,
-            margin + pr.width / 2,
-            vw - margin - pr.width / 2
-          );
-          let y = clamp(pickerPos.y, margin, vh - margin - pr.height);
-
-          if (x !== pickerPos.x || y !== pickerPos.y) setPickerPos({ x, y });
+        if (x !== pickerPos.x || y !== pickerPos.y) {
+          setPickerPos({ x, y });
         }
-      });
+      }
     });
+  });
 
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [isPickerOpen, pickerPos]);
-
+  return () => {
+    cancelAnimationFrame(raf1);
+    cancelAnimationFrame(raf2);
+  };
+}, [isPickerOpen, pickerPos]);
   useEffect(() => {
     function handleClickOutside(e) {
       if (!isPickerOpen) return;
@@ -648,15 +656,18 @@ function MessageBubble({
         <div
           ref={pickerRef}
           className="reaction-picker reaction-picker-fixed"
-          style={
-            pickerPos
-              ? {
-                  left: pickerPos.x,
-                  top: pickerPos.y,
-                  transform: "translateX(-50%)",
-                }
-              : undefined
-          }
+        style={
+  pickerPos
+    ? {
+        left: pickerPos.x,
+        top: pickerPos.y,
+        transform:
+          typeof window !== "undefined" && window.innerWidth <= 768
+            ? "translateX(-50%)"
+            : "none",
+      }
+    : undefined
+}
         >
           {activePack.map((emo) => (
             <button
