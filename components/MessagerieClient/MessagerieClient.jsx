@@ -52,13 +52,22 @@ export default function MessagerieClient({ user }) {
 
   const isMobile = useIsMobile(900);
 
-  // ✅ Source de vérité : URL
-  const conversationId = useMemo(() => {
+  // ✅ Source de vérité URL
+  const urlConversationId = useMemo(() => {
     const id = searchParams.get("conversationId");
     const n = Number(id);
     return id && !isNaN(n) ? n : null;
   }, [searchParams]);
-const [initialParticipants, setInitialParticipants] = useState([]);
+
+  const [initialParticipants, setInitialParticipants] = useState([]);
+
+  // ✅ conversation active immédiate côté UI
+  const [activeConversationId, setActiveConversationId] = useState(urlConversationId);
+
+  // ✅ synchronise l’état local quand l’URL change réellement
+  useEffect(() => {
+    setActiveConversationId(urlConversationId);
+  }, [urlConversationId]);
 
   // ⚡ Ne rafraîchir l'user QUE si on n'en a vraiment pas encore
   useEffect(() => {
@@ -67,7 +76,7 @@ const [initialParticipants, setInitialParticipants] = useState([]);
     }
   }, [currentUser, loading, refreshUser]);
 
-  // ⚡ Pré-chargement ChatBox en idle (moins impact au chargement)
+  // ⚡ Pré-chargement ChatBox en idle
   useEffect(() => {
     const run = () => import("../ChatBox/ChatBox").catch(() => {});
     if (typeof window === "undefined") return;
@@ -81,7 +90,7 @@ const [initialParticipants, setInitialParticipants] = useState([]);
     }
   }, []);
 
-  // ✅ Patch non lus : une fois par user (pas à chaque re-render)
+  // ✅ Patch non lus : une fois par user
   const patchedNonLusRef = useRef(null);
   useEffect(() => {
     if (!displayedUser?.id) return;
@@ -89,25 +98,31 @@ const [initialParticipants, setInitialParticipants] = useState([]);
     if (patchedNonLusRef.current === displayedUser.id) return;
     patchedNonLusRef.current = displayedUser.id;
 
-    // tâche de fond, non bloquante
     fetch("/api/messages/nonlus", { method: "PATCH" }).catch(() => {});
   }, [displayedUser?.id]);
 
- const handleSelectConversation = useCallback(
-  (payload) => {
-    const id = typeof payload === "object" ? payload?.id : payload;
-    const initP = typeof payload === "object" ? payload?.initialParticipants : null;
+  const handleSelectConversation = useCallback(
+    (payload) => {
+      const id = typeof payload === "object" ? payload?.id : payload;
+      const initP =
+        typeof payload === "object" ? payload?.initialParticipants : null;
 
-        if (Array.isArray(initP)) setInitialParticipants(initP);
-else setInitialParticipants([]);
+      if (!id) return;
 
-    router.push(`/messagerie?conversationId=${id}`, { scroll: false });
-  },
-  [router]
-);
+      // ✅ mise à jour immédiate de l’UI
+      setActiveConversationId(id);
 
+      if (Array.isArray(initP)) setInitialParticipants(initP);
+      else setInitialParticipants([]);
+
+      router.push(`/messagerie?conversationId=${id}`, { scroll: false });
+    },
+    [router]
+  );
 
   const handleBack = useCallback(() => {
+    setActiveConversationId(null);
+    setInitialParticipants([]);
     router.push(`/messagerie`, { scroll: false });
   }, [router]);
 
@@ -131,13 +146,13 @@ else setInitialParticipants([]);
 
   // --- MOBILE VIEW ---
   if (isMobile) {
-    if (!conversationId) {
+    if (!activeConversationId) {
       return (
         <div className="messagerie-mobile-list">
           <ListeConversations
             userId={displayedUser.id}
             onSelectConversation={handleSelectConversation}
-            selectedId={conversationId}
+            selectedId={activeConversationId}
             autoSelectFirst={false}
           />
         </div>
@@ -146,14 +161,13 @@ else setInitialParticipants([]);
 
     return (
       <div className="messagerie-mobile-chat">
-<ChatBox
-  conversationId={conversationId}
-  utilisateur={displayedUser}
-  initialParticipants={initialParticipants}
-  onBack={handleBack}
-/>
-
-
+        <ChatBox
+          key={activeConversationId}
+          conversationId={activeConversationId}
+          utilisateur={displayedUser}
+          initialParticipants={initialParticipants}
+          onBack={handleBack}
+        />
       </div>
     );
   }
@@ -164,20 +178,20 @@ else setInitialParticipants([]);
       <ListeConversations
         userId={displayedUser.id}
         onSelectConversation={handleSelectConversation}
-        selectedId={conversationId}
+        selectedId={activeConversationId}
         className="liste-conversations"
         autoSelectFirst={false}
       />
 
       <div className="chat-section">
-        {conversationId ? (
-         <ChatBox
-  conversationId={conversationId}
-  utilisateur={displayedUser}
-  initialParticipants={initialParticipants}
-  onBack={handleBack}
-/>
-
+        {activeConversationId ? (
+          <ChatBox
+            key={activeConversationId}
+            conversationId={activeConversationId}
+            utilisateur={displayedUser}
+            initialParticipants={initialParticipants}
+            onBack={handleBack}
+          />
         ) : (
           <div className="no-conversation">
             <p>Sélectionne une conversation</p>
