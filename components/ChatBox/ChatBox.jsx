@@ -18,7 +18,7 @@ import "./ChatBox.css";
 
 import ChatHeader from "./ChatHeader";
 
-// ✅ PERF: MessagesList en dynamic pour éviter le gros freeze au clic
+// ✅ PERF: MessagesList en dynamic
 const MessagesList = dynamic(() => import("../MessagesList"), {
   ssr: false,
   loading: () => (
@@ -59,6 +59,7 @@ function getAblyClient() {
     console.error("❌ NEXT_PUBLIC_ABLY_API_KEY manquant pour Ably");
     return null;
   }
+
   ablyClient = new Realtime(process.env.NEXT_PUBLIC_ABLY_API_KEY);
   return ablyClient;
 }
@@ -90,7 +91,6 @@ export default function ChatBox({
   onBack,
   initialParticipants = [],
 }) {
-  // --------------------- STATES ----------------------
   const [texte, setTexte] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inCall, setInCall] = useState(false);
@@ -106,7 +106,6 @@ export default function ChatBox({
   const [prenom2, setPrenom2] = useState("");
   const [savingPrenoms, setSavingPrenoms] = useState(false);
   const [errorPrenoms, setErrorPrenoms] = useState("");
-
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addUserInput, setAddUserInput] = useState("");
   const [addUserError, setAddUserError] = useState("");
@@ -114,36 +113,30 @@ export default function ChatBox({
   const [callStartTime, setCallStartTime] = useState(null);
   const [callDuration, setCallDuration] = useState("0:00");
   const [recording, setRecording] = useState(false);
+  const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
 
-  // --------------------- REFS ----------------------
   const sonnerieRef = useRef(null);
   const appelTimeoutRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunks = useRef([]);
   const callTimerRef = useRef(null);
   const audioContextRef = useRef(null);
-
   const messagesListRef = useRef(null);
-
   const mediaStreamRef = useRef(null);
   const scriptProcessorRef = useRef(null);
   const audioDataRef = useRef({ buffer: [], length: 0 });
-
   const roomRef = useRef(null);
   const appelEntrantRef = useRef(null);
   const inCallRef = useRef(false);
   const participantsAutresRef = useRef(null);
 
-  // Auto-scroll maîtrisé
   const lastMsgIdRef = useRef(null);
   const skipNextAutoScrollRef = useRef(false);
   const hasScrolledInitialRef = useRef(false);
-const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
-  // ✅ Perf: état "at bottom" maintenu par listener scroll
+
   const atBottomRef = useRef(true);
   const SCROLL_TOLERANCE_PX = 140;
 
-  // ✅ helper: récupérer le vrai élément scrollable
   const getScrollEl = useCallback(() => {
     const handle = messagesListRef.current;
     if (!handle) return null;
@@ -152,11 +145,6 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
     return null;
   }, []);
 
-  /* =========================================================
-     ✅ FIX iOS clavier (SIMPLE + SAFE)
-     - Met à jour --app-vh et --kb
-     - AUCUN body lock (sinon blanc/décalage Safari)
-     ========================================================= */
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -171,7 +159,10 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
       root.style.setProperty("--app-vh", `${viewportH}px`);
 
       if (vv) {
-        const kb = Math.max(0, window.innerHeight - (vv?.height || window.innerHeight));
+        const kb = Math.max(
+          0,
+          window.innerHeight - (vv?.height || window.innerHeight)
+        );
         root.style.setProperty("--kb", `${kb}px`);
       } else {
         root.style.setProperty("--kb", `0px`);
@@ -183,7 +174,6 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
     vv?.addEventListener("scroll", setVars);
     window.addEventListener("resize", setVars);
 
-    // Quand on focus un champ texte : on recalc + scroll bottom (type Messenger)
     const onFocusIn = (e) => {
       const t = e.target;
       if (!t) return;
@@ -208,7 +198,6 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
     };
 
     const onFocusOut = () => {
-      // quand le clavier se ferme
       root.style.setProperty("--kb", "0px");
       setTimeout(setVars, 50);
     };
@@ -255,7 +244,6 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
     [getScrollEl]
   );
 
-  // ✅ Re-scroll si la hauteur change (images/presign/etc.)
   useEffect(() => {
     if (!conversationId) return;
     if (typeof ResizeObserver === "undefined") return;
@@ -276,8 +264,6 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
       });
     };
 
-    reScroll();
-
     const ro = new ResizeObserver(() => {
       reScroll();
     });
@@ -291,45 +277,31 @@ const [hidePrenomsUI, setHidePrenomsUI] = useState(false);
     };
   }, [conversationId, loadingInitial, scrollToBottom, getScrollEl]);
 
-  // ✅ MEGA PERF: précharge le chunk MessagesList dès que la ChatBox est montée
   useEffect(() => {
-    import("../MessagesList").catch(() => {});
-  }, []);
-// ✅ À l’ouverture de la conversation : mark-as-read côté conversation
-useEffect(() => {
-  if (!conversationId || !utilisateur?.id) return;
+    if (!conversationId || !utilisateur?.id) return;
 
-  let cancelled = false;
+    const run = async () => {
+      try {
+        await fetch(`/api/conversations/${conversationId}/mark-as-read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ userId: utilisateur.id }),
+        });
 
-  (async () => {
-    try {
-      const res = await fetch(`/api/conversations/${conversationId}/mark-as-read`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ userId: utilisateur.id }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        console.error("mark-as-read failed", res.status, err);
-      }
-
-      // ✅ Si tu as un système temps réel de notifs, on peut déclencher un clear UI
-      if (!cancelled) {
         publishNotification(utilisateur.id, "notif:clear-conversation", {
           conversationId,
         });
+      } catch (e) {
+        console.error("mark-as-read error", e);
       }
-    } catch (e) {
-      console.error("mark-as-read error", e);
-    }
-  })();
+    };
 
-  return () => {
-    cancelled = true;
-  };
-}, [conversationId, utilisateur?.id]);
+    const cancel = runIdle(run, 500);
+    return () => {
+      if (typeof cancel === "function") cancel();
+    };
+  }, [conversationId, utilisateur?.id]);
 
   const {
     messages,
@@ -344,6 +316,7 @@ useEffect(() => {
   } = useMessages(conversationId, utilisateur, setTexte);
 
   const lastNonEmptyParticipantsRef = useRef(initialParticipants);
+
   useEffect(() => {
     if (Array.isArray(initialParticipants) && initialParticipants.length > 0) {
       lastNonEmptyParticipantsRef.current = initialParticipants;
@@ -363,7 +336,6 @@ useEffect(() => {
     return lastNonEmptyParticipantsRef.current || [];
   }, [participantsAutres]);
 
-  // ✅ Optimistic UI: afficher la réaction immédiatement (sans refresh)
   const toggleReactionLocal = useCallback((reactions = [], emoji, userId) => {
     const rx = Array.isArray(reactions) ? [...reactions] : [];
     const idx = rx.findIndex(
@@ -383,6 +355,7 @@ useEffect(() => {
       mutate(
         (old) => {
           const list = old?.messages || old?.data || old || [];
+
           if (old?.messages) {
             return {
               ...old,
@@ -463,9 +436,6 @@ useEffect(() => {
     return others.concat(utilisateur);
   }, [displayParticipantsAutres, utilisateur]);
 
-  /* ======================================================================= */
-  /*                        SYNC REFS AVEC LES STATES                        */
-  /* ======================================================================= */
   useEffect(() => {
     appelEntrantRef.current = appelEntrant;
   }, [appelEntrant]);
@@ -482,9 +452,6 @@ useEffect(() => {
     roomRef.current = room;
   }, [room]);
 
-  /* ======================================================================= */
-  /* ✅ LISTENER scroll : met à jour atBottomRef (passive)                    */
-  /* ======================================================================= */
   useEffect(() => {
     const el = getScrollEl();
     if (!el) return;
@@ -499,11 +466,6 @@ useEffect(() => {
     return () => el.removeEventListener("scroll", onScroll);
   }, [computeIsNearBottom, getScrollEl]);
 
-  /* ======================================================================= */
-  /*                              USE EFFECTS                                */
-  /* ======================================================================= */
-
-  // ✅ Préload LiveKit en idle (moins de freeze au 1er appel)
   useEffect(() => {
     return runIdle(async () => {
       try {
@@ -515,40 +477,42 @@ useEffect(() => {
       } catch (_) {}
     }, 1800);
   }, []);
-useEffect(() => {
-  const root = document.querySelector(".chatbox-container");
-  if (!root) return;
 
-  const isTextField = (t) => {
-    if (!t) return false;
-    if (t.tagName === "TEXTAREA") return true;
-    if (t.tagName === "INPUT") {
-      const type = (t.getAttribute("type") || "text").toLowerCase();
-      return ["text", "search", "email", "tel", "url", "password"].includes(type);
-    }
-    return false;
-  };
+  useEffect(() => {
+    const root = document.querySelector(".chatbox-container");
+    if (!root) return;
 
-  const onFocusIn = (e) => {
-    if (isTextField(e.target)) {
-      setHidePrenomsUI(true); // ✅ on masque pendant la saisie
-    }
-  };
+    const isTextField = (t) => {
+      if (!t) return false;
+      if (t.tagName === "TEXTAREA") return true;
+      if (t.tagName === "INPUT") {
+        const type = (t.getAttribute("type") || "text").toLowerCase();
+        return ["text", "search", "email", "tel", "url", "password"].includes(
+          type
+        );
+      }
+      return false;
+    };
 
-  const onFocusOut = () => {
-    // ✅ on ré-affiche quand on sort du champ (petit délai safe pour iOS)
-    setTimeout(() => setHidePrenomsUI(false), 80);
-  };
+    const onFocusIn = (e) => {
+      if (isTextField(e.target)) {
+        setHidePrenomsUI(true);
+      }
+    };
 
-  root.addEventListener("focusin", onFocusIn);
-  root.addEventListener("focusout", onFocusOut);
+    const onFocusOut = () => {
+      setTimeout(() => setHidePrenomsUI(false), 80);
+    };
 
-  return () => {
-    root.removeEventListener("focusin", onFocusIn);
-    root.removeEventListener("focusout", onFocusOut);
-  };
-}, []);
-  /* --------------------- Notifications d'appel Ably ---------------------- */
+    root.addEventListener("focusin", onFocusIn);
+    root.addEventListener("focusout", onFocusOut);
+
+    return () => {
+      root.removeEventListener("focusin", onFocusIn);
+      root.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+
   useEffect(() => {
     if (!utilisateur?.id) return;
     const client = getAblyClient();
@@ -622,7 +586,6 @@ useEffect(() => {
     };
   }, [utilisateur?.id]);
 
-  /* --------------------- Prénoms couple (idle + abort) ------------------- */
   useEffect(() => {
     if (utilisateur.type !== "couple" || !conversationId) {
       setPrenomsCouple(null);
@@ -670,31 +633,31 @@ useEffect(() => {
     hasScrolledInitialRef.current = false;
   }, [conversationId]);
 
-  // ✅ scroll initial: iPhone friendly
   useLayoutEffect(() => {
     if (!conversationId) return;
     if (!loadingInitial) return;
-    if (!messages?.length) return;
+    if (!messages?.length) {
+      setLoadingInitial(false);
+      return;
+    }
 
     let tries = 0;
-    const maxTries = 8;
+    const maxTries = 5;
 
     const attempt = () => {
       tries += 1;
 
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el = getScrollEl();
-          if (!el) {
-            if (tries < maxTries) setTimeout(attempt, 60);
-            return;
-          }
+        const el = getScrollEl();
+        if (!el) {
+          if (tries < maxTries) setTimeout(attempt, 40);
+          return;
+        }
 
-          scrollToBottom(false);
-          hasScrolledInitialRef.current = true;
-          lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
-          setLoadingInitial(false);
-        });
+        scrollToBottom(false);
+        hasScrolledInitialRef.current = true;
+        lastMsgIdRef.current = messages[messages.length - 1]?.id || null;
+        setLoadingInitial(false);
       });
     };
 
@@ -705,9 +668,9 @@ useEffect(() => {
     messages?.length,
     scrollToBottom,
     getScrollEl,
+    messages,
   ]);
 
-  // ✅ auto-scroll new messages (uniquement si on est en bas)
   useEffect(() => {
     if (!messages?.length) return;
 
@@ -733,7 +696,7 @@ useEffect(() => {
     if (atBottomRef.current) {
       scrollToBottom(true);
     }
-  }, [messages?.length, utilisateur?.id, scrollToBottom]);
+  }, [messages?.length, utilisateur?.id, scrollToBottom, messages]);
 
   useEffect(() => {
     return () => {
@@ -744,10 +707,6 @@ useEffect(() => {
       }
     };
   }, []);
-
-  /* ======================================================================= */
-  /*                              TIMER APPEL                                */
-  /* ======================================================================= */
 
   const startTimer = () => {
     const start = Date.now();
@@ -768,10 +727,6 @@ useEffect(() => {
     setCallStartTime(null);
     setCallDuration("0:00");
   };
-
-  /* ======================================================================= */
-  /*                              APPEL LIVEKIT                              */
-  /* ======================================================================= */
 
   const startCall = async (video = true, initiateur = true) => {
     if (inCallRef.current) {
@@ -904,19 +859,17 @@ useEffect(() => {
         el.srcObject = null;
       }
     });
+
     if (window.localStream && window.localStream.getTracks) {
       window.localStream.getTracks().forEach((track) => track.stop());
       window.localStream = null;
     }
+
     if (window.localVideoTrack) {
       window.localVideoTrack.stop();
       delete window.localVideoTrack;
     }
   }
-
-  /* ======================================================================= */
-  /*                         ENREGISTREMENT AUDIO                            */
-  /* ======================================================================= */
 
   const startRecording = async () => {
     try {
@@ -927,6 +880,7 @@ useEffect(() => {
       mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
+
       const source = audioCtx.createMediaStreamSource(mediaStreamRef.current);
       const processor = audioCtx.createScriptProcessor(4096, 1, 1);
       scriptProcessorRef.current = processor;
@@ -1055,15 +1009,12 @@ useEffect(() => {
     }
   }
 
-  /* ======================================================================= */
-  /*                          HANDLERS MESSAGES                              */
-  /* ======================================================================= */
-
   const handleDelete = async (messageId) => {
     try {
       const res = await fetch(`/api/messages/${messageId}`, {
         method: "DELETE",
       });
+
       if (res.ok) {
         mutate(
           (currentData) => {
@@ -1263,7 +1214,7 @@ useEffect(() => {
         />
       </div>
 
-      {utilisateur?.type === "couple"&& !hidePrenomsUI && (
+      {utilisateur?.type === "couple" && !hidePrenomsUI && (
         <div className="couple-prenoms-bar">
           <span>
             Prénoms du couple :{" "}
@@ -1359,15 +1310,15 @@ useEffect(() => {
         </div>
       )}
 
- {inCall && (
-  <VideoCallView
-    inCall={inCall}
-    room={room}
-    remoteTracks={remoteTracks}
-    hangupCall={hangupCall}
-    callDuration={callDuration}
-  />
-)}
+      {inCall && (
+        <VideoCallView
+          inCall={inCall}
+          room={room}
+          remoteTracks={remoteTracks}
+          hangupCall={hangupCall}
+          callDuration={callDuration}
+        />
+      )}
 
       <MessagesList
         ref={messagesListRef}

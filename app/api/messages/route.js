@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
-import { sendPush } from "../../../lib/push"; // 🔔 NEW: helper push
+import { sendPush } from "../../../lib/push";
 
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
@@ -17,9 +17,9 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
 const BUCKET = process.env.AWS_S3_BUCKET;
 
-// Petit helper pour le texte de la push
 function pushPreview(type, contenu) {
   const c = (contenu || "").trim();
   if (type === "TEXTE") return c ? c.slice(0, 80) : "Nouveau message";
@@ -31,17 +31,6 @@ function pushPreview(type, contenu) {
 }
 
 export async function POST(req) {
-  console.log("⇒ POST /api/messages déclenché");
-  console.log("POST /api/messages CONTENT-TYPE:", req.headers.get("content-type"));
-  let debugBody = "";
-  try {
-    debugBody = await req.clone().text();
-  } catch {}
-
-  if (debugBody) {
-    console.log("[LOG][POST /api/messages] raw body (truncated 800):", debugBody.slice(0, 800));
-  }
-
   try {
     const contentType = req.headers.get("content-type") || "";
     let body = {};
@@ -49,17 +38,11 @@ export async function POST(req) {
 
     if (contentType.includes("application/json")) {
       body = await req.json();
-      console.log("[LOG][POST] body(JSON):", {
-        conversationId: body?.conversationId,
-        type: body?.type,
-        hasContenu: !!body?.contenu,
-        imageUrl: body?.imageUrl,
-        audioUrl: body?.audioUrl,
-      });
     } else if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
+
       body = {
-        conversationId: parseInt(formData.get("conversationId")),
+        conversationId: parseInt(formData.get("conversationId"), 10),
         contenu: formData.get("contenu"),
         type: formData.get("type"),
         imageUrl: null,
@@ -72,72 +55,68 @@ export async function POST(req) {
         optimisticKey: formData.get("optimisticKey") || null,
       };
 
-      // Sélection du fichier selon le type
-      if ((body.type === "IMAGE" || body.type === "EPHEMERE") && formData.get("image")) {
+      if (
+        (body.type === "IMAGE" || body.type === "EPHEMERE") &&
+        formData.get("image")
+      ) {
         file = formData.get("image");
-      } else if ((body.type === "AUDIO" || body.type === "EPHEMERE") && formData.get("audio")) {
+      } else if (
+        (body.type === "AUDIO" || body.type === "EPHEMERE") &&
+        formData.get("audio")
+      ) {
         file = formData.get("audio");
       }
-
-      console.log("[LOG][POST] body(form-data):", {
-        conversationId: body.conversationId,
-        type: body.type,
-        hasContenu: !!body.contenu,
-        hasFile: !!file,
-        fileName: file?.name,
-        fileType: file?.type,
-        fileSize: file?.size,
-      });
     } else {
-      console.warn("[LOG][POST] Type non supporté:", contentType);
-      return NextResponse.json({ error: "Type non supporté" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Type non supporté" },
+        { status: 400 }
+      );
     }
 
-    // Upload S3 si fichier fourni
     if (file && file.size > 0) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const ext = file.name.split(".").pop();
-      let fileName;
+      const fileName =
+        body.type === "EPHEMERE"
+          ? `ephemere/snap_${uuidv4()}.${ext}`
+          : `msg_${uuidv4()}.${ext}`;
 
-      if (body.type === "EPHEMERE") {
-        fileName = `ephemere/snap_${uuidv4()}.${ext}`;
-      } else {
-        fileName = `msg_${uuidv4()}.${ext}`;
-      }
-
-      console.log("[LOG][POST] prêt upload S3:", {
-        bucket: BUCKET,
-        key: fileName,
-        contentType: file.type,
-        size: buffer.length,
-      });
-
-      // Détection mineur (Sightengine) si IMAGE/EPHEMERE
       if (
         (body.type === "IMAGE" || body.type === "EPHEMERE") &&
         file.type.startsWith("image/")
       ) {
         try {
           const moderationForm = new FormData();
-          moderationForm.append("media", new Blob([buffer], { type: file.type }), file.name);
+          moderationForm.append(
+            "media",
+            new Blob([buffer], { type: file.type }),
+            file.name
+          );
           moderationForm.append("models", "face-attributes");
           moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
           moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
 
-          const moderationRes = await fetch("https://api.sightengine.com/1.0/check.json", {
-            method: "POST",
-            body: moderationForm,
-          });
+          const moderationRes = await fetch(
+            "https://api.sightengine.com/1.0/check.json",
+            {
+              method: "POST",
+              body: moderationForm,
+            }
+          );
 
           const moderationData = await moderationRes.json();
-          console.log("🧠 [CHAT] Sightengine:", JSON.stringify(moderationData, null, 2));
 
           if (moderationData?.faces?.length) {
-            const hasMinor = moderationData.faces.some((f) => f.attributes?.minor > 0.9);
+            const hasMinor = moderationData.faces.some(
+              (f) => f.attributes?.minor > 0.9
+            );
+
             if (hasMinor) {
-              console.warn("[LOG][POST] Image rejetée (mineur détecté)");
               return NextResponse.json(
-                { success: false, message: "Image refusée : visage mineur détecté (IA)." },
+                {
+                  success: false,
+                  message: "Image refusée : visage mineur détecté (IA).",
+                },
                 { status: 400 }
               );
             }
@@ -160,67 +139,55 @@ export async function POST(req) {
         })
       );
 
-      // Stocke la clé S3 (tu utilises imageUrl/audioUrl comme storageKey, on garde)
       if (file.type.startsWith("audio/")) {
         body.audioUrl = fileName;
       } else {
         body.imageUrl = fileName;
       }
-
-      console.log("[LOG][POST] upload S3 OK, champs mis à jour:", {
-        imageUrl: body.imageUrl,
-        audioUrl: body.audioUrl,
-      });
-    } else {
-      console.log("[LOG][POST] aucun fichier à uploader ou size=0");
     }
 
-    const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } = body;
+    const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } =
+      body;
+
+    if (!conversationId || Number.isNaN(conversationId)) {
+      return NextResponse.json(
+        { success: false, message: "conversationId manquant" },
+        { status: 400 }
+      );
+    }
+
     const user = await getUserFromToken();
     if (!user) {
-      console.warn("[LOG][POST] getUserFromToken => null");
-      return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "Non autorisé" },
+        { status: 401 }
+      );
     }
 
     const auteurId = user.id;
-    console.log(
-      "[LOG][POST] auteurId:",
-      auteurId,
-      "conversationId:",
-      conversationId,
-      "type:",
-      type,
-      "imageUrl:",
-      imageUrl,
-      "audioUrl:",
-      audioUrl
-    );
 
-    // Participants (ids)
-    const participants = await prisma.participant.findMany({
-      where: { conversationId },
-      select: { utilisateurId: true },
-    });
-    console.log("[LOG][POST] participants:", participants?.map((p) => p.utilisateurId));
+    const [participants, exclus] = await Promise.all([
+      prisma.participant.findMany({
+        where: { conversationId },
+        select: { utilisateurId: true },
+      }),
+      getIdsUtilisateursExclus(auteurId),
+    ]);
 
     const autresParticipants = (participants || [])
       .map((p) => p.utilisateurId)
       .filter((id) => id !== auteurId);
 
-    // Vérifie si certains participants sont bloqués
-    const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
-      console.warn("[LOG][POST] utilisateur bloqué détecté");
-      return NextResponse.json({ success: false, message: "Utilisateur bloqué" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "Utilisateur bloqué" },
+        { status: 403 }
+      );
     }
 
-    let prenomEnvoyeur = body.prenomEnvoyeur || null;
-
-    // ✅ EPHEMERE: doit expirer uniquement après "vu"
-    // => openedAt = null, expiresAt = null à la création
+    const prenomEnvoyeur = body.prenomEnvoyeur || null;
     const isEphemere = type === "EPHEMERE";
 
-    console.log("[LOG][POST] création message…");
     const message = await prisma.message.create({
       data: {
         conversationId,
@@ -234,146 +201,113 @@ export async function POST(req) {
         lu: false,
         envoyeur: envoyeur || null,
         prenomEnvoyeur: prenomEnvoyeur || null,
-
         openedAt: null,
-        // ✅ nouveau champ (doit exister en DB)
         expiresAt: isEphemere ? null : null,
-        // ✅ optionnel si tu l’ajoutes en DB plus tard
-        // deletedAt: null,
       },
       include: {
         auteur: {
-          select: { id: true, pseudo: true, photoUrl: true, type: true },
+          select: {
+            id: true,
+            pseudo: true,
+            photoUrl: true,
+            type: true,
+          },
         },
         reactions: {
           select: {
             emoji: true,
             utilisateurId: true,
-            utilisateur: { select: { pseudo: true } },
+            utilisateur: {
+              select: {
+                pseudo: true,
+              },
+            },
           },
         },
       },
     });
-    console.log("[LOG][POST] message créé:", {
-      id: message.id,
-      type: message.type,
-      imageUrl: message.imageUrl,
-      audioUrl: message.audioUrl,
-      createdAt: message.createdAt,
-    });
 
-    // PATCH: optimisticKey pour le front
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
-    // Publish Ably conversation
-    console.log("[LOG][POST] publish Ably payload (avant):", {
-      id: messageWithOptimisticKey.id,
-      type: messageWithOptimisticKey.type,
-      imageUrl: messageWithOptimisticKey.imageUrl,
-      audioUrl: messageWithOptimisticKey.audioUrl,
-      optimisticKey,
-    });
-    await ably.channels
-      .get(`conversation-${conversationId}`)
-      .publish("message", messageWithOptimisticKey);
-    console.log("[LOG][POST] publish Ably: OK");
+    await Promise.all([
+      ably.channels
+        .get(`conversation-${conversationId}`)
+        .publish("message", messageWithOptimisticKey),
 
-    await prisma.conversation.update({
-      where: { id: conversationId },
-      data: { updatedAt: new Date() },
-    });
+      prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      }),
+    ]);
 
-    // Notifications internes (DB)
-    await Promise.all(
-      autresParticipants.map((destId) =>
-        prisma.notification.create({
-          data: {
+    if (autresParticipants.length > 0) {
+      await Promise.all([
+        prisma.notification.createMany({
+          data: autresParticipants.map((destId) => ({
             utilisateurId: destId,
             message: `${message.auteur.pseudo} vous a envoyé un nouveau message`,
             lien: `/messagerie?conversationId=${conversationId}`,
             lu: false,
-          },
-        })
-      )
-    );
-    console.log("[LOG][POST] notifications enregistrées pour:", autresParticipants);
+          })),
+        }),
 
-    // DIGEST QUOTIDIEN
-    if (autresParticipants.length > 0) {
-      await prisma.digestNotification.createMany({
-        data: autresParticipants.map((destId) => ({
-          destinataireId: destId,
-          conversationId,
-          messageId: message.id,
-        })),
-        skipDuplicates: true,
-      });
-      console.log(
-        "[LOG][POST] digestNotification createMany OK (count≈):",
-        autresParticipants.length
-      );
+        prisma.digestNotification.createMany({
+          data: autresParticipants.map((destId) => ({
+            destinataireId: destId,
+            conversationId,
+            messageId: message.id,
+          })),
+          skipDuplicates: true,
+        }),
+      ]);
     }
 
-    // 🔔 PUSH EXPO : envoi aux autres participants de la conv
     if (autresParticipants.length > 0) {
       const dests = await prisma.utilisateur.findMany({
         where: { id: { in: autresParticipants } },
         select: { expoPushToken: true, pushEnabled: true },
       });
+
       const tokens = (dests || [])
         .filter((u) => u.pushEnabled && u.expoPushToken)
         .map((u) => u.expoPushToken);
 
       if (tokens.length) {
         const bodyText = pushPreview(message.type, message.contenu);
+
         try {
           await sendPush(tokens, {
             title: "Nouveau message 💬",
             body: bodyText,
             data: { type: "MESSAGE", conversationId: Number(conversationId) },
           });
-          console.log("[LOG][POST] push envoyées:", tokens.length);
         } catch (e) {
-          console.warn("[LOG][POST] échec envoi push:", e?.message || e);
+          console.warn("[POST /api/messages] échec envoi push:", e?.message || e);
         }
-      } else {
-        console.log("[LOG][POST] aucun token Expo à notifier");
       }
     }
 
-    // 🆕 ABLY IN-APP (BANNIÈRE MOBILE)
     if (autresParticipants.length > 0) {
       const preview = pushPreview(message.type, message.contenu);
 
-      for (const destId of autresParticipants) {
-        try {
-        await ably.channels
-  .get(`user-${destId}`)
-  .publish("new-message", {
-    conversationId: Number(conversationId),
-    fromId: auteurId,                 // ✅ AJOUT
-    fromPseudo: message.auteur.pseudo,
-    preview,
-    type: message.type,
-  });
-
-
-          console.log(`📡 Ably new-message envoyé sur user-${destId}`);
-        } catch (e) {
-          console.warn("⚠️ Erreur Ably new-message:", e?.message || e);
-        }
-      }
+      await Promise.all(
+        autresParticipants.map(async (destId) => {
+          try {
+            await ably.channels.get(`user-${destId}`).publish("new-message", {
+              conversationId: Number(conversationId),
+              fromId: auteurId,
+              fromPseudo: message.auteur.pseudo,
+              preview,
+              type: message.type,
+            });
+          } catch (e) {
+            console.warn("[POST /api/messages] erreur Ably user channel:", e?.message || e);
+          }
+        })
+      );
     }
 
-    // ✅ Réponse API avec optimisticKey
-    console.log("[LOG][POST] réponse API:", {
-      id: messageWithOptimisticKey.id,
-      type: messageWithOptimisticKey.type,
-      imageUrl: messageWithOptimisticKey.imageUrl,
-      audioUrl: messageWithOptimisticKey.audioUrl,
-      optimisticKey,
-    });
     return NextResponse.json(
       { success: true, message: messageWithOptimisticKey },
       { status: 200 }
@@ -391,10 +325,9 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const conversationId = parseInt(searchParams.get("conversationId") || "", 10);
-    const beforeId = searchParams.get("beforeId");
+    const beforeIdRaw = searchParams.get("beforeId");
+    const beforeId = beforeIdRaw ? parseInt(beforeIdRaw, 10) : null;
     const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 50);
-
-    console.log("[LOG][GET] params:", { conversationId, beforeId, limit });
 
     if (!conversationId || Number.isNaN(conversationId)) {
       return NextResponse.json(
@@ -405,63 +338,54 @@ export async function GET(req) {
 
     const user = await getUserFromToken();
     if (!user) {
-      console.warn("[LOG][GET] getUserFromToken => null");
       return NextResponse.json(
         { success: false, message: "Non autorisé" },
         { status: 401 }
       );
     }
+
     const auteurId = user.id;
+    const now = new Date();
 
-    // Participants + droits
-    const allParticipants = await prisma.participant.findMany({
-      where: { conversationId },
-      select: {
-        utilisateurId: true,
-        lastReadAt: true,
-        utilisateur: {
-          select: { id: true, pseudo: true, photoUrl: true, type: true },
+    const [allParticipants, exclus] = await Promise.all([
+      prisma.participant.findMany({
+        where: { conversationId },
+        select: {
+          utilisateurId: true,
+          lastReadAt: true,
+          utilisateur: {
+            select: {
+              id: true,
+              pseudo: true,
+              photoUrl: true,
+              type: true,
+            },
+          },
         },
-      },
-    });
-
-    console.log(
-      "[LOG][GET] participants:",
-      allParticipants.map((p) => ({
-        utilisateurId: p.utilisateurId,
-        lastReadAt: p.lastReadAt,
-      }))
-    );
+      }),
+      getIdsUtilisateursExclus(auteurId),
+    ]);
 
     const autresParticipants = allParticipants
       .map((p) => p.utilisateurId)
       .filter((id) => id !== auteurId);
 
-    const exclus = await getIdsUtilisateursExclus(auteurId);
     if (autresParticipants.some((id) => exclus.includes(id))) {
-      console.warn("[LOG][GET] accès refusé (utilisateur bloqué)");
       return NextResponse.json(
         { success: false, message: "Accès refusé à cette conversation." },
         { status: 403 }
       );
     }
 
-    // ✅ Filtrage EPHEMERE expirés
-    const now = new Date();
-
-    // 🔥 Pagination : on prend limit + 1 pour savoir s'il reste des messages
     const where = {
       conversationId,
-      ...(beforeId && { id: { lt: parseInt(beforeId, 10) } }),
-
-      // ✅ cache les ephemères expirés (et deleted si tu l’ajoutes)
+      ...(beforeId ? { id: { lt: beforeId } } : {}),
       AND: [
-        // { deletedAt: null }, // si tu ajoutes deletedAt en DB + Prisma
         {
           OR: [
             { type: { not: "EPHEMERE" } },
-            { type: "EPHEMERE", expiresAt: null }, // pas encore vu => visible
-            { type: "EPHEMERE", expiresAt: { gt: now } }, // vu mais pas encore expiré => visible
+            { type: "EPHEMERE", expiresAt: null },
+            { type: "EPHEMERE", expiresAt: { gt: now } },
           ],
         },
       ],
@@ -470,7 +394,7 @@ export async function GET(req) {
     const rows = await prisma.message.findMany({
       where,
       orderBy: { id: "desc" },
-      take: limit + 1, // <= important
+      take: limit + 1,
       select: {
         id: true,
         contenu: true,
@@ -482,13 +406,15 @@ export async function GET(req) {
         createdAt: true,
         auteurId: true,
         lu: true,
-
-        // ✅ utile si tu veux afficher un timer côté front
         openedAt: true,
         expiresAt: true,
-
         auteur: {
-          select: { id: true, pseudo: true, photoUrl: true, type: true },
+          select: {
+            id: true,
+            pseudo: true,
+            photoUrl: true,
+            type: true,
+          },
         },
         envoyeur: true,
         prenomEnvoyeur: true,
@@ -496,7 +422,11 @@ export async function GET(req) {
           select: {
             emoji: true,
             utilisateurId: true,
-            utilisateur: { select: { pseudo: true } },
+            utilisateur: {
+              select: {
+                pseudo: true,
+              },
+            },
           },
         },
       },
@@ -510,31 +440,19 @@ export async function GET(req) {
       messages = rows.slice(0, limit);
     }
 
-    // On renvoie au front en ordre chronologique (ancien -> récent)
     messages.reverse();
-
-    console.log("[LOG][GET] messages count:", messages.length);
-    console.log(
-      "[LOG][GET] tail sample:",
-      messages.slice(-3).map((m) => ({
-        id: m.id,
-        type: m.type,
-        imageUrl: m.imageUrl,
-        audioUrl: m.audioUrl,
-        createdAt: m.createdAt,
-        expiresAt: m.expiresAt,
-      }))
-    );
 
     const lastReads = allParticipants.map((p) => ({
       utilisateurId: p.utilisateurId,
       lastReadAt: p.lastReadAt,
     }));
+
     const participantsInfos = allParticipants.map((p) => p.utilisateur);
 
     let destinataire = null;
     if (participantsInfos.length === 2) {
-      destinataire = participantsInfos.find((u) => u.id !== auteurId) || null;
+      destinataire =
+        participantsInfos.find((u) => u.id !== auteurId) || null;
     }
 
     return NextResponse.json(
@@ -544,12 +462,12 @@ export async function GET(req) {
         destinataire,
         participants: participantsInfos,
         lastReads,
-        hasMore, // 👈 ajouté pour le front
+        hasMore,
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error("[LOG][GET] erreur:", error);
+    console.error("[GET /api/messages] erreur:", error);
     return NextResponse.json(
       { success: false, message: "Impossible de récupérer les messages." },
       { status: 500 }
