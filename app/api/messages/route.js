@@ -6,6 +6,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
 import { sendPush } from "../../../lib/push";
+import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
 
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
@@ -146,8 +147,15 @@ export async function POST(req) {
       }
     }
 
-    const { conversationId, contenu, imageUrl, audioUrl, videoUrl, type, envoyeur } =
-      body;
+    const {
+      conversationId,
+      contenu,
+      imageUrl,
+      audioUrl,
+      videoUrl,
+      type,
+      envoyeur,
+    } = body;
 
     if (!conversationId || Number.isNaN(conversationId)) {
       return NextResponse.json(
@@ -227,6 +235,21 @@ export async function POST(req) {
       },
     });
 
+    // ✅ Tracking analytics admin : message envoyé
+    setTimeout(() => {
+      logSiteEvent({
+        userId: auteurId,
+        type: SITE_EVENT_TYPES.MESSAGE_SENT,
+        metadata: {
+          conversationId,
+          messageId: message.id,
+          messageType: type || null,
+          hasMedia: Boolean(imageUrl || audioUrl || videoUrl),
+          destinatairesCount: autresParticipants.length,
+        },
+      }).catch(console.error);
+    }, 0);
+
     const optimisticKey = body.optimisticKey || null;
     const messageWithOptimisticKey = { ...message, optimisticKey };
 
@@ -302,7 +325,10 @@ export async function POST(req) {
               type: message.type,
             });
           } catch (e) {
-            console.warn("[POST /api/messages] erreur Ably user channel:", e?.message || e);
+            console.warn(
+              "[POST /api/messages] erreur Ably user channel:",
+              e?.message || e
+            );
           }
         })
       );

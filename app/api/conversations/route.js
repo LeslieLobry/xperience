@@ -2,9 +2,9 @@ import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
+import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
 
 // ----------- CRÉATION (POST) -----------
-// (INCHANGÉ)
 export async function POST(req) {
   try {
     const currentUser = await getUserFromToken();
@@ -26,6 +26,7 @@ export async function POST(req) {
 
     const exclus = await getIdsUtilisateursExclus(currentUser.id);
     const autres = ids.filter((id) => id !== currentUser.id);
+
     if (autres.some((id) => exclus.includes(id)))
       return NextResponse.json(
         { error: "Impossible de créer une conversation avec un utilisateur bloqué." },
@@ -49,12 +50,14 @@ export async function POST(req) {
       const myParticipant = existingConv.participants.find(
         (p) => p.utilisateurId === currentUser.id
       );
+
       if (myParticipant?.supprimé) {
         await prisma.participant.update({
           where: { id: myParticipant.id },
           data: { supprimé: false },
         });
       }
+
       return NextResponse.json({ conversation: existingConv, existed: true });
     }
 
@@ -73,6 +76,19 @@ export async function POST(req) {
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
+
+    // ✅ Tracking analytics admin : conversation réellement créée
+    setTimeout(() => {
+      logSiteEvent({
+        userId: currentUser.id,
+        type: SITE_EVENT_TYPES.CONVERSATION_CREATED,
+        metadata: {
+          conversationId: conversation.id,
+          participantsCount: ids.length,
+          participantIds: ids,
+        },
+      }).catch(console.error);
+    }, 0);
 
     return NextResponse.json({ conversation, created: true });
   } catch (err) {
@@ -115,8 +131,6 @@ export async function GET() {
     let unreadCounts = {};
 
     if (convIds.length) {
-      // ⚡ 1 seule requête: compte des messages > lastReadAt pour CE user
-      // (on se base sur Participant.lastReadAt comme ton code)
       const rows = await prisma.$queryRaw`
         SELECT
           m."conversationId" AS "conversationId",

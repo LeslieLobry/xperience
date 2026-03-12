@@ -2,16 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { sendPush } from "../../../lib/push"; // 🔔 PUSH EXPO
-import Ably from "ably"; // 🆕 temps réel bannière
+import { sendPush } from "../../../lib/push";
+import Ably from "ably";
+import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
 
 // 🆕 Client Ably REST (clé serveur)
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 
 /* ---------- CORS ---------- */
 const ALLOWED_ORIGINS = [
-  "http://localhost:8081", // Expo web
-  "http://localhost:19006", // Expo dev
+  "http://localhost:8081",
+  "http://localhost:19006",
   "https://x-periences.fr",
   "https://www.x-periences.fr",
 ];
@@ -37,7 +38,6 @@ export async function OPTIONS(req) {
 /* ---------- helpers ---------- */
 async function safeJson(req) {
   try {
-    // si pas de body JSON => ça peut throw
     return await req.json();
   } catch {
     return null;
@@ -47,11 +47,9 @@ async function safeJson(req) {
 function getCibleId(req, body) {
   const url = new URL(req.url);
 
-  // 1) query ?cibleId=123
   const q = url.searchParams.get("cibleId");
   if (q && !isNaN(Number(q))) return Number(q);
 
-  // 2) body { cibleId }
   const b = body?.cibleId;
   if (b !== undefined && b !== null && !isNaN(Number(b))) return Number(b);
 
@@ -66,7 +64,7 @@ async function getUserFromRequest(req) {
   const match = auth.match(/^Bearer\s+(.+)$/i);
   const tokenHeader = match?.[1];
 
-  const cookieStore = cookies(); // pas besoin de await
+  const cookieStore = cookies();
   const tokenCookie = cookieStore.get("token")?.value;
 
   const token = tokenHeader || tokenCookie;
@@ -103,6 +101,7 @@ export async function POST(req) {
     }
 
     const auteurId = Number(user.id);
+
     if (auteurId === cibleIdNum) {
       return NextResponse.json(
         { message: "Auto-like ignoré" },
@@ -110,14 +109,13 @@ export async function POST(req) {
       );
     }
 
-    // Création du like
     let like = null;
+
     try {
       like = await prisma.like.create({
         data: { auteurId, cibleId: cibleIdNum },
       });
     } catch (err) {
-      // ✅ si déjà existant, on répond OK (pas d’erreur côté app)
       if (err?.code === "P2002") {
         return NextResponse.json(
           { success: true, alreadyExists: true },
@@ -127,7 +125,18 @@ export async function POST(req) {
       throw err;
     }
 
-    // Notification interne (DB)
+    // ✅ Tracking analytics admin : like réellement créé
+    setTimeout(() => {
+      logSiteEvent({
+        userId: auteurId,
+        type: SITE_EVENT_TYPES.LIKE_SENT,
+        metadata: {
+          likeId: like.id,
+          cibleId: cibleIdNum,
+        },
+      }).catch(console.error);
+    }, 0);
+
     await prisma.notification.create({
       data: {
         utilisateurId: cibleIdNum,
@@ -137,11 +146,11 @@ export async function POST(req) {
       },
     });
 
-    // Push Expo immédiate
     const cible = await prisma.utilisateur.findUnique({
       where: { id: cibleIdNum },
       select: { expoPushToken: true, pushEnabled: true },
     });
+
     const auteur = await prisma.utilisateur.findUnique({
       where: { id: auteurId },
       select: { pseudo: true },
@@ -150,37 +159,32 @@ export async function POST(req) {
     if (cible?.pushEnabled && cible.expoPushToken) {
       try {
         await sendPush(cible.expoPushToken, {
-  title: "Nouveau like ❤️",
-  body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
-  data: {
-    url: `/(tabs)/profil/${auteurId}`, // ✅ route mobile pour expo-router
-    type: "like",                      // (optionnel mais propre)
-    userId: auteurId,                  // (optionnel)
-  },
-});
+          title: "Nouveau like ❤️",
+          body: `@${auteur?.pseudo ?? "Un membre"} t’a liké`,
+          data: {
+            url: `/(tabs)/profil/${auteurId}`,
+            type: "like",
+            userId: auteurId,
+          },
+        });
       } catch (e) {
         console.warn("⚠️ Échec push LIKE:", e?.message || e);
       }
     }
 
-    // Ably temps réel
     try {
       const channelName = `user-${cibleIdNum}`;
       const channel = ably.channels.get(channelName);
 
-    await channel.publish("new-like", {
-  pseudo: auteur?.pseudo ?? "Un membre",
-  fromPseudo: auteur?.pseudo ?? "Un membre",
-  likerId: auteurId,
-  fromId: auteurId,
-  cibleId: cibleIdNum,
-
-  // ✅ route mobile
-  url: `/(tabs)/profil/${auteurId}`,
-
-  // (optionnel) garder le lien web si tu en as besoin ailleurs
-  webLien: `/profil/${auteurId}`,
-});
+      await channel.publish("new-like", {
+        pseudo: auteur?.pseudo ?? "Un membre",
+        fromPseudo: auteur?.pseudo ?? "Un membre",
+        likerId: auteurId,
+        fromId: auteurId,
+        cibleId: cibleIdNum,
+        url: `/(tabs)/profil/${auteurId}`,
+        webLien: `/profil/${auteurId}`,
+      });
 
       console.log("📡 Ably new-like envoyé sur", channelName);
     } catch (e) {
@@ -190,7 +194,10 @@ export async function POST(req) {
     return NextResponse.json(like, { headers });
   } catch (err) {
     console.error("Erreur POST /likes :", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500, headers });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500, headers }
+    );
   }
 }
 
@@ -199,8 +206,8 @@ export async function DELETE(req) {
   const headers = corsHeaders(req);
 
   try {
-    const body = await safeJson(req); // ✅ ne plante pas si pas de body
-    const cibleIdNum = getCibleId(req, body); // ✅ query OU body
+    const body = await safeJson(req);
+    const cibleIdNum = getCibleId(req, body);
 
     if (!cibleIdNum) {
       return NextResponse.json(
@@ -217,7 +224,6 @@ export async function DELETE(req) {
       );
     }
 
-    // ✅ idempotent: si le like n'existe pas, deleteMany = ok (0 supprimé)
     await prisma.like.deleteMany({
       where: {
         auteurId: Number(user.id),
@@ -228,6 +234,9 @@ export async function DELETE(req) {
     return NextResponse.json({ success: true }, { headers });
   } catch (err) {
     console.error("Erreur DELETE /likes :", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500, headers });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500, headers }
+    );
   }
 }

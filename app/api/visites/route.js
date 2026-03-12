@@ -4,6 +4,7 @@ import { getUserFromToken } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { sendPush } from "../../../lib/push";
 import Ably from "ably";
+import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
 
 export const runtime = "nodejs";
 
@@ -57,13 +58,25 @@ export async function POST(req) {
 
     console.log("✅ Visite enregistrée :", created);
 
+    // ✅ Tracking analytics admin : visite profil réellement créée
+    setTimeout(() => {
+      logSiteEvent({
+        userId: Number(user.id),
+        type: SITE_EVENT_TYPES.PROFILE_VIEW,
+        metadata: {
+          visiteId: created.id,
+          cibleId: visiteIdNum,
+        },
+      }).catch(console.error);
+    }, 0);
+
     // ✅ notif interne (DB)
     await prisma.notification.create({
       data: {
         utilisateurId: visiteIdNum,
         auteurId: Number(user.id),
         message: "a visité ton profil",
-        lien: `/profil/${user.id}`, // ⚠️ on garde pour le web
+        lien: `/profil/${user.id}`,
         lu: false,
       },
     });
@@ -82,17 +95,17 @@ export async function POST(req) {
 
     const pseudoVisiteur = visiteur?.pseudo ?? "Un membre";
 
-    // 🔔 PUSH EXPO (CORRIGÉE POUR REDIRECTION MOBILE)
+    // 🔔 PUSH EXPO
     if (cible?.pushEnabled && cible.expoPushToken) {
       try {
         await sendPush(cible.expoPushToken, {
           title: "Nouvelle visite 👀",
           body: `@${pseudoVisiteur} a visité ton profil`,
           data: {
-            url: `/(tabs)/profil/${Number(user.id)}`, // ✅ mobile route
+            url: `/(tabs)/profil/${Number(user.id)}`,
             type: "visit",
             userId: Number(user.id),
-            visiteurId: Number(user.id), // compat ancien mapping
+            visiteurId: Number(user.id),
           },
         });
         console.log("🔔 Push VISITE envoyée");
@@ -103,7 +116,7 @@ export async function POST(req) {
       console.log("ℹ️ Aucun token/opt-in pour le visité — pas de push envoyée");
     }
 
-    // 📡 Ably temps réel (CORRIGÉ MOBILE + WEB)
+    // 📡 Ably temps réel
     try {
       const channelName = `user-${visiteIdNum}`;
 
@@ -112,11 +125,7 @@ export async function POST(req) {
         fromPseudo: pseudoVisiteur,
         visiteurId: Number(user.id),
         fromId: Number(user.id),
-
-        // ✅ mobile
         url: `/(tabs)/profil/${Number(user.id)}`,
-
-        // ✅ web (on garde pour compatibilité)
         lien: `/profil/${Number(user.id)}`,
       });
 

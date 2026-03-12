@@ -8,6 +8,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { IncomingForm } from "formidable";
 import { Readable } from "stream";
 import fs from "fs/promises";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 export const config = {
   api: { bodyParser: false },
@@ -51,11 +52,8 @@ export async function POST(req) {
 
         const nom = String(fields.nom || "");
         const prenom = String(fields.prenom || "");
-
-        // 🔧 on trim le pseudo (mais on garde la casse)
         const pseudo = String(fields.pseudo || "").trim();
 
-        // 🔧 EMAIL NORMALISÉ : minuscules + trim
         const rawEmail = String(fields.email || "");
         const email = rawEmail.toLowerCase().trim();
 
@@ -97,6 +95,7 @@ export async function POST(req) {
 
         const captchaData = await captchaRes.json();
         console.log("✅ Résultat reCAPTCHA :", captchaData);
+
         if (!captchaData.success) {
           return resolve(
             NextResponse.json(
@@ -144,14 +143,8 @@ export async function POST(req) {
               photoFile.originalFilename
             );
             moderationForm.append("models", "face-attributes");
-            moderationForm.append(
-              "api_user",
-              process.env.SIGHTENGINE_USER
-            );
-            moderationForm.append(
-              "api_secret",
-              process.env.SIGHTENGINE_SECRET
-            );
+            moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
+            moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
 
             const moderationRes = await fetch(
               "https://api.sightengine.com/1.0/check.json",
@@ -168,6 +161,7 @@ export async function POST(req) {
               const hasMinor = moderationData.faces.some(
                 (f) => f.attributes?.minor > 0.8
               );
+
               if (hasMinor) {
                 console.warn("🚫 Visage potentiellement mineur détecté");
                 return resolve(
@@ -183,9 +177,7 @@ export async function POST(req) {
               }
             }
 
-            const filename = `photo_${Date.now()}_${
-              photoFile.originalFilename
-            }`;
+            const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
             const bucket = process.env.AWS_S3_BUCKET;
 
             console.log("☁️ Envoi vers S3 :", filename);
@@ -219,7 +211,7 @@ export async function POST(req) {
             nom,
             prenom,
             pseudo,
-            email, // ✅ email déjà normalisé
+            email,
             password: hashedPassword,
             type,
             orientation,
@@ -240,11 +232,25 @@ export async function POST(req) {
           },
         });
 
+        // ✅ Tracking analytics admin : inscription réussie
+        setTimeout(() => {
+          logSiteEvent({
+            userId: newUser.id,
+            type: SITE_EVENT_TYPES.REGISTER,
+            metadata: {
+              typeCompte: type || null,
+              orientation: orientation || null,
+              localisation: localisation || null,
+            },
+          }).catch(console.error);
+        }, 0);
+
         const token = uuidv4();
+
         console.log("✉️ Envoi de l'email de confirmation...");
         await prisma.emailVerificationToken.create({
           data: {
-            email, // ✅ même email normalisé
+            email,
             token,
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           },
@@ -263,6 +269,7 @@ export async function POST(req) {
         });
 
         console.log("✅ Utilisateur créé avec succès :", newUser.id);
+
         return resolve(
           NextResponse.json({ success: true, user: newUser, photoUrl })
         );

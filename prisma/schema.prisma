@@ -21,107 +21,111 @@ model DemandeAcces {
 
   @@unique([galeriePriveeId, demandeurId])
 }
+
 model VerificationIdentite {
   id            Int         @id @default(autoincrement())
   utilisateurId Int         @unique @map("utilisateurid")
   utilisateur   Utilisateur @relation("UtilisateurVerification", fields: [utilisateurId], references: [id])
 
-  type          String
-  photoCI1Url   String      @map("photoci1url")
-  selfie1Url    String      @map("selfie1url")
-  photoCI2Url   String?     @map("photoci2url")
-  selfie2Url    String?     @map("selfie2url")
+  type        String
+  photoCI1Url String  @map("photoci1url")
+  selfie1Url  String  @map("selfie1url")
+  photoCI2Url String? @map("photoci2url")
+  selfie2Url  String? @map("selfie2url")
 
-  statut        VerificationStatut @default(EN_ATTENTE)
-  commentaire   String?
+  statut      VerificationStatut @default(EN_ATTENTE)
+  commentaire String?
 
-  // ✅ nouveau : liste des documents rejetés
-  documentsRefuses Json?    @map("documents_refuses")
+  documentsRefuses Json? @map("documents_refuses")
 
-  createdAt     DateTime    @default(now()) @map("createdat")
-  updatedAt     DateTime    @updatedAt      @map("updatedat")
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
 }
 
-
 model Utilisateur {
-  id                   Int             @id @default(autoincrement())
-  nom                  String
-  prenom               String
-  pseudo               String          @unique
-  email                String          @unique
-  role                 Role            @default(USER)
-  password             String
-  type                 String
-  orientation          String
-  age                  Int
-  consent              Boolean
-  localisation         String
-  latitude             Float?
-  longitude            Float?
-  photoUrl             String?
-  createdAt            DateTime        @default(now())
-  lastLogin            DateTime?
-  emailVerified        DateTime?
-  description          String?
-  experience           String?
-  rechercheType        String?
-  fumeur               String?
-  silhouette           String?
-  taille               Int?
-  origines             String?
-  yeux                 String?
-  cheveux              String?
-  reactions            MessageReaction[]
-  profilComplet        Boolean         @default(false) @map("profil_complet")
-  reminderSent         Boolean         @default(false) @map("reminder_sent")
-  expoPushToken  String?  @db.VarChar(255)
-  pushEnabled    Boolean  @default(true)
-  // ✅ Champs supplémentaires pour les couples
-  age2                 Int?
-  dateNaissance2       DateTime?
-  fumeur2              String?
-  silhouette2          String?
-  taille2              Int?
-  origines2            String?
-  yeux2                String?
-  cheveux2             String?
-  description2         String?
-  statut               String          @default("hors_ligne")
-  statutAuto           Boolean         @default(true)
-  lastSeenAt           DateTime?
-  consentCGU           Boolean         @default(false)
-  consentCGUDate       DateTime?
-  verificationDeadline DateTime?
-  verificationIdentiteStatut Boolean         @default(false)
-  articles             Article[]
-  avisLaisses          Avis[]          @relation("AvisAuteur")
-  avisRecus            Avis[]          @relation("AvisCible")
-  blocagesFaits        Blocage[]       @relation("BlocagesFaits")
-  blocagesRecus        Blocage[]       @relation("BlocagesRecus")
-  demandesFaite        DemandeAcces[]  @relation("Demandeur")
-  demandesRecues       DemandeAcces[]  @relation("GalerieProprio")
-  envies               Envie[]
-  evenementsCrees      Evenement[]     @relation("EvenementCreateur")
-  galeriePrivee        GaleriePrivee?
-  globalChatRead       GlobalChatRead?
-  messagesGlobaux      GlobalMessage[]
-  likesEnvoyes         Like[]          @relation("LikesEnvoyes")
-  likesRecus           Like[]          @relation("LikesRecus")
-  messages             Message[]       @relation("MessageAuteur")
-  notifications Notification[] @relation("NotificationDestinataire")
-  notificationsEnvoyees Notification[] @relation("NotificationAuteur")
-  participants         Participant[]
-  photos               Photo[]
-  recherches           Recherche[]
-  evenements           Evenement[]     @relation("Participation")
-  visitesFaites        VisiteProfil[]  @relation("Visiteur")
-  visitesRecues        VisiteProfil[]  @relation("Visite")
-  prenomsCouple        PrenomCoupleConversation[]
-  verificationIdentite VerificationIdentite?    @relation("UtilisateurVerification")
-  digestNotifications DigestNotification[] @relation("DigestToUtilisateur")
+  id                          Int                          @id @default(autoincrement())
+  nom                         String
+  prenom                      String
+  pseudo                      String                       @unique
+  email                       String                       @unique
+  role                        Role                         @default(USER)
+  password                    String
+  type                        String
+  orientation                 String
+  age                         Int
+  consent                     Boolean
+  localisation                String
+  latitude                    Float?
+  longitude                   Float?
+  photoUrl                    String?
+  createdAt                   DateTime                     @default(now())
+  lastLogin                   DateTime?
+  emailVerified               DateTime?
+  description                 String?
+  experience                  String?
+  rechercheType               String?
+  fumeur                      String?
+  silhouette                  String?
+  taille                      Int?
+  origines                    String?
+  yeux                        String?
+  cheveux                     String?
+  reactions                   MessageReaction[]
+  profilComplet               Boolean                      @default(false) @map("profil_complet")
+  reminderSent                Boolean                      @default(false) @map("reminder_sent")
+  expoPushToken               String?                      @db.VarChar(255)
+  pushEnabled                 Boolean                      @default(true)
+
+  age2                        Int?
+  dateNaissance2              DateTime?
+  fumeur2                     String?
+  silhouette2                 String?
+  taille2                     Int?
+  origines2                   String?
+  yeux2                       String?
+  cheveux2                    String?
+  description2                String?
+  statut                      String                       @default("hors_ligne")
+  statutAuto                  Boolean                      @default(true)
+  lastSeenAt                  DateTime?
+  consentCGU                  Boolean                      @default(false)
+  consentCGUDate              DateTime?
+  verificationDeadline        DateTime?
+  verificationIdentiteStatut  Boolean                      @default(false)
+
+  articles                    Article[]
+  avisLaisses                 Avis[]                       @relation("AvisAuteur")
+  avisRecus                   Avis[]                       @relation("AvisCible")
+  blocagesFaits               Blocage[]                    @relation("BlocagesFaits")
+  blocagesRecus               Blocage[]                    @relation("BlocagesRecus")
+  demandesFaite               DemandeAcces[]               @relation("Demandeur")
+  demandesRecues              DemandeAcces[]               @relation("GalerieProprio")
+  envies                      Envie[]
+  evenementsCrees             Evenement[]                  @relation("EvenementCreateur")
+  galeriePrivee               GaleriePrivee?
+  globalChatRead              GlobalChatRead?
+  messagesGlobaux             GlobalMessage[]
+  likesEnvoyes                Like[]                       @relation("LikesEnvoyes")
+  likesRecus                  Like[]                       @relation("LikesRecus")
+  messages                    Message[]                    @relation("MessageAuteur")
+  notifications               Notification[]               @relation("NotificationDestinataire")
+  notificationsEnvoyees       Notification[]               @relation("NotificationAuteur")
+  participants                Participant[]
+  photos                      Photo[]
+  recherches                  Recherche[]
+  evenements                  Evenement[]                  @relation("Participation")
+  visitesFaites               VisiteProfil[]               @relation("Visiteur")
+  visitesRecues               VisiteProfil[]               @relation("Visite")
+  prenomsCouple               PrenomCoupleConversation[]
+  verificationIdentite        VerificationIdentite?        @relation("UtilisateurVerification")
+  digestNotifications         DigestNotification[]         @relation("DigestToUtilisateur")
+
+  // ✅ ajout analytics admin
+  siteEvents                  SiteEvent[]
+
   @@map("Utilisateur")
-  @@index([lastSeenAt])                // ⬅️ utile pour les cron/lectures
-  @@index([statut, statutAuto])   
+  @@index([lastSeenAt])
+  @@index([statut, statutAuto])
 }
 
 model GaleriePrivee {
@@ -132,6 +136,7 @@ model GaleriePrivee {
   demandesAcces DemandeAcces[] @relation("DemandeGalerie")
   utilisateur   Utilisateur    @relation(fields: [utilisateurId], references: [id])
   photos        Photo[]
+
   @@map("GaleriePrivee")
 }
 
@@ -139,7 +144,7 @@ model Evenement {
   id           Int           @id @default(autoincrement())
   titre        String
   description  String
-  dates        DateTime[]    // 👈 Ici, plus de "date" simple
+  dates        DateTime[]
   lieu         String
   type         String
   acces        String
@@ -152,10 +157,11 @@ model Evenement {
   latitude     Float?
   longitude    Float?
   lien         String?
-  pays         String? 
+  pays         String?
   createurId   Int
   createur     Utilisateur   @relation("EvenementCreateur", fields: [createurId], references: [id])
   participants Utilisateur[] @relation("Participation")
+
   @@map("Evenement")
 }
 
@@ -171,6 +177,7 @@ model Article {
   vues        Int            @default(0)
   auteur      Utilisateur    @relation(fields: [auteurId], references: [id])
   images      ImageArticle[]
+
   @@map("Article")
 }
 
@@ -179,6 +186,7 @@ model ImageArticle {
   url       String
   articleId String
   article   Article @relation(fields: [articleId], references: [id])
+
   @@map("ImageArticle")
 }
 
@@ -187,6 +195,7 @@ model Recherche {
   label         String
   utilisateurId Int
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+
   @@map("Recherche")
 }
 
@@ -195,6 +204,7 @@ model Envie {
   label         String
   utilisateurId Int
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+
   @@map("Envie")
 }
 
@@ -204,6 +214,7 @@ model EmailVerificationToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
+
   @@map("EmailVerificationToken")
 }
 
@@ -213,6 +224,7 @@ model PasswordResetToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
+
   @@map("PasswordResetToken")
 }
 
@@ -222,26 +234,24 @@ model Avis {
   createdAt   DateTime    @default(now())
   auteurId    Int
   cibleId     Int
-
   auteur      Utilisateur @relation("AvisAuteur", fields: [auteurId], references: [id])
   cible       Utilisateur @relation("AvisCible", fields: [cibleId], references: [id])
-
-  digests     DigestNotification[] @relation("DigestToAvis") // 👈 manquait ici
+  digests     DigestNotification[] @relation("DigestToAvis")
 
   @@map("Avis")
   @@unique([auteurId, cibleId])
 }
 
-
 model Conversation {
-  id           Int           @id @default(autoincrement())
-  nom          String?
-  updatedAt    DateTime      @updatedAt
-  createdAt    DateTime      @default(now())
-  messages     Message[]
-  participants Participant[]
-  prenomsCouple PrenomCoupleConversation[]
+  id                  Int                  @id @default(autoincrement())
+  nom                 String?
+  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime             @default(now())
+  messages            Message[]
+  participants        Participant[]
+  prenomsCouple       PrenomCoupleConversation[]
   digestNotifications DigestNotification[] @relation("DigestToConversation")
+
   @@map("Conversation")
 }
 
@@ -259,45 +269,36 @@ model Participant {
 }
 
 model Message {
-  id             Int          @id @default(autoincrement())
-  conversationId Int
-  auteurId       Int
-  contenu        String?
-  imageUrl       String?
-  videoUrl       String?
-  audioUrl       String?
-  duree          String?
-  type           MessageType  @default(TEXTE)
-  lu             Boolean      @default(false)
-
-  // ✅ EPHEMERE : expiration + suppression logique
-  expiresAt      DateTime?
-  deletedAt      DateTime?
-
-  // ✅ (reco S3) clés de stockage pour deleteObject
-  imageKey       String?
-  videoKey       String?
-  audioKey       String?
-
-  createdAt      DateTime     @default(now())
-  openedAt       DateTime?    @map("opened_at")
-  auteur         Utilisateur  @relation("MessageAuteur", fields: [auteurId], references: [id])
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  reactions      MessageReaction[]
-  envoyeur       String?
-  prenomEnvoyeur String?
+  id                  Int                  @id @default(autoincrement())
+  conversationId      Int
+  auteurId            Int
+  contenu             String?
+  imageUrl            String?
+  videoUrl            String?
+  audioUrl            String?
+  duree               String?
+  type                MessageType          @default(TEXTE)
+  lu                  Boolean              @default(false)
+  expiresAt           DateTime?
+  deletedAt           DateTime?
+  imageKey            String?
+  videoKey            String?
+  audioKey            String?
+  createdAt           DateTime             @default(now())
+  openedAt            DateTime?            @map("opened_at")
+  auteur              Utilisateur          @relation("MessageAuteur", fields: [auteurId], references: [id])
+  conversation        Conversation         @relation(fields: [conversationId], references: [id])
+  reactions           MessageReaction[]
+  envoyeur            String?
+  prenomEnvoyeur      String?
   digestNotifications DigestNotification[] @relation("DigestToMessage")
 
   @@index([conversationId, id])
   @@index([conversationId, createdAt])
-
-  // ✅ utile pour cleanup
   @@index([type, expiresAt])
   @@index([deletedAt])
-
   @@map("Message")
 }
-
 
 model Photo {
   id              Int            @id @default(autoincrement())
@@ -307,6 +308,7 @@ model Photo {
   createdAt       DateTime       @default(now())
   galeriePrivee   GaleriePrivee? @relation(fields: [galeriePriveeId], references: [id])
   utilisateur     Utilisateur    @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
   @@map("Photo")
 }
 
@@ -316,6 +318,7 @@ model GlobalMessage {
   contenu   String
   createdAt DateTime    @default(now())
   auteur    Utilisateur @relation(fields: [auteurId], references: [id])
+
   @@map("GlobalMessage")
 }
 
@@ -324,6 +327,7 @@ model GlobalChatRead {
   userId   Int         @unique
   lastRead DateTime
   user     Utilisateur @relation(fields: [userId], references: [id])
+
   @@map("GlobalChatRead")
 }
 
@@ -346,37 +350,33 @@ model Like {
   createdAt DateTime    @default(now())
   auteur    Utilisateur @relation("LikesEnvoyes", fields: [auteurId], references: [id])
   cible     Utilisateur @relation("LikesRecus", fields: [cibleId], references: [id])
- digests   DigestNotification[] @relation("DigestToLike")
+  digests   DigestNotification[] @relation("DigestToLike")
+
   @@unique([auteurId, cibleId])
   @@map("Like")
 }
 
 model Notification {
-  id            Int         @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   utilisateurId Int
-  auteurId      Int?        // ✅ celui qui déclenche (like/visite)
+  auteurId      Int?
   message       String
   lien          String?
-  lu            Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-
-  // ✅ destinataire (inchangé, mais on nomme la relation)
-  utilisateur   Utilisateur @relation("NotificationDestinataire", fields: [utilisateurId], references: [id])
-
-  // ✅ auteur (nouveau)
+  lu            Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  utilisateur   Utilisateur  @relation("NotificationDestinataire", fields: [utilisateurId], references: [id])
   auteur        Utilisateur? @relation("NotificationAuteur", fields: [auteurId], references: [id])
 
   @@index([utilisateurId, lu, createdAt])
   @@index([auteurId])
-
   @@map("Notification")
 }
-
 
 model AbonneNewsletter {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   createdAt DateTime @default(now())
+
   @@map("AbonneNewsletterRecherche")
 }
 
@@ -385,18 +385,19 @@ model Newsletter {
   titre     String
   contenu   String
   createdAt DateTime @default(now())
+
   @@map("Newsletter")
 }
 
 model VisiteProfil {
-  id         Int         @id @default(autoincrement())
+  id       Int      @id @default(autoincrement())
   visiteurId Int
-  visiteId   Int
-  date       DateTime    @default(now())
+  visiteId Int
+  date     DateTime @default(now())
 
-  visiteur   Utilisateur @relation("Visiteur", fields: [visiteurId], references: [id])
-  visite     Utilisateur @relation("Visite", fields: [visiteId], references: [id])
-  digests     DigestNotification[] @relation("DigestToVisite")
+  visiteur Utilisateur @relation("Visiteur", fields: [visiteurId], references: [id])
+  visite   Utilisateur @relation("Visite", fields: [visiteId], references: [id])
+  digests  DigestNotification[] @relation("DigestToVisite")
 
   @@unique([visiteurId, visiteId, date])
   @@map("VisiteProfil")
@@ -404,16 +405,106 @@ model VisiteProfil {
 
 model MessageReaction {
   id            Int         @id @default(autoincrement())
-  emoji         String      // Exemple : "❤️" ou "😂"
+  emoji         String
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
   utilisateurId Int
   message       Message     @relation(fields: [messageId], references: [id])
   messageId     Int
   createdAt     DateTime    @default(now())
 
-  @@unique([utilisateurId, messageId]) // un utilisateur ne peut réagir qu'une seule fois par message
-  @@index([messageId])  
+  @@unique([utilisateurId, messageId])
+  @@index([messageId])
 }
+
+model Partenaire {
+  id        String   @id @default(dbgenerated()) @db.Uuid
+  nom       String
+  type      String
+  lien      String
+  photoUrl  String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("Partenaire")
+}
+
+model PrenomCoupleConversation {
+  id             Int          @id @default(autoincrement())
+  conversationId Int          @map("conversationid")
+  utilisateurId  Int          @map("utilisateurid")
+  prenom1        String
+  prenom2        String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
+
+  @@unique([conversationId, utilisateurId])
+  @@map("PrenomCoupleConversation")
+}
+
+model DigestNotification {
+  id             Int             @id @default(autoincrement())
+  destinataireId Int             @map("destinataireid")
+  conversationId Int?            @map("conversationid")
+  messageId      Int?            @map("messageid")
+  visiteId       Int?            @map("visiteid")
+  likeId         Int?            @map("likeid")
+  avisId         Int?            @map("avisid")
+  eventType      DigestEventType @default(MESSAGE) @map("eventtype")
+  createdAt      DateTime        @default(now()) @map("createdat")
+  processingAt   DateTime?       @map("processingat")
+  sentAt         DateTime?       @map("sentat")
+
+  destinataire Utilisateur   @relation("DigestToUtilisateur", fields: [destinataireId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation("DigestToConversation", fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?      @relation("DigestToMessage", fields: [messageId], references: [id], onDelete: Cascade)
+  visite       VisiteProfil? @relation("DigestToVisite", fields: [visiteId], references: [id], onDelete: Cascade)
+  like         Like?         @relation("DigestToLike", fields: [likeId], references: [id], onDelete: Cascade)
+  avis         Avis?         @relation("DigestToAvis", fields: [avisId], references: [id], onDelete: Cascade)
+
+  @@unique([destinataireId, messageId], map: "digest_dest_message_uniq")
+  @@unique([destinataireId, visiteId], map: "digest_dest_visite_uniq")
+  @@unique([destinataireId, likeId], map: "digest_dest_like_uniq")
+  @@unique([destinataireId, avisId], map: "digest_dest_avis_uniq")
+  @@index([destinataireId, sentAt], map: "digest_dest_sent_idx")
+  @@index([createdAt], map: "digest_created_idx")
+  @@index([sentAt, processingAt], map: "digest_sent_processing_idx")
+
+  @@map("DigestNotification")
+}
+
+model Annonce {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titre          String
+  message        String
+  actif          Boolean  @default(true)
+  expireAt       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  durationMs     Int?
+  textColor      String?
+  bgColor        String?
+  overlayColor   String?
+  fontSizePx     Int?
+  borderRadiusPx Int?
+  maxWidthPx     Int?
+
+  @@map("Annonce")
+}
+
+// ✅ NOUVEAU : table des événements analytics/admin
+model SiteEvent {
+  id        Int           @id @default(autoincrement())
+  userId    Int?
+  type      SiteEventType
+  createdAt DateTime      @default(now())
+  metadata  Json?
+
+  utilisateur Utilisateur? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
 enum VerificationStatut {
   EN_ATTENTE
   ACCEPTEE
@@ -431,7 +522,7 @@ enum MessageType {
   VIDEO
   AUDIO
   EPHEMERE
-  SYSTEME 
+  SYSTEME
 }
 
 enum DemandeStatut {
@@ -440,30 +531,6 @@ enum DemandeStatut {
   REFUSEE
 }
 
-model Partenaire {
-  id        String   @id @default(dbgenerated()) @db.Uuid
-  nom       String
-  type      String
-  lien      String
-  photoUrl  String?  
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-
-  @@map("Partenaire")
-}
-
-model PrenomCoupleConversation {
-  id             Int    @id @default(autoincrement())
-  conversationId  Int    @map("conversationid")
-  utilisateurId   Int    @map("utilisateurid")
-  prenom1        String
-  prenom2        String
-
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
-
-  @@unique([conversationId, utilisateurId])
-  @@map("PrenomCoupleConversation")  // 👈 important !
-}
 enum DigestEventType {
   MESSAGE
   VISITE
@@ -471,53 +538,14 @@ enum DigestEventType {
   AVIS
 }
 
-model DigestNotification {
-  id              Int              @id @default(autoincrement())
-  destinataireId  Int              @map("destinataireid")
-  conversationId  Int?             @map("conversationid")
-  messageId       Int?             @map("messageid")
-  visiteId        Int?             @map("visiteid")
-  likeId          Int?             @map("likeid")
-  avisId          Int?             @map("avisid")
-  eventType       DigestEventType  @default(MESSAGE) @map("eventtype")
-  createdAt       DateTime         @default(now())   @map("createdat")
-  processingAt    DateTime?                         @map("processingat")
-  sentAt          DateTime?                         @map("sentat")
-
-  destinataire    Utilisateur      @relation("DigestToUtilisateur",  fields: [destinataireId], references: [id], onDelete: Cascade)
-  conversation    Conversation?    @relation("DigestToConversation", fields: [conversationId], references: [id], onDelete: Cascade)
-  message         Message?         @relation("DigestToMessage",      fields: [messageId],       references: [id], onDelete: Cascade)
-  visite          VisiteProfil?    @relation("DigestToVisite",       fields: [visiteId],        references: [id], onDelete: Cascade)
-  like            Like?            @relation("DigestToLike",         fields: [likeId],          references: [id], onDelete: Cascade)
-  avis            Avis?            @relation("DigestToAvis",         fields: [avisId],          references: [id], onDelete: Cascade)
-
-  @@unique([destinataireId, messageId], map: "digest_dest_message_uniq")
-  @@unique([destinataireId, visiteId],  map: "digest_dest_visite_uniq")
-  @@unique([destinataireId, likeId],    map: "digest_dest_like_uniq")
-  @@unique([destinataireId, avisId],    map: "digest_dest_avis_uniq")
-  @@index([destinataireId, sentAt],     map: "digest_dest_sent_idx")
-  @@index([createdAt],                  map: "digest_created_idx")
-  @@index([sentAt, processingAt],       map: "digest_sent_processing_idx")
-
-  @@map("DigestNotification")
-}
-model Annonce {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  titre          String
-  message        String
-  actif          Boolean  @default(true)
-  expireAt       DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // 🎛️ Options de rendu
-  durationMs     Int?           // ms
-  textColor      String?        // "#e0c084"
-  bgColor        String?        // "#0b0f14" ou "white"
-  overlayColor   String?        // "rgba(0,0,0,.6)"
-  fontSizePx     Int?           // 36
-  borderRadiusPx Int?           // 16
-  maxWidthPx     Int?           // 520
-
-  @@map("Annonce")              // ⚠️ mets "annonces" si ta table s’appelle ainsi
+// ✅ NOUVEAU : types d’événements à suivre
+enum SiteEventType {
+  LOGIN_SUCCESS
+  REGISTER
+  MESSAGE_SENT
+  CONVERSATION_CREATED
+  LIKE_SENT
+  PROFILE_VIEW
+  PRIVATE_GALLERY_REQUEST
+  CALL_STARTED
 }

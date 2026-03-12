@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../lib/prisma";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 export const runtime = "nodejs";
 
@@ -85,7 +86,7 @@ export async function POST(req) {
       );
     }
 
-    // async / low priority
+    // ✅ Mise à jour lastLogin
     setTimeout(() => {
       prisma.utilisateur
         .update({
@@ -94,6 +95,18 @@ export async function POST(req) {
           select: { id: true },
         })
         .catch(console.error);
+    }, 0);
+
+    // ✅ Tracking analytics admin : login réussi
+    setTimeout(() => {
+      logSiteEvent({
+        userId: user.id,
+        type: SITE_EVENT_TYPES.LOGIN_SUCCESS,
+        metadata: {
+          platform: isMobile ? "mobile" : "web",
+          origin: origin || null,
+        },
+      }).catch(console.error);
     }, 0);
 
     const token = jwt.sign(
@@ -126,18 +139,15 @@ export async function POST(req) {
 
     const res = NextResponse.json(body, { headers });
 
-    // ✅ Cookie partagé entre x-periences.fr et www.x-periences.fr
-    // ✅ Dev-friendly (localhost) : secure=false + sameSite=lax
     const isProd = process.env.NODE_ENV === "production";
 
     res.cookies.set("token", token, {
       httpOnly: true,
-      secure: isProd, // ✅ true en prod, false en dev (http://localhost)
+      secure: isProd,
       sameSite: isProd ? "none" : "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
       ...(isProd ? { domain: ".x-periences.fr" } : {}),
-
     });
 
     return res;
