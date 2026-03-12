@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import "./stats.css";
+import "./StatsClient.css";
 
 function StatCard({ title, value, subtitle, highlight = false }) {
   return (
@@ -24,7 +24,7 @@ function MiniLegend() {
   );
 }
 
-export default function AdminStatsPage() {
+export default function StatsClient() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,8 +69,7 @@ export default function AdminStatsPage() {
 
   const chartMax = useMemo(() => {
     if (!history.length) return 10;
-    const maxValue = Math.max(...history.map((item) => item.total || 0), 1);
-    return maxValue;
+    return Math.max(...history.map((item) => item.total || 0), 1);
   }, [history]);
 
   const usersTotal = stats?.users?.total ?? 0;
@@ -213,22 +212,10 @@ export default function AdminStatsPage() {
                   </div>
 
                   <div className="admin-chart-bars">
-                    <div
-                      className="bar total"
-                      style={{ height: `${totalHeight}%` }}
-                    />
-                    <div
-                      className="bar messages"
-                      style={{ height: `${messagesHeight}%` }}
-                    />
-                    <div
-                      className="bar logins"
-                      style={{ height: `${loginsHeight}%` }}
-                    />
-                    <div
-                      className="bar visits"
-                      style={{ height: `${visitsHeight}%` }}
-                    />
+                    <div className="bar total" style={{ height: `${totalHeight}%` }} />
+                    <div className="bar messages" style={{ height: `${messagesHeight}%` }} />
+                    <div className="bar logins" style={{ height: `${loginsHeight}%` }} />
+                    <div className="bar visits" style={{ height: `${visitsHeight}%` }} />
                   </div>
 
                   <span className="admin-chart-label">{item.label}</span>
