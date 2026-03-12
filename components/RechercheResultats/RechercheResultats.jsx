@@ -6,25 +6,40 @@ import Link from "next/link";
 import "../ProfilsDisplay/ProfilsDisplay.css";
 import "./RechercheResultats.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
+import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
 
 /* ---------------- Hook presign ---------------- */
 function usePresignedPhotos(users) {
   const [photoUrls, setPhotoUrls] = useState({});
+
+  const usersKey = useMemo(() => {
+    return Array.isArray(users)
+      ? users.map((u) => `${u?.id}-${u?.photoUrl || ""}`).join("|")
+      : "";
+  }, [users]);
+
   useEffect(() => {
     let canceled = false;
+
     async function fetchAll() {
       const result = {};
+
       await Promise.all(
         users.map(async (user) => {
           const key = user?.photoUrl;
+
+          if (!user?.id) return;
+
           if (!key) {
             result[user.id] = "/default.jpg";
             return;
           }
+
           if (typeof key === "string" && key.startsWith("http")) {
             result[user.id] = key;
             return;
           }
+
           try {
             const res = await fetch("/api/photos/presign", {
               method: "POST",
@@ -32,6 +47,7 @@ function usePresignedPhotos(users) {
               credentials: "include",
               body: JSON.stringify({ key }),
             });
+
             const data = await res.json().catch(() => null);
             result[user.id] = data?.url || "/default.jpg";
           } catch {
@@ -39,20 +55,29 @@ function usePresignedPhotos(users) {
           }
         })
       );
-      if (!canceled) setPhotoUrls(result);
+
+      if (!canceled) {
+        setPhotoUrls(result);
+      }
     }
-    if (Array.isArray(users) && users.length) fetchAll();
-    else setPhotoUrls({});
+
+    if (Array.isArray(users) && users.length) {
+      fetchAll();
+    } else {
+      setPhotoUrls({});
+    }
+
     return () => {
       canceled = true;
     };
-  }, [JSON.stringify(users)]);
+  }, [users, usersKey]);
+
   return photoUrls;
 }
 
 const DEFAULT_RAYON = 20;
 
-// ✅ helpers
+// helpers
 function normalizeType(val) {
   return String(val || "")
     .toLowerCase()
@@ -96,10 +121,9 @@ export default function RechercheResultats({
   const [hasSearched, setHasSearched] = useState(false);
 
   const photoUrls = usePresignedPhotos(utilisateurs);
-  const { isOnline } = useOnlineStatus();
+  const { isOnline, ready, debug } = useOnlineStatus();
 
   const hasParams = useMemo(() => {
-    // On considère qu'il y a recherche si on a autourDeMoi ou un des filtres non vides
     return (
       !!autourDeMoi ||
       !!pseudo ||
@@ -146,9 +170,18 @@ export default function RechercheResultats({
   ]);
 
   useEffect(() => {
+    console.log("[RechercheResultats] STATE", {
+      ready,
+      onlineDebug: debug,
+      usersLen: utilisateurs.length,
+      hasParams,
+      loading,
+    });
+  }, [ready, debug, utilisateurs.length, hasParams, loading]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
-    // pas de recherche = reset
     if (!hasParams) {
       setUtilisateurs([]);
       setHasSearched(false);
@@ -161,7 +194,6 @@ export default function RechercheResultats({
 
     const distance = Number(rayon || DEFAULT_RAYON);
 
-    // ✅ construit les filtres à envoyer (depuis les props)
     const filters = {
       pseudo: pseudo || "",
       statut: statut || "all",
@@ -171,7 +203,6 @@ export default function RechercheResultats({
       description: !!description,
       localisation: localisation || "",
 
-      // arrays
       type: (type || []).map(normalizeType),
       orientation: orientation || [],
       rechercheType: rechercheType || [],
@@ -189,7 +220,6 @@ export default function RechercheResultats({
     async function load() {
       try {
         if (autourDeMoi) {
-          // ✅ plus de géoloc ici : on attend celle du parent
           if (loadingGeo) {
             setLoading(false);
             return;
@@ -203,7 +233,6 @@ export default function RechercheResultats({
           }
 
           if (latitude == null || longitude == null) {
-            // pas encore dispo
             setUtilisateurs([]);
             setLoading(false);
             return;
@@ -235,13 +264,14 @@ export default function RechercheResultats({
           return;
         }
 
-        // ✅ recherche classique (ville / filtres sans GPS) => on peut appeler /api/recherche avec query string
-        // Ici, comme tu as déjà l'URL en sync via RechercheClient, on peut reconstruire params pour rester safe
         const params = new URLSearchParams();
+
         if (pseudo) params.set("pseudo", pseudo);
         (type || []).forEach((x) => params.append("type", x));
         (orientation || []).forEach((x) => params.append("orientation", x));
-        (rechercheType || []).forEach((x) => params.append("rechercheType", x));
+        (rechercheType || []).forEach((x) =>
+          params.append("rechercheType", x)
+        );
         if (ageMin !== "") params.set("ageMin", String(ageMin));
         if (ageMax !== "") params.set("ageMax", String(ageMax));
         if (localisation) params.set("localisation", localisation);
@@ -268,7 +298,10 @@ export default function RechercheResultats({
         setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
         setLoading(false);
       } catch (err) {
-        if (err?.name !== "AbortError") setLoading(false);
+        if (err?.name !== "AbortError") {
+          console.error("[RechercheResultats] load error:", err);
+          setLoading(false);
+        }
       }
     }
 
@@ -277,7 +310,6 @@ export default function RechercheResultats({
     return () => controller.abort();
   }, [
     hasParams,
-
     pseudo,
     type,
     orientation,
@@ -298,7 +330,6 @@ export default function RechercheResultats({
     recherches,
     envies,
     rayon,
-
     autourDeMoi,
     latitude,
     longitude,
@@ -320,7 +351,11 @@ export default function RechercheResultats({
   return (
     <div className={`profil-list1 ${className}`}>
       {hasParams && (
-        <div className="recherche-toolbar2" role="region" aria-label="Actions de recherche">
+        <div
+          className="recherche-toolbar2"
+          role="region"
+          aria-label="Actions de recherche"
+        >
           <button className="btn-outlined" onClick={handleResetSearch}>
             Nouvelle recherche
           </button>
@@ -343,7 +378,8 @@ export default function RechercheResultats({
             <p>Aucun utilisateur trouvé.</p>
           ) : (
             utilisateurs.map((user) => {
-              const online = isOnline(user?.id);
+              const statutEff = getUserDisplayStatus(user, isOnline(user?.id));
+              const online = statutEff === "en_ligne";
 
               return (
                 <Link
@@ -353,7 +389,9 @@ export default function RechercheResultats({
                 >
                   <div className="profil-card">
                     <span
-                      className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
+                      className={`statut-badge ${
+                        online ? "en-ligne" : "hors-ligne"
+                      }`}
                       title={online ? "En ligne" : "Hors ligne"}
                     />
 
