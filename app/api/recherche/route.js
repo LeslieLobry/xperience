@@ -6,11 +6,8 @@ import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
 import { getUserFromToken } from "../../../lib/auth";
 import { cookies } from "next/headers";
 
-// === Helpers ===
-
 const DEFAULT_RAYON = 20;
 
-// Normalise une valeur (lowercase + sans accents)
 function normalizeToDb(val) {
   return val
     .toLowerCase()
@@ -18,15 +15,21 @@ function normalizeToDb(val) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-// Supprime le "s" final pour uniformiser singulier/pluriel
 function singularize(v) {
   return v.endsWith("s") ? v.slice(0, -1) : v;
 }
 
-// Applique normalization + singularisation + dédoublonnage
 function normalizeAndSingularizeArray(arr) {
   const set = new Set(arr.map(normalizeToDb).map(singularize));
   return [...set];
+}
+
+function asNumIds(arr) {
+  return [...new Set(
+    (Array.isArray(arr) ? arr : [])
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  )];
 }
 
 async function getCoordsFromVille(ville) {
@@ -74,7 +77,6 @@ export async function GET(req) {
     return one ? [one] : [];
   };
 
-  // Récupération brute des filtres
   const pseudo = searchParams.get("pseudo") || "";
   const type = getAll("type");
   const orientation = getAll("orientation");
@@ -89,17 +91,18 @@ export async function GET(req) {
   const ageMin = searchParams.get("ageMin") || null;
   const ageMax = searchParams.get("ageMax") || null;
 
-  // alias accepté: localisation OU ville
   const localisation =
     searchParams.get("localisation") || searchParams.get("ville") || "";
 
   const photo = searchParams.get("photo") === "true";
   const description = searchParams.get("description") === "true";
 
-  // statut: all | en_ligne | hors_ligne
+  // all | en_ligne | hors_ligne
   const statut = searchParams.get("statut") || "all";
 
-  // Rayon/coords
+  // ✅ online ids venant d’Ably côté client
+  const onlineIds = asNumIds(getAll("onlineIds"));
+
   const rayonRaw = searchParams.get("rayon");
   const rayon = Number.isFinite(parseFloat(rayonRaw))
     ? parseFloat(rayonRaw)
@@ -110,7 +113,6 @@ export async function GET(req) {
 
   const autourDeMoi = searchParams.get("autourDeMoi") === "true";
 
-  // --- Normalisation + singularisation ---
   const typeNorm = normalizeAndSingularizeArray(type);
   const orientationNorm = normalizeAndSingularizeArray(orientation);
   const rechercheTypeNorm = normalizeAndSingularizeArray(rechercheType);
@@ -121,7 +123,6 @@ export async function GET(req) {
   const yeuxNorm = normalizeAndSingularizeArray(yeux);
   const cheveuxNorm = normalizeAndSingularizeArray(cheveux);
 
-  // 🔒 Exclusion des utilisateurs bloqués
   let exclus = [];
   try {
     const cookieStore = await cookies();
@@ -135,7 +136,6 @@ export async function GET(req) {
     exclus = [];
   }
 
-  // Construction du where Prisma
   const andParts = [];
 
   if (pseudo.trim()) {
@@ -147,7 +147,6 @@ export async function GET(req) {
   if (photo) andParts.push({ photoUrl: { not: null } });
   if (description) andParts.push({ description: { not: null } });
 
-  // âge
   if (ageMin || ageMax) {
     const ageFilter = {};
     if (ageMin) ageFilter.gte = parseInt(ageMin, 10);
@@ -209,9 +208,17 @@ export async function GET(req) {
     });
   }
 
-  // ✅ Filtre visible/invisible : respecte le mode invisible
+  // ✅ logique exacte "En ligne"
   if (statut === "en_ligne") {
     andParts.push({ statut: "en_ligne" });
+
+    // si on filtre "en ligne", il faut aussi les ids Ably
+    if (onlineIds.length > 0) {
+      andParts.push({ id: { in: onlineIds } });
+    } else {
+      // pas d’ids Ably => aucun vrai online
+      andParts.push({ id: { in: [-1] } });
+    }
   } else if (statut === "hors_ligne") {
     andParts.push({ statut: "hors_ligne" });
   }
@@ -233,11 +240,9 @@ export async function GET(req) {
         type: true,
         orientation: true,
         description: true,
-
         statut: true,
         statutAuto: true,
         lastSeenAt: true,
-
         experience: true,
         rechercheType: true,
         fumeur: true,
@@ -252,7 +257,6 @@ export async function GET(req) {
       },
     });
 
-    // --- Filtrage géographique ---
     let logs = "\nRecherche distance : ";
     const hasCoords = (lat, lon) => !isNaN(lat) && !isNaN(lon);
 
