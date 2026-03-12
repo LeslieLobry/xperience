@@ -49,15 +49,30 @@ export default function Notifications() {
     }
   }, []);
 
-  // ⚠️ Ton PATCH actuel marque TOUT lu et vide tout.
-  // On le garde pour "Tout marquer lu" (ou clic notif si tu veux),
-  // mais ce n’est pas ce qui doit se passer quand tu lis dans une conversation.
+  // ✅ on garde cette fonction pour un vrai "Tout marquer comme lu"
   const markAllAsRead = useCallback(async () => {
     try {
-      await fetch("/api/notifications", { method: "PATCH", credentials: "include" });
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        credentials: "include",
+      });
       setNotifications([]);
     } catch (err) {
       console.error("Erreur marquer notifications lues", err);
+    }
+  }, []);
+
+  // ✅ nouvelle fonction : marquer UNE seule notification comme lue
+  const markOneAsRead = useCallback(async (notifId) => {
+    try {
+      await fetch(`/api/notifications/${notifId}`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    } catch (err) {
+      console.error("Erreur marquer notification lue", err);
     }
   }, []);
 
@@ -69,72 +84,67 @@ export default function Notifications() {
     }, 400);
   }, [fetchNotifications]);
 
-  // ✅ retire localement les notifs liées à une conversation (basé sur lien)
+  // ✅ retire localement les notifs liées à une conversation
   const clearConversationNotifsLocally = useCallback((conversationId) => {
     const convStr = String(conversationId);
+
     setNotifications((prev) =>
       prev.filter((n) => {
         const lien = n?.lien || "";
-        const msg = n?.message || "";
-        return !(lien.includes(convStr) || msg.includes(convStr));
+
+        // plus fiable que msg.includes(convStr)
+        return !lien.includes(`conversationId=${convStr}`);
       })
     );
   }, []);
 
-  // ✅ VERSION "BLINDÉE" anti-doublon pseudo :
-  // - si le pseudo apparaît déjà N’IMPORTE OÙ dans le message => on n’ajoute pas de préfixe
-  // - si le message commence par "Pseudo Pseudo ..." ou "Pseudo: Pseudo ..." => on nettoie le début
-  // - sinon => on préfixe "Pseudo : message"
-const formatNotifText = useCallback((notif) => {
-  const pseudoRaw = (notif?.auteur?.pseudo || "").trim();
-  let msgRaw = (notif?.message || "").trim();
+  const formatNotifText = useCallback((notif) => {
+    const pseudoRaw = (notif?.auteur?.pseudo || "").trim();
+    let msgRaw = (notif?.message || "").trim();
 
-  if (!pseudoRaw) return msgRaw;
+    if (!pseudoRaw) return msgRaw;
 
-  const normalize = (s) =>
-    String(s || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\u00a0/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const normalize = (s) =>
+      String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
-  const pseudo = normalize(pseudoRaw);
+    const pseudo = normalize(pseudoRaw);
 
-  // ✅ 1) Nettoyage ultra-safe du début si le backend a déjà mis le pseudo
-  // ex: "Gael : a accepté..." / "Gael - ..." / "Gael Gael ..." / "GAEL: ..."
-  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pEsc = escapeRegExp(pseudoRaw);
+    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pEsc = escapeRegExp(pseudoRaw);
 
-  const startPrefixRe = new RegExp(
-    `^\\s*(?:${pEsc}\\s*(?::|-)?\\s*)+(?=\\S)`,
-    "i"
-  );
+    const startPrefixRe = new RegExp(
+      `^\\s*(?:${pEsc}\\s*(?::|-)?\\s*)+(?=\\S)`,
+      "i"
+    );
 
-  // On applique 2 fois max pour virer "Pseudo Pseudo :"
-  msgRaw = msgRaw.replace(startPrefixRe, "").replace(startPrefixRe, "").trim();
+    msgRaw = msgRaw.replace(startPrefixRe, "").replace(startPrefixRe, "").trim();
 
-  const msg = normalize(msgRaw);
+    const msg = normalize(msgRaw);
 
-  // ✅ 2) Cas galerie (demande / accepté / refusé / accès / galerie) => on NE préfixe JAMAIS
-  const isGalleryEvent =
-    msg.includes("galerie") ||
-    msg.includes("acces") ||
-    msg.includes("demande") ||
-    msg.includes("accepte") ||
-    msg.includes("refuse");
+    const isGalleryEvent =
+      msg.includes("galerie") ||
+      msg.includes("acces") ||
+      msg.includes("demande") ||
+      msg.includes("accepte") ||
+      msg.includes("refuse");
 
-  if (isGalleryEvent) return msgRaw;
+    if (isGalleryEvent) return msgRaw;
 
-  // ✅ 3) Si le pseudo est déjà dans le message (même partiellement) => pas de préfixe
-  const pseudoWords = pseudo.split(" ").filter((w) => w.length >= 3);
-  const pseudoAlreadyInMsg = msg.includes(pseudo) || pseudoWords.some((w) => msg.includes(w));
-  if (pseudoAlreadyInMsg) return msgRaw;
+    const pseudoWords = pseudo.split(" ").filter((w) => w.length >= 3);
+    const pseudoAlreadyInMsg =
+      msg.includes(pseudo) || pseudoWords.some((w) => msg.includes(w));
 
-  // ✅ 4) Sinon on préfixe
-  return `${pseudoRaw} : ${msgRaw}`;
-}, []);
+    if (pseudoAlreadyInMsg) return msgRaw;
+
+    return `${pseudoRaw} : ${msgRaw}`;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -155,20 +165,19 @@ const formatNotifText = useCallback((notif) => {
 
         channelRef.current = clientRef.current.channels.get(`notification-${userId}`);
 
-        // ✅ event classique: "notification" => on refetch
         channelRef.current.subscribe("notification", () => {
           scheduleRefreshSoon();
         });
 
-        // ✅ NOUVEL event: quand une conversation a été lue
         channelRef.current.subscribe("notif:clear-conversation", (msg) => {
           const convId = msg?.data?.conversationId;
           if (!convId) return;
 
-          // 1) on enlève instantanément dans l’UI
           clearConversationNotifsLocally(convId);
+          scheduleRefreshSoon();
+        });
 
-          // 2) et on refetch bientôt pour être 100% sync
+        channelRef.current.subscribe("refresh-conversations", () => {
           scheduleRefreshSoon();
         });
       } catch (e) {
@@ -197,22 +206,28 @@ const formatNotifText = useCallback((notif) => {
         if (clientRef.current) clientRef.current.close();
       } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchNotifications, scheduleRefreshSoon, clearConversationNotifsLocally]);
 
   if (error) return <p>{error}</p>;
-  if (notifications.length === 0) return <p>{loading ? "Chargement..." : "Aucune notification"}</p>;
+
+  if (notifications.length === 0) {
+    return <p>{loading ? "Chargement..." : "Aucune notification"}</p>;
+  }
 
   return (
     <div className="notifications-popup">
+      {/* ✅ tu gardes markAllAsRead, et tu peux l’utiliser ici */}
+      <div className="notifications-actions">
+        <button onClick={markAllAsRead}>Tout marquer comme lu</button>
+      </div>
+
       <ul>
         {notifications.map((notif) => (
           <li key={notif.id}>
             <Link
               href={notif.lien || "#"}
               onClick={async () => {
-                // clic notif => tout marquer lu (comportement actuel)
-                await markAllAsRead();
+                await markOneAsRead(notif.id);
               }}
             >
               {formatNotifText(notif)}

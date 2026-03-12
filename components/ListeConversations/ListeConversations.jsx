@@ -335,40 +335,46 @@ export default function ListeConversations({
   }, [autoSelectFirst, conversations, router, searchParams]);
 
   // ✅ Ably → rafraîchir la liste (lazy + throttled)
-  useEffect(() => {
-    if (!userId) return;
+useEffect(() => {
+  if (!userId) return;
 
-    let channel = null;
-    let timeout = null;
-    let isMounted = true;
+  let channel = null;
+  let timeout = null;
+  let isMounted = true;
 
-    const scheduleRefresh = () => {
-      if (!isMounted) return;
-      if (timeout) return;
-      timeout = setTimeout(() => {
-        mutate();
-        timeout = null;
-      }, 450);
-    };
+  const scheduleRefresh = () => {
+    if (!isMounted) return;
+    if (timeout) return;
 
-    runIdle(() => {
-      const ably = getAbly();
-      if (!ably || !isMounted) return;
+    timeout = setTimeout(() => {
+      mutate();
+      timeout = null;
+    }, 300);
+  };
 
-      channel = ably.channels.get(`notification-${userId}`);
-      channel.subscribe("message", scheduleRefresh);
-      channel.subscribe("refresh-conversations", scheduleRefresh);
-    }, 1200);
+  runIdle(() => {
+    const ably = getAbly();
+    if (!ably || !isMounted) return;
 
-    return () => {
-      isMounted = false;
-      if (channel) {
-        channel.unsubscribe("message", scheduleRefresh);
-        channel.unsubscribe("refresh-conversations", scheduleRefresh);
-      }
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [userId, mutate]);
+    channel = ably.channels.get(`notification-${userId}`);
+
+    channel.subscribe("message", scheduleRefresh);
+    channel.subscribe("refresh-conversations", scheduleRefresh);
+    channel.subscribe("notif:clear-conversation", scheduleRefresh);
+  }, 1200);
+
+  return () => {
+    isMounted = false;
+
+    if (channel) {
+      channel.unsubscribe("message", scheduleRefresh);
+      channel.unsubscribe("refresh-conversations", scheduleRefresh);
+      channel.unsubscribe("notif:clear-conversation", scheduleRefresh);
+    }
+
+    if (timeout) clearTimeout(timeout);
+  };
+}, [userId, mutate]);
 
   /* ---------------------------------------------------------------------- */
   /* 🔹 Actions                                                              */
@@ -475,13 +481,13 @@ export default function ListeConversations({
       false
     );
 
-    fetch(`/api/conversations/${id}/mark-as-read`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-      keepalive: true,
-    }).catch(() => {});
+fetch(`/api/conversations/${id}/mark-as-read`, {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ userId }),
+  keepalive: true,
+}).catch(() => {});
   },
   [conversations, mutate, onSelectConversation, router, userId]
 );

@@ -89,8 +89,9 @@ export async function GET(req) {
   const ageMin = searchParams.get("ageMin") || null;
   const ageMax = searchParams.get("ageMax") || null;
 
-  // ⚠️ alias accepté: localisation OU ville
-  const localisation = searchParams.get("localisation") || searchParams.get("ville") || "";
+  // alias accepté: localisation OU ville
+  const localisation =
+    searchParams.get("localisation") || searchParams.get("ville") || "";
 
   const photo = searchParams.get("photo") === "true";
   const description = searchParams.get("description") === "true";
@@ -98,9 +99,11 @@ export async function GET(req) {
   // statut: all | en_ligne | hors_ligne
   const statut = searchParams.get("statut") || "all";
 
-  // Rayon/coords (peuvent être absents)
+  // Rayon/coords
   const rayonRaw = searchParams.get("rayon");
-  const rayon = Number.isFinite(parseFloat(rayonRaw)) ? parseFloat(rayonRaw) : 0;
+  const rayon = Number.isFinite(parseFloat(rayonRaw))
+    ? parseFloat(rayonRaw)
+    : 0;
 
   const latitude = parseFloat(searchParams.get("latitude") || "NaN");
   const longitude = parseFloat(searchParams.get("longitude") || "NaN");
@@ -121,21 +124,24 @@ export async function GET(req) {
   // 🔒 Exclusion des utilisateurs bloqués
   let exclus = [];
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const user = await getUserFromToken(cookieStore);
     if (user?.id) {
       exclus = await getIdsUtilisateursExclus(user.id);
+      exclus = Array.isArray(exclus) ? exclus : [];
     }
   } catch (err) {
     console.error("Erreur filtrage exclus :", err);
     exclus = [];
   }
 
-  // ✅ Construction du where Prisma (corrigé : OR non écrasé)
+  // Construction du where Prisma
   const andParts = [];
 
   if (pseudo.trim()) {
-    andParts.push({ pseudo: { contains: pseudo.trim(), mode: "insensitive" } });
+    andParts.push({
+      pseudo: { contains: pseudo.trim(), mode: "insensitive" },
+    });
   }
 
   if (photo) andParts.push({ photoUrl: { not: null } });
@@ -149,11 +155,11 @@ export async function GET(req) {
     andParts.push({ age: ageFilter });
   }
 
-  // ✅ type : si tu veux insensitive, il faut OR equals + mode
-  // (car Prisma n'accepte pas mode avec in)
   if (typeNorm.length) {
     andParts.push({
-      OR: typeNorm.map((t) => ({ type: { equals: t, mode: "insensitive" } })),
+      OR: typeNorm.map((t) => ({
+        type: { equals: t, mode: "insensitive" },
+      })),
     });
   }
 
@@ -174,7 +180,9 @@ export async function GET(req) {
   }
 
   if (taille.length) {
-    andParts.push({ taille: { in: taille.map((t) => parseInt(t, 10) || -1) } });
+    andParts.push({
+      taille: { in: taille.map((t) => parseInt(t, 10) || -1) },
+    });
   }
 
   if (originesNorm.length) {
@@ -185,7 +193,6 @@ export async function GET(req) {
     andParts.push({ yeux: { in: yeuxNorm } });
   }
 
-  // ✅ OR orientation (dans AND)
   if (orientationNorm.length) {
     andParts.push({
       OR: orientationNorm.map((o) => ({
@@ -194,7 +201,6 @@ export async function GET(req) {
     });
   }
 
-  // ✅ OR cheveux (dans AND) — sinon tu écrases l’OR orientation
   if (cheveuxNorm.length) {
     andParts.push({
       OR: cheveuxNorm.map((c) => ({
@@ -203,19 +209,11 @@ export async function GET(req) {
     });
   }
 
-  // ✅ Filtre online/offline cohérent avec Prisma (statutAuto boolean + lastSeenAt)
-  if (statut === "en_ligne" || statut === "hors_ligne") {
-    const ONLINE_WINDOW_MS = 2 * 60 * 1000;
-    const since = new Date(Date.now() - ONLINE_WINDOW_MS);
-
-    if (statut === "en_ligne") {
-      andParts.push({ statutAuto: true });
-      andParts.push({ lastSeenAt: { gte: since } });
-    } else {
-      andParts.push({
-        OR: [{ statutAuto: false }, { lastSeenAt: null }, { lastSeenAt: { lt: since } }],
-      });
-    }
+  // ✅ Filtre visible/invisible : respecte le mode invisible
+  if (statut === "en_ligne") {
+    andParts.push({ statut: "en_ligne" });
+  } else if (statut === "hors_ligne") {
+    andParts.push({ statut: "hors_ligne" });
   }
 
   const where = {
@@ -224,7 +222,6 @@ export async function GET(req) {
   };
 
   try {
-    // Requête principale
     let utilisateurs = await prisma.utilisateur.findMany({
       where,
       select: {
@@ -255,7 +252,7 @@ export async function GET(req) {
       },
     });
 
-    // --- Filtrage géographique (modes exclusifs) ---
+    // --- Filtrage géographique ---
     let logs = "\nRecherche distance : ";
     const hasCoords = (lat, lon) => !isNaN(lat) && !isNaN(lon);
 

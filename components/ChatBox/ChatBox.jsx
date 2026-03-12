@@ -277,31 +277,28 @@ export default function ChatBox({
     };
   }, [conversationId, loadingInitial, scrollToBottom, getScrollEl]);
 
-  useEffect(() => {
-    if (!conversationId || !utilisateur?.id) return;
+useEffect(() => {
+  if (!conversationId || !utilisateur?.id) return;
 
-    const run = async () => {
-      try {
-        await fetch(`/api/conversations/${conversationId}/mark-as-read`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ userId: utilisateur.id }),
-        });
+  const run = async () => {
+    try {
+      await fetch(`/api/conversations/${conversationId}/mark-as-read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId: utilisateur.id }),
+      });
+    } catch (e) {
+      console.error("mark-as-read error", e);
+    }
+  };
 
-        publishNotification(utilisateur.id, "notif:clear-conversation", {
-          conversationId,
-        });
-      } catch (e) {
-        console.error("mark-as-read error", e);
-      }
-    };
+  const cancel = runIdle(run, 500);
 
-    const cancel = runIdle(run, 500);
-    return () => {
-      if (typeof cancel === "function") cancel();
-    };
-  }, [conversationId, utilisateur?.id]);
+  return () => {
+    if (typeof cancel === "function") cancel();
+  };
+}, [conversationId, utilisateur?.id]);
 
   const {
     messages,

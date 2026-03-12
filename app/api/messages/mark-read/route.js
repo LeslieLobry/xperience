@@ -36,6 +36,7 @@ async function getUserFromToken(req) {
 
   const token = (await cookies()).get("token")?.value;
   if (!token) return null;
+
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch {
@@ -50,6 +51,7 @@ export async function OPTIONS() {
 export async function POST(req) {
   try {
     const user = await getUserFromToken(req);
+
     if (!user) {
       return NextResponse.json(
         { error: "Non authentifié" },
@@ -64,11 +66,10 @@ export async function POST(req) {
       body = {};
     }
 
-    // ✅ compat: messageId toujours accepté
     const messageId = body?.messageId ? Number(body.messageId) : null;
-
-    // ✅ nouveau: conversationId direct (évite 1 requête DB)
-    const conversationId = body?.conversationId ? Number(body.conversationId) : null;
+    const conversationId = body?.conversationId
+      ? Number(body.conversationId)
+      : null;
 
     if (!messageId && !conversationId) {
       return NextResponse.json(
@@ -79,7 +80,6 @@ export async function POST(req) {
 
     let convId = conversationId;
 
-    // Si on n'a pas conversationId, on le récupère via messageId (comportement actuel)
     if (!convId) {
       const msg = await prisma.message.findUnique({
         where: { id: messageId },
@@ -92,16 +92,22 @@ export async function POST(req) {
           { status: 404, headers: CORS }
         );
       }
+
       convId = msg.conversationId;
     }
 
-    // ✅ sécurité: l'utilisateur doit être participant
-    const isParticipant = await prisma.participant.findFirst({
-      where: { conversationId: convId, utilisateurId: user.id },
-      select: { id: true },
+    const participant = await prisma.participant.findFirst({
+      where: {
+        conversationId: convId,
+        utilisateurId: user.id,
+      },
+      select: {
+        id: true,
+        lastReadAt: true,
+      },
     });
 
-    if (!isParticipant) {
+    if (!participant) {
       return NextResponse.json(
         { error: "Accès refusé" },
         { status: 403, headers: CORS }
@@ -110,30 +116,51 @@ export async function POST(req) {
 
     const now = new Date();
 
-    // ✅ update lastReadAt
     await prisma.participant.updateMany({
-      where: { conversationId: convId, utilisateurId: user.id },
-      data: { lastReadAt: now },
+      where: {
+        conversationId: convId,
+        utilisateurId: user.id,
+      },
+      data: {
+        lastReadAt: now,
+      },
     });
 
-    // ✅ Ably: best-effort (ne bloque pas la réponse si Ably est lent)
     if (ably) {
       try {
-        const channel = ably.channels.get(`conversation-${convId}`);
-        // pas besoin d'attendre pour répondre vite
-        channel.publish("read", {
+        await ably.channels.get(`conversation-${convId}`).publish("read", {
           utilisateurId: user.id,
-          lastReadAt: now.toISOString(),
           conversationId: convId,
+          lastReadAt: now.toISOString(),
         });
+
+        await ably
+          .channels.get(`notification-${user.id}`)
+          .publish("notif:clear-conversation", {
+            utilisateurId: user.id,
+            conversationId: convId,
+            lastReadAt: now.toISOString(),
+          });
+
+        await ably
+          .channels.get(`notification-${user.id}`)
+          .publish("refresh-conversations", {
+            utilisateurId: user.id,
+            conversationId: convId,
+            reason: "mark-as-read",
+            lastReadAt: now.toISOString(),
+          });
       } catch (e) {
-        // on log, mais on ne casse pas l’API
         console.warn("Ably publish read failed:", e?.message || e);
       }
     }
 
     return NextResponse.json(
-      { success: true },
+      {
+        success: true,
+        conversationId: convId,
+        lastReadAt: now.toISOString(),
+      },
       { status: 200, headers: CORS }
     );
   } catch (error) {
