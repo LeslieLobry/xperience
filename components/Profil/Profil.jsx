@@ -14,6 +14,7 @@ import "../Profil/Profil.css";
 import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
+import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
 
 const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
   ssr: false,
@@ -23,14 +24,19 @@ const AvisList = dynamic(() => import("../AvisList/AvisList"), {
   ssr: false,
   loading: Spinner,
 });
-const MenuProfilActions = dynamic(() => import("../MenuProfilActions/MenuProfilActions"), {
-  ssr: false,
-});
+const MenuProfilActions = dynamic(
+  () => import("../MenuProfilActions/MenuProfilActions"),
+  {
+    ssr: false,
+  }
+);
 const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), {
   ssr: false,
   loading: Spinner,
 });
-const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), { ssr: false });
+const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), {
+  ssr: false,
+});
 const DemandesAccesGalerie = dynamic(
   () => import("../DemandesAccesGalerie/DemandesAccesGalerie"),
   { ssr: false }
@@ -108,28 +114,22 @@ function calculateProfileCompletion(user) {
     "silhouette",
     "origines",
   ];
+
   if (user.type?.toLowerCase() === "couple") {
     fields.push("age2", "taille2", "silhouette2", "origines2");
   }
+
   let completed = 0;
-  for (let field of fields) {
+
+  for (const field of fields) {
     if (Array.isArray(user[field])) {
       if (user[field].length > 0) completed++;
     } else if (user[field] && user[field] !== "") {
       completed++;
     }
   }
-  return Math.round((completed / fields.length) * 100);
-}
 
-function computeStatut(u) {
-  const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-  if (u?.statutAuto && u?.lastSeenAt) {
-    const seen = new Date(u.lastSeenAt).getTime();
-    if (Number.isFinite(seen) && Date.now() - seen <= ONLINE_WINDOW_MS) return "en_ligne";
-    return "hors_ligne";
-  }
-  return u?.statut || "hors_ligne";
+  return Math.round((completed / fields.length) * 100);
 }
 
 function getTargetUserId(u) {
@@ -141,25 +141,27 @@ export default function Profil({ user, connectedUser }) {
   const router = useRouter();
   const isOwnProfile = parseInt(connectedUser.id) === parseInt(user.id);
 
-  const { counts, presenceReady } = useOnlineStatus();
+  const { ready, isOnline, onlineIds, debug } = useOnlineStatus();
   const cibleId = getTargetUserId(user);
 
-  // ✅ online via counts (même si ready=false)
   const onlineViaPresence =
-    !isOwnProfile && cibleId ? !!counts?.[String(cibleId)] : false;
+    !isOwnProfile && cibleId ? isOnline(cibleId) : false;
 
-  // LOG
   useEffect(() => {
     console.log("[UI Profil]", {
       cibleId,
       isOwnProfile,
-      presenceReady,
-      countsIds: Object.keys(counts || {}),
+      ready,
+      onlineIdsSample: Array.isArray(onlineIds) ? onlineIds.slice(0, 20) : [],
       onlineViaPresence,
+      debug,
     });
-  }, [cibleId, isOwnProfile, presenceReady, counts, onlineViaPresence]);
+  }, [cibleId, isOwnProfile, ready, onlineIds, onlineViaPresence, debug]);
 
-  const statutEff = isOwnProfile ? null : onlineViaPresence ? "en_ligne" : computeStatut(user);
+  const statutEff = !isOwnProfile
+    ? getUserDisplayStatus(user, onlineViaPresence)
+    : null;
+
   const online = !isOwnProfile && statutEff === "en_ligne";
 
   const [photoUrl, setPhotoUrl] = useState(user.photoUrl);
@@ -192,10 +194,12 @@ export default function Profil({ user, connectedUser }) {
       setPresignedPhotoUrl("/default.jpg");
       return;
     }
+
     if (photoUrl.startsWith("http")) {
       setPresignedPhotoUrl(photoUrl);
       return;
     }
+
     fetch("/api/photos/presign", {
       method: "POST",
       credentials: "include",
@@ -223,10 +227,12 @@ export default function Profil({ user, connectedUser }) {
 
   useEffect(() => {
     if (!isOwnProfile) return;
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch("/api/me", { credentials: "include" });
         if (!res.ok) return;
+
         const data = await res.json();
         if (data?.success && data?.user) {
           setStatut(data.user.statut);
@@ -234,6 +240,7 @@ export default function Profil({ user, connectedUser }) {
         }
       } catch {}
     }, 30000);
+
     return () => clearInterval(interval);
   }, [isOwnProfile]);
 
@@ -260,9 +267,11 @@ export default function Profil({ user, connectedUser }) {
   ];
 
   function handleEditField(champ) {
-    if (champ === "Description") setOpenDescriptionModal(true);
-    else if (profilDetailsFields.includes(champ)) setOpenProfilDetailsModal(true);
-    else if (champ === "Photo de profil") {
+    if (champ === "Description") {
+      setOpenDescriptionModal(true);
+    } else if (profilDetailsFields.includes(champ)) {
+      setOpenProfilDetailsModal(true);
+    } else if (champ === "Photo de profil") {
       setUploaderKey(Date.now());
       setOpenPhotoUploader(true);
     }
@@ -270,10 +279,13 @@ export default function Profil({ user, connectedUser }) {
 
   const handleStartConversation = async () => {
     if (startingConv) return;
+
     setStartingConv(true);
+
     try {
       const meId = Number(connectedUser?.id);
       const otherId = Number(user?.id);
+
       if (!meId || !otherId || Number.isNaN(meId) || Number.isNaN(otherId)) {
         throw new Error("IDs invalides pour la conversation");
       }
@@ -289,6 +301,7 @@ export default function Profil({ user, connectedUser }) {
         router.push(`/connexion?next=${encodeURIComponent(`/messagerie`)}`);
         return;
       }
+
       if (res.redirected) {
         router.push(res.url);
         return;
@@ -315,7 +328,9 @@ export default function Profil({ user, connectedUser }) {
       router.push(`/messagerie?conversationId=${convId}`);
     } catch (err) {
       console.error("handleStartConversation error:", err);
-      alert("Impossible de démarrer la conversation. " + (err?.message || ""));
+      alert(
+        "Impossible de démarrer la conversation. " + (err?.message || "")
+      );
     } finally {
       setStartingConv(false);
     }
@@ -323,7 +338,11 @@ export default function Profil({ user, connectedUser }) {
 
   return (
     <div className="profil-page">
-      <SimpleModal open={openPhotoUploader} onClose={() => setOpenPhotoUploader(false)} offsetTop={80}>
+      <SimpleModal
+        open={openPhotoUploader}
+        onClose={() => setOpenPhotoUploader(false)}
+        offsetTop={80}
+      >
         <PhotoUploader
           key={uploaderKey}
           priority
@@ -368,14 +387,18 @@ export default function Profil({ user, connectedUser }) {
 
           <div className="profil-name-like">
             <h1 className="profil-name">
-              {user.pseudo.charAt(0).toUpperCase() + user.pseudo.slice(1).toLowerCase()}
+              {user.pseudo.charAt(0).toUpperCase() +
+                user.pseudo.slice(1).toLowerCase()}
               {user.verificationIdentiteStatut && (
-                <img src="/Profilverif.png" alt="Profil vérifié" className="badge-verifie-img" />
+                <img
+                  src="/Profilverif.png"
+                  alt="Profil vérifié"
+                  className="badge-verifie-img"
+                />
               )}
             </h1>
 
             {!isOwnProfile && (
-              <>
               <div className="btn-row">
                 <button
                   className="btn-envoyer-message"
@@ -384,26 +407,38 @@ export default function Profil({ user, connectedUser }) {
                   aria-busy={startingConv ? "true" : "false"}
                 >
                   <div className="tooltip-container">
-                    <Image src="/images/enveloppe.svg" alt="Envoyer un message" width={46} height={46} />
+                    <Image
+                      src="/images/enveloppe.svg"
+                      alt="Envoyer un message"
+                      width={46}
+                      height={46}
+                    />
                   </div>
                 </button>
                 <BoutonLike cibleId={user.id} />
                 <MenuProfilActions cibleId={user.id} />
-                </div>
-              </>
+              </div>
             )}
           </div>
 
           <div>
             {isOwnProfile ? (
-              <StatutToggle statut={statut} statutAuto={statutAuto} editable={isOwnProfile} />
+              <StatutToggle
+                statut={statut}
+                statutAuto={statutAuto}
+                editable={isOwnProfile}
+              />
             ) : (
               <div className="profil-statut-presence">
                 <span
-                  className={`statut-badge ${online ? "en-ligne" : "hors-ligne"}`}
+                  className={`statut-badge ${
+                    online ? "en-ligne" : "hors-ligne"
+                  }`}
                   title={online ? "En ligne" : "Hors ligne"}
                 />
-                <span className="profil-statut-text">{online ? "En ligne" : "Hors ligne"}</span>
+                <span className="profil-statut-text">
+                  {online ? "En ligne" : "Hors ligne"}
+                </span>
               </div>
             )}
 
@@ -415,7 +450,11 @@ export default function Profil({ user, connectedUser }) {
       </div>
 
       {isOwnProfile && (
-        <ProfilCompletionBox user={user} completion={completion} onEditField={handleEditField} />
+        <ProfilCompletionBox
+          user={user}
+          completion={completion}
+          onEditField={handleEditField}
+        />
       )}
 
       <div className="grid">
@@ -446,12 +485,13 @@ export default function Profil({ user, connectedUser }) {
         />
 
         <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
-       {!isOwnProfile && (
-  <AvisForm
-    cibleId={user.id}
-    onStartConversation={handleStartConversation}
-  />
-)}
+
+        {!isOwnProfile && (
+          <AvisForm
+            cibleId={user.id}
+            onStartConversation={handleStartConversation}
+          />
+        )}
 
         <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
       </div>
