@@ -14,21 +14,28 @@ export async function OPTIONS(req) {
 
 export async function GET(req) {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get("token")?.value;
+    const cookieStore = await cookies();
+    const cookieToken = cookieStore.get("token")?.value || null;
+
+    const authHeader = req.headers.get("authorization") || "";
+    const bearerToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    const token = cookieToken || bearerToken;
 
     let userId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, secret);
-        userId = decoded.id;
+        userId = Number(decoded.id || decoded.sub) || null;
       } catch {}
     }
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "0");
+    const page = parseInt(searchParams.get("page") || "0", 10);
     const cursor = searchParams.get("cursor");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "24"), 100);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "24", 10), 100);
 
     let where = {};
     if (userId) {
