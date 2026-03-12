@@ -247,6 +247,7 @@ export async function POST(req, { params }) {
       });
     }
 
+    
     return NextResponse.json(demande);
   } catch (error) {
     console.error("💥 Erreur demande accès :", error);
