@@ -225,7 +225,7 @@ export default function StatsClient() {
           </div>
         </section>
 
-        <section className="admin-resume-grid">
+        {/* <section className="admin-resume-grid">
           <article className="admin-resume-card">
             <p className="admin-section-kicker">Lecture rapide</p>
             <h3>Ce que le client peut voir</h3>
@@ -250,7 +250,7 @@ export default function StatsClient() {
               <li>Conversation créée</li>
             </ul>
           </article>
-        </section>
+        </section> */}
       </div>
     </main>
   );
