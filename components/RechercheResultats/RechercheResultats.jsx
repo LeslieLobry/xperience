@@ -121,7 +121,9 @@ export default function RechercheResultats({
   const [hasSearched, setHasSearched] = useState(false);
 
   const photoUrls = usePresignedPhotos(utilisateurs);
-  const { isOnline, ready, debug } = useOnlineStatus();
+
+  // ✅ IMPORTANT : récupérer aussi onlineIds
+  const { isOnline, ready, onlineIds, debug } = useOnlineStatus();
 
   const hasParams = useMemo(() => {
     return (
@@ -172,12 +174,15 @@ export default function RechercheResultats({
   useEffect(() => {
     console.log("[RechercheResultats] STATE", {
       ready,
+      onlineIdsLen: Array.isArray(onlineIds) ? onlineIds.length : 0,
+      onlineIdsSample: Array.isArray(onlineIds) ? onlineIds.slice(0, 20) : [],
       onlineDebug: debug,
       usersLen: utilisateurs.length,
       hasParams,
       loading,
+      statut,
     });
-  }, [ready, debug, utilisateurs.length, hasParams, loading]);
+  }, [ready, onlineIds, debug, utilisateurs.length, hasParams, loading, statut]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -185,6 +190,21 @@ export default function RechercheResultats({
     if (!hasParams) {
       setUtilisateurs([]);
       setHasSearched(false);
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    // ✅ si filtre en ligne, on attend qu'Ably soit prêt
+    if (statut === "en_ligne" && !ready) {
+      setHasSearched(true);
+      setLoading(true);
+      return () => controller.abort();
+    }
+
+    // ✅ si filtre en ligne + Ably prêt mais personne online
+    if (statut === "en_ligne" && ready && (!onlineIds || onlineIds.length === 0)) {
+      setHasSearched(true);
+      setUtilisateurs([]);
       setLoading(false);
       return () => controller.abort();
     }
@@ -253,11 +273,19 @@ export default function RechercheResultats({
 
           const data = await res.json().catch(() => null);
 
-          const list = Array.isArray(data)
+          let list = Array.isArray(data)
             ? data
             : Array.isArray(data?.proches)
             ? data.proches
             : [];
+
+          // ✅ même en "autour de moi", si filtre en ligne actif, on respecte Ably + visible
+          if (statut === "en_ligne") {
+            list = list.filter((user) => {
+              const statutEff = getUserDisplayStatus(user, isOnline(user?.id));
+              return statutEff === "en_ligne";
+            });
+          }
 
           setUtilisateurs(list);
           setLoading(false);
@@ -289,13 +317,22 @@ export default function RechercheResultats({
         (envies || []).forEach((x) => params.append("envies", x));
         if (rayon !== "") params.set("rayon", String(rayon));
 
+        // ✅ ICI le vrai correctif : envoyer onlineIds à l’API
+        if (statut === "en_ligne" && Array.isArray(onlineIds)) {
+          onlineIds.forEach((id) => {
+            params.append("onlineIds", String(id));
+          });
+        }
+
         const res = await fetch(`/api/recherche?${params.toString()}`, {
           signal: controller.signal,
           credentials: "include",
         });
 
         const data = await res.json().catch(() => null);
-        setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
+        setUtilisateurs(
+          Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
+        );
         setLoading(false);
       } catch (err) {
         if (err?.name !== "AbortError") {
@@ -335,6 +372,9 @@ export default function RechercheResultats({
     longitude,
     loadingGeo,
     geoError,
+    ready,
+    onlineIds,
+    isOnline,
   ]);
 
   if (!hasSearched) return null;
