@@ -1,6 +1,6 @@
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../lib/auth";
+import { getUserFromToken } from "../../../lib/auth";
 
 export const runtime = "nodejs";
 
