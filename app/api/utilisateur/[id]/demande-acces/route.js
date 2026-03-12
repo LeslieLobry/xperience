@@ -39,7 +39,6 @@ async function sendEmailDemandeAcces({
   ownerPseudo,
   demandeurId,
   demandeurPseudo,
-  demandeurPhotoUrl,
 }) {
   if (!ownerEmail) return;
 
@@ -49,21 +48,16 @@ async function sendEmailDemandeAcces({
   const profilUrl = `${APP_URL}/profil/${demandeurId}`;
   const settingsUrl = `${APP_URL}/parametres/galerie`;
 
-  const avatar =
-    absoluteUrl(demandeurPhotoUrl) || `${APP_URL}/default.jpg`;
-
   const html = `
   <div style="margin:0;padding:0;background:#0b1220;">
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0b1220;">
       <tr>
         <td align="center" style="padding:24px;">
-          
           <table width="600" cellpadding="0" cellspacing="0" border="0"
             style="max-width:600px;width:100%;border-radius:18px;">
             
             <tr>
               <td style="background:#1f2c3a;border-radius:18px;padding:20px;">
-                
                 <div style="font-family:Arial,Helvetica,sans-serif;color:#ffffff;">
                   
                   <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#cbd5e1;">
@@ -129,7 +123,6 @@ async function sendEmailDemandeAcces({
                   </div>
 
                 </div>
-
               </td>
             </tr>
 
@@ -138,9 +131,7 @@ async function sendEmailDemandeAcces({
                 © ${new Date().getFullYear()} Xperiences • Email automatique
               </td>
             </tr>
-
           </table>
-
         </td>
       </tr>
     </table>
@@ -150,7 +141,7 @@ async function sendEmailDemandeAcces({
   await resend.emails.send({
     from: "Xperiences <no-reply@x-periences.fr>",
     to: ownerEmail,
-    subject: `Nouvelle demande d'accès • ${demandeurPseudo}`,
+    subject: `Nouvelle demande d'accès • ${demandeurPseudo || "Un membre"}`,
     html,
   });
 }
@@ -164,7 +155,10 @@ export async function POST(req, { params }) {
 
     if (!utilisateurId || !visiteurId) {
       return NextResponse.json(
-        { error: "Données manquantes" },
+        {
+          success: false,
+          error: "Données manquantes",
+        },
         { status: 400 }
       );
     }
@@ -178,10 +172,15 @@ export async function POST(req, { params }) {
       },
     });
 
+    // ✅ Ici on ne renvoie plus un 404 brutal
     if (!galerie) {
       return NextResponse.json(
-        { error: "Galerie non trouvée" },
-        { status: 404 }
+        {
+          success: false,
+          code: "NO_PRIVATE_GALLERY",
+          message: "Cet utilisateur n'a pas de galerie privée.",
+        },
+        { status: 200 }
       );
     }
 
@@ -196,7 +195,11 @@ export async function POST(req, { params }) {
 
     if (existing) {
       return NextResponse.json(
-        { message: "Demande déjà existante" },
+        {
+          success: false,
+          code: "REQUEST_ALREADY_EXISTS",
+          message: "Demande déjà existante.",
+        },
         { status: 200 }
       );
     }
@@ -215,7 +218,7 @@ export async function POST(req, { params }) {
       },
     });
 
-    // ✅ Tracking analytics admin : demande galerie réellement créée
+    // ✅ Tracking analytics admin
     setTimeout(() => {
       logSiteEvent({
         userId: Number(visiteurId),
@@ -232,7 +235,7 @@ export async function POST(req, { params }) {
       data: {
         utilisateurId,
         auteurId: visiteurId,
-        message: `Nouvelle demande d'accès (${demande.demandeur?.pseudo})`,
+        message: `Nouvelle demande d'accès (${demande.demandeur?.pseudo || "Utilisateur"})`,
         lien: `/parametres/galerie`,
       },
     });
@@ -243,15 +246,21 @@ export async function POST(req, { params }) {
         ownerPseudo: galerie.utilisateur.pseudo,
         demandeurId: demande.demandeur.id,
         demandeurPseudo: demande.demandeur.pseudo,
-        demandeurPhotoUrl: demande.demandeur.photoUrl,
       });
     }
 
-    return NextResponse.json(demande);
+    return NextResponse.json({
+      success: true,
+      message: "Demande envoyée avec succès.",
+      demande,
+    });
   } catch (error) {
     console.error("💥 Erreur demande accès :", error);
     return NextResponse.json(
-      { error: "Erreur serveur" },
+      {
+        success: false,
+        error: "Erreur serveur",
+      },
       { status: 500 }
     );
   }
