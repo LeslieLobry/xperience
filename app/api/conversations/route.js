@@ -2,7 +2,7 @@ import { prisma } from "../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "../../../lib/auth";
 import { getIdsUtilisateursExclus } from "../../../lib/utilsFiltrage";
-import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 // ----------- CRÉATION (POST) -----------
 export async function POST(req) {

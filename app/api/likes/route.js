@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { sendPush } from "../../../lib/push";
 import Ably from "ably";
-import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 // 🆕 Client Ably REST (clé serveur)
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);

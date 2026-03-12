@@ -6,7 +6,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import Ably from "ably";
 import { sendPush } from "../../../lib/push";
-import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 const ably = new Ably.Rest(process.env.ABLY_API_KEY_SERVER);
 

@@ -4,7 +4,7 @@ import { getUserFromToken } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { sendPush } from "../../../lib/push";
 import Ably from "ably";
-import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
 export const runtime = "nodejs";
 

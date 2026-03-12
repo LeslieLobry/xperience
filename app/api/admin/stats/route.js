@@ -1,7 +1,7 @@
-import { prisma } from "../../../../../lib/prisma";
+import { prisma } from "../../../../lib/prisma";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
-import { logSiteEvent, SITE_EVENT_TYPES } from "@/lib/siteEvents";
+import { logSiteEvent, SITE_EVENT_TYPES } from "../../../../lib/siteEvents";
 
 export const runtime = "nodejs";
 
