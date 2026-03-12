@@ -11,15 +11,12 @@ export default function MentionsLegalesPage() {
       <h2>Éditeur du site</h2>
       <p>
         <strong>Xperiences</strong><br />
-        [Raison sociale ou nom du responsable]<br />
-        [Adresse postale]<br />
         Email : <a href="mailto:contact@x-periences.fr">contact@x-periences.fr</a>
       </p>
 
       <h2>Hébergement</h2>
       <p>
-        [Hébergeur choisi, ex : Vercel / OVH / Scaleway]<br />
-        [Adresse de l&rsquo;hébergeur]
+        [Vercel]<br />
       </p>
 
       <h2>Propriété intellectuelle</h2>

@@ -21,7 +21,7 @@ export async function POST() {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[presence/heartbeat] error:", e);
+    console.error("[presence/offline] error:", e);
     return NextResponse.json({ ok: false, error: "Erreur serveur" }, { status: 500 });
   }
 }

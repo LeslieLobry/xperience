@@ -1,4 +1,3 @@
-// app/api/profils-online/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { cookies } from "next/headers";
@@ -28,9 +27,26 @@ function pickSample(arr, n = 10) {
 }
 
 function asNumIds(list) {
-  return (Array.isArray(list) ? list : [])
-    .map((x) => Number(x))
-    .filter((n) => Number.isFinite(n) && n > 0);
+  return [...new Set(
+    (Array.isArray(list) ? list : [])
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  )];
+}
+
+async function getCurrentUserId() {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
+    if (!token || !secret) return null;
+
+    const decoded = jwt.verify(token, secret);
+    return Number(decoded.id || decoded.sub) || null;
+  } catch (e) {
+    console.log("[profils-online] jwt invalid:", e?.message || e);
+    return null;
+  }
 }
 
 export async function POST(req) {
@@ -38,89 +54,52 @@ export async function POST(req) {
   const reqId = Math.random().toString(16).slice(2, 8);
 
   try {
-    // ------------------- Auth userId (facultatif) -------------------
-    const cookieStore = cookies();
-    const token = cookieStore.get("token")?.value;
+    const userId = await getCurrentUserId();
 
-    let userId = null;
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, secret);
-        userId = Number(decoded.id || decoded.sub) || null;
-      } catch (e) {
-        console.log(`[profils-online:${reqId}] jwt invalid:`, e?.message || e);
-      }
-    }
-
-    // ------------------- Body ids -------------------
     const body = await req.json().catch(() => null);
     const idsRaw = Array.isArray(body?.ids) ? body.ids : [];
-
-    const idsStr = idsRaw.map(String);
-    const idsNum = asNumIds(idsStr);
+    const idsNum = asNumIds(idsRaw);
 
     console.log(
       `[profils-online:${reqId}] START userId=${userId} idsRawLen=${idsRaw.length} idsNumLen=${idsNum.length}`
     );
-    console.log(`[profils-online:${reqId}] idsRaw sample=`, pickSample(idsRaw, 15));
     console.log(`[profils-online:${reqId}] idsNum sample=`, pickSample(idsNum, 15));
 
-    // ------------------- Empty guard -------------------
     if (idsNum.length === 0) {
-      console.log(`[profils-online:${reqId}] EXIT empty idsNum`);
       return noStoreJson({
         ok: true,
         utilisateurs: [],
-        debug: { reqId, userId, idsRawLen: idsRaw.length, idsNumLen: idsNum.length },
+        debug: {
+          reqId,
+          userId,
+          idsRawLen: idsRaw.length,
+          idsNumLen: idsNum.length,
+          tookMs: Date.now() - t0,
+        },
       });
     }
 
-    // ------------------- Exclusions (blocages etc.) -------------------
-    let exclus = [];
     let exclusNum = [];
 
-    // ✅ Mode invisible : on ne renvoie que les profils VISIBLES (statut=en_ligne)
-    // Donc même si un user est connecté Ably, s'il est invisible => il ne remonte pas.
-    let where = {
-      AND: [{ id: { in: idsNum } }, { statut: "en_ligne" }],
-    };
-
     if (userId) {
-      exclus = await getIdsUtilisateursExclus(userId);
+      const exclus = await getIdsUtilisateursExclus(userId);
       exclusNum = asNumIds(exclus);
 
       console.log(
-        `[profils-online:${reqId}] exclusLen=${Array.isArray(exclus) ? exclus.length : 0} exclusNumLen=${exclusNum.length}`
+        `[profils-online:${reqId}] exclusNumLen=${exclusNum.length} sample=`,
+        pickSample(exclusNum, 30)
       );
-      console.log(`[profils-online:${reqId}] exclus sample=`, pickSample(exclus, 30));
-      console.log(`[profils-online:${reqId}] exclusNum sample=`, pickSample(exclusNum, 30));
-
-      // ✅ LOG: ids demandés exclus
-      const idsExcluded = idsNum.filter((id) => exclusNum.includes(id));
-      console.log(
-        `[profils-online:${reqId}] idsExcludedByExclusLen=${idsExcluded.length} sample=`,
-        pickSample(idsExcluded, 50)
-      );
-
-      where = {
-        AND: [
-          { id: { in: idsNum } },
-          { id: { not: userId } }, // pas moi
-          { id: { notIn: exclusNum } }, // pas les bloqués/exclus
-          { statut: "en_ligne" }, // ✅ uniquement visibles
-        ],
-      };
     }
 
-    // ✅ LOG: résumé du where (sans spam)
-    console.log(`[profils-online:${reqId}] WHERE summary=`, {
-      idsNumLen: idsNum.length,
-      hasUserId: !!userId,
-      exclusNumLen: exclusNum.length,
-      onlyVisible: true,
-    });
+    const where = {
+      AND: [
+        { id: { in: idsNum } },
+        { statut: "en_ligne" }, // visible seulement
+        ...(userId ? [{ id: { not: userId } }] : []),
+        ...(exclusNum.length ? [{ id: { notIn: exclusNum } }] : []),
+      ],
+    };
 
-    // ------------------- DB query -------------------
     const utilisateurs = await prisma.utilisateur.findMany({
       where,
       select: {
@@ -129,7 +108,9 @@ export async function POST(req) {
         photoUrl: true,
         age: true,
         localisation: true,
-        statut: true, // "en_ligne" (visible) seulement ici, logique
+        statut: true,
+        statutAuto: true,
+        lastSeenAt: true,
         type: true,
         verificationIdentiteStatut: true,
       },
@@ -137,15 +118,11 @@ export async function POST(req) {
       take: 2000,
     });
 
-    // ------------------- Missing analysis -------------------
     const returnedIds = utilisateurs.map((u) => u.id);
     const returnedIdSet = new Set(returnedIds);
 
-    // ✅ IDs demandés absents du résultat
     const missingFromDb = idsNum.filter((id) => !returnedIdSet.has(id));
 
-    // ✅ LOG: cas "profil connecté mais pas renvoyé"
-    // (ici, un profil peut manquer car invisible => "NOT_FOUND_OR_FILTERED")
     const missingBreakdown = missingFromDb.map((id) => ({
       id,
       reason:
@@ -153,27 +130,12 @@ export async function POST(req) {
           ? "IS_SELF"
           : exclusNum.includes(id)
           ? "EXCLUDED"
-          : "NOT_FOUND_OR_FILTERED",
+          : "NOT_FOUND_OR_INVISIBLE",
     }));
 
     console.log(
       `[profils-online:${reqId}] RESULT utilisateursLen=${utilisateurs.length} missingFromDbLen=${missingFromDb.length} tookMs=${Date.now() - t0}`
     );
-    console.log(`[profils-online:${reqId}] returnedIds sample=`, pickSample(returnedIds, 30));
-    if (missingFromDb.length) {
-      console.log(`[profils-online:${reqId}] missingFromDb sample=`, pickSample(missingFromDb, 50));
-      console.log(
-        `[profils-online:${reqId}] missingBreakdown sample=`,
-        pickSample(missingBreakdown, 50)
-      );
-    }
-
-    // ✅ LOG: si un id demandé = moi, on le note explicitement
-    if (userId && idsNum.includes(userId)) {
-      console.log(
-        `[profils-online:${reqId}] NOTE: requested list contains SELF id=${userId} (filtered out)`
-      );
-    }
 
     return noStoreJson({
       ok: true,
@@ -183,13 +145,11 @@ export async function POST(req) {
         userId,
         idsRawLen: idsRaw.length,
         idsNumLen: idsNum.length,
-        exclusLen: Array.isArray(exclus) ? exclus.length : 0,
         exclusNumLen: exclusNum.length,
         utilisateursLen: utilisateurs.length,
         missingFromDbLen: missingFromDb.length,
         sample: {
           idsNum: pickSample(idsNum, 15),
-          exclus: pickSample(exclus, 30),
           exclusNum: pickSample(exclusNum, 30),
           returnedIds: pickSample(returnedIds, 30),
           missingFromDb: pickSample(missingFromDb, 30),

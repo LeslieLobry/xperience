@@ -15,7 +15,7 @@ export default function CguPage() {
       </p>
 
       <h2>2. Mentions légales</h2>
-      <p>Éditeur : Xperiences<br />Adresse : [à compléter]<br />Email : contact@x-periences.fr</p>
+      <p>Éditeur : Xperiences<br /><br />Email : contact@x-periences.fr</p>
 
       <h2>3. Accès au service</h2>
       <p>
