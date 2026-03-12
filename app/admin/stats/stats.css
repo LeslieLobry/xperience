@@ -1,0 +1,270 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import "./stats.css";
+
+function StatCard({ title, value, subtitle, highlight = false }) {
+  return (
+    <article className={`admin-stat-card${highlight ? " highlight" : ""}`}>
+      <p className="admin-stat-title">{title}</p>
+      <p className="admin-stat-value">{value}</p>
+      {subtitle ? <p className="admin-stat-subtitle">{subtitle}</p> : null}
+    </article>
+  );
+}
+
+function MiniLegend() {
+  return (
+    <div className="admin-chart-legend">
+      <span><i className="legend-dot legend-total" /> Activité totale</span>
+      <span><i className="legend-dot legend-messages" /> Messages</span>
+      <span><i className="legend-dot legend-logins" /> Connexions</span>
+      <span><i className="legend-dot legend-visits" /> Visites</span>
+    </div>
+  );
+}
+
+export default function AdminStatsPage() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  async function fetchStats(showRefresh = false) {
+    try {
+      if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError("");
+
+      const res = await fetch("/api/admin/stats", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Impossible de charger les statistiques.");
+      }
+
+      setStats(data);
+    } catch (err) {
+      setError(err.message || "Erreur inconnue");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const history = stats?.history7d || [];
+
+  const chartMax = useMemo(() => {
+    if (!history.length) return 10;
+    const maxValue = Math.max(...history.map((item) => item.total || 0), 1);
+    return maxValue;
+  }, [history]);
+
+  const usersTotal = stats?.users?.total ?? 0;
+  const usersToday = stats?.users?.today ?? 0;
+
+  const logins = stats?.activityToday?.logins ?? 0;
+  const uniqueLogins = stats?.activityToday?.uniqueLogins ?? 0;
+  const uniqueActiveUsers = stats?.activityToday?.uniqueActiveUsers ?? 0;
+  const messages = stats?.activityToday?.messages ?? 0;
+  const likes = stats?.activityToday?.likes ?? 0;
+  const visits = stats?.activityToday?.visits ?? 0;
+  const galleryRequests = stats?.activityToday?.galleryRequests ?? 0;
+  const conversations = stats?.activityToday?.conversations ?? 0;
+  const total30dEvents = stats?.totals30d?.events ?? 0;
+
+  const totalToday =
+    logins + messages + likes + visits + galleryRequests + conversations;
+
+  if (loading) {
+    return (
+      <main className="admin-stats-page">
+        <div className="admin-stats-shell">
+          <div className="admin-stats-loading">
+            <div className="admin-loader" />
+            <p>Chargement des statistiques...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="admin-stats-page">
+        <div className="admin-stats-shell">
+          <div className="admin-stats-topbar">
+            <div>
+              <p className="admin-stats-kicker">Administration</p>
+              <h1>Statistiques</h1>
+            </div>
+            <button
+              className="admin-stats-button"
+              onClick={() => fetchStats(true)}
+            >
+              Réessayer
+            </button>
+          </div>
+
+          <div className="admin-stats-error">
+            <h2>Impossible de charger les statistiques</h2>
+            <p>{error}</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="admin-stats-page">
+      <div className="admin-stats-shell">
+        <div className="admin-stats-topbar">
+          <div>
+            <p className="admin-stats-kicker">Administration</p>
+            <h1>Statistiques du site</h1>
+            <p className="admin-stats-intro">
+              Vue globale de l’activité de Xperiences, avec suivi du jour et tendance sur 7 jours.
+            </p>
+          </div>
+
+          <button
+            className="admin-stats-button"
+            onClick={() => fetchStats(true)}
+            disabled={refreshing}
+          >
+            {refreshing ? "Actualisation..." : "Actualiser"}
+          </button>
+        </div>
+
+        <section className="admin-stats-grid top-grid">
+          <StatCard
+            title="Activité du jour"
+            value={totalToday}
+            subtitle="Total des interactions suivies aujourd’hui"
+            highlight
+          />
+          <StatCard
+            title="Utilisateurs inscrits"
+            value={usersTotal}
+            subtitle={`${usersToday} nouveau(x) aujourd’hui`}
+          />
+          <StatCard
+            title="Connexions du jour"
+            value={logins}
+            subtitle={`${uniqueLogins} utilisateur(s) unique(s)`}
+          />
+          <StatCard
+            title="Utilisateurs actifs"
+            value={uniqueActiveUsers}
+            subtitle="Ont réalisé au moins une action aujourd’hui"
+          />
+        </section>
+
+        <section className="admin-stats-grid metrics-grid">
+          <StatCard title="Messages" value={messages} subtitle="Envoyés aujourd’hui" />
+          <StatCard title="Likes" value={likes} subtitle="Envoyés aujourd’hui" />
+          <StatCard title="Visites profil" value={visits} subtitle="Enregistrées aujourd’hui" />
+          <StatCard title="Demandes galerie" value={galleryRequests} subtitle="Aujourd’hui" />
+          <StatCard title="Conversations créées" value={conversations} subtitle="Aujourd’hui" />
+          <StatCard title="Événements 30 jours" value={total30dEvents} subtitle="Tous événements suivis" />
+        </section>
+
+        <section className="admin-chart-card">
+          <div className="admin-chart-header">
+            <div>
+              <p className="admin-section-kicker">Tendance</p>
+              <h2>Activité sur les 7 derniers jours</h2>
+            </div>
+            <MiniLegend />
+          </div>
+
+          <div className="admin-chart">
+            {history.map((item) => {
+              const totalHeight = Math.max((item.total / chartMax) * 100, item.total > 0 ? 6 : 0);
+              const messagesHeight = Math.max((item.messages / chartMax) * 100, item.messages > 0 ? 4 : 0);
+              const loginsHeight = Math.max((item.logins / chartMax) * 100, item.logins > 0 ? 4 : 0);
+              const visitsHeight = Math.max((item.visits / chartMax) * 100, item.visits > 0 ? 4 : 0);
+
+              return (
+                <div className="admin-chart-col" key={item.key}>
+                  <div className="admin-chart-tooltip">
+                    <strong>{item.label}</strong>
+                    <span>Total : {item.total}</span>
+                    <span>Connexions : {item.logins}</span>
+                    <span>Messages : {item.messages}</span>
+                    <span>Likes : {item.likes}</span>
+                    <span>Visites : {item.visits}</span>
+                    <span>Demandes galerie : {item.galleryRequests}</span>
+                    <span>Conversations : {item.conversations}</span>
+                    <span>Inscriptions : {item.registrations}</span>
+                  </div>
+
+                  <div className="admin-chart-bars">
+                    <div
+                      className="bar total"
+                      style={{ height: `${totalHeight}%` }}
+                    />
+                    <div
+                      className="bar messages"
+                      style={{ height: `${messagesHeight}%` }}
+                    />
+                    <div
+                      className="bar logins"
+                      style={{ height: `${loginsHeight}%` }}
+                    />
+                    <div
+                      className="bar visits"
+                      style={{ height: `${visitsHeight}%` }}
+                    />
+                  </div>
+
+                  <span className="admin-chart-label">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="admin-resume-grid">
+          <article className="admin-resume-card">
+            <p className="admin-section-kicker">Lecture rapide</p>
+            <h3>Ce que le client peut voir</h3>
+            <ul>
+              <li>Le nombre de connexions quotidiennes</li>
+              <li>Le volume réel d’échanges et d’interactions</li>
+              <li>Si le site vit vraiment au quotidien</li>
+              <li>La tendance récente sans ouvrir la base de données</li>
+            </ul>
+          </article>
+
+          <article className="admin-resume-card">
+            <p className="admin-section-kicker">Indicateurs suivis</p>
+            <h3>Événements actuellement trackés</h3>
+            <ul>
+              <li>Connexion réussie</li>
+              <li>Inscription</li>
+              <li>Message envoyé</li>
+              <li>Like envoyé</li>
+              <li>Visite de profil</li>
+              <li>Demande d’accès galerie privée</li>
+              <li>Conversation créée</li>
+            </ul>
+          </article>
+        </section>
+      </div>
+    </main>
+  );
+}

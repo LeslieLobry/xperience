@@ -1,4 +1,3 @@
-// app/admin/page.jsx
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "../../lib/auth";
 import Link from "next/link";
@@ -16,6 +15,7 @@ export default async function AdminDashboard() {
       <h1>Tableau de bord admin</h1>
 
       <ul className="admin-links">
+        <li><Link href="/admin/stats">📊 Voir les statistiques</Link></li>
         <li><Link href="/admin/utilisateurs">👤 Gérer les utilisateurs</Link></li>
         <li><Link href="/admin/evenements">📅 Gérer les événements</Link></li>
         <li><Link href="/admin/blog">📝 Gérer les articles de blog</Link></li>
