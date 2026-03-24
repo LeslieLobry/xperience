@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import "./ImageViewer.css";
 
 const MIN_SCALE = 1;
@@ -15,6 +16,7 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
   const overlayRef = useRef(null);
   const imgRef = useRef(null);
 
+  const [mounted, setMounted] = useState(false);
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -30,6 +32,10 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
   const resetView = useCallback(() => {
     setScale(1);
     setTranslate({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -180,7 +186,9 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  const content = (
     <div
       ref={overlayRef}
       className="image-viewer-overlay"
@@ -256,4 +264,6 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
