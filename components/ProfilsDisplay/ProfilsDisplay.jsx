@@ -5,7 +5,7 @@ import Link from "next/link";
 import "./ProfilsDisplay.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
-
+import { formatLocationLabel } from "../../lib/formatLocationLabel";
 // shuffle stable
 function stableShuffle(list, seed) {
   const arr = Array.isArray(list) ? [...list] : [];
@@ -406,9 +406,8 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </h2>
 
                     <p className="profil-card-details">
-                      {user.age} ans - {user.localisation}
-                    </p>
-
+  {user.age} ans{formatLocationLabel(user) ? ` - ${formatLocationLabel(user)}` : ""}
+</p>
                     <p className="profil-card-details-type">{user.type}</p>
 
                     {user.distance != null && Number.isFinite(user.distance) && (
