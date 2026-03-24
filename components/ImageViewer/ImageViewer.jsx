@@ -199,7 +199,11 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
       <button
         type="button"
         className="image-viewer-close"
-        onClick={onClose}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose?.();
+        }}
         aria-label="Fermer"
       >
         ✕
@@ -208,7 +212,9 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
       <button
         type="button"
         className="image-viewer-action image-viewer-zoomout"
-        onClick={() => {
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
           setScale((prev) => {
             const next = clamp(Number((prev - 0.25).toFixed(2)), MIN_SCALE, MAX_SCALE);
             if (next === 1) setTranslate({ x: 0, y: 0 });
@@ -223,7 +229,9 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
       <button
         type="button"
         className="image-viewer-action image-viewer-zoomin"
-        onClick={() => {
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
           setScale((prev) =>
             clamp(Number((prev + 0.25).toFixed(2)), MIN_SCALE, MAX_SCALE)
           );
@@ -231,15 +239,6 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
         aria-label="Zoom avant"
       >
         +
-      </button>
-
-      <button
-        type="button"
-        className="image-viewer-action image-viewer-reset"
-        onClick={resetView}
-        aria-label="Réinitialiser"
-      >
-        100%
       </button>
 
       <div className="image-viewer-stage">
