@@ -6,7 +6,7 @@
 .image-viewer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 999999;
   background: rgba(0, 0, 0, 0.96);
   backdrop-filter: blur(6px);
   display: flex;
@@ -16,9 +16,9 @@
 }
 
 .image-viewer-stage {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -45,7 +45,7 @@
 .image-viewer-close,
 .image-viewer-action {
   position: fixed;
-  z-index: 10001;
+  z-index: 1000001;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(20, 20, 20, 0.78);
   color: #fff;

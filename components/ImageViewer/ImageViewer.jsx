@@ -26,7 +26,6 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
   const pointersRef = useRef(new Map());
   const pinchStartDistanceRef = useRef(null);
   const pinchStartScaleRef = useRef(1);
-  const pinchStartCenterRef = useRef(null);
 
   const resetView = useCallback(() => {
     setScale(1);
@@ -55,15 +54,11 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  const getCenter = (p1, p2) => ({
-    x: (p1.clientX + p2.clientX) / 2,
-    y: (p1.clientY + p2.clientY) / 2,
-  });
-
   const handleWheel = (e) => {
     e.preventDefault();
 
     const delta = e.deltaY > 0 ? -0.2 : 0.2;
+
     setScale((prev) => {
       const next = clamp(Number((prev + delta).toFixed(2)), MIN_SCALE, MAX_SCALE);
       if (next === 1) {
@@ -89,6 +84,7 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
     if (!imgRef.current) return;
 
     imgRef.current.setPointerCapture?.(e.pointerId);
+
     pointersRef.current.set(e.pointerId, {
       clientX: e.clientX,
       clientY: e.clientY,
@@ -96,9 +92,11 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
 
     if (pointersRef.current.size === 1) {
       const now = Date.now();
+
       if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
         handleDoubleClick(e);
       }
+
       lastTapRef.current = now;
 
       if (scale > 1) {
@@ -112,7 +110,6 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
       const pts = Array.from(pointersRef.current.values());
       pinchStartDistanceRef.current = getDistance(pts[0], pts[1]);
       pinchStartScaleRef.current = scale;
-      pinchStartCenterRef.current = getCenter(pts[0], pts[1]);
       setDragging(false);
     }
   };
@@ -163,11 +160,11 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
 
     if (pointersRef.current.size < 2) {
       pinchStartDistanceRef.current = null;
-      pinchStartCenterRef.current = null;
     }
 
     if (pointersRef.current.size === 0) {
       setDragging(false);
+
       if (scale <= 1) {
         setTranslate({ x: 0, y: 0 });
       }
@@ -219,7 +216,9 @@ export default function ImageViewer({ src, alt = "image", onClose }) {
         type="button"
         className="image-viewer-action image-viewer-zoomin"
         onClick={() => {
-          setScale((prev) => clamp(Number((prev + 0.25).toFixed(2)), MIN_SCALE, MAX_SCALE));
+          setScale((prev) =>
+            clamp(Number((prev + 0.25).toFixed(2)), MIN_SCALE, MAX_SCALE)
+          );
         }}
         aria-label="Zoom avant"
       >
