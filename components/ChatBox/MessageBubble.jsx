@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import MessageAudio from "../MessageAudio/MessageAudio";
 import MessageEphemere from "../MessageEphemere/MessageEphemere";
+import ImageViewer from "../ImageViewer/ImageViewer";
 import "./MessageBubble.css";
 
 /* =========================================================
@@ -56,6 +57,7 @@ function usePresignedPhoto(photoKey) {
     }
 
     let p = PRESIGN_INFLIGHT.get(photoKey);
+
     if (!p) {
       p = fetch("/api/photos/presign", {
         method: "POST",
@@ -79,6 +81,7 @@ function usePresignedPhoto(photoKey) {
     }
 
     let cancelled = false;
+
     p.then((finalUrl) => {
       if (!cancelled && url !== finalUrl) setUrl(finalUrl);
     });
@@ -135,10 +138,10 @@ function MessageBubble({
   /* ---------------- Picker ---------------- */
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState(null); // { x, y }
+  const [viewerSrc, setViewerSrc] = useState(null);
+
   const pickerRef = useRef(null);
   const pressableRef = useRef(null);
-
-  // ✅ bouton "comme sur l'app" : petite icône emoji toujours dispo
   const triggerRef = useRef(null);
 
   /* ---------- Long press (on le garde en bonus) ---------- */
@@ -186,10 +189,11 @@ function MessageBubble({
 
   const unblockScroll = useCallback(() => {
     if (unblockTouchMoveRef.current) unblockTouchMoveRef.current();
-  }, [blockScrollWhilePressing]);
+  }, []);
 
   const openPickerFromEl = useCallback((el) => {
     const rect = el?.getBoundingClientRect?.();
+
     if (!rect) {
       setPickerPos(null);
       setIsPickerOpen(true);
@@ -200,7 +204,6 @@ function MessageBubble({
     const vh = window.innerHeight;
 
     let x = rect.left + rect.width / 2;
-
     const yAbove = rect.top - 62;
     let y = yAbove >= 8 ? yAbove : rect.bottom + 10;
 
@@ -222,23 +225,24 @@ function MessageBubble({
         return;
       }
 
-      // On place le picker proche du doigt/clic
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
       const clientX = e.clientX ?? e.touches?.[0]?.clientX;
       const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
-   if (typeof clientX === "number" && typeof clientY === "number") {
-  const isMobile = vw <= 768;
-  const x = isMobile ? clamp(clientX, 8, vw - 8) : clamp(clientX - 20, 8, vw - 8);
-  const y = clamp(clientY - 70, 8, vh - 8);
+      if (typeof clientX === "number" && typeof clientY === "number") {
+        const isMobile = vw <= 768;
+        const x = isMobile
+          ? clamp(clientX, 8, vw - 8)
+          : clamp(clientX - 20, 8, vw - 8);
+        const y = clamp(clientY - 70, 8, vh - 8);
 
-  setPickerPos({ x, y });
-  setIsPickerOpen(true);
-} else {
-  openPickerFromEl(triggerRef.current || pressableRef.current);
-}
+        setPickerPos({ x, y });
+        setIsPickerOpen(true);
+      } else {
+        openPickerFromEl(triggerRef.current || pressableRef.current);
+      }
     },
     [openPickerFromEl]
   );
@@ -358,51 +362,52 @@ function MessageBubble({
     if (isCoarsePointer()) e.preventDefault();
   };
 
- useLayoutEffect(() => {
-  if (!isPickerOpen) return;
+  useLayoutEffect(() => {
+    if (!isPickerOpen) return;
 
-  let raf1 = 0;
-  let raf2 = 0;
+    let raf1 = 0;
+    let raf2 = 0;
 
-  raf1 = requestAnimationFrame(() => {
-    raf2 = requestAnimationFrame(() => {
-      const el = pickerRef.current;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = pickerRef.current;
 
-      if (el) {
-        el.scrollLeft = 0;
-        el.scrollTo?.({ left: 0, behavior: "auto" });
-      }
-
-      if (pickerPos && el) {
-        const pr = el.getBoundingClientRect();
-        const margin = 8;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const isMobile = vw <= 768;
-
-        let x = pickerPos.x;
-        let y = pickerPos.y;
-
-        if (isMobile) {
-          x = clamp(x, margin + pr.width / 2, vw - margin - pr.width / 2);
-        } else {
-          x = clamp(x, margin, vw - margin - pr.width);
+        if (el) {
+          el.scrollLeft = 0;
+          el.scrollTo?.({ left: 0, behavior: "auto" });
         }
 
-        y = clamp(y, margin, vh - margin - pr.height);
+        if (pickerPos && el) {
+          const pr = el.getBoundingClientRect();
+          const margin = 8;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const isMobile = vw <= 768;
 
-        if (x !== pickerPos.x || y !== pickerPos.y) {
-          setPickerPos({ x, y });
+          let x = pickerPos.x;
+          let y = pickerPos.y;
+
+          if (isMobile) {
+            x = clamp(x, margin + pr.width / 2, vw - margin - pr.width / 2);
+          } else {
+            x = clamp(x, margin, vw - margin - pr.width);
+          }
+
+          y = clamp(y, margin, vh - margin - pr.height);
+
+          if (x !== pickerPos.x || y !== pickerPos.y) {
+            setPickerPos({ x, y });
+          }
         }
-      }
+      });
     });
-  });
 
-  return () => {
-    cancelAnimationFrame(raf1);
-    cancelAnimationFrame(raf2);
-  };
-}, [isPickerOpen, pickerPos]);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [isPickerOpen, pickerPos]);
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (!isPickerOpen) return;
@@ -424,7 +429,9 @@ function MessageBubble({
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside, { passive: true });
+    document.addEventListener("touchstart", handleClickOutside, {
+      passive: true,
+    });
     document.addEventListener("keydown", handleEsc);
 
     return () => {
@@ -455,7 +462,11 @@ function MessageBubble({
 
   const statutTexte = useMemo(() => {
     if (!isOwn || !lastReads || !msg.createdAt) return "";
-    const autresLecteurs = lastReads.filter((r) => r.utilisateurId !== utilisateur.id);
+
+    const autresLecteurs = lastReads.filter(
+      (r) => r.utilisateurId !== utilisateur.id
+    );
+
     if (!autresLecteurs.length) return "✔ Envoyé";
 
     const msgTime = new Date(msg.createdAt).getTime();
@@ -478,6 +489,7 @@ function MessageBubble({
   const groupedReactions = useMemo(() => {
     const rx = msg.reactions || [];
     if (!rx.length) return [];
+
     return Object.entries(
       rx.reduce((acc, r) => {
         if (!acc[r.emoji]) acc[r.emoji] = new Set();
@@ -487,14 +499,19 @@ function MessageBubble({
     );
   }, [msg.reactions]);
 
-  // ✅ NEW: légende (photo/audio) si contenu non vide
   const caption = useMemo(() => {
     const c = (msg?.contenu || "").trim();
     return c.length ? c : "";
   }, [msg?.contenu]);
 
   if (msg.type === "EPHEMERE") {
-    return <MessageEphemere msg={msg} onDelete={onDelete} utilisateurId={utilisateur.id} />;
+    return (
+      <MessageEphemere
+        msg={msg}
+        onDelete={onDelete}
+        utilisateurId={utilisateur.id}
+      />
+    );
   }
 
   if (msg.type === "SYSTEME") {
@@ -520,8 +537,11 @@ function MessageBubble({
             {msg.prenomEnvoyeur ? (
               <span className="author-name">{msg.prenomEnvoyeur}</span>
             ) : (
-              <span className="author-name">{msg.auteur?.pseudo || "Utilisateur"}</span>
+              <span className="author-name">
+                {msg.auteur?.pseudo || "Utilisateur"}
+              </span>
             )}
+
             {auteurIsCouple && prenomsCouple && (
               <span
                 className="author-couple-names"
@@ -539,7 +559,6 @@ function MessageBubble({
         </div>
       )}
 
-      {/* ✅ Le message (on garde ton long-press, mais ce n'est PLUS la méthode principale) */}
       <div
         ref={pressableRef}
         className="message-content-pressable"
@@ -553,7 +572,6 @@ function MessageBubble({
         onTouchCancel={handleTouchCancel}
         onContextMenu={handleContextMenu}
         onClickCapture={(e) => {
-          // si long-press a ouvert → on stoppe le click fantôme
           if (didLongPressRef.current) {
             e.preventDefault();
             e.stopPropagation();
@@ -566,32 +584,36 @@ function MessageBubble({
             <img
               src={imageMsgUrl || "/default.jpg"}
               alt="image envoyée"
-              className="message-image"
+              className="message-image message-image-clickable"
               draggable={false}
               loading="lazy"
               decoding="async"
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewerSrc(imageMsgUrl || "/default.jpg");
+              }}
             />
-            {/* ✅ NEW: légende sous la photo */}
-            {caption ? <p className="message-text message-caption">{caption}</p> : null}
+            {caption ? (
+              <p className="message-text message-caption">{caption}</p>
+            ) : null}
           </>
         ) : msg.type === "AUDIO" && msg.audioUrl ? (
           <>
             <MessageAudio url={audioMsgUrl} duration={msg.duree || "0:00"} />
-            {/* ✅ NEW: légende sous l’audio */}
-            {caption ? <p className="message-text message-caption">{caption}</p> : null}
+            {caption ? (
+              <p className="message-text message-caption">{caption}</p>
+            ) : null}
           </>
         ) : (
           <p className="message-text">{msg.contenu}</p>
         )}
       </div>
 
-      {/* ✅ Bouton "comme sur l'app" pour déclencher les réactions (FIABLE) */}
       <button
         ref={triggerRef}
         className="message-react-btn"
         type="button"
         onMouseDown={(e) => {
-          // desktop: on évite de perdre le focus / déclencher des sélections
           e.preventDefault();
         }}
         onClick={(e) => {
@@ -604,7 +626,6 @@ function MessageBubble({
           openPickerFromEvent(e);
         }}
         onTouchStart={(e) => {
-          // mobile: ouverture immédiate au tap (plus fiable que long press)
           if (isPickerOpen) return;
           openPickerFromEvent(e);
         }}
@@ -656,18 +677,18 @@ function MessageBubble({
         <div
           ref={pickerRef}
           className="reaction-picker reaction-picker-fixed"
-        style={
-  pickerPos
-    ? {
-        left: pickerPos.x,
-        top: pickerPos.y,
-        transform:
-          typeof window !== "undefined" && window.innerWidth <= 768
-            ? "translateX(-50%)"
-            : "none",
-      }
-    : undefined
-}
+          style={
+            pickerPos
+              ? {
+                  left: pickerPos.x,
+                  top: pickerPos.y,
+                  transform:
+                    typeof window !== "undefined" && window.innerWidth <= 768
+                      ? "translateX(-50%)"
+                      : "none",
+                }
+              : undefined
+          }
         >
           {activePack.map((emo) => (
             <button
@@ -684,6 +705,14 @@ function MessageBubble({
             </button>
           ))}
         </div>
+      )}
+
+      {viewerSrc && (
+        <ImageViewer
+          src={viewerSrc}
+          alt="image envoyée"
+          onClose={() => setViewerSrc(null)}
+        />
       )}
 
       <div className="message-meta">

@@ -2001,7 +2001,21 @@
   width: 100% !important;
   z-index: 9999 !important;
 }
+.message-image-clickable {
+  cursor: zoom-in;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
 
+.message-image-clickable:hover {
+  transform: scale(1.02);
+  opacity: 0.96;
+}
+@media (max-width: 768px) {
+  .message-image-clickable:hover {
+    transform: none;
+    opacity: 1;
+  }
+}
 /* ✅ FIX FINAL : textarea piloté par JS (grandit puis scroll) */
 /* .input-text{
   max-height: 140px !important;

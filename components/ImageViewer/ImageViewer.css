@@ -1,0 +1,139 @@
+.image-viewer-open {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.image-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.96);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: viewerFadeIn 0.18s ease;
+}
+
+.image-viewer-stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.image-viewer-img {
+  max-width: 94vw;
+  max-height: 90vh;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform;
+  transition: transform 0.08s linear;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.image-viewer-img.dragging {
+  transition: none;
+}
+
+.image-viewer-close,
+.image-viewer-action {
+  position: fixed;
+  z-index: 10001;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 20, 20, 0.78);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.image-viewer-close:hover,
+.image-viewer-action:hover {
+  transform: scale(1.04);
+  background: rgba(35, 35, 35, 0.92);
+}
+
+.image-viewer-close {
+  top: 18px;
+  right: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.image-viewer-action {
+  bottom: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.image-viewer-zoomout {
+  right: 150px;
+}
+
+.image-viewer-zoomin {
+  right: 86px;
+}
+
+.image-viewer-reset {
+  right: 18px;
+  width: 58px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@keyframes viewerFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .image-viewer-img {
+    max-width: 100vw;
+    max-height: 84vh;
+    border-radius: 0;
+  }
+
+  .image-viewer-close {
+    top: 12px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .image-viewer-action {
+    bottom: 14px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .image-viewer-zoomout {
+    right: 126px;
+  }
+
+  .image-viewer-zoomin {
+    right: 70px;
+  }
+
+  .image-viewer-reset {
+    right: 12px;
+    width: 52px;
+    font-size: 12px;
+  }
+}
