@@ -6,6 +6,7 @@ import "./ProfilsDisplay.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
 import { formatLocationLabel } from "../../lib/formatLocationLabel";
+
 // shuffle stable
 function stableShuffle(list, seed) {
   const arr = Array.isArray(list) ? [...list] : [];
@@ -257,6 +258,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
             setProfilsAffiches(list);
           } catch (err) {
             console.error("Erreur chargement profils proches :", err);
+            setProfilsAffiches([]);
           } finally {
             setLoading(false);
           }
@@ -360,6 +362,7 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
 
               const statutEff = getUserDisplayStatus(user, isOnline(targetId));
               const routeId = user?.id ?? user?.utilisateurId ?? targetId;
+              const locationLabel = formatLocationLabel(user);
 
               return (
                 <Link
@@ -406,8 +409,11 @@ export default function ProfilsDisplay({ profils, afficherPlus = false }) {
                     </h2>
 
                     <p className="profil-card-details">
-  {user.age} ans{formatLocationLabel(user) ? ` - ${formatLocationLabel(user)}` : ""}
-</p>
+                      {user.age ? `${user.age} ans` : ""}
+                      {user.age && locationLabel ? " - " : ""}
+                      {locationLabel}
+                    </p>
+
                     <p className="profil-card-details-type">{user.type}</p>
 
                     {user.distance != null && Number.isFinite(user.distance) && (
