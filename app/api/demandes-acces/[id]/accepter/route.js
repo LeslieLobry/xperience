@@ -117,7 +117,7 @@ export async function PATCH(req, { params }) {
       data: {
         utilisateurId: demande.demandeurId, // destinataire
         auteurId: demande.proprietaireId, // celui qui accepte
-        message: `${ownerPseudo} a accepté votre demande d'accès à sa galerie privée.`,
+        message: ` a accepté votre demande d'accès à sa galerie privée.`,
         lien,
       },
     });
