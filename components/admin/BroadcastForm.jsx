@@ -1,158 +1,284 @@
-"use client"
+"use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { buildBroadcastEmail } from "../../../lib/emails/buildBroadcastEmail";
+import "./BroadcastPremiumForm.css";
 
-// Variables de couleurs (adapte à ta charte)
-const COLORS = {
-  primary: "#112347",       // Bleu nuit
-  accent: "#e0c084",        // Bleu turquoise accent
-  bg: "#181f32",            // Fond global sombre
-  card: "#232f47",          // Fond des cards
-  border: "#283356",
-  text: "#f6f6fb",
-  muted: "#a7adc8",
-  button: "#e0c084",
-  buttonHover: "#15a3b0",
-  error: "#ef5350",
-  success: "#48eaa6",
-};
-
-const LOGO_URL = "https://x-periences.fr/logo.png"; 
-
-export default function BroadcastForm() {
-  const [objet, setObjet] = useState("");
+export default function BroadcastPremiumForm() {
+  const [subject, setSubject] = useState("");
+  const [preheader, setPreheader] = useState("");
+  const [title, setTitle] = useState("");
+  const [intro, setIntro] = useState("");
   const [message, setMessage] = useState("");
-  const [sending, setSending] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [signature, setSignature] = useState("L’équipe Xperiences");
+
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [sendingAll, setSendingAll] = useState(false);
+
+  const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const send = async () => {
-    setSending(true);
-    setError("");
-    setSuccess(false);
-    const res = await fetch("/api/admin/broadcast", {
-      method: "POST",
-      body: JSON.stringify({ objet, message }),
-      headers: { "Content-Type": "application/json" },
+  const previewHtml = useMemo(() => {
+    return buildBroadcastEmail({
+      subject: subject || "Objet du mail",
+      preheader,
+      title: title || subject || "Titre principal",
+      intro,
+      message,
+      ctaLabel,
+      ctaUrl,
+      signature,
     });
-    if (res.ok) setSuccess(true);
-    else setError("Erreur lors de l'envoi !");
-    setSending(false);
-  };
+  }, [subject, preheader, title, intro, message, ctaLabel, ctaUrl, signature]);
+
+  function resetFeedback() {
+    setSuccess("");
+    setError("");
+  }
+
+  function getPayload() {
+    return {
+      subject: subject.trim(),
+      preheader: preheader.trim(),
+      title: title.trim(),
+      intro: intro.trim(),
+      message: message.trim(),
+      ctaLabel: ctaLabel.trim(),
+      ctaUrl: ctaUrl.trim(),
+      signature: signature.trim(),
+    };
+  }
+
+  function isValidForm() {
+    return Boolean(subject.trim() && message.trim());
+  }
+
+  async function sendTest() {
+    resetFeedback();
+
+    if (!isValidForm()) {
+      setError("Il faut au minimum un objet et un message.");
+      return;
+    }
+
+    if (!testEmail.trim()) {
+      setError("Renseigne une adresse email de test.");
+      return;
+    }
+
+    try {
+      setSendingTest(true);
+
+      const res = await fetch("/api/admin/broadcast/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...getPayload(),
+          testEmail: testEmail.trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Erreur lors de l'envoi du test.");
+      }
+
+      setSuccess(data?.message || "Email de test envoyé.");
+    } catch (err) {
+      setError(err.message || "Erreur lors de l'envoi du test.");
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  async function sendAll() {
+    resetFeedback();
+
+    if (!isValidForm()) {
+      setError("Il faut au minimum un objet et un message.");
+      return;
+    }
+
+    try {
+      setSendingAll(true);
+
+      const res = await fetch("/api/admin/broadcast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(getPayload()),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Erreur lors de l'envoi global.");
+      }
+
+      setSuccess(data?.message || "Mail envoyé à tous les utilisateurs.");
+    } catch (err) {
+      setError(err.message || "Erreur lors de l'envoi global.");
+    } finally {
+      setSendingAll(false);
+    }
+  }
 
   return (
-    <div style={{
-      maxWidth: 1050,
-      margin: "40px auto",
-      padding: 24,
-      background: COLORS.bg,
-      color: COLORS.text,
-      borderRadius: 16,
-      boxShadow: "0 8px 24px rgba(20,30,60,0.18)",
-      display: "flex",
-      gap: 32,
-      fontFamily: "inherit"
-    }}>
-      {/* Formulaire */}
-      <div style={{ flex: 1, minWidth: 320 }}>
-        <h2 style={{ color: COLORS.accent, fontWeight: 700, fontSize: 24, marginBottom: 24 }}>
-          Envoyer un mail général à tous
-        </h2>
-        <label style={{ color: COLORS.muted, fontWeight: 600 }}>Objet du mail</label>
-        <input
-          type="text"
-          value={objet}
-          onChange={e => setObjet(e.target.value)}
-          placeholder="Objet du mail"
-          style={{
-            width: "100%",
-            marginBottom: 18,
-            marginTop: 6,
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: `1px solid ${COLORS.border}`,
-            background: COLORS.card,
-            color: COLORS.text,
-            fontSize: 16,
-            outline: "none"
-          }}
-        />
-        <label style={{ color: COLORS.muted, fontWeight: 600 }}>Message</label>
-        <textarea
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          placeholder="Message (HTML possible)"
-          rows={10}
-          style={{
-            width: "100%",
-            marginBottom: 18,
-            marginTop: 6,
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: `1px solid ${COLORS.border}`,
-            background: COLORS.card,
-            color: COLORS.text,
-            fontSize: 15,
-            fontFamily: "inherit",
-            outline: "none",
-            resize: "vertical"
-          }}
-        />
-        <button
-          onClick={send}
-          disabled={sending || !objet || !message}
-          style={{
-            background: COLORS.button,
-            color: "#fff",
-            fontWeight: 700,
-            padding: "12px 30px",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 16,
-            cursor: sending || !objet || !message ? "not-allowed" : "pointer",
-            boxShadow: "0 2px 10px rgba(32,180,199,0.09)",
-            transition: "background 0.18s"
-          }}
-          onMouseOver={e => e.currentTarget.style.background = COLORS.buttonHover}
-          onMouseOut={e => e.currentTarget.style.background = COLORS.button}
-        >
-          {sending ? "Envoi en cours..." : "Envoyer à tous"}
-        </button>
-        {success && <p style={{ color: COLORS.success, fontWeight: 600, marginTop: 16 }}>Mail envoyé à tous les utilisateurs !</p>}
-        {error && <p style={{ color: COLORS.error, fontWeight: 600, marginTop: 16 }}>{error}</p>}
-      </div>
-      {/* Aperçu du mail */}
-      <div style={{
-        flex: 1,
-        background: COLORS.card,
-        borderRadius: 12,
-        border: `1px solid ${COLORS.border}`,
-        boxShadow: "0 2px 10px rgba(30,60,90,0.08)",
-        padding: 24,
-        minHeight: 260,
-        color: COLORS.text
-      }}>
-        <h3 style={{ color: COLORS.accent, margin: "0 0 18px 0", fontSize: 20 }}>Aperçu du mail</h3>
-        <div style={{
-          border: `1px solid ${COLORS.border}`,
-          borderRadius: 8,
-          background: "#222c45",
-          padding: 16,
-          minHeight: 170,
-        }}>
-          <h4 style={{ margin: "0 0 12px 0", color: COLORS.text, fontWeight: 700 }}>
-            {objet || <span style={{ color: COLORS.muted }}>Objet du mail…</span>}
-          </h4>
-          {/* Affiche le message en HTML + le logo à la fin */}
-          <div
-            dangerouslySetInnerHTML={{
-              __html:
-                (message || "<i style='color:#a7adc8;'>(Votre message ici)</i>") +
-                `<div style='text-align:center;margin-top:32px;'>
-                  <img src="${LOGO_URL}" alt="Logo X-periences" style="height:48px;opacity:0.92;" />
-                </div>`,
-            }}
-          />
+    <div className="broadcastPremiumPage">
+      <div className="broadcastPremiumCard">
+        <div className="broadcastPremiumLeft">
+          <h2 className="broadcastPremiumTitle">Broadcast email premium</h2>
+
+          <div className="broadcastPremiumGrid">
+            <div className="broadcastPremiumField">
+              <label htmlFor="subject">Objet</label>
+              <input
+                id="subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Ex : Nouveautés Xperiences"
+                maxLength={160}
+              />
+            </div>
+
+            <div className="broadcastPremiumField">
+              <label htmlFor="preheader">Préheader</label>
+              <input
+                id="preheader"
+                type="text"
+                value={preheader}
+                onChange={(e) => setPreheader(e.target.value)}
+                placeholder="Petit texte aperçu dans certaines boîtes mail"
+                maxLength={180}
+              />
+            </div>
+          </div>
+
+          <div className="broadcastPremiumField">
+            <label htmlFor="title">Titre principal</label>
+            <input
+              id="title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex : Découvrez nos nouveautés"
+              maxLength={180}
+            />
+          </div>
+
+          <div className="broadcastPremiumField">
+            <label htmlFor="intro">Introduction</label>
+            <textarea
+              id="intro"
+              value={intro}
+              onChange={(e) => setIntro(e.target.value)}
+              placeholder="Petit texte d’introduction"
+              rows={4}
+            />
+          </div>
+
+          <div className="broadcastPremiumField">
+            <label htmlFor="message">Message principal</label>
+            <textarea
+              id="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Écris ton message principal ici"
+              rows={10}
+            />
+          </div>
+
+          <div className="broadcastPremiumGrid">
+            <div className="broadcastPremiumField">
+              <label htmlFor="ctaLabel">Texte du bouton</label>
+              <input
+                id="ctaLabel"
+                type="text"
+                value={ctaLabel}
+                onChange={(e) => setCtaLabel(e.target.value)}
+                placeholder="Ex : Découvrir"
+                maxLength={60}
+              />
+            </div>
+
+            <div className="broadcastPremiumField">
+              <label htmlFor="ctaUrl">Lien du bouton</label>
+              <input
+                id="ctaUrl"
+                type="text"
+                value={ctaUrl}
+                onChange={(e) => setCtaUrl(e.target.value)}
+                placeholder="https://x-periences.fr/..."
+              />
+            </div>
+          </div>
+
+          <div className="broadcastPremiumField">
+            <label htmlFor="signature">Signature</label>
+            <input
+              id="signature"
+              type="text"
+              value={signature}
+              onChange={(e) => setSignature(e.target.value)}
+              placeholder="L’équipe Xperiences"
+              maxLength={120}
+            />
+          </div>
+
+          <div className="broadcastPremiumTestBox">
+            <div className="broadcastPremiumField">
+              <label htmlFor="testEmail">Envoyer un test à</label>
+              <input
+                id="testEmail"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="ton@email.fr"
+              />
+            </div>
+
+            <button
+              type="button"
+              className="broadcastPremiumSecondaryButton"
+              onClick={sendTest}
+              disabled={sendingTest || sendingAll}
+            >
+              {sendingTest ? "Envoi du test..." : "Envoyer un test"}
+            </button>
+          </div>
+
+          <div className="broadcastPremiumActions">
+            <button
+              type="button"
+              className="broadcastPremiumPrimaryButton"
+              onClick={sendAll}
+              disabled={!isValidForm() || sendingAll || sendingTest}
+            >
+              {sendingAll ? "Envoi global..." : "Envoyer à tous"}
+            </button>
+          </div>
+
+          {success ? <p className="broadcastPremiumSuccess">{success}</p> : null}
+          {error ? <p className="broadcastPremiumError">{error}</p> : null}
+        </div>
+
+        <div className="broadcastPremiumRight">
+          <h3 className="broadcastPremiumPreviewTitle">Aperçu réel du mail</h3>
+          <div className="broadcastPremiumPreviewFrame">
+            <iframe
+              title="Aperçu du mail premium"
+              srcDoc={previewHtml}
+              className="broadcastPremiumIframe"
+            />
+          </div>
         </div>
       </div>
     </div>
