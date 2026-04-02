@@ -35,8 +35,7 @@ button {
 .text p {
   color:white ;
   font-size: 20px; 
-  width: 50%;
-  text-align: justify;
+ padding: 16px;
 }
 
 ul {
@@ -71,8 +70,9 @@ ul {
 }
 
 .text-bas p{
-  font-size: 25px;
+  font-size: 20px;
   color: white;
+  padding: 16px;
 }
 button[type=submit]{
   color: white;
