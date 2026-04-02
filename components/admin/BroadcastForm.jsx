@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildBroadcastEmail } from "../../../lib/emails/buildBroadcastEmail";
+import { buildBroadcastEmail } from "../../lib/emails/buildBroadcastEmail";
 import "./BroadcastPremiumForm.css";
 
 export default function BroadcastPremiumForm() {
