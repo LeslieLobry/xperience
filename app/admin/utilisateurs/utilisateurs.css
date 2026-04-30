@@ -146,3 +146,28 @@ a[href^="mailto:"]:hover {
     justify-content: center;
   }
 }
+.admin-utilisateurs-filtres {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.admin-utilisateurs-filtres input,
+.admin-utilisateurs-filtres select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #e0c084;
+  background: #112347;
+  color: white;
+  font-size: 15px;
+}
+
+.admin-utilisateurs-filtres input {
+  min-width: 260px;
+  flex: 1;
+}
+
+.admin-utilisateurs-filtres input::placeholder {
+  color: #cfcfcf;
+}
