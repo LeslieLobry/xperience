@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getUserFromToken } from "../../../../lib/auth";
 
+export const runtime = "nodejs";
+
 export async function GET() {
   const user = await getUserFromToken();
 
   if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Accès interdit" },
+      { status: 403 }
+    );
   }
 
   try {
@@ -16,9 +21,10 @@ export async function GET() {
         id: true,
         pseudo: true,
         email: true,
+        type: true,       // ✅ AJOUT ICI
         role: true,
         createdAt: true,
-        lastLogin: true, 
+        lastLogin: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -28,6 +34,9 @@ export async function GET() {
     return NextResponse.json(utilisateurs);
   } catch (error) {
     console.error("Erreur récupération utilisateurs:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
   }
 }
