@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../../lib/auth";
+import { prisma } from "../../../../lib/prisma";
+import { getUserFromToken } from "../../../../lib/auth";
 import { Resend } from "resend";
-import { buildBroadcastEmail } from "../../../../../lib/emails/buildBroadcastEmail";
+import { buildBroadcastEmail } from "../../../../lib/emails/buildBroadcastEmail";
 import {
   normalizeBroadcastPayload,
   validateBroadcastPayload,
-} from "../helpers";
+} from "./helpers";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,16 @@ function isAdmin(user) {
 
 function isValidEmail(email = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
+}
+
+function uniqueEmails(list = []) {
+  return [
+    ...new Set(
+      list
+        .map((email) => String(email || "").trim().toLowerCase())
+        .filter(isValidEmail)
+    ),
+  ];
 }
 
 export async function POST(request) {
@@ -39,32 +50,98 @@ export async function POST(request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const testEmail = String(body.testEmail || "").trim();
+    const utilisateurs = await prisma.utilisateur.findMany({
+      where: {
+        email: {
+          not: null,
+        },
+      },
+      select: {
+        email: true,
+      },
+    });
 
-    if (!isValidEmail(testEmail)) {
+    const emails = uniqueEmails(utilisateurs.map((u) => u.email));
+
+    console.log("Broadcast global - utilisateurs trouvés :", utilisateurs.length);
+    console.log("Broadcast global - emails valides :", emails.length);
+
+    if (!emails.length) {
       return NextResponse.json(
-        { error: "Adresse email de test invalide." },
+        { error: "Aucun destinataire valide trouvé." },
         { status: 400 }
       );
     }
 
     const html = buildBroadcastEmail(payload);
 
-    await resend.emails.send({
-      from: "Xperiences <no-reply@x-periences.fr>",
-      to: testEmail,
-      subject: `[TEST] ${payload.subject}`,
-      html,
-    });
+    const batchSize = 25;
+
+    let successCount = 0;
+    let failCount = 0;
+    const failedEmails = [];
+
+    for (let i = 0; i < emails.length; i += batchSize) {
+      const batch = emails.slice(i, i + batchSize);
+
+      const results = await Promise.allSettled(
+        batch.map(async (email) => {
+          const result = await resend.emails.send({
+            from: "Xperiences <no-reply@x-periences.fr>",
+            to: email,
+            subject: payload.subject,
+            html,
+          });
+
+          if (result?.error) {
+            throw result.error;
+          }
+
+          return result;
+        })
+      );
+
+      results.forEach((result, index) => {
+        const email = batch[index];
+
+        if (result.status === "fulfilled") {
+          successCount += 1;
+        } else {
+          failCount += 1;
+
+          failedEmails.push({
+            email,
+            error:
+              result.reason?.message ||
+              result.reason?.name ||
+              JSON.stringify(result.reason),
+          });
+
+          console.error("Erreur email broadcast :", {
+            email,
+            error: result.reason,
+          });
+        }
+      });
+    }
 
     return NextResponse.json({
       ok: true,
-      message: `Email de test envoyé à ${testEmail}.`,
+      total: emails.length,
+      successCount,
+      failCount,
+      failedEmails: failedEmails.slice(0, 10),
+      message: `Broadcast terminé : ${successCount} envoyé(s), ${failCount} échec(s).`,
     });
   } catch (error) {
-    console.error("Erreur broadcast test :", error);
+    console.error("Erreur broadcast global :", error);
+
     return NextResponse.json(
-      { error: "Erreur serveur lors de l'envoi du test." },
+      {
+        error:
+          error?.message ||
+          "Erreur serveur lors de l'envoi global.",
+      },
       { status: 500 }
     );
   }
