@@ -9,7 +9,7 @@ import styles from "./profils.module.css";
 
 const secret = process.env.JWT_SECRET;
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // ✅ évite tout cache RSC sur cette page (utile en debug)
 
 export default async function PageTousLesProfils() {
   if (!secret) return redirect("/connexion");
@@ -20,7 +20,6 @@ export default async function PageTousLesProfils() {
   if (!token) return redirect("/connexion");
 
   let decoded;
-
   try {
     decoded = jwt.verify(token, secret);
   } catch {
@@ -28,33 +27,20 @@ export default async function PageTousLesProfils() {
   }
 
   const userId = Number(decoded.id);
-
-  if (!userId || Number.isNaN(userId)) {
-    return redirect("/connexion");
-  }
+  if (!userId || Number.isNaN(userId)) return redirect("/connexion");
 
   const exclus = await getIdsUtilisateursExclus(userId);
 
   const utilisateurs = await prisma.utilisateur.findMany({
     where: {
-      NOT: {
-        id: {
-          in: [...exclus, userId],
-        },
-      },
+      NOT: { id: { in: [...exclus, userId] } },
     },
     select: {
       id: true,
       pseudo: true,
       photoUrl: true,
       age: true,
-
-      // ✅ Localisation complète pour formatLocationLabel()
       localisation: true,
-      deptCode: true,
-      codePostal: true,
-      country: true,
-      pays: true,
 
       // ✅ fallback si Presence indispo
       statut: true,
@@ -64,9 +50,7 @@ export default async function PageTousLesProfils() {
       type: true,
       verificationIdentiteStatut: true,
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: { createdAt: "desc" },
   });
 
   return (

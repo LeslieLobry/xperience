@@ -7,7 +7,6 @@ import "../ProfilsDisplay/ProfilsDisplay.css";
 import "./RechercheResultats.css";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
-import { formatLocationLabel } from "../../lib/formatLocationLabel";
 
 /* ---------------- Hook presign ---------------- */
 function usePresignedPhotos(users) {
@@ -203,11 +202,7 @@ export default function RechercheResultats({
     }
 
     // ✅ si filtre en ligne + Ably prêt mais personne online
-    if (
-      statut === "en_ligne" &&
-      ready &&
-      (!onlineIds || onlineIds.length === 0)
-    ) {
+    if (statut === "en_ligne" && ready && (!onlineIds || onlineIds.length === 0)) {
       setHasSearched(true);
       setUtilisateurs([]);
       setLoading(false);
@@ -335,11 +330,9 @@ export default function RechercheResultats({
         });
 
         const data = await res.json().catch(() => null);
-
         setUtilisateurs(
           Array.isArray(data?.utilisateurs) ? data.utilisateurs : []
         );
-
         setLoading(false);
       } catch (err) {
         if (err?.name !== "AbortError") {
@@ -406,7 +399,6 @@ export default function RechercheResultats({
           <button className="btn-outlined" onClick={handleResetSearch}>
             Nouvelle recherche
           </button>
-
           <button className="btn-primary" onClick={handleGoHome}>
             Accueil
           </button>
@@ -416,7 +408,6 @@ export default function RechercheResultats({
       <h1 className="profil-list1-title">Résultats de recherche</h1>
 
       {autourDeMoi && loadingGeo && <p>📍 Récupération de ta position…</p>}
-
       {autourDeMoi && geoError && <p style={{ color: "red" }}>{geoError}</p>}
 
       {loading ? (
@@ -429,11 +420,6 @@ export default function RechercheResultats({
             utilisateurs.map((user) => {
               const statutEff = getUserDisplayStatus(user, isOnline(user?.id));
               const online = statutEff === "en_ligne";
-
-              const locationLabel = formatLocationLabel(user, {
-                showCountry: false,
-                showPostalCode: true,
-              });
 
               return (
                 <Link
@@ -459,7 +445,6 @@ export default function RechercheResultats({
                           e.currentTarget.src = "/default.jpg";
                         }}
                       />
-
                       {user.verificationIdentiteStatut === true && (
                         <img
                           src="/Profilverif.png"
@@ -476,8 +461,7 @@ export default function RechercheResultats({
                     </h2>
 
                     <p className="profil-card-details">
-                      {user.age} ans
-                      {locationLabel ? ` - ${locationLabel}` : ""}
+                      {user.age} ans - {user.localisation}
                     </p>
 
                     <p className="profil-card-details-type">{user.type}</p>
