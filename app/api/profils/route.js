@@ -55,7 +55,11 @@ export async function GET(req) {
       pseudo: true,
       photoUrl: true,
       age: true,
+
       localisation: true,
+      deptCode: true,
+      country: true,
+
       statut: true,
       statutAuto: true,
       lastSeenAt: true,
