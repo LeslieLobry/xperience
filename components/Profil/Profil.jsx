@@ -15,28 +15,34 @@ import ProfilCompletionBox from "../ProfilCompletionBox/ProfilCompletionBox";
 import Spinner from "../Spinner/Spinner";
 import { useOnlineStatus } from "../../context/OnlineStatusContext";
 import { getUserDisplayStatus } from "../../lib/getUserDisplayStatus";
+import { formatLocationLabel } from "../../lib/formatLocationLabel";
 
 const AvisForm = dynamic(() => import("../AvisForm/AvisForm"), {
   ssr: false,
   loading: Spinner,
 });
+
 const AvisList = dynamic(() => import("../AvisList/AvisList"), {
   ssr: false,
   loading: Spinner,
 });
+
 const MenuProfilActions = dynamic(
   () => import("../MenuProfilActions/MenuProfilActions"),
   {
     ssr: false,
   }
 );
+
 const GalerieTabs = dynamic(() => import("../GalerieTabs/GalerieTabs"), {
   ssr: false,
   loading: Spinner,
 });
+
 const BoutonLike = dynamic(() => import("../BoutonLike/BoutonLike"), {
   ssr: false,
 });
+
 const DemandesAccesGalerie = dynamic(
   () => import("../DemandesAccesGalerie/DemandesAccesGalerie"),
   { ssr: false }
@@ -182,6 +188,7 @@ export default function Profil({ user, connectedUser }) {
 
   async function parseJsonSafe(res) {
     const text = await res.text();
+
     try {
       return JSON.parse(text);
     } catch {
@@ -208,7 +215,9 @@ export default function Profil({ user, connectedUser }) {
     })
       .then(async (res) => {
         if (!res.ok) throw new Error("presign failed");
+
         const data = await res.json();
+
         setPresignedPhotoUrl(data.url || "/default.jpg");
       })
       .catch(() => setPresignedPhotoUrl("/default.jpg"));
@@ -230,10 +239,14 @@ export default function Profil({ user, connectedUser }) {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/me", { credentials: "include" });
+        const res = await fetch("/api/me", {
+          credentials: "include",
+        });
+
         if (!res.ok) return;
 
         const data = await res.json();
+
         if (data?.success && data?.user) {
           setStatut(data.user.statut);
           setStatutAuto(data.user.statutAuto);
@@ -293,8 +306,12 @@ export default function Profil({ user, connectedUser }) {
       const res = await fetch("/api/conversations", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantIds: [meId, otherId] }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participantIds: [meId, otherId],
+        }),
       });
 
       if (res.status === 401 || res.status === 403) {
@@ -320,14 +337,18 @@ export default function Profil({ user, connectedUser }) {
         const msg =
           data?.error ||
           data?.message ||
-          (typeof data?.__raw === "string" ? data.__raw.slice(0, 200) : "") ||
+          (typeof data?.__raw === "string"
+            ? data.__raw.slice(0, 200)
+            : "") ||
           `HTTP ${res.status}`;
+
         throw new Error(`Création/lookup conversation échouée: ${msg}`);
       }
 
       router.push(`/messagerie?conversationId=${convId}`);
     } catch (err) {
       console.error("handleStartConversation error:", err);
+
       alert(
         "Impossible de démarrer la conversation. " + (err?.message || "")
       );
@@ -358,7 +379,10 @@ export default function Profil({ user, connectedUser }) {
       <div className="profil-header-horizontal">
         <div className="profil-header-row">
           <div className="profil-avatar-horizontal">
-            <div style={{ cursor: "zoom-in" }} onClick={() => setModalOpen(true)}>
+            <div
+              style={{ cursor: "zoom-in" }}
+              onClick={() => setModalOpen(true)}
+            >
               <PhotoUploader
                 priority
                 currentUrl={photoUrl}
@@ -370,7 +394,10 @@ export default function Profil({ user, connectedUser }) {
               />
             </div>
 
-            <SimpleModal open={modalOpen} onClose={() => setModalOpen(false)}>
+            <SimpleModal
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+            >
               <img
                 src={presignedPhotoUrl || "/default.jpg"}
                 alt="Photo de profil"
@@ -389,6 +416,7 @@ export default function Profil({ user, connectedUser }) {
             <h1 className="profil-name">
               {user.pseudo.charAt(0).toUpperCase() +
                 user.pseudo.slice(1).toLowerCase()}
+
               {user.verificationIdentiteStatut && (
                 <img
                   src="/Profilverif.png"
@@ -397,6 +425,13 @@ export default function Profil({ user, connectedUser }) {
                 />
               )}
             </h1>
+
+            <div className="profil-location">
+              {formatLocationLabel(user, {
+                showCountry: true,
+                showPostalCode: true,
+              })}
+            </div>
 
             {!isOwnProfile && (
               <div className="btn-row">
@@ -415,7 +450,9 @@ export default function Profil({ user, connectedUser }) {
                     />
                   </div>
                 </button>
+
                 <BoutonLike cibleId={user.id} />
+
                 <MenuProfilActions cibleId={user.id} />
               </div>
             )}
@@ -436,6 +473,7 @@ export default function Profil({ user, connectedUser }) {
                   }`}
                   title={online ? "En ligne" : "Hors ligne"}
                 />
+
                 <span className="profil-statut-text">
                   {online ? "En ligne" : "Hors ligne"}
                 </span>
@@ -473,7 +511,9 @@ export default function Profil({ user, connectedUser }) {
           visiteurId={connectedUser.id}
         />
 
-        {isOwnProfile && <DemandesAccesGalerie isOwnProfile={isOwnProfile} />}
+        {isOwnProfile && (
+          <DemandesAccesGalerie isOwnProfile={isOwnProfile} />
+        )}
 
         <PreferencesSummary editable={isOwnProfile} user={user} />
 
@@ -484,7 +524,10 @@ export default function Profil({ user, connectedUser }) {
           setIsModalOpen={setOpenProfilDetailsModal}
         />
 
-        <AvisList cibleId={user.id} connectedUserId={connectedUser.id} />
+        <AvisList
+          cibleId={user.id}
+          connectedUserId={connectedUser.id}
+        />
 
         {!isOwnProfile && (
           <AvisForm
@@ -493,7 +536,10 @@ export default function Profil({ user, connectedUser }) {
           />
         )}
 
-        <AProposCard createdAt={user.createdAt} lastLogin={user.lastLogin} />
+        <AProposCard
+          createdAt={user.createdAt}
+          lastLogin={user.lastLogin}
+        />
       </div>
     </div>
   );
