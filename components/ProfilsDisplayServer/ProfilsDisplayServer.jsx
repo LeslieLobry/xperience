@@ -8,8 +8,8 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
   const userIdInt = Number(userId);
 
   let exclusIds = [];
+
   try {
-    // On essaye d'utiliser la promesse passée pour paralléliser au niveau au-dessus
     exclusIds = exclusPromise
       ? await exclusPromise
       : await getIdsUtilisateursExclus(userIdInt);
@@ -18,7 +18,6 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
     exclusIds = [];
   }
 
-  // Normalisation des IDs en nombres + nettoyage
   const idsToExclude = [
     ...new Set(
       [...exclusIds, userIdInt]
@@ -27,7 +26,6 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
     ),
   ];
 
-  // Construction du where le plus simple possible pour la DB
   const where =
     idsToExclude.length > 0
       ? {
@@ -48,20 +46,24 @@ export default async function ProfilsDisplayServer({ userId, exclusPromise }) {
       pseudo: true,
       photoUrl: true,
       age: true,
+
+      // ✅ nécessaire pour afficher Lille (59)
       localisation: true,
+      deptCode: true,
+      country: true,
+
       type: true,
 
-      // ✅ important pour "en ligne" fallback (lastSeenAt + statutAuto)
+      // ✅ important pour "en ligne" fallback
       statutAuto: true,
       lastSeenAt: true,
 
-      // ✅ optionnel (legacy)
+      // ✅ legacy
       statut: true,
 
-      // ✅ si tu affiches le badge vérifié
+      // ✅ badge vérifié
       verificationIdentiteStatut: true,
     },
-    // 🔁 Idem que ta route /api/profils (id desc) pour éviter les doublons
     orderBy: { id: "desc" },
     take: PAGE_SIZE,
   });
