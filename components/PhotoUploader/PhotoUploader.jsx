@@ -14,11 +14,13 @@ function isVideoFile(fileOrUrl) {
   return false;
 }
 
-// ✅ HEIC/HEIF detection (même si file.type est vide)
+// ✅ HEIC/HEIF detection
 function isHeicFile(file) {
   if (!file) return false;
+
   const type = (file.type || "").toLowerCase();
   const name = (file.name || "").toLowerCase();
+
   return (
     type === "image/heic" ||
     type === "image/heif" ||
@@ -27,22 +29,56 @@ function isHeicFile(file) {
   );
 }
 
-function safeNameToJpg(originalName = "photo.heic") {
-  return originalName.replace(/\.(heic|heif)$/i, "") + ".jpg";
+function safeNameToWebp(originalName = "photo") {
+  return originalName.replace(/\.(heic|heif|jpg|jpeg|png|webp)$/i, "") + ".webp";
 }
 
-// ✅ Convertit HEIC -> JPEG (retourne un File JPEG)
-async function convertHeicToJpeg(file) {
-  const output = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.85,
+// ✅ Convertit toutes les images en WEBP avant upload
+async function convertImageToWebp(file) {
+  let sourceBlob = file;
+
+  // ✅ Si HEIC/HEIF, on convertit d'abord en JPEG lisible
+  if (isHeicFile(file)) {
+    const output = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    });
+
+    sourceBlob = Array.isArray(output) ? output[0] : output;
+  }
+
+  const imageBitmap = await createImageBitmap(sourceBlob);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = imageBitmap.width;
+  canvas.height = imageBitmap.height;
+
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error("Impossible de préparer l'image.");
+  }
+
+  ctx.drawImage(imageBitmap, 0, 0);
+
+  const webpBlob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Conversion WEBP impossible."));
+          return;
+        }
+
+        resolve(blob);
+      },
+      "image/webp",
+      0.82
+    );
   });
 
-  const blob = Array.isArray(output) ? output[0] : output;
-
-  return new File([blob], safeNameToJpg(file.name), {
-    type: "image/jpeg",
+  return new File([webpBlob], safeNameToWebp(file.name), {
+    type: "image/webp",
     lastModified: Date.now(),
   });
 }
@@ -58,11 +94,13 @@ function usePresignedPreview(url) {
       setPreviewType("image");
       return;
     }
+
     if (typeof url === "string" && url.startsWith("http")) {
       setPreview(url);
       setPreviewType(isVideoFile(url) ? "video" : "image");
       return;
     }
+
     // Si c'est une clé S3, on fetch la presigned URL
     (async () => {
       try {
@@ -71,7 +109,9 @@ function usePresignedPreview(url) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ key: url }),
         });
+
         const data = await res.json();
+
         setPreview(data.url || "/default.jpg");
         setPreviewType(isVideoFile(url) ? "video" : "image");
       } catch {
@@ -92,7 +132,7 @@ export default function PhotoUploader({
   isPublic = false,
   isOwnProfile = false,
 
-  // ✅ NOUVEAU : permet de masquer le "+"
+  // ✅ permet de masquer le "+"
   hidePlus = false,
 }) {
   const fileInputRef = useRef(null);
@@ -108,22 +148,23 @@ export default function PhotoUploader({
     if (!file) return;
 
     try {
-      // ✅ Conversion HEIC/HEIF -> JPEG AVANT tout le reste
-      if (isHeicFile(file)) {
-        toast.info("Conversion HEIC en JPEG…");
-        file = await convertHeicToJpeg(file);
-      }
-
-      // 🚩 Vérification taille fichier AVANT upload
-      const MAX_SIZE_MB = 4;
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        toast.error("Photo trop volumineuse !\nLa taille maximale autorisée est 4 Mo.");
+      // ✅ Petit garde-fou avant traitement
+      if (!isVideoFile(file) && !(file.type || "").startsWith("image/") && !isHeicFile(file)) {
+        toast.error("Fichier non supporté.");
         return;
       }
 
-      // ✅ Petit garde-fou (optionnel mais utile)
-      if (!isVideoFile(file) && !(file.type || "").startsWith("image/")) {
-        toast.error("Fichier non supporté.");
+      // ✅ Conversion universelle des images vers WEBP
+      if (!isVideoFile(file)) {
+        toast.info("Optimisation de l'image en WEBP…");
+        file = await convertImageToWebp(file);
+      }
+
+      // 🚩 Vérification taille fichier APRÈS compression WEBP
+      const MAX_SIZE_MB = 4;
+
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        toast.error("Photo trop volumineuse !\nLa taille maximale autorisée est 4 Mo.");
         return;
       }
 
@@ -139,18 +180,19 @@ export default function PhotoUploader({
       const formData = new FormData();
       formData.append("photo", file);
 
-      // ✅ Galerie publique : inchangé
+      // ✅ Galerie publique
       if (isGallery && isPublic) {
         formData.append("isPublic", "true");
       }
 
-      // ✅ Galerie privée : check simplifié, ne casse pas les IDs string
+      // ✅ Galerie privée
       if (isGallery && !isPublic) {
         if (!galerieId) {
           toast.error("Erreur : galerie privée introuvable.");
           console.error("PhotoUploader → galerieId manquant pour galerie privée :", galerieId);
           return;
         }
+
         formData.append("galerieId", String(galerieId));
       }
 
@@ -162,12 +204,14 @@ export default function PhotoUploader({
 
       if (!res.ok) {
         let message = "Erreur lors de l'envoi du fichier.";
+
         try {
           const json = await res.json();
           message = json.message || message;
         } catch (err) {
           console.error("Erreur lors de la lecture de la réponse JSON :", err);
         }
+
         console.error("Upload échoué :", message);
         toast.error(message);
         return;
@@ -176,14 +220,16 @@ export default function PhotoUploader({
       const data = await res.json();
       const url = data.photoUrl;
 
-      // Après upload, on force la preview via presigned URL (pour le S3 privé)
+      // Après upload, on force la preview via presigned URL si S3 privé
       if (typeof url === "string" && !url.startsWith("http")) {
         const r = await fetch("/api/photos/presign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ key: url }),
         });
+
         const d = await r.json();
+
         setPreview(d.url || "/default.jpg");
         setPreviewType(isVideoFile(url) ? "video" : "image");
       } else {
@@ -194,7 +240,7 @@ export default function PhotoUploader({
       if (onUpload) onUpload(isGallery ? data : url);
     } catch (err) {
       console.error("Erreur conversion/upload :", err);
-      toast.error("Impossible de traiter cette photo (HEIC?). Essaie en JPEG.");
+      toast.error("Impossible de traiter cette image. Essaie avec une autre photo.");
     } finally {
       // reset input sinon re-upload même fichier ne déclenche pas change
       e.target.value = "";
@@ -248,7 +294,6 @@ export default function PhotoUploader({
             if (e.key === "Enter" || e.key === " ") openPicker();
           }}
         >
-          {/* ✅ plus de + si hidePlus */}
           {!hidePlus && <Plus size={32} color="#ccc" />}
         </div>
       )}
@@ -257,7 +302,6 @@ export default function PhotoUploader({
         id="photo-upload"
         type="file"
         ref={fileInputRef}
-        // ✅ Ajout .heic/.heif en plus (certains navigateurs les filtrent sinon)
         accept="image/*,video/*,.heic,.heif"
         style={{ visibility: "hidden", width: 0, height: 0 }}
         onChange={handleFileChange}
