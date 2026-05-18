@@ -504,7 +504,43 @@ model SiteEvent {
   @@index([userId, createdAt])
   @@index([createdAt])
 }
+model BroadcastCampaign {
+  id          Int      @id @default(autoincrement())
+  subject     String
+  preheader   String?
+  title       String?
+  intro       String?
+  message     String
+  ctaLabel    String?
+  ctaUrl      String?
+  signature   String?
 
+  status      String   @default("PENDING")
+  total       Int      @default(0)
+  sentCount   Int      @default(0)
+  failCount   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recipients  BroadcastRecipient[]
+}
+
+model BroadcastRecipient {
+  id          Int      @id @default(autoincrement())
+  campaignId  Int
+  email       String
+  status      String   @default("PENDING")
+  error       String?
+
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  campaign    BroadcastCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([status])
+}
 enum VerificationStatut {
   EN_ATTENTE
   ACCEPTEE

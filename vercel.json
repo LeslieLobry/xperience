@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/cleanup-online?token=@CRON_SECRET",
       "schedule": "*/5 * * * *"
+    },
+     {
+      "path": "/api/cron/broadcast",
+      "schedule": "*/1 * * * *"
     }
   ]
 }

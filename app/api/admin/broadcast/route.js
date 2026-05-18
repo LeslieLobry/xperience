@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getUserFromToken } from "../../../../lib/auth";
-import { Resend } from "resend";
-import { buildBroadcastEmail } from "../../../../lib/emails/buildBroadcastEmail";
 import {
   normalizeBroadcastPayload,
   validateBroadcastPayload,
@@ -10,14 +8,22 @@ import {
 
 export const runtime = "nodejs";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 function isAdmin(user) {
   return user && user.role === "ADMIN";
 }
 
+function isValidEmail(email = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
+}
+
 function uniqueEmails(list = []) {
-  return [...new Set(list.map((email) => String(email || "").trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      list
+        .map((email) => String(email || "").trim().toLowerCase())
+        .filter(isValidEmail)
+    ),
+  ];
 }
 
 export async function POST(request) {
@@ -55,45 +61,47 @@ export async function POST(request) {
 
     if (!emails.length) {
       return NextResponse.json(
-        { error: "Aucun destinataire trouvé." },
+        { error: "Aucun destinataire valide trouvé." },
         { status: 400 }
       );
     }
 
-    const html = buildBroadcastEmail(payload);
-    const batchSize = 50;
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < emails.length; i += batchSize) {
-      const batch = emails.slice(i, i + batchSize);
-
-      const results = await Promise.allSettled(
-        batch.map((email) =>
-          resend.emails.send({
-            from: "Xperiences <no-reply@x-periences.fr>",
-            to: email,
-            subject: payload.subject,
-            html,
-          })
-        )
-      );
-
-      results.forEach((result) => {
-        if (result.status === "fulfilled") successCount += 1;
-        else failCount += 1;
-      });
-    }
+    const campaign = await prisma.broadcastCampaign.create({
+      data: {
+        subject: payload.subject,
+        preheader: payload.preheader || null,
+        title: payload.title || null,
+        intro: payload.intro || null,
+        message: payload.message,
+        ctaLabel: payload.ctaLabel || null,
+        ctaUrl: payload.ctaUrl || null,
+        signature: payload.signature || null,
+        status: "PENDING",
+        total: emails.length,
+        recipients: {
+          create: emails.map((email) => ({
+            email,
+            status: "PENDING",
+          })),
+        },
+      },
+    });
 
     return NextResponse.json({
       ok: true,
-      message: `Broadcast terminé : ${successCount} envoyé(s), ${failCount} échec(s).`,
+      campaignId: campaign.id,
+      total: emails.length,
+      message: `Campagne créée avec ${emails.length} destinataire(s). L’envoi va se faire progressivement.`,
     });
   } catch (error) {
-    console.error("Erreur broadcast global :", error);
+    console.error("Erreur création broadcast :", error);
+
     return NextResponse.json(
-      { error: "Erreur serveur lors de l'envoi global." },
+      {
+        error:
+          error?.message ||
+          "Erreur serveur lors de la création du broadcast.",
+      },
       { status: 500 }
     );
   }
