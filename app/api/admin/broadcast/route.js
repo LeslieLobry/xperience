@@ -93,16 +93,21 @@ export async function POST(request) {
       total: emails.length,
       message: `Campagne créée avec ${emails.length} destinataire(s). L’envoi va se faire progressivement.`,
     });
-  } catch (error) {
-    console.error("Erreur création broadcast :", error);
+} catch (error) {
+  console.error("Erreur création broadcast :", {
+    message: error?.message,
+    stack: error?.stack,
+    code: error?.code,
+    name: error?.name,
+  });
 
-    return NextResponse.json(
-      {
-        error:
-          error?.message ||
-          "Erreur serveur lors de la création du broadcast.",
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error:
+        error?.message ||
+        "Erreur serveur lors de la création du broadcast.",
+    },
+    { status: 500 }
+  );
+}
 }
