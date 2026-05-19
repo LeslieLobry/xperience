@@ -81,7 +81,7 @@ function Footer() {
             />
           </a>
 
-          <a
+          {/* <a
             href="https://www.tiktok.com/@xperiences1"
             target="_blank"
             rel="noopener noreferrer"
@@ -94,7 +94,7 @@ function Footer() {
               height={50}
               className="footer-tik"
             />
-          </a>
+          </a> */}
         </div>
 
         {/* Liens internes : pas d'ouverture dans un nouvel onglet */}
