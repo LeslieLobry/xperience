@@ -45,9 +45,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-
     const payload = normalizeBroadcastPayload(body);
-
     const validationError = validateBroadcastPayload(payload);
 
     if (validationError) {
@@ -58,24 +56,14 @@ export async function POST(request) {
     }
 
     const utilisateurs = await prisma.utilisateur.findMany({
-      where: {
-        email: {
-          not: null,
-        },
-      },
       select: {
         email: true,
       },
     });
 
-    const emails = uniqueEmails(
-      utilisateurs.map((u) => u.email)
-    );
+    const emails = uniqueEmails(utilisateurs.map((u) => u.email));
 
-    console.log(
-      "Broadcast global - emails valides :",
-      emails.length
-    );
+    console.log("Broadcast global - emails valides :", emails.length);
 
     if (!emails.length) {
       return NextResponse.json(
@@ -94,11 +82,8 @@ export async function POST(request) {
         ctaLabel: payload.ctaLabel || null,
         ctaUrl: payload.ctaUrl || null,
         signature: payload.signature || null,
-
         status: "PENDING",
-
         total: emails.length,
-
         recipients: {
           create: emails.map((email) => ({
             email,
