@@ -44,7 +44,7 @@
     opacity: 1; 
     background-color: transparent;
     border: 2px #F6D391 solid;
-    font-size: 25px;
+    /* font-size: 25px; */
 }
 
 .form-connexion ::placeholder{
@@ -62,7 +62,7 @@
 
 .input-wrapper input {
   width: 100%;
-  padding-right: 40px; /* pour ne pas cacher le texte sous l’icône */
+  padding-right: 40px; 
 }
 
 .toggle-password {
@@ -72,16 +72,16 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  font-size: 1.5rem;
+  /* font-size: 1.5rem; */
   cursor: pointer;
   color: #ccc;
 }
 
 .input-email {
-  color: #e0c084!important;            /* Texte violet foncé */
-  border: 2px solid #F6D391 !important; /* Bordure violette */
+  color: #e0c084!important;       
+  border: 2px solid #F6D391 !important; 
   font-weight: 900;
-  font-size: 25px;
+  /* font-size: 25px; */
   padding: 25px;
   border-radius: 25px;
   transition: border-color 0.2s, background 0.2s;
