@@ -31,19 +31,30 @@ export async function POST(request) {
     const user = await getUserFromToken(request);
 
     if (!user) {
-      return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Non autorisé." },
+        { status: 401 }
+      );
     }
 
     if (!isAdmin(user)) {
-      return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Accès refusé." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
+
     const payload = normalizeBroadcastPayload(body);
+
     const validationError = validateBroadcastPayload(payload);
 
     if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
+      return NextResponse.json(
+        { error: validationError },
+        { status: 400 }
+      );
     }
 
     const utilisateurs = await prisma.utilisateur.findMany({
@@ -57,7 +68,14 @@ export async function POST(request) {
       },
     });
 
-    const emails = uniqueEmails(utilisateurs.map((u) => u.email));
+    const emails = uniqueEmails(
+      utilisateurs.map((u) => u.email)
+    );
+
+    console.log(
+      "Broadcast global - emails valides :",
+      emails.length
+    );
 
     if (!emails.length) {
       return NextResponse.json(
@@ -76,8 +94,11 @@ export async function POST(request) {
         ctaLabel: payload.ctaLabel || null,
         ctaUrl: payload.ctaUrl || null,
         signature: payload.signature || null,
+
         status: "PENDING",
+
         total: emails.length,
+
         recipients: {
           create: emails.map((email) => ({
             email,
@@ -91,23 +112,23 @@ export async function POST(request) {
       ok: true,
       campaignId: campaign.id,
       total: emails.length,
-      message: `Campagne créée avec ${emails.length} destinataire(s). L’envoi va se faire progressivement.`,
+      message: `Campagne créée avec ${emails.length} destinataire(s).`,
     });
-} catch (error) {
-  console.error("Erreur création broadcast :", {
-    message: error?.message,
-    stack: error?.stack,
-    code: error?.code,
-    name: error?.name,
-  });
+  } catch (error) {
+    console.error("Erreur création broadcast :", {
+      message: error?.message,
+      stack: error?.stack,
+      code: error?.code,
+      name: error?.name,
+    });
 
-  return NextResponse.json(
-    {
-      error:
-        error?.message ||
-        "Erreur serveur lors de la création du broadcast.",
-    },
-    { status: 500 }
-  );
-}
+    return NextResponse.json(
+      {
+        error:
+          error?.message ||
+          "Erreur serveur lors de la création du broadcast.",
+      },
+      { status: 500 }
+    );
+  }
 }
