@@ -425,7 +425,6 @@ export default function RegisterForm() {
                   value={form.password}
                   onChange={handleChange}
                   className="form-input"
-                  style={{ width: "100%" }}
                 />
 
                 <button

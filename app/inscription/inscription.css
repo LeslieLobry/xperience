@@ -127,6 +127,7 @@ color: #e0c084;
 
   .input-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .input-wrapper input {
