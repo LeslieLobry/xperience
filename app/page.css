@@ -35,7 +35,7 @@ button {
 .text p {
   color:white ;
   font-size: 20px; 
- padding: 16px;
+ padding: 16px 425px;
 }
 
 ul {
@@ -80,6 +80,10 @@ button[type=submit]{
 @media (width <= 768px){
   .logo-contenant img{
   width: 90%;
+
+}
+.text p{
+  padding: 0;
 }
 
 .masque-contenant img{
