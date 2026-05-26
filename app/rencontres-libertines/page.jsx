@@ -2,18 +2,18 @@
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "Rencontres libertines sérieuses en France | X-périences",
+  title: "Rencontres libertines sérieuses en France | X-periences",
   description:
-    "Rencontres libertines en France dans un cadre discret et respectueux. X-périences met l’accent sur la confiance, la compatibilité, la modération et le consentement.",
+    "Rencontres libertines en France dans un cadre discret et respectueux. X-periences met l’accent sur la confiance, la compatibilité, la modération et le consentement.",
   alternates: {
     canonical: "https://www.x-periences.fr/rencontres-libertines",
   },
   openGraph: {
-    title: "Rencontres libertines sérieuses en France | X-périences",
+    title: "Rencontres libertines sérieuses en France | X-periences",
     description:
       "Faites des rencontres libertines dans un cadre discret, sécurisé et orienté consentement. Profils de qualité, échanges plus clairs, communauté respectueuse.",
     url: "https://www.x-periences.fr/rencontres-libertines",
-    siteName: "X-périences",
+    siteName: "X-periences",
     type: "website",
     locale: "fr_FR",
   },
@@ -25,15 +25,15 @@ import styles from "./rencontres-libertines.module.css";
 const FAQ = [
   {
     q: "Comment faire des rencontres libertines sérieuses ?",
-    a: "En privilégiant la clarté des intentions, le respect du consentement et un cadre qui limite les comportements abusifs. X-périences est conçu pour favoriser des échanges plus fiables.",
+    a: "En privilégiant la clarté des intentions, le respect du consentement et un cadre qui limite les comportements abusifs. X-periences est conçu pour favoriser des échanges plus fiables.",
   },
   {
-    q: "X-périences est-il adapté aux couples libertins ?",
+    q: "X-periences est-il adapté aux couples libertins ?",
     a: "Oui. Les couples peuvent préciser leurs envies, limites et fonctionnement pour améliorer la compatibilité et éviter les malentendus.",
   },
   {
     q: "Peut-on faire des rencontres libertines en restant discret ?",
-    a: "Oui. X-périences adopte une approche orientée confidentialité, afin que vous gardiez la maîtrise de ce que vous partagez.",
+    a: "Oui. X-periences adopte une approche orientée confidentialité, afin que vous gardiez la maîtrise de ce que vous partagez.",
   },
   {
     q: "Quels profils peut-on rencontrer ?",
@@ -72,7 +72,7 @@ export default function RencontresLibertinesPage() {
           <p className={styles.kicker}>Rencontres libertines en France</p>
           <h1 className={styles.h1}>Rencontres libertines sérieuses, discrètes et respectueuses</h1>
           <p className={styles.lead}>
-            X-périences vous aide à faire des <strong>rencontres libertines</strong> dans un cadre{" "}
+            X-periences vous aide à faire des <strong>rencontres libertines</strong> dans un cadre{" "}
             <strong>plus sûr</strong>, <strong>plus clair</strong> et <strong>orienté consentement</strong>.
             L’idée : des échanges authentiques, des intentions lisibles, et moins de pertes de temps.
           </p>
@@ -102,7 +102,7 @@ export default function RencontresLibertinesPage() {
           </h2>
           <p className={styles.p}>
             Les rencontres libertines se passent mieux quand tout est clair : attentes, limites, rythme, discrétion.
-            X-périences est construit pour réduire les malentendus et favoriser des échanges plus sains.
+            X-periences est construit pour réduire les malentendus et favoriser des échanges plus sains.
           </p>
 
           <ul className={styles.list}>
@@ -128,7 +128,7 @@ export default function RencontresLibertinesPage() {
             Couples et célibataires : des rencontres libertines à votre rythme
           </h2>
           <p className={styles.p}>
-            Que vous soyez en couple ou célibataire, l’important est d’avancer sans pression. X-périences valorise
+            Que vous soyez en couple ou célibataire, l’important est d’avancer sans pression. X-periences valorise
             la transparence, le respect et la compatibilité pour augmenter la qualité des échanges.
           </p>
 

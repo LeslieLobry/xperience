@@ -2,18 +2,18 @@
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "Site libertin sérieux et sécurisé en France | X-périences",
+  title: "Site libertin sérieux et sécurisé en France | X-periences",
   description:
-    "X-périences est un site libertin français moderne et sécurisé pour couples et célibataires. Vérification d’identité, discrétion, modération et respect du consentement.",
+    "X-periences est un site libertin français moderne et sécurisé pour couples et célibataires. Vérification d’identité, discrétion, modération et respect du consentement.",
   alternates: {
     canonical: "https://www.x-periences.fr/site-libertin",
   },
   openGraph: {
-    title: "Site libertin sérieux et sécurisé en France | X-périences",
+    title: "Site libertin sérieux et sécurisé en France | X-perience",
     description:
       "Un site libertin français moderne et sécurisé pour couples et célibataires : vérification, discrétion, modération, consentement.",
     url: "https://www.x-periences.fr/site-libertin",
-    siteName: "X-périences",
+    siteName: "X-periences",
     type: "website",
     locale: "fr_FR",
   },
@@ -27,23 +27,23 @@ import styles from "./site-libertin.module.css";
 
 const FAQ = [
   {
-    q: "X-périences est-il un site libertin sérieux ?",
-    a: "Oui. X-périences met l’accent sur la qualité des profils, la modération, la sécurité et le respect du consentement pour proposer une expérience plus fiable qu’un site libertin classique.",
+    q: "X-perience est-il un site libertin sérieux ?",
+    a: "Oui. X-perience met l’accent sur la qualité des profils, la modération, la sécurité et le respect du consentement pour proposer une expérience plus fiable qu’un site libertin classique.",
   },
   {
-    q: "Peut-on s’inscrire en couple sur X-périences ?",
-    a: "Oui. X-périences est adapté aux couples et permet de présenter clairement vos envies, vos limites et votre façon de fonctionner, afin de favoriser des rencontres compatibles.",
+    q: "Peut-on s’inscrire en couple sur X-perience ?",
+    a: "Oui. X-perience est adapté aux couples et permet de présenter clairement vos envies, vos limites et votre façon de fonctionner, afin de favoriser des rencontres compatibles.",
   },
   {
-    q: "Comment X-périences limite les faux profils ?",
+    q: "Comment X-perience limite les faux profils ?",
     a: "La plateforme s’appuie sur des mécanismes de sécurité et de modération. L’objectif est de réduire les comportements abusifs et d’améliorer la confiance au sein de la communauté.",
   },
   {
     q: "Le site est-il discret ?",
-    a: "Oui. X-périences propose des fonctionnalités orientées confidentialité (par exemple des espaces et contenus contrôlés) pour garder la maîtrise de ce que vous partagez.",
+    a: "Oui. X-perience propose des fonctionnalités orientées confidentialité (par exemple des espaces et contenus contrôlés) pour garder la maîtrise de ce que vous partagez.",
   },
   {
-    q: "X-périences est-il gratuit ?",
+    q: "X-perience est-il gratuit ?",
     a: "L’accès et les fonctionnalités peuvent évoluer selon les périodes et les offres. Le plus simple est de consulter la page d’inscription et/ou la page Abonnement si elle existe sur votre site.",
   },
 ];
@@ -77,9 +77,9 @@ export default function SiteLibertinPage() {
       <header className={styles.hero}>
         <div className={styles.heroInner}>
           <p className={styles.kicker}>Site libertin français</p>
-          <h1 className={styles.h1}>X-périences : site libertin sérieux et sécurisé</h1>
+          <h1 className={styles.h1}>X-perience : site libertin sérieux et sécurisé</h1>
           <p className={styles.lead}>
-            X-périences est un <strong>site libertin français</strong> moderne, pensé pour les{" "}
+            X-perience est un <strong>site libertin français</strong> moderne, pensé pour les{" "}
             <strong>couples</strong> et <strong>célibataires</strong> qui veulent découvrir le
             libertinage dans un cadre <strong>respectueux</strong>, <strong>discret</strong> et{" "}
             <strong>sécurisé</strong>. Ici, l’objectif est simple : favoriser des rencontres
@@ -108,10 +108,10 @@ export default function SiteLibertinPage() {
       <section className={styles.section} aria-labelledby="pourquoi">
         <div className={styles.container}>
           <h2 id="pourquoi" className={styles.h2}>
-            Pourquoi choisir X-périences comme site libertin ?
+            Pourquoi choisir X-perience comme site libertin ?
           </h2>
           <p className={styles.p}>
-            Choisir un site libertin ne devrait jamais être un pari risqué. X-périences se
+            Choisir un site libertin ne devrait jamais être un pari risqué. X-perience se
             différencie par une approche centrée sur la <strong>confiance</strong>, la{" "}
             <strong>sécurité</strong> et la <strong>qualité des échanges</strong>. L’objectif : une
             communauté plus saine, plus claire, plus agréable à vivre.
@@ -144,7 +144,7 @@ export default function SiteLibertinPage() {
           </h2>
           <p className={styles.p}>
             Que vous soyez un <strong>couple libertin débutant</strong>, un couple expérimenté, ou un{" "}
-            <strong>célibataire</strong> qui respecte les codes du libertinage, X-périences vous
+            <strong>célibataire</strong> qui respecte les codes du libertinage, X-perience vous
             permet d’avancer à votre rythme. Le but n’est pas d’accumuler des contacts, mais de
             créer des échanges cohérents, sans pression.
           </p>
@@ -177,7 +177,7 @@ export default function SiteLibertinPage() {
           <p className={styles.p}>
             Les recherches autour d’un “<strong>site libertin sérieux</strong>” tournent souvent
             autour des mêmes inquiétudes : faux profils, manque de respect, exposition non désirée.
-            X-périences répond à ces enjeux avec une logique simple : renforcer la confiance et
+            X-perience répond à ces enjeux avec une logique simple : renforcer la confiance et
             protéger la communauté.
           </p>
 
@@ -201,7 +201,7 @@ export default function SiteLibertinPage() {
       <section className={styles.sectionAlt} aria-labelledby="comment">
         <div className={styles.container}>
           <h2 id="comment" className={styles.h2}>
-            Comment fonctionne X-périences ?
+            Comment fonctionne X-perience ?
           </h2>
 
           <ol className={styles.steps}>
@@ -227,7 +227,7 @@ export default function SiteLibertinPage() {
       <section className={styles.section} aria-labelledby="faq">
         <div className={styles.container}>
           <h2 id="faq" className={styles.h2}>
-            FAQ – Site libertin X-périences
+            FAQ – Site libertin X-perience
           </h2>
 
           <div className={styles.faq}>

@@ -2,18 +2,18 @@
 export const dynamic = "force-static";
 
 export const metadata = {
-  title: "Site échangiste sérieux et sécurisé en France | X-périences",
+  title: "Site échangiste sérieux et sécurisé en France | X-periences",
   description:
-    "X-périences est un site échangiste français moderne et sécurisé. Profils de qualité, discrétion, modération, consentement et rencontres compatibles.",
+    "X-periences est un site échangiste français moderne et sécurisé. Profils de qualité, discrétion, modération, consentement et rencontres compatibles.",
   alternates: {
     canonical: "https://www.x-periences.fr/site-echangiste",
   },
   openGraph: {
-    title: "Site échangiste sérieux et sécurisé en France | X-périences",
+    title: "Site échangiste sérieux et sécurisé en France | X-periences",
     description:
       "Site échangiste français moderne et sécurisé : discrétion, modération, consentement, profils plus fiables et rencontres compatibles.",
     url: "https://www.x-periences.fr/site-echangiste",
-    siteName: "X-périences",
+    siteName: "X-periences",
     type: "website",
     locale: "fr_FR",
   },
@@ -27,16 +27,16 @@ import styles from "./site-echangiste.module.css";
 
 const FAQ = [
   {
-    q: "X-périences est-il un site échangiste sérieux ?",
-    a: "Oui. X-périences vise une expérience plus fiable : profils mieux qualifiés, cadre respectueux, outils de modération et logique orientée confiance.",
+    q: "X-periences est-il un site échangiste sérieux ?",
+    a: "Oui. X-periences vise une expérience plus fiable : profils mieux qualifiés, cadre respectueux, outils de modération et logique orientée confiance.",
   },
   {
     q: "Le site est-il adapté aux couples échangistes ?",
-    a: "Oui. X-périences est conçu pour les couples : intentions plus lisibles, échanges plus clairs et rencontres mieux compatibles.",
+    a: "Oui. X-periences est conçu pour les couples : intentions plus lisibles, échanges plus clairs et rencontres mieux compatibles.",
   },
   {
     q: "Comment limiter les faux profils sur un site échangiste ?",
-    a: "X-périences combine des mécanismes de sécurité, des contrôles et de la modération. L’objectif est de réduire les abus et d’améliorer la qualité des échanges.",
+    a: "X-periences combine des mécanismes de sécurité, des contrôles et de la modération. L’objectif est de réduire les abus et d’améliorer la qualité des échanges.",
   },
   {
     q: "Est-ce discret ?",
@@ -77,9 +77,9 @@ export default function SiteEchangistePage() {
       <header className={styles.hero}>
         <div className={styles.heroInner}>
           <p className={styles.kicker}>Site échangiste français</p>
-          <h1 className={styles.h1}>X-périences : site échangiste sérieux et sécurisé</h1>
+          <h1 className={styles.h1}>X-periences : site échangiste sérieux et sécurisé</h1>
           <p className={styles.lead}>
-            X-périences est un <strong>site échangiste français</strong> moderne, pensé pour des{" "}
+            X-periences est un <strong>site échangiste français</strong> moderne, pensé pour des{" "}
             <strong>rencontres entre adultes consentants</strong>, dans un cadre{" "}
             <strong>respectueux</strong>, <strong>discret</strong> et <strong>sécurisé</strong>.
             L’objectif : favoriser des échanges authentiques, réduire les faux profils, et placer le{" "}
@@ -107,10 +107,10 @@ export default function SiteEchangistePage() {
       <section className={styles.section} aria-labelledby="pourquoi">
         <div className={styles.container}>
           <h2 id="pourquoi" className={styles.h2}>
-            Pourquoi choisir X-périences comme site échangiste ?
+            Pourquoi choisir X-periences comme site échangiste ?
           </h2>
           <p className={styles.p}>
-            Un site échangiste ne devrait pas être un terrain incertain. X-périences se différencie
+            Un site échangiste ne devrait pas être un terrain incertain. X-periences se différencie
             par une approche centrée sur la <strong>confiance</strong>, la <strong>sécurité</strong>{" "}
             et la <strong>qualité des échanges</strong>. Le but : une communauté plus saine, où les
             intentions sont claires et les rencontres plus compatibles.
@@ -140,7 +140,7 @@ export default function SiteEchangistePage() {
           </h2>
           <p className={styles.p}>
             Que vous soyez un <strong>couple échangiste débutant</strong>, un couple expérimenté, ou un{" "}
-            <strong>célibataire</strong> qui respecte les codes, X-périences vous permet d’avancer à votre rythme.
+            <strong>célibataire</strong> qui respecte les codes, X-periences vous permet d’avancer à votre rythme.
             L’objectif n’est pas d’accumuler des contacts, mais de créer des échanges cohérents, sans pression.
           </p>
 
@@ -170,7 +170,7 @@ export default function SiteEchangistePage() {
           </h2>
           <p className={styles.p}>
             Les recherches liées à “<strong>site échangiste sérieux</strong>” concernent souvent : faux profils, manque de respect,
-            exposition non désirée. X-périences répond à ces enjeux avec une logique simple : renforcer la confiance et protéger la communauté.
+            exposition non désirée. X-periences répond à ces enjeux avec une logique simple : renforcer la confiance et protéger la communauté.
           </p>
 
           <ul className={styles.list}>
@@ -193,7 +193,7 @@ export default function SiteEchangistePage() {
       <section className={styles.sectionAlt} aria-labelledby="comment">
         <div className={styles.container}>
           <h2 id="comment" className={styles.h2}>
-            Comment fonctionne X-périences ?
+            Comment fonctionne X-periences ?
           </h2>
 
           <ol className={styles.steps}>
@@ -219,7 +219,7 @@ export default function SiteEchangistePage() {
       <section className={styles.section} aria-labelledby="faq">
         <div className={styles.container}>
           <h2 id="faq" className={styles.h2}>
-            FAQ – Site échangiste X-périences
+            FAQ – Site échangiste X-periences
           </h2>
 
           <div className={styles.faq}>
