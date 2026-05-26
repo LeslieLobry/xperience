@@ -1,108 +1,153 @@
 .connexion-contenant {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    width: 100%;
-    padding: 2rem;
-    box-sizing: border-box;
-    z-index: 1; 
-    overflow: hidden; 
-    color:#f5ece0;
-    gap: 25px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  min-height: 100dvh;
+  width: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
+
+  z-index: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  color: #f5ece0;
+  gap: 18px;
 }
 
 .connexion-contenant::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: url('../../public//images/skin.jpg');
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    opacity: 0.3; 
-    z-index: -1; 
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("../../public/images/skin.jpg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.3;
+  z-index: -1;
 }
 
-.connexion-title{
-    color: #F6D391;
+.connexion-title {
+  color: #f6d391;
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
 }
 
-.form-connexion{
-    display: flex;
-    flex-direction: column;
-    gap: 25px;
+.form-connexion {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+  gap: 18px;
 }
 
 .form-connexion input {
-    padding: 25px;
-    border-radius: 25px;
-    color: #F6D391;
-    font-weight: 900;  
-    opacity: 1; 
-    background-color: transparent;
-    border: 2px #F6D391 solid;
-    /* font-size: 25px; */
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 18px;
+  border-radius: 18px;
+  color: #f6d391;
+  font-weight: 400;
+  opacity: 1;
+  background-color: transparent;
+  border: 2px solid #f6d391;
+  font-size: 16px;
 }
 
-.form-connexion ::placeholder{
-    color: #F6D391;
-    opacity: 1;
+.form-connexion input::placeholder {
+  color: #f6d391;
+  opacity: 1;
 }
 
-.form-connexion :not(:placeholder-shown){
-    background-color: transparent;
+.form-connexion input:not(:placeholder-shown) {
+  background-color: transparent;
 }
 
 .input-wrapper {
   position: relative;
+  width: 100%;
 }
 
 .input-wrapper input {
   width: 100%;
-  padding-right: 40px; 
+  padding-right: 48px;
 }
 
 .toggle-password {
   position: absolute;
-  right: 10px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 32px;
+  height: 32px;
+
   background: none;
   border: none;
-  /* font-size: 1.5rem; */
   cursor: pointer;
-  color: #ccc;
+  color: #e0c084;
+  padding: 0;
 }
 
 .input-email {
-  color: #e0c084!important;       
-  border: 2px solid #F6D391 !important; 
-  font-weight: 900;
-  /* font-size: 25px; */
-  padding: 25px;
-  border-radius: 25px;
+  color: #e0c084 !important;
+  border: 2px solid #f6d391 !important;
+  font-weight: 400;
+  padding: 14px 18px;
+  border-radius: 18px;
   transition: border-color 0.2s, background 0.2s;
+  font-size: 16px;
 }
 
 .input-email::placeholder {
-  color: #e0c084 !important;   
+  color: #e0c084 !important;
   opacity: 1;
 }
 
-input{
-    font-weight: normal !important;
-}
-
-.btn-connection{
-    color: white;
-    font-weight: normal;
-    background-color: #e0c084;
+.btn-connection {
+  color: white;
+  font-weight: normal;
+  background-color: #e0c084;
 }
 
 .button-blanc {
   color: #fff !important;
   font-weight: 400 !important;
+}
+
+.forgot-link {
+  color: #f6d391;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .connexion-contenant {
+    justify-content: flex-start;
+    padding: 2rem 1rem;
+    gap: 16px;
+  }
+
+  .form-connexion {
+    max-width: 100%;
+    gap: 16px;
+  }
+
+  .form-connexion input,
+  .input-email {
+    padding: 13px 16px;
+    border-radius: 16px;
+    font-size: 16px;
+  }
 }
