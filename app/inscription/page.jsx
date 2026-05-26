@@ -5,11 +5,12 @@ import Button from "../../components/Button/Button";
 import "../inscription/inscription.css";
 import Select from "react-select";
 import { useRouter } from "next/navigation";
-import { getCoordsFromVille } from "../../lib/getCoordsFromVille"; // Adapte si besoin
+import { getCoordsFromVille } from "../../lib/getCoordsFromVille";
 
 export default function RegisterForm() {
   const [step, setStep] = useState(1);
   const [captchaToken, setCaptchaToken] = useState(null);
+
   const [form, setForm] = useState({
     nom: "",
     prenom: "",
@@ -39,7 +40,6 @@ export default function RegisterForm() {
   const debounceTimeout = useRef(null);
   const router = useRouter();
 
-  // --- AUTOCOMPLETE VILLE MONDE ---
   const handleLocalisationChange = (e) => {
     const value = e.target.value;
     setLocalisationInput(value);
@@ -55,6 +55,7 @@ export default function RegisterForm() {
               value
             )}&limit=5&boost=population&fields=nom,centre,departement,codeDepartement`
           );
+
           const dataFr = await resFr.json();
 
           if (Array.isArray(dataFr) && dataFr.length > 0) {
@@ -84,7 +85,9 @@ export default function RegisterForm() {
               },
             }
           );
+
           const data = await res.json();
+
           setSuggestions(
             (data?.data || []).map((v) => ({
               label: `${v.city}${
@@ -110,6 +113,7 @@ export default function RegisterForm() {
 
   const handleVilleSelect = (villeObj) => {
     const isFrance = villeObj.country === "France";
+
     const labelAffichee = isFrance
       ? `${villeObj.city}${villeObj.deptCode ? ` (${villeObj.deptCode})` : ""}`
       : villeObj.label;
@@ -123,17 +127,18 @@ export default function RegisterForm() {
       deptCode: villeObj.deptCode || null,
       region: villeObj.region || null,
     }));
+
     setLocalisationInput(labelAffichee);
     setSuggestions([]);
   };
 
-  /** 🔧 handleChange : on force l'email en minuscules */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
     let newValue = type === "checkbox" ? checked : value;
 
     if (name === "email") {
-      newValue = value.toLowerCase(); // <-- tout en minuscules
+      newValue = value.toLowerCase();
     }
 
     setForm((prev) => ({
@@ -144,10 +149,12 @@ export default function RegisterForm() {
 
   const handleRechercheChange = (e) => {
     const value = e.target.value;
+
     setForm((prev) => {
       const recherche = prev.recherche.includes(value)
         ? prev.recherche.filter((v) => v !== value)
         : [...prev.recherche, value];
+
       return { ...prev, recherche };
     });
   };
@@ -168,6 +175,7 @@ export default function RegisterForm() {
   const prevStep = () => setStep((s) => s - 1);
 
   const isValidName = (name) => /^[A-Za-zÀ-ÿ' -]{2,}$/.test(name);
+
   const isPseudoEmailLike = (pseudo) => {
     if (!pseudo) return false;
     const emailRegex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -177,58 +185,68 @@ export default function RegisterForm() {
   const validateStep = () => {
     if (step === 1) {
       const { nom, prenom, pseudo, email, password, confirmPassword } = form;
-      if (!nom || !prenom || !pseudo || !email || !password || !confirmPassword)
-        return setError("Merci de remplir tous les champs requis."), false;
-      if (!isValidName(nom) || !isValidName(prenom))
-        return (
-          setError(
-            "Le nom et le prénom doivent contenir uniquement des lettres."
-          ),
-          false
-        );
 
-      if (isPseudoEmailLike(pseudo))
-        return (
-          setError("Votre pseudo ne peut pas contenir d'adresse email."), false
+      if (!nom || !prenom || !pseudo || !email || !password || !confirmPassword) {
+        setError("Merci de remplir tous les champs requis.");
+        return false;
+      }
+
+      if (!isValidName(nom) || !isValidName(prenom)) {
+        setError("Le nom et le prénom doivent contenir uniquement des lettres.");
+        return false;
+      }
+
+      if (isPseudoEmailLike(pseudo)) {
+        setError("Votre pseudo ne peut pas contenir d'adresse email.");
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Les mots de passe ne correspondent pas.");
+        return false;
+      }
+
+      if (!isPasswordStrong(password)) {
+        setError(
+          "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial."
         );
-      if (password !== confirmPassword)
-        return setError("Les mots de passe ne correspondent pas."), false;
-      if (!isPasswordStrong(password))
-        return setError("Le mot de passe n'est pas assez sécurisé."), false;
+        return false;
+      }
     }
 
     if (step === 2) {
-      if (!form.type || !form.orientation)
-        return (
-          setError("Merci de sélectionner un type et une orientation."), false
-        );
+      if (!form.type || !form.orientation) {
+        setError("Merci de sélectionner un type et une orientation.");
+        return false;
+      }
     }
 
     if (step === 3) {
-      if (!form.age || !form.consent || !form.localisation || !photo)
-        return (
-          setError(
-            "Merci de compléter tous les champs requis, photo comprise."
-          ),
-          false
-        );
+      if (!form.age || !form.consent || !form.localisation || !photo) {
+        setError("Merci de compléter tous les champs requis, photo comprise.");
+        return false;
+      }
     }
 
     setError("");
     return true;
   };
 
-  // --- Envoi Form ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!captchaToken) return setError("Merci de valider le reCAPTCHA.");
+    if (!captchaToken) {
+      setError("Merci de valider le reCAPTCHA.");
+      return;
+    }
+
     if (!validateStep()) return;
 
     try {
       setLoading(true);
+
       const formData = new FormData();
 
       let latitude = form.latitude;
@@ -244,10 +262,7 @@ export default function RegisterForm() {
         }
       }
 
-      // 🔧 on renormalise l'email au cas où
-      const normalizedEmail = form.email
-        ? form.email.toLowerCase().trim()
-        : "";
+      const normalizedEmail = form.email ? form.email.toLowerCase().trim() : "";
 
       Object.entries({
         ...form,
@@ -275,6 +290,7 @@ export default function RegisterForm() {
       });
 
       const result = await res.json();
+
       if (result.success) {
         setSuccess("Inscription réussie !");
         setShowModal(true);
@@ -349,36 +365,40 @@ export default function RegisterForm() {
       <div className="register-background">
         <h1 className="form-title">Inscription</h1>
         <p className="form-step">Étape {step} / 3</p>
+
         <form onSubmit={handleSubmit} className="form-container">
           {error && <p className="form-error">{error}</p>}
           {success && <p className="form-success">{success}</p>}
 
-          {/* ETAPE 1 */}
           {step === 1 && (
             <>
               <input
                 type="text"
                 name="nom"
                 placeholder="Nom"
-                onChange={handleChange}
-                className="form-input"
-              />
-              <input
-                type="text"
-                name="prenom"
-                placeholder="Prénom"
-                onChange={handleChange}
-                className="form-input"
-              />
-              <input
-                type="text"
-                name="pseudo"
-                placeholder="Pseudo"
+                value={form.nom}
                 onChange={handleChange}
                 className="form-input"
               />
 
-              {/* 🔧 email contrôlé + pas de majuscule auto */}
+              <input
+                type="text"
+                name="prenom"
+                placeholder="Prénom"
+                value={form.prenom}
+                onChange={handleChange}
+                className="form-input"
+              />
+
+              <input
+                type="text"
+                name="pseudo"
+                placeholder="Pseudo"
+                value={form.pseudo}
+                onChange={handleChange}
+                className="form-input"
+              />
+
               <input
                 type="email"
                 name="email"
@@ -397,9 +417,11 @@ export default function RegisterForm() {
                   type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Mot de passe"
+                  value={form.password}
                   onChange={handleChange}
                   className="form-input"
                 />
+
                 <button
                   type="button"
                   className="toggle-password"
@@ -418,20 +440,25 @@ export default function RegisterForm() {
                 </button>
               </div>
 
+              <p className="password-help">
+                Le mot de passe doit contenir au moins 8 caractères, une
+                majuscule, une minuscule, un chiffre et un caractère spécial.
+              </p>
+
               <div className="input-wrapper">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   placeholder="Confirmer mot de passe"
+                  value={form.confirmPassword}
                   onChange={handleChange}
                   className="form-input"
                 />
+
                 <button
                   type="button"
                   className="toggle-password"
-                  onClick={() =>
-                    setShowConfirmPassword((prev) => !prev)
-                  }
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
                   aria-label={
                     showConfirmPassword
                       ? "Masquer la confirmation de mot de passe"
@@ -457,7 +484,6 @@ export default function RegisterForm() {
             </>
           )}
 
-          {/* ETAPE 2 */}
           {step === 2 && (
             <>
               <div style={{ width: "100%", maxWidth: "400px" }}>
@@ -515,6 +541,7 @@ export default function RegisterForm() {
                   onClick={prevStep}
                   color="#a2b9c1"
                 />
+
                 <Button
                   type="button"
                   title="Suivant"
@@ -525,7 +552,6 @@ export default function RegisterForm() {
             </>
           )}
 
-          {/* ETAPE 3 */}
           {step === 3 && (
             <>
               <div style={{ position: "relative" }}>
@@ -538,6 +564,7 @@ export default function RegisterForm() {
                   className="form-input"
                   autoComplete="off"
                 />
+
                 {suggestions.length > 0 && (
                   <ul className="suggestions-list">
                     {suggestions.map((ville, i) => (
@@ -552,20 +579,22 @@ export default function RegisterForm() {
                   </ul>
                 )}
               </div>
+
               <input
                 type="number"
                 name="age"
                 placeholder="Âge"
+                value={form.age}
                 onChange={handleChange}
                 className="form-input"
               />
 
               <div className="form-group">
                 <label>
-                  Photo de profil{" "}
-                  <span style={{ color: "#e57c73" }}>*</span> :
+                  Photo de profil <span style={{ color: "#e57c73" }}>*</span> :
                 </label>
                 <br />
+
                 <input
                   type="file"
                   name="photo"
@@ -574,6 +603,7 @@ export default function RegisterForm() {
                   className="form-input"
                 />
               </div>
+
               <label className="form-checkbox">
                 <input
                   type="checkbox"
@@ -583,10 +613,12 @@ export default function RegisterForm() {
                 />
                 J’accepte les CGU et j’ai plus de 18 ans.
               </label>
+
               <ReCAPTCHA
                 sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
                 onChange={setCaptchaToken}
               />
+
               <div className="form-buttons">
                 <Button
                   type="button"
@@ -594,8 +626,9 @@ export default function RegisterForm() {
                   onClick={prevStep}
                   color="#888"
                 />
+
                 <Button
-                  title="Créer mon compte"
+                  title={loading ? "Création..." : "Créer mon compte"}
                   type="submit"
                   color="#e0c084"
                   disabled={loading}
@@ -603,18 +636,15 @@ export default function RegisterForm() {
               </div>
             </>
           )}
+
           {showModal && (
             <div className="modal-overlay">
               <div className="modal-content">
                 <h3>🎉 Inscription réussie !</h3>
                 <p>Un email de confirmation vous a été envoyé.</p>
-                <p>
-                  Merci de cliquer sur le lien pour activer votre compte.
-                </p>
-                <button
-                  onClick={handleModalConfirm}
-                  className="btn-modal"
-                >
+                <p>Merci de cliquer sur le lien pour activer votre compte.</p>
+
+                <button onClick={handleModalConfirm} className="btn-modal">
                   OK
                 </button>
               </div>
