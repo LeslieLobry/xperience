@@ -425,6 +425,7 @@ export default function RegisterForm() {
                   value={form.password}
                   onChange={handleChange}
                   className="form-input"
+                  style={{ width: "100%" }}
                 />
 
                 <button
@@ -568,6 +569,7 @@ export default function RegisterForm() {
                   onChange={handleLocalisationChange}
                   className="form-input"
                   autoComplete="off"
+                  style={{ width: "100%" }}
                 />
 
                 {suggestions.length > 0 && (
