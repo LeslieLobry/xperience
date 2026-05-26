@@ -221,12 +221,17 @@ export default function RegisterForm() {
       }
     }
 
-    if (step === 3) {
-      if (!form.age || !form.consent || !form.localisation || !photo) {
-        setError("Merci de compléter tous les champs requis, photo comprise.");
-        return false;
-      }
-    }
+   if (step === 3) {
+  if (!form.age || !form.consent || !form.localisation || !photo) {
+    setError("Merci de compléter tous les champs requis, photo comprise.");
+    return false;
+  }
+
+  if (Number(form.age) < 18 || Number(form.age) > 99) {
+    setError("L'âge doit être compris entre 18 et 99 ans.");
+    return false;
+  }
+}
 
     setError("");
     return true;
@@ -587,6 +592,8 @@ export default function RegisterForm() {
                 value={form.age}
                 onChange={handleChange}
                 className="form-input"
+                min="18"
+                 max="99"  
               />
 
               <div className="form-group">
