@@ -15,6 +15,7 @@ function hasOneDayPassed() {
     return true;
   }
 }
+
 function markSeenNow() {
   try {
     localStorage.setItem(LS_LAST_SEEN_KEY, Date.now().toString());
@@ -23,7 +24,9 @@ function markSeenNow() {
 
 function isActive(a) {
   const on = !!a?.actif;
-  const notExpired = !a?.expireAt || new Date(a.expireAt).getTime() >= Date.now();
+  const notExpired =
+    !a?.expireAt || new Date(a.expireAt).getTime() >= Date.now();
+
   return on && notExpired;
 }
 
@@ -36,7 +39,7 @@ export default function LoaderAnnonce() {
   const abortRef = useRef(null);
   const timerRef = useRef(null);
 
-  // ✅ mémorise l'overflow précédent pour le restaurer proprement
+  // mémorise l'overflow précédent pour le restaurer proprement
   const prevOverflowRef = useRef(null);
 
   // index courant dans la file d'annonces
@@ -53,54 +56,57 @@ export default function LoaderAnnonce() {
           cache: "no-store",
           signal: controller.signal,
         });
+
         if (!res.ok) {
           setError(`HTTP ${res.status}`);
           return;
         }
+
         const text = await res.text();
         const json = text ? JSON.parse(text) : { data: [] };
         const data = Array.isArray(json?.data) ? json.data : [];
+
         setAnnonces(data);
       } catch (e) {
-        if (e?.name !== "AbortError") setError(e.message || "fetch error");
+        if (e?.name !== "AbortError") {
+          setError(e.message || "fetch error");
+        }
       }
     })();
 
     return () => controller.abort();
   }, []);
 
-  // File d'annonces à afficher (actives & non expirées)
+  // File d'annonces à afficher
   const queue = useMemo(() => {
     return (annonces || []).filter(isActive);
   }, [annonces]);
 
   const current = queue[idx] || null;
 
-  // ✅ Décider d'afficher (une fois par jour)
+  // Décider d'afficher (une fois par jour)
   useEffect(() => {
     if (!current) return;
     if (!hasOneDayPassed()) return;
+
     setVisible(true);
   }, [current]);
 
-  // ✅ Lock/Unlock scroll basé sur "visible"
-  // (évite le bug où le scroll reste bloqué après fermeture)
+  // Lock / Unlock scroll
   useEffect(() => {
     if (!visible) {
-      // unlock
       if (prevOverflowRef.current !== null) {
         document.body.style.overflow = prevOverflowRef.current;
         prevOverflowRef.current = null;
       }
+
       return;
     }
 
-    // lock
     prevOverflowRef.current = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
-      // sécurité si unmount pendant visible
       if (prevOverflowRef.current !== null) {
         document.body.style.overflow = prevOverflowRef.current;
         prevOverflowRef.current = null;
@@ -108,9 +114,8 @@ export default function LoaderAnnonce() {
     };
   }, [visible]);
 
-  // Avancer à l’annonce suivante ou fermer si fin
+  // Passer à l'annonce suivante
   const closeOrNext = useCallback(() => {
-    // Efface le timer courant
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -120,19 +125,24 @@ export default function LoaderAnnonce() {
       setIdx((i) => i + 1);
     } else {
       setVisible(false);
-      markSeenNow(); // on a montré le “lot” du jour
+      markSeenNow();
     }
   }, [idx, queue.length]);
 
-  // Auto-hide par annonce (durée propre)
+  // Auto hide
   useEffect(() => {
     if (!visible || !current) return;
-    const autoHideMs = Number.isFinite(current.durationMs) ? current.durationMs : 6000;
+
+    const autoHideMs = Number.isFinite(current.durationMs)
+      ? current.durationMs
+      : 6000;
+
     if (autoHideMs > 0) {
       timerRef.current = setTimeout(() => {
         closeOrNext();
       }, autoHideMs);
     }
+
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -141,15 +151,19 @@ export default function LoaderAnnonce() {
     };
   }, [visible, current, closeOrNext]);
 
-  // Click dehors + ESC → passe à la suivante
+  // Click extérieur + ESC
   useEffect(() => {
     if (!visible) return;
 
     const onClick = (e) => {
-      if (contenuRef.current && !contenuRef.current.contains(e.target)) {
+      if (
+        contenuRef.current &&
+        !contenuRef.current.contains(e.target)
+      ) {
         closeOrNext();
       }
     };
+
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         closeOrNext();
@@ -158,6 +172,7 @@ export default function LoaderAnnonce() {
 
     window.addEventListener("click", onClick);
     window.addEventListener("keydown", onKeyDown);
+
     return () => {
       window.removeEventListener("click", onClick);
       window.removeEventListener("keydown", onKeyDown);
@@ -170,12 +185,14 @@ export default function LoaderAnnonce() {
   const overlayStyle = {
     backgroundColor: current.overlayColor || "rgba(0,0,0,.6)",
   };
+
   const boxStyle = {
     background: current.bgColor || "white",
     borderRadius: (current.borderRadiusPx ?? 16) + "px",
     maxWidth: (current.maxWidthPx ?? 520) + "px",
     position: "relative",
   };
+
   const pStyle = {
     color: current.textColor || "#e0c084",
     fontSize: (current.fontSizePx ?? 36) + "px",
@@ -190,7 +207,11 @@ export default function LoaderAnnonce() {
       aria-modal="true"
       aria-label="Annonce"
     >
-      <div className="loader-contenu fade-in" style={boxStyle} ref={contenuRef}>
+      <div
+        className="loader-contenu fade-in"
+        style={boxStyle}
+        ref={contenuRef}
+      >
         {/* bouton fermer */}
         <button
           aria-label="Fermer l’annonce"
@@ -211,11 +232,20 @@ export default function LoaderAnnonce() {
 
         <p style={pStyle}>
           <strong>{current.titre}</strong>
+
           <br />
-          {current.message}
+
+          {current.message
+            ?.split("\n")
+            .map((line, index) => (
+              <span key={index}>
+                {line}
+                <br />
+              </span>
+            ))}
         </p>
 
-        {/* barre d’actions (facultative) */}
+        {/* barre d’actions */}
         {queue.length > 1 && (
           <div
             style={{
@@ -229,10 +259,15 @@ export default function LoaderAnnonce() {
             <small style={{ opacity: 0.7 }}>
               {idx + 1} / {queue.length}
             </small>
+
             <button
               onClick={closeOrNext}
               className="btn btn-secondary"
-              style={{ padding: "6px 10px", borderRadius: 8, cursor: "pointer" }}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
             >
               Suivant
             </button>
