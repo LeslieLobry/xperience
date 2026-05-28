@@ -52,6 +52,21 @@
   border-radius: 16px;
   flex-shrink: 0;
 }
+.blog-article-image-wrapper {
+  width: 160px;
+  height: 110px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.blog-article-image-wrapper img {
+  width: 160px;
+  height: 110px;
+  object-fit: cover;
+  display: block;
+  border-radius: 16px;
+}
 .blog-admin-button::after {
   content: "";
   position: absolute;

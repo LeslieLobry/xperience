@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import DeleteArticleButton from "../../components/DeleteArticleButton/DeleteArticleButton";
 import "./blog.css";
 import { getUserFromToken } from "../../lib/auth";
+import ArticleImagesWithPresign from "./[slug]/ArticleImagesWithPresign";
 
 const secret = process.env.JWT_SECRET;
 
@@ -18,19 +19,18 @@ export default async function BlogPage() {
     orderBy: {
       createdAt: "desc",
     },
-
     select: {
       id: true,
       slug: true,
       titre: true,
       description: true,
       createdAt: true,
-
       images: {
         take: 1,
-
         select: {
+          id: true,
           url: true,
+          articleId: true,
         },
       },
     },
@@ -56,18 +56,16 @@ export default async function BlogPage() {
                 href={`/blog/${article.slug}`}
                 className="blog-article-link"
               >
-                {article.images?.[0]?.url && (
-                  <img
-                    src={article.images[0].url}
-                    alt={article.titre}
-                    className="blog-article-image"
-                  />
+                {article.images?.length > 0 && (
+                  <div className="blog-article-image-wrapper">
+                    <ArticleImagesWithPresign images={article.images} />
+                  </div>
                 )}
 
                 <div className="blog-article-content">
                   <h2>{article.titre}</h2>
 
-                  <p>{article.description}</p>
+                  {article.description && <p>{article.description}</p>}
 
                   <small>
                     Publié le{" "}
