@@ -40,7 +40,22 @@
     font-size: 1.1em;
     line-height: 1.6;
   }
+.article-images {
+  width: 100%;
+  max-width: 900px;
+  margin: 2rem auto;
+  display: flex;
+  justify-content: center;
+}
 
+.article-image {
+  width: 100%;
+  max-width: 900px;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 18px;
+  display: block;
+}
   .back-to-blog-button {
   display: inline-block;
   margin-bottom: 2rem;
