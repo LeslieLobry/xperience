@@ -57,9 +57,11 @@ export default async function BlogPage() {
                 className="blog-article-link"
               >
                 {article.images?.length > 0 && (
-                  <div className="blog-article-image-wrapper">
-                    <ArticleImagesWithPresign images={article.images} />
-                  </div>
+                  <ArticleImagesWithPresign
+                    images={article.images}
+                    variant="blog"
+                    alt={article.titre}
+                  />
                 )}
 
                 <div className="blog-article-content">

@@ -2,49 +2,69 @@
 
 import { useState, useEffect } from "react";
 
-export default function ArticleImagesWithPresign({ images }) {
+export default function ArticleImagesWithPresign({
+  images = [],
+  variant = "article",
+  alt = "Illustration",
+}) {
   const [urls, setUrls] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
+
+    if (!images || images.length === 0) {
+      setUrls([]);
+      return;
+    }
+
     Promise.all(
       images.map((img) =>
         fetch("/api/photos/presign", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: img.url }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            key: img.url,
+          }),
         })
-          .then(res => res.json())
-          .then(data => data.url || "/default.jpg")
+          .then((res) => res.json())
+          .then((data) => data.url || "/default.jpg")
           .catch(() => "/default.jpg")
       )
     ).then((result) => {
-      if (isMounted) setUrls(result);
+      if (isMounted) {
+        setUrls(result);
+      }
     });
+
     return () => {
       isMounted = false;
     };
   }, [images]);
 
+  if (urls.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="article-images">
+    <div
+      className={
+        variant === "blog"
+          ? "blog-article-image-wrapper"
+          : "article-images"
+      }
+    >
       {urls.map((url, index) => (
         <img
           key={index}
           src={url}
-          alt={`Illustration ${index + 1}`}
-          className="article-image"
-          // style={{
-          //   maxWidth: "100%",
-          //   margin: "10px 0",
-          //   borderRadius: "10px",
-          //   objectFit: "cover",
-          //   width: "350px",
-          //   height: "350px"
-          // }}
-          // width={350}
-          // height={350}
-          
+          alt={`${alt} ${index + 1}`}
+          className={
+            variant === "blog"
+              ? "blog-article-image"
+              : "article-image"
+          }
         />
       ))}
     </div>
