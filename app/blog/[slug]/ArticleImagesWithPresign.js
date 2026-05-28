@@ -34,16 +34,17 @@ export default function ArticleImagesWithPresign({ images }) {
           src={url}
           alt={`Illustration ${index + 1}`}
           className="article-image"
-          style={{
-            maxWidth: "100%",
-            margin: "10px 0",
-            borderRadius: "10px",
-            objectFit: "cover",
-            width: "350px",
-            height: "350px"
-          }}
-          width={350}
-          height={350}
+          // style={{
+          //   maxWidth: "100%",
+          //   margin: "10px 0",
+          //   borderRadius: "10px",
+          //   objectFit: "cover",
+          //   width: "350px",
+          //   height: "350px"
+          // }}
+          // width={350}
+          // height={350}
+          
         />
       ))}
     </div>
