@@ -19,14 +19,17 @@ export default async function BlogPage() {
     orderBy: {
       createdAt: "desc",
     },
+
     select: {
       id: true,
       slug: true,
       titre: true,
       description: true,
       createdAt: true,
+
       images: {
         take: 1,
+
         select: {
           id: true,
           url: true,
@@ -67,7 +70,9 @@ export default async function BlogPage() {
                 <div className="blog-article-content">
                   <h2>{article.titre}</h2>
 
-                  {article.description && <p>{article.description}</p>}
+                  {article.description && (
+                    <p>{article.description}</p>
+                  )}
 
                   <small>
                     Publié le{" "}
@@ -78,7 +83,10 @@ export default async function BlogPage() {
 
               {isAdmin && (
                 <div className="admin-actions">
-                  <Link href={`/admin/blog/editer/${article.id}`}>
+                  <Link
+                    href={`/admin/blog/editer/${article.id}`}
+                    className="admin-edit-button"
+                  >
                     ✏️ Modifier
                   </Link>
 
