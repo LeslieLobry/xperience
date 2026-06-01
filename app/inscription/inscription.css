@@ -71,7 +71,6 @@ input,
 select {
     width: 100%;
     max-width: 400px;
-    font-size: 1.6rem;
     padding: 0.5rem;
     box-sizing: border-box;
     border-radius: 8px;
