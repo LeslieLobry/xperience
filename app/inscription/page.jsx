@@ -559,7 +559,7 @@ export default function RegisterForm() {
 
           {step === 3 && (
             <>
-              <div style={{ position: "relative" }}>
+              <div style={{ position: "relative", width: "100%"}}>
                 <input
                   type="text"
                   name="localisation"
