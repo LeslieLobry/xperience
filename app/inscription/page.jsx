@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useRef } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import Button from "../../components/Button/Button";
@@ -23,6 +24,11 @@ export default function RegisterForm() {
     sexe: "",
     recherche: [],
     localisation: "",
+    latitude: undefined,
+    longitude: undefined,
+    country: null,
+    deptCode: null,
+    region: null,
     age: "",
     consent: false,
   });
@@ -37,13 +43,26 @@ export default function RegisterForm() {
 
   const [suggestions, setSuggestions] = useState([]);
   const [localisationInput, setLocalisationInput] = useState("");
+  const [villeSelectionnee, setVilleSelectionnee] = useState(false);
+
   const debounceTimeout = useRef(null);
   const router = useRouter();
 
   const handleLocalisationChange = (e) => {
     const value = e.target.value;
+
     setLocalisationInput(value);
-    setForm((prev) => ({ ...prev, localisation: value }));
+    setVilleSelectionnee(false);
+
+    setForm((prev) => ({
+      ...prev,
+      localisation: value,
+      latitude: undefined,
+      longitude: undefined,
+      country: null,
+      deptCode: null,
+      region: null,
+    }));
 
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
@@ -129,6 +148,7 @@ export default function RegisterForm() {
     }));
 
     setLocalisationInput(labelAffichee);
+    setVilleSelectionnee(true);
     setSuggestions([]);
   };
 
@@ -221,17 +241,22 @@ export default function RegisterForm() {
       }
     }
 
-   if (step === 3) {
-  if (!form.age || !form.consent || !form.localisation || !photo) {
-    setError("Merci de compléter tous les champs requis, photo comprise.");
-    return false;
-  }
+    if (step === 3) {
+      if (!form.age || !form.consent || !form.localisation || !photo) {
+        setError("Merci de compléter tous les champs requis, photo comprise.");
+        return false;
+      }
 
-  if (Number(form.age) < 18 || Number(form.age) > 99) {
-    setError("L'âge doit être compris entre 18 et 99 ans.");
-    return false;
-  }
-}
+      if (!villeSelectionnee || !form.latitude || !form.longitude) {
+        setError("Merci de sélectionner une vraie ville dans la liste proposée.");
+        return false;
+      }
+
+      if (Number(form.age) < 18 || Number(form.age) > 99) {
+        setError("L'âge doit être compris entre 18 et 99 ans.");
+        return false;
+      }
+    }
 
     setError("");
     return true;
@@ -257,13 +282,15 @@ export default function RegisterForm() {
       let latitude = form.latitude;
       let longitude = form.longitude;
 
-      if (typeof latitude === "undefined" || typeof longitude === "undefined") {
+      if (!latitude || !longitude) {
         try {
           const coords = await getCoordsFromVille(form.localisation);
           latitude = coords.latitude;
           longitude = coords.longitude;
         } catch {
-          // ignore
+          setError("Ville invalide. Merci de sélectionner une ville dans la liste.");
+          setLoading(false);
+          return;
         }
       }
 
@@ -275,6 +302,8 @@ export default function RegisterForm() {
         latitude,
         longitude,
       }).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+
         if (Array.isArray(value)) {
           value.forEach((v) => formData.append(`${key}[]`, v));
         } else if (typeof value === "boolean") {
@@ -559,11 +588,11 @@ export default function RegisterForm() {
 
           {step === 3 && (
             <>
-              <div style={{ position: "relative", width: "100%"}}>
+              <div style={{ position: "relative", width: "100%" }}>
                 <input
                   type="text"
                   name="localisation"
-                  placeholder="Ville (Monde entier)"
+                  placeholder="Ville"
                   value={localisationInput}
                   onChange={handleLocalisationChange}
                   className="form-input"
@@ -594,7 +623,7 @@ export default function RegisterForm() {
                 onChange={handleChange}
                 className="form-input"
                 min="18"
-                 max="99"  
+                max="99"
               />
 
               <div className="form-group">

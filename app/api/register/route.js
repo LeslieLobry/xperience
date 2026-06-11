@@ -10,12 +10,15 @@ import { Readable } from "stream";
 import fs from "fs/promises";
 import { logSiteEvent, SITE_EVENT_TYPES } from "../../../lib/siteEvents";
 
+export const runtime = "nodejs";
+
 export const config = {
   api: { bodyParser: false },
 };
 
 function streamFromRequest(request) {
   const reader = request.body.getReader();
+
   return new Readable({
     async read() {
       const { done, value } = await reader.read();
@@ -23,6 +26,38 @@ function streamFromRequest(request) {
       this.push(value);
     },
   });
+}
+
+function getField(fields, key) {
+  const value = fields[key];
+  if (Array.isArray(value)) return String(value[0] || "").trim();
+  return String(value || "").trim();
+}
+
+function isValidLatitude(value) {
+  return Number.isFinite(value) && value >= -90 && value <= 90;
+}
+
+function isValidLongitude(value) {
+  return Number.isFinite(value) && value >= -180 && value <= 180;
+}
+
+function isForbiddenLocation(value) {
+  const clean = String(value || "").toLowerCase().trim();
+
+  const forbidden = [
+    "monde entier",
+    "partout",
+    "toute la france",
+    "france entière",
+    "france entiere",
+    "n'importe où",
+    "n importe ou",
+    "inconnu",
+    "unknown",
+  ];
+
+  return forbidden.includes(clean);
 }
 
 export async function POST(req) {
@@ -38,6 +73,7 @@ export async function POST(req) {
     form.parse(nodeReq, async (err, fields, files) => {
       if (err) {
         console.error("❌ Erreur parsing formulaire :", err);
+
         return resolve(
           NextResponse.json(
             { success: false, message: "Erreur parsing" },
@@ -50,31 +86,96 @@ export async function POST(req) {
         console.log("📩 Champs reçus :", fields);
         console.log("🖼️ Fichiers reçus :", files);
 
-        const nom = String(fields.nom || "");
-        const prenom = String(fields.prenom || "");
-        const pseudo = String(fields.pseudo || "").trim();
+        const nom = getField(fields, "nom");
+        const prenom = getField(fields, "prenom");
+        const pseudo = getField(fields, "pseudo");
 
-        const rawEmail = String(fields.email || "");
-        const email = rawEmail.toLowerCase().trim();
+        const email = getField(fields, "email").toLowerCase();
+        const password = getField(fields, "password");
+        const type = getField(fields, "type");
+        const orientation = getField(fields, "orientation");
 
-        const password = String(fields.password || "");
-        const type = String(fields.type || "");
-        const orientation = String(fields.orientation || "");
-        const age = parseInt(fields.age || "0", 10);
-        const localisation = String(fields.localisation || "");
-        const latitude = parseFloat(fields.latitude || "");
-        const longitude = parseFloat(fields.longitude || "");
-        const consent = fields.consent === "true";
-        const captchaToken = String(fields.captchaToken || "");
+        const age = parseInt(getField(fields, "age") || "0", 10);
+
+        const localisation = getField(fields, "localisation");
+        const latitude = parseFloat(getField(fields, "latitude"));
+        const longitude = parseFloat(getField(fields, "longitude"));
+
+        const country = getField(fields, "country") || null;
+        const deptCode = getField(fields, "deptCode") || null;
+        const region = getField(fields, "region") || null;
+
+        const consent = getField(fields, "consent") === "true";
+        const captchaToken = getField(fields, "captchaToken");
 
         const recherche = fields["recherche[]"]
           ? Array.isArray(fields["recherche[]"])
-            ? fields["recherche[]"]
-            : [fields["recherche[]"]]
+            ? fields["recherche[]"].map((v) => String(v).trim()).filter(Boolean)
+            : [String(fields["recherche[]"]).trim()]
           : [];
 
+        if (
+          !nom ||
+          !prenom ||
+          !pseudo ||
+          !email ||
+          !password ||
+          !type ||
+          !orientation ||
+          !age ||
+          !localisation
+        ) {
+          return resolve(
+            NextResponse.json(
+              { success: false, message: "Merci de remplir tous les champs obligatoires." },
+              { status: 400 }
+            )
+          );
+        }
+
+        if (isForbiddenLocation(localisation)) {
+          return resolve(
+            NextResponse.json(
+              {
+                success: false,
+                message: "Merci de sélectionner une vraie ville, pas une zone générale.",
+              },
+              { status: 400 }
+            )
+          );
+        }
+
+        if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+          return resolve(
+            NextResponse.json(
+              {
+                success: false,
+                message: "Merci de sélectionner une vraie ville dans la liste proposée.",
+              },
+              { status: 400 }
+            )
+          );
+        }
+
+        if (age < 18 || age > 99) {
+          return resolve(
+            NextResponse.json(
+              { success: false, message: "L'âge doit être compris entre 18 et 99 ans." },
+              { status: 400 }
+            )
+          );
+        }
+
+        if (!consent) {
+          return resolve(
+            NextResponse.json(
+              { success: false, message: "Vous devez accepter les CGU et confirmer votre majorité." },
+              { status: 400 }
+            )
+          );
+        }
+
         if (!captchaToken) {
-          console.warn("⚠️ Captcha manquant");
           return resolve(
             NextResponse.json(
               { success: false, message: "Captcha manquant" },
@@ -84,6 +185,7 @@ export async function POST(req) {
         }
 
         console.log("🔐 Vérification reCAPTCHA...");
+
         const captchaRes = await fetch(
           "https://www.google.com/recaptcha/api/siteverify",
           {
@@ -106,6 +208,7 @@ export async function POST(req) {
         }
 
         console.log("🔍 Vérification utilisateur existant...");
+
         const exists = await prisma.utilisateur.findFirst({
           where: {
             OR: [{ email }, { pseudo }],
@@ -113,7 +216,6 @@ export async function POST(req) {
         });
 
         if (exists) {
-          console.warn("❌ Utilisateur déjà existant :", { email, pseudo });
           return resolve(
             NextResponse.json(
               { success: false, message: "Email ou pseudo déjà utilisé" },
@@ -123,89 +225,102 @@ export async function POST(req) {
         }
 
         console.log("🔒 Hash du mot de passe...");
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         let photoUrl = null;
+
         const photoFile = Array.isArray(files.photo)
           ? files.photo[0]
           : files.photo;
 
-        if (photoFile && photoFile.filepath) {
-          try {
-            console.log("📂 Lecture du fichier image...");
-            const buffer = await fs.readFile(photoFile.filepath);
+        if (!photoFile || !photoFile.filepath) {
+          return resolve(
+            NextResponse.json(
+              { success: false, message: "Photo de profil obligatoire." },
+              { status: 400 }
+            )
+          );
+        }
 
-            console.log("🔎 Modération de la photo avec Sightengine...");
-            const moderationForm = new FormData();
-            moderationForm.append(
-              "media",
-              new Blob([buffer], { type: photoFile.mimetype }),
-              photoFile.originalFilename
-            );
-            moderationForm.append("models", "face-attributes");
-            moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
-            moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
+        try {
+          console.log("📂 Lecture du fichier image...");
+          const buffer = await fs.readFile(photoFile.filepath);
 
-            const moderationRes = await fetch(
-              "https://api.sightengine.com/1.0/check.json",
-              {
-                method: "POST",
-                body: moderationForm,
-              }
-            );
+          console.log("🔎 Modération de la photo avec Sightengine...");
 
-            const moderationData = await moderationRes.json();
-            console.log("📄 Résultat Sightengine :", moderationData);
+          const moderationForm = new FormData();
 
-            if (moderationData?.faces?.length) {
-              const hasMinor = moderationData.faces.some(
-                (f) => f.attributes?.minor > 0.8
-              );
+          moderationForm.append(
+            "media",
+            new Blob([buffer], { type: photoFile.mimetype }),
+            photoFile.originalFilename
+          );
 
-              if (hasMinor) {
-                console.warn("🚫 Visage potentiellement mineur détecté");
-                return resolve(
-                  NextResponse.json(
-                    {
-                      success: false,
-                      message:
-                        "Photo refusée : une personne semble avoir moins de 18 ans.",
-                    },
-                    { status: 400 }
-                  )
-                );
-              }
+          moderationForm.append("models", "face-attributes");
+          moderationForm.append("api_user", process.env.SIGHTENGINE_USER);
+          moderationForm.append("api_secret", process.env.SIGHTENGINE_SECRET);
+
+          const moderationRes = await fetch(
+            "https://api.sightengine.com/1.0/check.json",
+            {
+              method: "POST",
+              body: moderationForm,
             }
+          );
 
-            const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
-            const bucket = process.env.AWS_S3_BUCKET;
+          const moderationData = await moderationRes.json();
+          console.log("📄 Résultat Sightengine :", moderationData);
 
-            console.log("☁️ Envoi vers S3 :", filename);
-            await s3.send(
-              new PutObjectCommand({
-                Bucket: bucket,
-                Key: filename,
-                Body: Buffer.from(buffer),
-                ContentType: photoFile.mimetype,
-              })
+          if (moderationData?.faces?.length) {
+            const hasMinor = moderationData.faces.some(
+              (f) => f.attributes?.minor > 0.8
             );
 
-            photoUrl = filename;
-            console.log("✅ Upload S3 réussi :", photoUrl);
-          } catch (uploadErr) {
-            console.error("💥 Erreur upload photo :", uploadErr);
-            return resolve(
-              NextResponse.json(
-                { success: false, message: "Erreur upload photo" },
-                { status: 500 }
-              )
-            );
+            if (hasMinor) {
+              return resolve(
+                NextResponse.json(
+                  {
+                    success: false,
+                    message:
+                      "Photo refusée : une personne semble avoir moins de 18 ans.",
+                  },
+                  { status: 400 }
+                )
+              );
+            }
           }
-        } else {
-          console.warn("⚠️ Aucun fichier photo reçu");
+
+          const filename = `photo_${Date.now()}_${photoFile.originalFilename}`;
+          const bucket = process.env.AWS_S3_BUCKET;
+
+          console.log("☁️ Envoi vers S3 :", filename);
+
+          await s3.send(
+            new PutObjectCommand({
+              Bucket: bucket,
+              Key: filename,
+              Body: Buffer.from(buffer),
+              ContentType: photoFile.mimetype,
+            })
+          );
+
+          photoUrl = filename;
+
+          console.log("✅ Upload S3 réussi :", photoUrl);
+        } catch (uploadErr) {
+          console.error("💥 Erreur upload photo :", uploadErr);
+
+          return resolve(
+            NextResponse.json(
+              { success: false, message: "Erreur upload photo" },
+              { status: 500 }
+            )
+          );
         }
 
         console.log("👤 Création de l'utilisateur...");
+
         const newUser = await prisma.utilisateur.create({
           data: {
             nom,
@@ -223,16 +338,14 @@ export async function POST(req) {
             consentCGU: consent,
             consentCGUDate: new Date(),
             photoUrl,
-            verificationDeadline: new Date(
-              Date.now() + 48 * 60 * 60 * 1000
-            ),
+            verificationDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000),
+
             recherches: {
               create: recherche.map((label) => ({ label })),
             },
           },
         });
 
-        // ✅ Tracking analytics admin : inscription réussie
         setTimeout(() => {
           logSiteEvent({
             userId: newUser.id,
@@ -241,6 +354,11 @@ export async function POST(req) {
               typeCompte: type || null,
               orientation: orientation || null,
               localisation: localisation || null,
+              latitude,
+              longitude,
+              country,
+              deptCode,
+              region,
             },
           }).catch(console.error);
         }, 0);
@@ -248,6 +366,7 @@ export async function POST(req) {
         const token = uuidv4();
 
         console.log("✉️ Envoi de l'email de confirmation...");
+
         await prisma.emailVerificationToken.create({
           data: {
             email,
@@ -271,10 +390,15 @@ export async function POST(req) {
         console.log("✅ Utilisateur créé avec succès :", newUser.id);
 
         return resolve(
-          NextResponse.json({ success: true, user: newUser, photoUrl })
+          NextResponse.json({
+            success: true,
+            user: newUser,
+            photoUrl,
+          })
         );
       } catch (e) {
         console.error("💥 ERREUR SERVEUR GÉNÉRALE :", e);
+
         return resolve(
           NextResponse.json(
             { success: false, message: "Erreur serveur" },
