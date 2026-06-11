@@ -418,14 +418,19 @@ const customSelectStyles = {
     fontSize: "1.3rem",
   }),
 
-  menu: (base) => ({
-    ...base,
-    backgroundColor: "#171717",
-    border: "1px solid #e0c084",
-    borderRadius: "10px",
-    overflow: "hidden",
-    zIndex: 9999,
-  }),
+menu: (base) => ({
+  ...base,
+  backgroundColor: "#171717",
+  border: "1px solid #e0c084",
+  borderRadius: "10px",
+  overflow: "hidden",
+  zIndex: 99999,
+}),
+
+menuPortal: (base) => ({
+  ...base,
+  zIndex: 99999,
+}),
 
   option: (base, state) => ({
     ...base,
@@ -574,50 +579,56 @@ const customSelectStyles = {
             <>
               <div className="select-wrapper">
                 <Select
-                  options={[
-                    { value: "homme", label: "Homme seul" },
-                    { value: "femme", label: "Femme seule" },
-                    { value: "couple", label: "Couple" },
-                    { value: "autre", label: "Autre" },
-                  ]}
-                  placeholder="Type de compte"
-                  value={
-                    form.type
-                      ? { value: form.type, label: typeLabel(form.type) }
-                      : null
-                  }
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, type: e.value }))
-                  }
-                  styles={customSelectStyles}
-                />
+  options={[
+    { value: "homme", label: "Homme seul" },
+    { value: "femme", label: "Femme seule" },
+    { value: "couple", label: "Couple" },
+    { value: "autre", label: "Autre" },
+  ]}
+  placeholder="Type de compte"
+  value={
+    form.type
+      ? { value: form.type, label: typeLabel(form.type) }
+      : null
+  }
+  onChange={(e) =>
+    setForm((prev) => ({ ...prev, type: e.value }))
+  }
+  styles={customSelectStyles}
+  menuPortalTarget={document.body}
+  menuPosition="fixed"
+  menuPlacement="auto"
+/>
               </div>
 
               <div className="select-wrapper">
                 <Select
-                  options={[
-                    { value: "hetero", label: "Hétéro" },
-                    { value: "bi", label: "Bi" },
-                    { value: "pan", label: "Pan" },
-                    { value: "ouvert", label: "Ouvert" },
-                  ]}
-                  placeholder="Orientation"
-                  value={
-                    form.orientation
-                      ? {
-                          value: form.orientation,
-                          label: orientationLabel(form.orientation),
-                        }
-                      : null
-                  }
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      orientation: e.value,
-                    }))
-                  }
-                  styles={customSelectStyles}
-                />
+  options={[
+    { value: "hetero", label: "Hétéro" },
+    { value: "bi", label: "Bi" },
+    { value: "pan", label: "Pan" },
+    { value: "ouvert", label: "Ouvert" },
+  ]}
+  placeholder="Orientation"
+  value={
+    form.orientation
+      ? {
+          value: form.orientation,
+          label: orientationLabel(form.orientation),
+        }
+      : null
+  }
+  onChange={(e) =>
+    setForm((prev) => ({
+      ...prev,
+      orientation: e.value,
+    }))
+  }
+  styles={customSelectStyles}
+  menuPortalTarget={document.body}
+  menuPosition="fixed"
+  menuPlacement="auto"
+/>
               </div>
 
               <div className="form-buttons">
