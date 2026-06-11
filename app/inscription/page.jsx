@@ -674,9 +674,7 @@ menuPortal: (base) => ({
                 <label>
                   Photo de profil <span style={{ color: "#e57c73" }}>*</span> :
                 </label>
-                <br />
-
-                <input
+                 <input
                   type="file"
                   name="photo"
                   accept="image/*"
