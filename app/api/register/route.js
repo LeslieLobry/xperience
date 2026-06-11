@@ -95,8 +95,6 @@ export async function POST(req) {
         const type = getField(fields, "type");
         const orientation = getField(fields, "orientation");
 
-        const age = parseInt(getField(fields, "age") || "0", 10);
-
         const localisation = getField(fields, "localisation");
         const latitude = parseFloat(getField(fields, "latitude"));
         const longitude = parseFloat(getField(fields, "longitude"));
@@ -122,7 +120,6 @@ export async function POST(req) {
           !password ||
           !type ||
           !orientation ||
-          !age ||
           !localisation
         ) {
           return resolve(
@@ -157,14 +154,6 @@ export async function POST(req) {
           );
         }
 
-        if (age < 18 || age > 99) {
-          return resolve(
-            NextResponse.json(
-              { success: false, message: "L'âge doit être compris entre 18 et 99 ans." },
-              { status: 400 }
-            )
-          );
-        }
 
         if (!consent) {
           return resolve(
@@ -330,7 +319,6 @@ export async function POST(req) {
             password: hashedPassword,
             type,
             orientation,
-            age,
             localisation,
             latitude,
             longitude,

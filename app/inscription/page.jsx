@@ -29,7 +29,6 @@ export default function RegisterForm() {
     country: null,
     deptCode: null,
     region: null,
-    age: "",
     consent: false,
   });
 
@@ -242,20 +241,15 @@ export default function RegisterForm() {
     }
 
     if (step === 3) {
-      if (!form.age || !form.consent || !form.localisation || !photo) {
-        setError("Merci de compléter tous les champs requis, photo comprise.");
-        return false;
-      }
+    if (!form.consent || !form.localisation || !photo) {
+  setError("Merci de compléter tous les champs requis, photo comprise.");
+  return false;
+}
 
-      if (!villeSelectionnee || !form.latitude || !form.longitude) {
-        setError("Merci de sélectionner une vraie ville dans la liste proposée.");
-        return false;
-      }
-
-      if (Number(form.age) < 18 || Number(form.age) > 99) {
-        setError("L'âge doit être compris entre 18 et 99 ans.");
-        return false;
-      }
+if (!villeSelectionnee || !form.latitude || !form.longitude) {
+  setError("Merci de sélectionner une vraie ville dans la liste proposée.");
+  return false;
+}
     }
 
     setError("");
@@ -308,8 +302,6 @@ export default function RegisterForm() {
           value.forEach((v) => formData.append(`${key}[]`, v));
         } else if (typeof value === "boolean") {
           formData.append(key, value ? "true" : "false");
-        } else if (key === "age") {
-          formData.append(key, parseInt(value, 10));
         } else {
           formData.append(key, value);
         }
@@ -677,17 +669,6 @@ menuPortal: (base) => ({
                   </ul>
                 )}
               </div>
-
-              <input
-                type="number"
-                name="age"
-                placeholder="Âge"
-                value={form.age}
-                onChange={handleChange}
-                className="form-input"
-                min="18"
-                max="99"
-              />
 
               <div className="form-group">
                 <label>

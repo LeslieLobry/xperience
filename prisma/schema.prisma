@@ -52,7 +52,7 @@ model Utilisateur {
   password                    String
   type                        String
   orientation                 String
-  age                         Int
+  age                         Int?
   consent                     Boolean
   localisation                String
   latitude                    Float?
