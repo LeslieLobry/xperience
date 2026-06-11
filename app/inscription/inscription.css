@@ -132,7 +132,7 @@ input:not(:placeholder-shown) {
   align-items: center;
   gap: 0.8rem;
   color: #f5ece0;
-  font-size: 1.3rem;
+  font-size: 1rem;
   line-height: 1.4;
 }
 
