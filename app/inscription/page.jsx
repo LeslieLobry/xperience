@@ -651,7 +651,7 @@ menuPortal: (base) => ({
 
           {step === 3 && (
             <>
-              <div style={{ position: "relative", width: "100%" }}>
+              <div className="ville-wrapper" style={{ position: "relative", width: "100%" }}>
                 <input
                   type="text"
                   name="localisation"

@@ -124,7 +124,12 @@ input:not(:placeholder-shown) {
   height: auto;
   min-height: 54px;
 }
-
+.ville-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
 .form-checkbox {
   width: 100%;
   max-width: 400px;
