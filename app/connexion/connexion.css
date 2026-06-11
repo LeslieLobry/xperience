@@ -15,7 +15,7 @@
   overflow-y: auto;
 
   color: #f5ece0;
-  gap: 18px;
+  gap: 1rem;
 }
 
 .connexion-contenant::before {
@@ -31,63 +31,81 @@
 }
 
 .connexion-title {
-  color: #f6d391;
+  color: var(--primary-color);
+  font-size: 2rem;
+  text-align: center;
   margin: 0;
-  font-size: clamp(1.8rem, 5vw, 2.5rem);
 }
 
 .form-connexion {
   display: flex;
   flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 420px;
-  gap: 18px;
-}
-
-.form-connexion input {
-  width: 100%;
+  max-width: 460px;
+  gap: 1rem;
+  padding: 1rem;
   box-sizing: border-box;
-  padding: 14px 18px;
-  border-radius: 18px;
-  color: #f6d391;
+}
+
+.form-connexion input,
+.input-email,
+.form-input {
+  width: 100%;
+  max-width: 400px;
+  min-height: 54px;
+  padding: 0 1rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid #e0c084 !important;
+  background-color: rgba(0, 0, 0, 0.25);
+  color: #f5ece0 !important;
+  font-size: 1.3rem;
   font-weight: 400;
-  opacity: 1;
-  background-color: transparent;
-  border: 2px solid #f6d391;
-  font-size: 16px;
+  outline: none;
 }
 
-.form-connexion input::placeholder {
-  color: #f6d391;
-  opacity: 1;
+.form-connexion input:focus,
+.input-email:focus,
+.form-input:focus {
+  border-color: #f5d89a !important;
+  box-shadow: 0 0 0 2px rgba(224, 192, 132, 0.25);
 }
 
-.form-connexion input:not(:placeholder-shown) {
-  background-color: transparent;
+.form-connexion input::placeholder,
+.input-email::placeholder,
+.form-input::placeholder {
+  color: #e0c084 !important;
+  opacity: 0.9;
+}
+
+.form-connexion input:not(:placeholder-shown),
+.input-email:not(:placeholder-shown),
+.form-input:not(:placeholder-shown) {
+  background-color: rgba(0, 0, 0, 0.25);
 }
 
 .input-wrapper {
   position: relative;
   width: 100%;
+  max-width: 400px;
 }
 
 .input-wrapper input {
   width: 100%;
-  padding-right: 48px;
+  max-width: 400px;
+  padding-right: 45px;
 }
 
 .toggle-password {
   position: absolute;
-  right: 12px;
+  right: 1rem;
   top: 50%;
   transform: translateY(-50%);
 
   display: flex;
   align-items: center;
   justify-content: center;
-
-  width: 32px;
-  height: 32px;
 
   background: none;
   border: none;
@@ -96,25 +114,10 @@
   padding: 0;
 }
 
-.input-email {
-  color: #e0c084 !important;
-  border: 2px solid #f6d391 !important;
-  font-weight: 400;
-  padding: 14px 18px;
-  border-radius: 18px;
-  transition: border-color 0.2s, background 0.2s;
-  font-size: 16px;
-}
-
-.input-email::placeholder {
-  color: #e0c084 !important;
-  opacity: 1;
-}
-
-.btn-connection {
-  color: white;
-  font-weight: normal;
-  background-color: #e0c084;
+.toggle-password svg {
+  display: block;
+  width: 22px;
+  height: 22px;
 }
 
 .button-blanc {
@@ -123,9 +126,9 @@
 }
 
 .forgot-link {
-  color: #f6d391;
+  color: #e0c084;
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
 }
 
 .forgot-link:hover {
@@ -136,18 +139,22 @@
   .connexion-contenant {
     justify-content: flex-start;
     padding: 2rem 1rem;
-    gap: 16px;
+    gap: 1rem;
   }
 
   .form-connexion {
     max-width: 100%;
-    gap: 16px;
+    padding: 1rem;
   }
 
   .form-connexion input,
-  .input-email {
-    padding: 13px 16px;
-    border-radius: 16px;
-    font-size: 16px;
+  .input-email,
+  .form-input,
+  .input-wrapper {
+    max-width: 100%;
+  }
+
+  .connexion-title {
+    font-size: 1.6rem;
   }
 }
