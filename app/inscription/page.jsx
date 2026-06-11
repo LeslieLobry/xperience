@@ -374,26 +374,78 @@ export default function RegisterForm() {
     }
   };
 
-  const customSelectStyles = {
-    control: (base) => ({
-      ...base,
-      backgroundColor: "transparent",
-      borderColor: "#ccc",
-      color: "white",
-      height: "3.5rem",
-      fontSize: "1.6rem",
-    }),
-    menu: (base) => ({
-      ...base,
-      backgroundColor: "#222",
-      color: "white",
-      zIndex: 10,
-    }),
-    singleValue: (base) => ({ ...base, color: "white" }),
-    placeholder: (base) => ({ ...base, color: "white", opacity: 0.7 }),
-    input: (base) => ({ ...base, color: "white" }),
-  };
+const customSelectStyles = {
+  container: (base) => ({
+    ...base,
+    width: "100%",
+  }),
 
+  control: (base) => ({
+    ...base,
+    width: "100%",
+    minHeight: "54px",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    border: "1px solid #e0c084",
+    borderRadius: "10px",
+    boxShadow: "none",
+    cursor: "pointer",
+
+    "&:hover": {
+      borderColor: "#e0c084",
+    },
+  }),
+
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 1rem",
+  }),
+
+  singleValue: (base) => ({
+    ...base,
+    color: "#f5ece0",
+    fontSize: "1.3rem",
+  }),
+
+  placeholder: (base) => ({
+    ...base,
+    color: "#e0c084",
+    fontSize: "1.3rem",
+  }),
+
+  input: (base) => ({
+    ...base,
+    color: "#f5ece0",
+    fontSize: "1.3rem",
+  }),
+
+  menu: (base) => ({
+    ...base,
+    backgroundColor: "#171717",
+    border: "1px solid #e0c084",
+    borderRadius: "10px",
+    overflow: "hidden",
+    zIndex: 9999,
+  }),
+
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isFocused
+      ? "rgba(224,192,132,0.20)"
+      : "#171717",
+    color: "#f5ece0",
+    fontSize: "1.3rem",
+    cursor: "pointer",
+  }),
+
+  dropdownIndicator: (base) => ({
+    ...base,
+    color: "#e0c084",
+  }),
+
+  indicatorSeparator: () => ({
+    display: "none",
+  }),
+};
   return (
     <div className="register-contenant">
       <div className="register-background">
@@ -520,7 +572,7 @@ export default function RegisterForm() {
 
           {step === 2 && (
             <>
-              <div style={{ width: "100%", maxWidth: "400px" }}>
+              <div className="select-wrapper">
                 <Select
                   options={[
                     { value: "homme", label: "Homme seul" },
@@ -541,7 +593,7 @@ export default function RegisterForm() {
                 />
               </div>
 
-              <div style={{ width: "100%", maxWidth: "400px" }}>
+              <div className="select-wrapper">
                 <Select
                   options={[
                     { value: "hetero", label: "Hétéro" },
